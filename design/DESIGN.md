@@ -37,6 +37,12 @@ start. Harness convention: Path.of("casehubio", "<app>", "<case-type>") for
 SettingsScope construction — org segment, app segment, case-type segment — so the
 inheritance chain resolves correctly up through devtown to casehubio.
 
+PathParamConverter and PathParamConverterProvider are shipped in platform/ under
+io.casehub.platform.converter. JAX-RS @Provider enables automatic Jandex discovery.
+Consumer REST endpoints can declare @PathParam and @QueryParam of type Path without
+manual string conversion. fromString() delegates to Path.parse(); toString() returns
+Path.value() preserving the original stripped string.
+
 ## Preferences API
 
 PreferenceKey<T extends Preference> is a record carrying namespace, name, defaultValue,
@@ -66,6 +72,13 @@ in dev/test. Real implementations must be @RequestScoped backed by SecurityIdent
 safely by CDI client proxies. The mock is intentionally @ApplicationScoped — it has
 no request context to read from. @ActivateRequestContext is required before accessing
 CurrentPrincipal in reactive pipelines.
+
+GroupMembershipProvider real implementations should also register as Quarkus
+SecurityIdentityAugmentor. GroupMembershipProvider answers the inverse query (who is in
+group X?); SecurityIdentityAugmentor answers the forward query (what groups is user X in?)
+— both from the same data source. Augmenting SecurityIdentity.getRoles() with casehub
+group memberships makes @RolesAllowed work with casehub groups without manual
+CurrentPrincipal.hasGroup() checks at every call site.
 
 ## Mock Implementation Pattern
 
