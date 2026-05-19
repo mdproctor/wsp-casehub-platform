@@ -15,6 +15,14 @@ consumers. platform/ owns @DefaultBean @ApplicationScoped beans for every SPI,
 each configurable via @ConfigProperty and displaceable by any non-default
 @ApplicationScoped implementation in consumer deployments.
 
+A third module, testing/ (casehub-platform-testing), ships @Alternative @Priority(1)
+fixtures for identity SPIs: FixedCurrentPrincipal and InMemoryGroupMembershipProvider.
+Follows the casehub-work-testing pattern: fixtures live in src/main/java of the testing
+artifact, consumers declare test-scoped dependency, CDI selects automatically. No
+quarkus-arc dependency — CDI API (provided) and Jandex only. Preference testing does
+not require an in-memory fixture — MockPreferenceProvider.get(key) now returns typed
+values via key.parse().
+
 ## Path API
 
 Path is a record with strict validation: segments must be non-blank, no leading,
@@ -31,16 +39,20 @@ inheritance chain resolves correctly up through devtown to casehubio.
 
 ## Preferences API
 
-PreferenceKey<T extends Preference> is a record carrying namespace, name, and
-a compile-time defaultValue. get(key) returns null when no override is configured;
-getOrDefault(key) applies key.defaultValue() automatically, eliminating null checks
-at every call site. Defaults live on the Preference record (e.g. HumanApprovalThreshold.DEFAULT),
-not on the Preferences interface — this keeps defaults discoverable alongside the key
-definition. MapPreferences uses an instanceof guard before casting (not a raw cast):
-a wrong-type map entry returns null rather than ClassCastException, which is the
-correct contract when the mock populates the map with String values from config.
-asMap() returns typed Java values (Integer, Long, Boolean, Double, List, String) —
-not raw strings — so any pluggable ExpressionEvaluator receives the correct type.
+PreferenceKey<T extends Preference> is a record carrying namespace, name, defaultValue,
+and a Function<String, T> parser. key.parse(raw) converts a config string (already
+interpolated) to a typed preference value — the Drools get(String) factory pattern
+colocated with the key definition. This enables MockPreferenceProvider.get(key) to
+return typed values via MapPreferences.get() calling key.parse() on String values,
+eliminating the need for a separate InMemoryPreferenceProvider test fixture. get(key)
+returns null when no override is configured; getOrDefault(key) applies key.defaultValue()
+automatically. Real business defaults live in the harness properties file (future config/
+module); key.defaultValue() is a type-safe null guard only. The Function component breaks
+record value equality — keys must be compared via key.qualifiedName(), not equals().
+MapPreferences uses an instanceof guard before casting: a wrong-type map entry returns null
+rather than ClassCastException. asMap() returns typed Java values (Integer, Long, Boolean,
+Double, List, String) — not raw strings — so any pluggable ExpressionEvaluator receives
+the correct type.
 
 ## Identity API
 
@@ -64,3 +76,12 @@ for groups, Optional<Map<String,String>> for preference defaults) because SmallR
 Config throws NoSuchElementException for absent keys on non-Optional types. @DefaultBean
 yields to any non-default @ApplicationScoped bean, so consumer deployments displace
 the mock by providing their own implementation — no exclusion config required.
+
+PreferenceProvider is permanently read-only — no save() or update() will ever be added.
+The write path is a separate preferences-editor module (future) that writes directly to
+the backend; provider and editor never call each other. This separation holds across all
+provider variants: config/ (YAML + env vars, read-only by nature), persistence-jpa/,
+persistence-mongodb/. The config/ module is the Drools ChainedProperties equivalent —
+each harness ships its own preferences YAML file using the platform's key/value types,
+following the Drools pattern where any domain has its own properties file while sharing
+the OptionKey<T> infrastructure.
