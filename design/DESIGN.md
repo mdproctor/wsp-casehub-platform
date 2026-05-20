@@ -23,6 +23,11 @@ quarkus-arc dependency — CDI API (provided) and Jandex only. Preference testin
 not require an in-memory fixture — MockPreferenceProvider.get(key) now returns typed
 values via key.parse().
 
+A fifth module, config/ (casehub-platform-config), ships ConfigFilePreferenceProvider as
+@ApplicationScoped (no @DefaultBean). This displaces MockPreferenceProvider automatically
+when on the classpath. pom.xml depends on platform-api, quarkus-arc, and snakeyaml
+(Quarkus BOM managed). Jandex plugin enables CDI discovery as a JAR.
+
 ## Path API
 
 Path is a record with strict validation: segments must be non-blank, no leading,
@@ -59,6 +64,14 @@ MapPreferences uses an instanceof guard before casting: a wrong-type map entry r
 rather than ClassCastException. asMap() returns typed Java values (Integer, Long, Boolean,
 Double, List, String) — not raw strings — so any pluggable ExpressionEvaluator receives
 the correct type.
+
+ConfigFilePreferenceProvider reads scope-aware YAML files at @PostConstruct (startup-only).
+YAML format uses explicit scope entries (no key/scope ambiguity). Files processed left to
+right — later wins per key+scope (chaining). ${VAR} interpolation (system property then env
+var) applied after loading. resolve(scope) merges: unscoped YAML → scope hierarchy (root →
+app → case-type) → SmallRye Config overrides (casehub.platform.preferences.defaults.*).
+SmallRye overrides are unscoped — apply to all resolve() calls. Values stored as raw
+strings; key.parse() converts on typed access via MapPreferences.get().
 
 ## Identity API
 
