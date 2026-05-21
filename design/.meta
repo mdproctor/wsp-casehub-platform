@@ -1,0 +1,7 @@
+branch: issue-3-current-principal-request-scoped
+project-sha: 9f186cb10a9b2826d1cbe1b0a8af9c9393b44bfe
+date: 2026-05-21
+issue: 3
+flyway-next-v: none
+design-repo: workspace
+design-section-hashes: b639b9af:## Module Structure|a0daf1a8:## Path API|e04eb669:## Preferences API|37e1b5d4:## Identity API|bfb8e762:## Mock Implementation Pattern|
