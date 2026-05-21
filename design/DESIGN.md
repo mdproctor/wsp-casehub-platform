@@ -86,6 +86,17 @@ safely by CDI client proxies. The mock is intentionally @ApplicationScoped — i
 no request context to read from. @ActivateRequestContext is required before accessing
 CurrentPrincipal in reactive pipelines.
 
+Two abstract methods added to CurrentPrincipal: tenancyId() and isCrossTenantAdmin().
+Both are abstract — not interface defaults — so every implementor is forced at compile
+time to declare a tenancy position. In single-tenant deployments the mock returns
+TenancyConstants.DEFAULT_TENANT_ID (a fixed UUID, configurable via
+casehub.tenancy.default-id); real OIDC-backed implementations will read from the JWT
+tenancyId claim. isCrossTenantAdmin() defaults to false everywhere; the mock exposes
+it via casehub.platform.principal.crossTenantAdmin for local simulation. A companion
+TenancyConstants utility class in platform-api owns the two sentinels
+(DEFAULT_TENANT_ID and PLATFORM_TENANT_ID) so any consumer can import constants
+without depending on the identity SPI itself.
+
 GroupMembershipProvider real implementations should also register as Quarkus
 SecurityIdentityAugmentor. GroupMembershipProvider answers the inverse query (who is in
 group X?); SecurityIdentityAugmentor answers the forward query (what groups is user X in?)
