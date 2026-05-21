@@ -1,15 +1,19 @@
-# Design Journal — issue-17-multitenancy-foundation
+# Design Journal — issue-3-current-principal-request-scoped
 
 ### 2026-05-21 · §Identity API
 
-Two abstract methods added to `CurrentPrincipal`: `tenancyId()` and
-`isCrossTenantAdmin()`. Both are abstract — not interface defaults — so every
-implementor is forced at compile time to declare a tenancy position. In
-single-tenant deployments the mock returns `TenancyConstants.DEFAULT_TENANT_ID`
-(a fixed UUID, configurable via `casehub.tenancy.default-id`); real OIDC-backed
-implementations will read from the JWT `tenancyId` claim. `isCrossTenantAdmin()`
-defaults to `false` everywhere; the mock exposes it via
-`casehub.platform.principal.crossTenantAdmin` for local simulation. A companion
-`TenancyConstants` utility class in `platform-api` owns the two sentinels
-(`DEFAULT_TENANT_ID` and `PLATFORM_TENANT_ID`) so any consumer can import
-constants without depending on the identity SPI itself.
+New `oidc/` module (`casehub-platform-oidc`) ships `OidcCurrentPrincipal @RequestScoped`.
+Follows the `config/` optional-module pattern: plain `@ApplicationScoped`-style bean (no
+`@DefaultBean`), Jandex plugin for CDI library discovery, `quarkus-oidc` compile dep.
+Consumers add the artifact to activate OIDC identity; the mock remains default for everyone
+else — no exclusion config.
+
+Claim names are fixed platform contract: `tenancyId` (required String — throws
+`IllegalStateException` if absent), `crossTenantAdmin` (optional Boolean — defaults
+`false`). Anonymous identity (`identity.isAnonymous() = true`) returns sentinel values
+without touching the JWT. OIDC session configuration for tests: `discovery-enabled=false`
++ `jwks-path` avoids startup connectivity while keeping CDI beans registered for
+`@InjectMock` replacement.
+
+`GroupMembershipProvider` OIDC / `SecurityIdentityAugmentor` is deferred — needs a
+directory (Keycloak Admin API, LDAP), not just the JWT.
