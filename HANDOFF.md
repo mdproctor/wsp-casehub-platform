@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-**Date:** 2026-05-20
+**Date:** 2026-05-21
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -8,11 +8,29 @@
 
 ## Last Session
 
-Five epics completed: `epic-platform-api` (SPIs), `epic-platform-testing` (test fixtures), `epic-quarkus-alignment` (Path ParamConverter, SecurityIdentityAugmentor pattern, Javadoc), `epic-platform-config` (ConfigFilePreferenceProvider — scope-aware YAML + SmallRye Config, 20 tests). Quarkus integration research produced `docs/repos/casehub-platform.md`. Key architecture: `PreferenceKey<T>` carries a `Function<String, T> parser` (Drools pattern), enabling `MockPreferenceProvider.get(key)` to return typed values — eliminating `InMemoryPreferenceProvider`. The `config/` module reads YAML at `@PostConstruct`, resolves scope hierarchy, SmallRye Config overrides win. Issues #1, #4, #5, #10, #11, #12, #13, #15 closed.
+Multi-tenancy foundation landed: `TenancyConstants` (DEFAULT_TENANT_ID UUID,
+PLATFORM_TENANT_ID), `tenancyId()` and `isCrossTenantAdmin()` added to
+`CurrentPrincipal` as abstract methods — compile-time enforcement on every
+implementor. Mock reads both from `@ConfigProperty`; `FixedCurrentPrincipal`
+gets setters and `reset()` support. Two protocols: no conditional tenancy
+filtering (PP-20260520-439daf), bind tenancyId in data access layer only
+(PP-20260520-e6a5f0). Issues closed: #17 (multi-tenancy foundation), #14
+(TenantContext bridge — won't do until needed), #9 (defaultValue — Drools
+convention, keep as-is), #18 (pom.xml module registration).
+Consumer issues filed: engine#299, claudony#121.
 
 ## Immediate Next Step
 
-devtown wires up `casehub-platform-api` in its own repo. Next platform work: `persistence-jpa/` (issue #6) when the time comes — no action needed immediately.
+Wait for parent to finish its cross-cutting concern, then engine#299 and
+claudony#121 can start (tenancyId on entities, scoped repository pattern).
+Platform itself has no blocking work — next platform issue is #16 (OIDC
+CurrentPrincipal) when auth lands, or #6 (persistence-jpa/) when needed.
+
+## Cross-Module
+
+**We're blocking:**
+- `engine` — tenancyId on entities + scoped repository pattern (engine#299) · L · Med
+- `claudony` — same (claudony#121) · L · Med
 
 ## What's Left
 
@@ -24,19 +42,19 @@ devtown wires up `casehub-platform-api` in its own repo. Next platform work: `pe
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
-| #6 | `persistence-jpa/` — JPA-backed scoped PreferenceProvider | L | Med | Depends on config/ being stable |
+| #16 | OIDC CurrentPrincipal — Keycloak/quarkus-oidc | M | Med | Deferred until auth lands |
+| #6 | `persistence-jpa/` — JPA-backed scoped PreferenceProvider | L | Med | Depends on config/ stable |
 | #7 | `persistence-mongodb/` — MongoDB alternative | M | Low | Follows work-testing pattern |
 | #8 | `preferences-editor/` — admin UI/API write path | XL | High | Separate from read providers |
-| #9 | CurrentPrincipal @RequestScoped retrofit | S | Low | At RBAC implementation time |
-| #14 | TenantContext → SettingsScope bridge | S | Med | Deferred — needs quarkiverse multitenancy adoption |
-| ledger#88 | ActorType migration to platform-api | M | Med | Unblocks CurrentPrincipal.actorType() TODO |
+| #3 | CurrentPrincipal @RequestScoped retrofit | S | Low | At RBAC implementation time |
+| ledger#88 | ActorType migration to platform-api | M | Med | Unblocks actorType() TODO |
 
 ## References
 
-- DESIGN.md: `design/DESIGN.md` (workspace main)
+- DESIGN.md: `design/DESIGN.md` (workspace main — §Identity API updated)
 - Deep-dive: `~/claude/casehub/parent/docs/repos/casehub-platform.md`
-- ADRs: `adr/0001` (Path split), `adr/0002` (PreferenceKey parser+default), `adr/0003` (null-returning get)
-- Protocols: `typed-preference-keys.md`, `module-tier-structure.md`, `platform-spi-contract.md`
-- Blog: `blog/2026-05-20-mdp01-preferences-drools-cascade.md`
-- Open issues: casehubio/platform #3, #6–#9, #14
-- Workspace branches retained (all closed): epic-platform-api (del. 2026-06-01), epic-platform-testing (del. 2026-06-02), epic-quarkus-alignment (del. 2026-06-02), epic-platform-config (del. 2026-06-03)
+- Protocols: `docs/protocols/casehub/` — FOUNDATION-INDEX.md, no-conditional-tenancy-filtering.md, tenancy-repository-pattern.md
+- Blog: `blog/2026-05-21-mdp01-tenancy-id-before-the-fields.md`
+- Open issues: casehubio/platform #3, #6–#8, #16
+- Garden: GE-20260521-aba9c9 (assertNotNull on primitive boolean — autoboxing trap)
+- Workspace branches (all closed): epic-* (del. 2026-06-01/02/03), issue-17 (del. 2026-06-04)
