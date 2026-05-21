@@ -28,6 +28,11 @@ A fifth module, config/ (casehub-platform-config), ships ConfigFilePreferencePro
 when on the classpath. pom.xml depends on platform-api, quarkus-arc, and snakeyaml
 (Quarkus BOM managed). Jandex plugin enables CDI discovery as a JAR.
 
+A sixth module, oidc/ (casehub-platform-oidc), ships OidcCurrentPrincipal as @RequestScoped
+(no @DefaultBean). Follows the same optional-module pattern as config/: Jandex plugin,
+quarkus-oidc compile dep. Displaces MockCurrentPrincipal automatically when on the classpath.
+Consumers who do not add the dep are unaffected — quarkus-oidc is never transitive.
+
 ## Path API
 
 Path is a record with strict validation: segments must be non-blank, no leading,
@@ -90,9 +95,12 @@ Two abstract methods added to CurrentPrincipal: tenancyId() and isCrossTenantAdm
 Both are abstract — not interface defaults — so every implementor is forced at compile
 time to declare a tenancy position. In single-tenant deployments the mock returns
 TenancyConstants.DEFAULT_TENANT_ID (a fixed UUID, configurable via
-casehub.tenancy.default-id); real OIDC-backed implementations will read from the JWT
-tenancyId claim. isCrossTenantAdmin() defaults to false everywhere; the mock exposes
-it via casehub.platform.principal.crossTenantAdmin for local simulation. A companion
+casehub.tenancy.default-id); OidcCurrentPrincipal (casehub-platform-oidc) reads tenancyId
+from a required JWT claim of the same name and crossTenantAdmin from an optional boolean
+JWT claim (defaults false). Claim names are fixed platform contract — not configurable.
+Anonymous identity (identity.isAnonymous() = true) returns sentinel values without touching
+the JWT. isCrossTenantAdmin() defaults to false everywhere; the mock exposes it via
+casehub.platform.principal.crossTenantAdmin for local simulation. A companion
 TenancyConstants utility class in platform-api owns the two sentinels
 (DEFAULT_TENANT_ID and PLATFORM_TENANT_ID) so any consumer can import constants
 without depending on the identity SPI itself.
@@ -102,7 +110,9 @@ SecurityIdentityAugmentor. GroupMembershipProvider answers the inverse query (wh
 group X?); SecurityIdentityAugmentor answers the forward query (what groups is user X in?)
 — both from the same data source. Augmenting SecurityIdentity.getRoles() with casehub
 group memberships makes @RolesAllowed work with casehub groups without manual
-CurrentPrincipal.hasGroup() checks at every call site.
+CurrentPrincipal.hasGroup() checks at every call site. A GroupMembershipProvider backed
+by OIDC/Keycloak Admin API is deferred — the JWT alone cannot answer inverse membership
+queries; that requires a directory.
 
 ## Mock Implementation Pattern
 
