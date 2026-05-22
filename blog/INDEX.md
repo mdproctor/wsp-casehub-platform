@@ -10,3 +10,4 @@
 | [2026-05-22-mdp03-preferences-meet-database.md](2026-05-22-mdp03-preferences-meet-database.md) | 2026-05-22 | JPA persistence-jpa module; effectiveAt current-only decision; H2 reserved word gotcha |
 | [2026-05-22-mdp04-closing-platform24.md](2026-05-22-mdp04-closing-platform24.md) | 2026-05-22 | Platform#24 closed — SlaBreachPolicy belongs in casehub-work-api, not platform |
 | [2026-05-22-mdp05-the-root-that-didnt-cache.md](2026-05-22-mdp05-the-root-that-didnt-cache.md) | 2026-05-22 | Path.root() review: missing tests and singleton fix |
+| [2026-05-22-mdp06-mongodb-preferences-missing-rung.md](2026-05-22-mdp06-mongodb-preferences-missing-rung.md) | 2026-05-22 | MongoDB PreferenceProvider: CDI priority ladder, compound _id, Filters.in(), startup index |
