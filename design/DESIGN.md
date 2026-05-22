@@ -80,16 +80,25 @@ strings; key.parse() converts on typed access via MapPreferences.get().
 
 ## Identity API
 
-CurrentPrincipal is intentionally minimal: actorId(), groups(), and four defaults
-(roles(), hasGroup(), isSystem(), isAuthenticated()). roles() delegates to groups()
-by convention — this documents the groups-as-roles contract and wires directly to
-@RolesAllowed without an interface change when RBAC is implemented. isAuthenticated()
-uses "anonymous" as the unauthenticated sentinel; "system" is the default actorId
-in dev/test. Real implementations must be @RequestScoped backed by SecurityIdentity;
-@RequestScoped beans injected into @ApplicationScoped REST resources are handled
-safely by CDI client proxies. The mock is intentionally @ApplicationScoped — it has
-no request context to read from. @ActivateRequestContext is required before accessing
-CurrentPrincipal in reactive pipelines.
+CurrentPrincipal is intentionally minimal: actorId(), groups(), and five defaults
+(roles(), hasGroup(), actorType(), isSystem(), isAuthenticated()). roles() delegates
+to groups() by convention — this documents the groups-as-roles contract and wires
+directly to @RolesAllowed without an interface change when RBAC is implemented.
+isAuthenticated() uses "anonymous" as the unauthenticated sentinel; "system" is the
+default actorId in dev/test. Real implementations must be @RequestScoped backed by
+SecurityIdentity; @RequestScoped beans injected into @ApplicationScoped REST resources
+are handled safely by CDI client proxies. The mock is intentionally @ApplicationScoped
+— it has no request context to read from. @ActivateRequestContext is required before
+accessing CurrentPrincipal in reactive pipelines.
+
+ActorType (HUMAN / AGENT / SYSTEM) is owned by platform-api, not casehub-ledger-api.
+ActorTypeResolver.resolve(String actorId) applies a seven-rule priority chain: null or
+blank → SYSTEM; "system" or "system:*" → SYSTEM; "agent:*" prefix → AGENT; versioned
+persona format word:word@version (e.g. "claude:analyst@v1") → AGENT; A2A role "user" →
+HUMAN; A2A role "agent" → AGENT; everything else → HUMAN. actorType() is the canonical
+source of truth for actor classification; boolean derivatives must agree with it.
+isSystem() delegates to actorType() == ActorType.SYSTEM — not an independent exact-match
+check — so system:* scoped actors resolve consistently.
 
 Two abstract methods added to CurrentPrincipal: tenancyId() and isCrossTenantAdmin().
 Both are abstract — not interface defaults — so every implementor is forced at compile
