@@ -8,3 +8,4 @@
 | [2026-05-21-mdp02-oidc-optional-module.md](2026-05-21-mdp02-oidc-optional-module.md) | 2026-05-21 | The optional OIDC module — @RequestScoped CurrentPrincipal backed by SecurityIdentity |
 | [2026-05-21-mdp03-wiring-the-pipeline.md](2026-05-21-mdp03-wiring-the-pipeline.md) | 2026-05-21 | CI pipeline finally wired — quarkus-junit migration, jandex property, GitHub Packages |
 | [2026-05-22-mdp03-preferences-meet-database.md](2026-05-22-mdp03-preferences-meet-database.md) | 2026-05-22 | JPA persistence-jpa module; effectiveAt current-only decision; H2 reserved word gotcha |
+| [2026-05-22-mdp04-closing-platform24.md](2026-05-22-mdp04-closing-platform24.md) | 2026-05-22 | Platform#24 closed — SlaBreachPolicy belongs in casehub-work-api, not platform |
