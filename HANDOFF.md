@@ -8,41 +8,30 @@
 
 ## Last Session
 
-Major foundation sprint. Shipped: ActorType migration (#22, unblocks ledger#88),
-casehub-platform-expression JQ evaluator (#23, with MockSecretManager Optional<Map>
-bug caught in review), casehub-platform-persistence-jpa (#6, JPA PreferenceProvider
-current-only per ADR-0006). Platform#24 (apps-api) was evaluated and closed —
-SlaBreachPolicy belongs in casehub-work-api (ADR-0007, work#213 filed with full
-type API design).
+Short review session. A separate Claude session had landed `Path.root()` (d8d8461);
+this session reviewed it, found missing tests and an unnecessary allocation on every
+call, and fixed both. Six root-contract tests added, static ROOT constant introduced,
+DESIGN.md updated to document the third construction path. Installed to local m2.
+
+⚠️ `platform/pom.xml` has an uncommitted modification — investigate before next commit.
 
 ## Immediate Next Step
 
 Resume `#7 persistence-mongodb/` — same pattern as persistence-jpa, no Flyway.
-Stack is empty; start fresh with `work-start`.
+Start fresh with `work-start`. Investigate `platform/pom.xml` uncommitted change first.
 
 ## Cross-Module
 
-**We're blocking:**
-- `casehub-ledger` — ledger#88 (actorType() on CurrentPrincipal) · XS · Low
-  ✅ Unblocked — casehub-platform-api 0.2-SNAPSHOT in .m2 with ActorType
-- `casehub-engine` — engine#320 (consume JQEvaluator from platform-expression) · M · Low
-- `casehub-work` — work#207 (replace JqConditionEvaluator) · S · Low
-- `casehub-work` — work#213 (SlaBreachPolicy API in casehub-work-api) · M · Low
+*Unchanged — `git show HEAD~1:HANDOFF.md`*
 
 ## What's Next
 
-| # | Description | Scale | Complexity | Notes |
-|---|-------------|-------|------------|-------|
-| #7 | `persistence-mongodb/` — MongoDB PreferenceProvider | M | Low | Mirrors persistence-jpa; no Flyway |
-| #8 | `preferences-editor/` — REST write path | L | Med | Needs write model design; low priority |
-| work#212 | Wire SlaBreachPolicy in casehub-work expiry service | M | Low | Blocks on work#213 first |
-| work#213 | Add SlaBreachPolicy types to casehub-work-api | M | Low | Full API in issue; ready to implement |
-| devtown#38 | Layer 2: SLA-bounded human review gate | L | Med | Blocks on work#213 |
+*Unchanged — `git show HEAD~1:HANDOFF.md`*
 
 ## References
 
 - ADRs: `adr/0005` (ActorType), `adr/0006` (JPA current-only), `adr/0007` (SlaBreachPolicy in work-api)
-- Blog: `blog/2026-05-22-mdp04-closing-platform24.md` (latest)
+- Blog: `blog/2026-05-22-mdp05-the-root-that-didnt-cache.md` (latest)
 - Garden: GE-20260522-a69fa1 (String.matches anchor), REVISE GE-20260519-b9719e (Optional<Map> nested prefix)
 - Protocol: PP-20260522-359dfc (CurrentPrincipal booleans delegate to actorType())
 - casehub-work: work#212 (wiring), work#213 (SlaBreachPolicy API — full type design in issue)
