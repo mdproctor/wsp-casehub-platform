@@ -1,19 +1,5 @@
-# Design Journal — issue-3-current-principal-request-scoped
+# Design Journal — issue-22-actor-type
 
-### 2026-05-21 · §Identity API
+### 2026-05-22 · §Identity API
 
-New `oidc/` module (`casehub-platform-oidc`) ships `OidcCurrentPrincipal @RequestScoped`.
-Follows the `config/` optional-module pattern: plain `@ApplicationScoped`-style bean (no
-`@DefaultBean`), Jandex plugin for CDI library discovery, `quarkus-oidc` compile dep.
-Consumers add the artifact to activate OIDC identity; the mock remains default for everyone
-else — no exclusion config.
-
-Claim names are fixed platform contract: `tenancyId` (required String — throws
-`IllegalStateException` if absent), `crossTenantAdmin` (optional Boolean — defaults
-`false`). Anonymous identity (`identity.isAnonymous() = true`) returns sentinel values
-without touching the JWT. OIDC session configuration for tests: `discovery-enabled=false`
-+ `jwks-path` avoids startup connectivity while keeping CDI beans registered for
-`@InjectMock` replacement.
-
-`GroupMembershipProvider` OIDC / `SecurityIdentityAugmentor` is deferred — needs a
-directory (Keycloak Admin API, LDAP), not just the JWT.
+`ActorType` (HUMAN / AGENT / SYSTEM) and `ActorTypeResolver` are now owned by `casehub-platform-api`, not `casehub-ledger-api`. The resolver applies a priority-ordered seven-rule chain: null/blank and `system:*` patterns resolve to SYSTEM; `agent:*` prefix and the versioned persona format (`word:word@version`, e.g. `claude:analyst@v1`) resolve to AGENT; A2A protocol roles `"user"` and `"agent"` are handled explicitly before the catch-all; everything else is HUMAN. `CurrentPrincipal.actorType()` is a new default method delegating to the resolver. `isSystem()` is widened to `actorType() == SYSTEM` so that `system:*` scoped actors (e.g. `system:scheduler`) are consistent with the type resolution rather than returning false from an exact-match check.
