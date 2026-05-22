@@ -33,6 +33,16 @@ A sixth module, oidc/ (casehub-platform-oidc), ships OidcCurrentPrincipal as @Re
 quarkus-oidc compile dep. Displaces MockCurrentPrincipal automatically when on the classpath.
 Consumers who do not add the dep are unaffected — quarkus-oidc is never transitive.
 
+A seventh module, expression/ (casehub-platform-expression), ships the canonical Foundation-tier
+JQ expression evaluator. JQEvaluator (@ApplicationScoped) compiles and caches JsonQuery instances
+via ConcurrentHashMap, supports $secret and $config scope injection. Extracted from
+casehub-engine-common so Foundation-tier repos (casehub-work, casehub-qhorus) can consume it
+without an Orchestration-tier dependency. SecretManager and ConfigManager SPIs are pure Java
+(Tier 1, platform-api). MockSecretManager and MockConfigManager (@DefaultBean) ship in
+expression/ itself — not platform/ — so the module is self-contained when added to a classpath.
+Consumer migration: casehubio/engine#320 (remove engine-common copy), casehubio/work#207
+(replace JqConditionEvaluator).
+
 ## Path API
 
 Path is a record with strict validation: segments must be non-blank, no leading,
