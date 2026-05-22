@@ -48,6 +48,10 @@ PreferenceProvider. Scope-aware, hierarchy-resolved, current-only (effectiveAt i
 ignored — ADR-0006). Displaces MockPreferenceProvider automatically. Consumers must add
 classpath:db/platform/migration to quarkus.flyway.locations (Flyway V1 migration).
 
+Any casehub repo may depend on casehub-platform-api — it is zero-external-dependency pure Java.
+casehub-platform-apps-api was evaluated and closed (ADR-0007); no such module exists or is
+planned until a truly cross-cutting application SPI is identified.
+
 ## Path API
 
 Path is a record with strict validation: segments must be non-blank, no leading,
