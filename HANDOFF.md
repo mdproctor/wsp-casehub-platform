@@ -8,10 +8,11 @@
 
 ## Last Session
 
-Implemented `persistence-mongodb/` (issue #7) end-to-end — brainstorm, TDD,
-`@Alternative @Priority(1)` CDI activation, compound `_id` natural key, `Filters.in()`
-for scope query, startup index bean. Code review caught missing scope index and
-query-string syntax risk; both fixed. Branch closed, merged to main, published.
+Cleared all S/XS What's Left items. parent#44 (CDI priority protocol written to garden,
+PLATFORM.md updated), parent#45/#46 (Repository Map + Capability Ownership), work#217
+(WorkItemStore/AuditEntryStore Javadoc links), devtown#39 (platform-api + platform-testing
+deps), platform#26 (root-scope ancestors() bug fixed + 5 contract tests each provider).
+Branch `issue-26-batch-housekeeping` closed and merged to platform main.
 
 ## Immediate Next Step
 
@@ -24,27 +25,19 @@ Run `work-start` on issue #8.
 
 ## What's Left
 
-- platform#26: root-scope contract tests for both JPA and MongoDB providers · S · Low
-- casehubio/parent#44: CDI persistence-backend priority protocol (pending) · S · Low
-- casehubio/parent#45/#46: PLATFORM.md Repository Map + Capability Ownership updates · S · Low
-- casehubio/work#217: link WorkItemStore Javadoc to parent#44 protocol (pending parent) · XS · Low
-- devtown not yet wired to platform-testing fixtures · S · Low
-- `casehub-platform-api` dep not added to devtown pom · S · Low
-- quarkus-junit5 → quarkus-junit migration across all modules (#19) · XS · Low
-- jandex version extracted to parent pom property (#20) · XS · Low
+Nothing — all trailing items from previous sessions are resolved.
 
 ## What's Next
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
-| #8 | `preferences-editor/` — admin UI/API write path | XL | High | Consumers of MongoDB write path |
+| #8 | `preferences-editor/` — admin UI/API write path | XL | High | Primary next |
 | ledger#88 | ActorType migration to platform-api | M | Med | Unblocks actorType() TODO |
 | — | GroupMembership OIDC provider | M | Med | Needs directory (Keycloak Admin/LDAP) |
 
 ## References
 
 - ADRs: `adr/0005` (ActorType), `adr/0006` (JPA current-only), `adr/0007` (SlaBreachPolicy in work-api)
-- Blog: `blog/2026-05-22-mdp06-mongodb-preferences-missing-rung.md` (latest)
-- Garden: GE-20260522-8df6a6 (Panache MongoDB Filters.in), GE-20260522-483b67 (compound @BsonId), GE-20260522-e570ee (@Startup index)
-- Spec: `specs/issue-007-persistence-mongodb/2026-05-22-persistence-mongodb-design.md`
-- casehub-work: work#212 (wiring), work#213 (SlaBreachPolicy API)
+- Blog: `blog/2026-05-22-mdp07-root-scope-cdi-ladder.md` (latest)
+- Garden: GE-20260522-a87fd7 (Path.parent null for single-segment paths)
+- Protocol: `casehub-garden/docs/protocols/universal/persistence-backend-cdi-priority.md` (new this session)
