@@ -1,0 +1,8 @@
+branch: issue-007-persistence-mongodb
+project-sha: e984307a3336cdadd258ca80b526f4ca86ad83e8
+date: 2026-05-22
+issue: 7
+issue-repo: casehubio/platform
+flyway-next-v: none
+design-repo: workspace
+design-section-hashes:
