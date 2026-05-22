@@ -55,11 +55,15 @@ planned until a truly cross-cutting application SPI is identified.
 ## Path API
 
 Path is a record with strict validation: segments must be non-blank, no leading,
-trailing, or consecutive separators. Two construction paths are intentionally
+trailing, or consecutive separators. Three construction paths are intentionally
 distinct: Path.of(String...) takes explicit pre-validated segments (use for
-programmatic construction), Path.parse(String) delegates to a PathParser strategy
+programmatic construction); Path.parse(String) delegates to a PathParser strategy
 whose separator is installation-wide config (casehub.platform.path.separator,
-default /). This separation prevents round-trip mutation — Path.of("a/b") is
+default /); Path.root() returns the singleton zero-segment root path representing
+the org-wide scope fallback — used when a WorkItem has no assigned scope. Root is
+the strict ancestor of every non-root path; isAncestorOf() and parent() both handle
+root correctly. SettingsScope.root() wraps it as a convenience factory.
+This separation prevents round-trip mutation — Path.of("a/b") is
 rejected; Path.parse("a/b") is the correct idiom for raw string input.
 PathParserConfigurator (@Startup) wires the config-driven parser at application
 start. Harness convention: Path.of("casehubio", "<app>", "<case-type>") for
