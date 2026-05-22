@@ -1,6 +1,6 @@
-# Design Journal — issue-007-persistence-mongodb
+# casehub-platform Design
 
-### 2026-05-22 · §Persistence Modules
+## Persistence Modules
 
 `persistence-mongodb/` implements `PreferenceProvider` via MongoDB Panache.
 The CDI activation pattern follows the persistence-backend priority ladder
