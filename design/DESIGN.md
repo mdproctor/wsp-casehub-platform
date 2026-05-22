@@ -43,6 +43,11 @@ expression/ itself — not platform/ — so the module is self-contained when ad
 Consumer migration: casehubio/engine#320 (remove engine-common copy), casehubio/work#207
 (replace JqConditionEvaluator).
 
+An eighth module, persistence-jpa/ (casehub-platform-persistence-jpa), ships a JPA-backed
+PreferenceProvider. Scope-aware, hierarchy-resolved, current-only (effectiveAt intentionally
+ignored — ADR-0006). Displaces MockPreferenceProvider automatically. Consumers must add
+classpath:db/platform/migration to quarkus.flyway.locations (Flyway V1 migration).
+
 ## Path API
 
 Path is a record with strict validation: segments must be non-blank, no leading,
@@ -87,6 +92,14 @@ var) applied after loading. resolve(scope) merges: unscoped YAML → scope hiera
 app → case-type) → SmallRye Config overrides (casehub.platform.preferences.defaults.*).
 SmallRye overrides are unscoped — apply to all resolve() calls. Values stored as raw
 strings; key.parse() converts on typed access via MapPreferences.get().
+
+JpaPreferenceProvider (persistence-jpa/) resolves by building the ancestor scope list from
+SettingsScope.scope() (shortest first), executing a single IN-clause query, sorting by
+ancestor list index (shallow = lower priority), and merging into a flat map consumed by
+MapPreferences. Single-value rows use sub_key="" (empty string); multi-value rows use the
+sub-key directly. Map keys follow namespace.name (single-value) and namespace.name.subKey
+(multi-value). @Transactional(TxType.SUPPORTS). effectiveAt is ignored — current-only
+(ADR-0006).
 
 ## Identity API
 
