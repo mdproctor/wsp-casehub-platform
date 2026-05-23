@@ -20,7 +20,7 @@ Verify engine#329 status (user wasn't sure if it was already fixed). If closed, 
 
 ## What's Left
 
-- `engine#329` — fix `CaseLedgerEventCapture.java` import (`ActorType` moved to `platform-api`; engine fails to compile on `0.2-SNAPSHOT`) · XS · Low — **verify first, may already be fixed**
+*Nothing outstanding.*
 
 ## What's Next
 
