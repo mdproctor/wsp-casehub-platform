@@ -12,3 +12,4 @@
 | [2026-05-22-mdp05-the-root-that-didnt-cache.md](2026-05-22-mdp05-the-root-that-didnt-cache.md) | 2026-05-22 | Path.root() review: missing tests and singleton fix |
 | [2026-05-22-mdp06-mongodb-preferences-missing-rung.md](2026-05-22-mdp06-mongodb-preferences-missing-rung.md) | 2026-05-22 | MongoDB PreferenceProvider: CDI priority ladder, compound _id, Filters.in(), startup index |
 | [2026-05-22-mdp07-root-scope-cdi-ladder.md](2026-05-22-mdp07-root-scope-cdi-ladder.md) | 2026-05-22 | Root-scope preference bug fixed; CDI priority ladder formalised as universal protocol |
+| [2026-05-23-mdp01-blogs-already-there.md](2026-05-23-mdp01-blogs-already-there.md) | 2026-05-23 | Blog publishing verified — all entries already live; workspace routing config added |
