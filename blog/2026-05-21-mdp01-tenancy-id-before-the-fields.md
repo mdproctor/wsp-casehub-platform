@@ -4,7 +4,7 @@ title: "Planting the tenancy ID before the fields exist"
 date: 2026-05-21
 type: phase-update
 entry_type: note
-subtype: log
+subtype: diary
 projects: [casehub-platform]
 tags: [multi-tenancy, java, design]
 ---

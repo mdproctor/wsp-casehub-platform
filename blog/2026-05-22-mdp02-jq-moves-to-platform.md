@@ -4,7 +4,7 @@ title: "JQ Moves to Platform"
 date: 2026-05-22
 type: phase-update
 entry_type: note
-subtype: log
+subtype: diary
 projects: [casehub-platform]
 tags: [expression, jq, platform-api]
 ---

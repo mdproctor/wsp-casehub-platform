@@ -4,7 +4,7 @@ title: "Preferences, Drools, and a cascade effect"
 date: 2026-05-20
 type: phase-update
 entry_type: note
-subtype: log
+subtype: diary
 projects: [casehub-platform]
 tags: [java, quarkus, preferences, drools, config]
 ---
