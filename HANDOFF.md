@@ -8,11 +8,11 @@
 
 ## Last Session
 
-Full hook infrastructure audit and bulk install across all active repos. Both hooks (pre-push squash detection, commit-msg issue ref enforcement) are now committed to `.githooks/` in 20+ repos. Three cc-praxis skills fixed (issue-workflow, workspace-init, work-start). check_project_setup.sh packaged as a proper plugin component in install-skills.
+Closed issue #25: normalised `jandex-maven-plugin` version from hardcoded `3.3.1` to `${jandex-maven-plugin.version}` in `platform/pom.xml` and `testing/pom.xml`. The core Jandex fix was already committed (132c9af) but the issue stayed open because the commit used `#25` not `closes #25`. Also applied `size:XS`–`size:XL` labels to all open GitHub issues.
 
 ## Immediate Next Step
 
-`work-start` on the **GroupMembership OIDC provider** — the actual planned work that got deferred by the hook session.
+`work-start` on the **GroupMembership OIDC provider** — deferred twice now, still the planned work.
 
 ## Cross-Module
 
@@ -28,11 +28,12 @@ Full hook infrastructure audit and bulk install across all active repos. Both ho
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
 | — | GroupMembership OIDC provider | M | Med | Needs directory (Keycloak Admin/LDAP) |
+| #27 | CaseMemoryStore SPI — `platform-api/` + no-op default + Memori adapter | L | Med | Spec at `docs/specs/case-memory-store.md`; open Qs: fact emission, module placement |
 | #8 | `preferences-editor/` — admin UI/API write path | XL | High | Parked — no UI work |
 
 ## References
 
-- Blog: `blog/2026-05-25-mdp01-hooks-everywhere.md` (latest)
-- Protocols: `casehub/garden/docs/protocols/universal/committed-git-hooks.md`, `casehub/garden/docs/protocols/casehub/repo-hook-requirements.md`
-- Garden: GE-20260525-8e5b29 (stale branch pointer post-rebase), GE-20260525-06327c (hook blocks own install), GE-20260525-c0b5a4 (Python /tmp/ bulk git), GE-20260525-db848c (CLAUDE_PLUGIN_ROOT)
-- cc-praxis issues: #101 (plugin hook packaging), #102 (workspace-init hook install)
+- Blog: `blog/2026-05-25-mdp02-already-fixed-still-open.md` (latest)
+- Memory spec: `docs/specs/case-memory-store.md` (platform#27)
+- Protocols: *Unchanged — `git show HEAD~1:HANDOFF.md`*
+- Garden: *Unchanged — `git show HEAD~1:HANDOFF.md`*
