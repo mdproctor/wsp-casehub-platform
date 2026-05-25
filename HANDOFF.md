@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-**Date:** 2026-05-23
+**Date:** 2026-05-25
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -8,11 +8,11 @@
 
 ## Last Session
 
-Blog publishing housekeeping: confirmed all 12 casehub-platform blog entries were already published to `mdproctor.github.io/_notes/`. Added `blog-routing.yaml` to workspace root so `publish-blog` can detect the source path when run standalone. Parked issue #8 (no UI work).
+Full hook infrastructure audit and bulk install across all active repos. Both hooks (pre-push squash detection, commit-msg issue ref enforcement) are now committed to `.githooks/` in 20+ repos. Three cc-praxis skills fixed (issue-workflow, workspace-init, work-start). check_project_setup.sh packaged as a proper plugin component in install-skills.
 
 ## Immediate Next Step
 
-Verify engine#329 status (user wasn't sure if it was already fixed). If closed, remove from What's Left. Then `work-start` on GroupMembership OIDC provider.
+`work-start` on the **GroupMembership OIDC provider** — the actual planned work that got deferred by the hook session.
 
 ## Cross-Module
 
@@ -20,7 +20,8 @@ Verify engine#329 status (user wasn't sure if it was already fixed). If closed, 
 
 ## What's Left
 
-*Nothing outstanding.*
+- Hook install still pending on 5 repos (branches open): `casehub/aml`, `casehub/clinical`, `hortora/garden`, `md-compare`, `casehub-poc` · XS · Low
+- `md-compare` has an issue-workflow `commit-msg` hook in `.git/hooks/` (old way) — migrate when branch returns · XS · Low
 
 ## What's Next
 
@@ -31,7 +32,7 @@ Verify engine#329 status (user wasn't sure if it was already fixed). If closed, 
 
 ## References
 
-- ADRs: `adr/0005` (ActorType), `adr/0006` (JPA current-only), `adr/0007` (SlaBreachPolicy in work-api)
-- Blog: `blog/2026-05-23-mdp01-blogs-already-there.md` (latest)
-- Garden: GE-20260522-409183 (GIT_SEQUENCE_EDITOR SHA typo), GE-20260522-b9a6d4 (force-with-lease fresh fork)
-- Squash backup: `backup/pre-squash-main-20260522` (local only)
+- Blog: `blog/2026-05-25-mdp01-hooks-everywhere.md` (latest)
+- Protocols: `casehub/garden/docs/protocols/universal/committed-git-hooks.md`, `casehub/garden/docs/protocols/casehub/repo-hook-requirements.md`
+- Garden: GE-20260525-8e5b29 (stale branch pointer post-rebase), GE-20260525-06327c (hook blocks own install), GE-20260525-c0b5a4 (Python /tmp/ bulk git), GE-20260525-db848c (CLAUDE_PLUGIN_ROOT)
+- cc-praxis issues: #101 (plugin hook packaging), #102 (workspace-init hook install)
