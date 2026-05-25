@@ -13,3 +13,4 @@
 | [2026-05-22-mdp06-mongodb-preferences-missing-rung.md](2026-05-22-mdp06-mongodb-preferences-missing-rung.md) | 2026-05-22 | MongoDB PreferenceProvider: CDI priority ladder, compound _id, Filters.in(), startup index |
 | [2026-05-22-mdp07-root-scope-cdi-ladder.md](2026-05-22-mdp07-root-scope-cdi-ladder.md) | 2026-05-22 | Root-scope preference bug fixed; CDI priority ladder formalised as universal protocol |
 | [2026-05-23-mdp01-blogs-already-there.md](2026-05-23-mdp01-blogs-already-there.md) | 2026-05-23 | Blog publishing verified — all entries already live; workspace routing config added |
+| [2026-05-25-mdp01-hooks-everywhere.md](2026-05-25-mdp01-hooks-everywhere.md) | 2026-05-25 | Hook infrastructure audit and bulk install across 20+ repos; cc-praxis skill fixes |
