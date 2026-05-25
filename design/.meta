@@ -1,0 +1,8 @@
+branch: issue-25-jandex-platform
+project-sha: 436641b892409b67344507895a2dc74b4676e7c4
+date: 2026-05-25
+issue: 25
+issue-repo: casehubio/platform
+flyway-next-v: none
+design-repo: workspace
+design-section-hashes:
