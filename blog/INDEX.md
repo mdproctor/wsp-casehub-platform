@@ -14,3 +14,4 @@
 | [2026-05-22-mdp07-root-scope-cdi-ladder.md](2026-05-22-mdp07-root-scope-cdi-ladder.md) | 2026-05-22 | Root-scope preference bug fixed; CDI priority ladder formalised as universal protocol |
 | [2026-05-23-mdp01-blogs-already-there.md](2026-05-23-mdp01-blogs-already-there.md) | 2026-05-23 | Blog publishing verified — all entries already live; workspace routing config added |
 | [2026-05-25-mdp01-hooks-everywhere.md](2026-05-25-mdp01-hooks-everywhere.md) | 2026-05-25 | Hook infrastructure audit and bulk install across 20+ repos; cc-praxis skill fixes |
+| [2026-05-25-mdp02-already-fixed-still-open.md](2026-05-25-mdp02-already-fixed-still-open.md) | 2026-05-25 | Jandex version normalised; issue #25 closed — already fixed, commit keyword missed |
