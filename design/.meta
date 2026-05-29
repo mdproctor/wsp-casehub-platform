@@ -3,6 +3,6 @@ project-sha: 213c007b645e936c1cabff31cc3d651ec3d95398
 date: 2026-05-29
 issue: 32
 issue-repo: casehubio/platform
-flyway-next-v: unknown
+flyway-next-v: 1000
 design-repo: workspace
 design-section-hashes:

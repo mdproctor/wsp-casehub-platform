@@ -187,7 +187,17 @@ adapters. Tracked in #39.
 
 ## 5. Schema (`memory-jpa/`)
 
-### `V1__memory_entry.sql`
+### Flyway version range
+
+`memory-jpa/` is assigned the **V1000–V1999** thousand-block per `flyway-version-range-allocation.md`.
+`persistence-jpa/` owns V1–V999 (`db/platform/migration`). When a consumer adds both locations to
+`quarkus.flyway.locations`, Flyway merges all files from all locations into one version sequence —
+two files at V1 would cause startup failure. The thousand-block separation eliminates this.
+
+`flyway-version-range-allocation.md` must be updated to add a platform adapter section recording
+this allocation before the first consumer configures both locations.
+
+### `V1000__memory_entry.sql`
 
 ```sql
 CREATE TABLE memory_entry (
@@ -323,12 +333,15 @@ ranking should use `memory-jpa/` (PostgreSQL FTS) or higher tiers.
 ```java
 @ConfigMapping(prefix = "casehub.memory.jpa")
 interface MemoryJpaConfig {
+    /** Full-text search settings for memory queries. */
     Fts fts();
 
     interface Fts {
+        /** Whether to use PostgreSQL FTS when a question is provided. Default: true. */
         @WithDefault("true")
         boolean enabled();
 
+        /** PostgreSQL text search configuration name (e.g. english, french). Default: english. */
         @WithDefault("english")
         String language();
     }
@@ -411,6 +424,10 @@ WHERE tenant_id = :t AND entity_id = :e AND domain = :d
 
 Domain is always non-null — no null-domain handling.
 
+After `executeUpdate()`: call `MemoryEntry.getEntityManager().clear()` — bulk DELETE does not
+invalidate Hibernate's L1 cache (JPA spec §4.10). Without `clear()`, subsequent reads in the
+same persistence context return stale cached entities.
+
 ### 8.6 `eraseById()`
 
 ```sql
@@ -421,6 +438,9 @@ WHERE memory_id = :id AND tenant_id = :t
 `tenant_id` in the WHERE clause: structural defence-in-depth alongside the `assertTenant`
 check. Cross-tenant deletion is architecturally impossible even if a UUID is guessed.
 
+Call `MemoryEntry.getEntityManager().clear()` after `executeUpdate()` — same L1 cache
+invalidation requirement as `erase()`.
+
 ### 8.7 `eraseEntity()` (GDPR full-entity wipe)
 
 ```sql
@@ -429,6 +449,8 @@ WHERE tenant_id = :t AND entity_id = :e
 ```
 
 Uses `memory_entry_erase_idx`. No domain predicate — wipes all domains atomically.
+
+Call `MemoryEntry.getEntityManager().clear()` after `executeUpdate()`.
 
 ---
 
@@ -483,7 +505,7 @@ Test `application.properties`:
 casehub.memory.jpa.fts.enabled=false
 quarkus.flyway.locations=classpath:db/memory/migration
 quarkus.datasource.db-kind=h2
-quarkus.datasource.jdbc.url=jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+quarkus.datasource.jdbc.url=jdbc:h2:mem:memorytest;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
 ```
 
 Key test cases:
@@ -534,6 +556,15 @@ quarkus.flyway.locations=classpath:db/memory/migration,<existing locations>
 
 `JpaMemoryStore @ApplicationScoped` displaces `NoOpCaseMemoryStore @DefaultBean` automatically.
 
+**`quarkus.index-dependency` (required for `@QuarkusTest` consumers):**
+```properties
+quarkus.index-dependency.memory-jpa.group-id=io.casehub
+quarkus.index-dependency.memory-jpa.artifact-id=casehub-platform-memory-jpa
+```
+
+Per `platform-cdi-index-dependency.md`: Quarkus will not discover CDI beans from casehub-platform
+library JARs in `@QuarkusTest` without this config, even when the JAR contains a Jandex index.
+
 ### Activating `memory-inmem/` (test/ephemeral)
 
 ```xml
@@ -548,6 +579,12 @@ quarkus.flyway.locations=classpath:db/memory/migration,<existing locations>
 `InMemoryMemoryStore @Alternative @Priority(1)` displaces both `NoOpCaseMemoryStore` and
 `JpaMemoryStore` when on the classpath. **Do not add alongside `memory-jpa/` in production
 scope** — `@Priority(1)` wins and the JPA adapter will be inactive.
+
+**`quarkus.index-dependency` (if using in `@QuarkusTest`):**
+```properties
+quarkus.index-dependency.memory-inmem.group-id=io.casehub
+quarkus.index-dependency.memory-inmem.artifact-id=casehub-platform-memory-inmem
+```
 
 ---
 
