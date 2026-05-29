@@ -24,7 +24,7 @@ as #40 pending API stabilisation.
 
 ## 2. SPI Changes (`platform-api/` + `platform/`)
 
-These are prerequisites for both adapter modules and should be committed first.
+These are prerequisites for both adapter modules and must be committed first.
 
 ### 2.1 `EraseRequest` — domain is now required
 
@@ -53,23 +53,33 @@ public record EraseRequest(
  * GDPR Art.17 full-entity wipe across ALL domains for this entity within the tenant.
  * Adapters MUST perform hard deletion.
  * Adapters MUST call {@link MemoryPermissions#assertTenant} before delegating to the backend.
+ *
+ * <p>Default throws {@link UnsupportedOperationException} — consistent with
+ * {@link #eraseById}. {@code NoOpCaseMemoryStore} overrides with a true no-op
+ * (nothing stored). Real adapters must override with actual cross-domain deletion.
  */
-void eraseEntity(String entityId, String tenantId);
+default void eraseEntity(String entityId, String tenantId) {
+    throw new UnsupportedOperationException("eraseEntity not supported by this adapter");
+}
 ```
 
-No default — abstract. `NoOpCaseMemoryStore` gets a no-op body. `eraseById()` default still
-throws `UnsupportedOperationException` per `spi-deletion-default-throws.md`.
+Default-throw rather than abstract — consistent with `eraseById()` and `spi-deletion-default-throws.md`.
+Gives a clear runtime signal rather than a compile-time break for any future external implementor.
 
 ### 2.3 `ReactiveCaseMemoryStore` — mirror `eraseEntity()`
 
 ```java
 /**
  * Reactive mirror of {@link CaseMemoryStore#eraseEntity}.
+ * Default returns a failed Uni matching the blocking interface's contract.
  */
-Uni<Void> eraseEntity(String entityId, String tenantId);
+default Uni<Void> eraseEntity(String entityId, String tenantId) {
+    return Uni.createFrom().failure(
+        new UnsupportedOperationException("eraseEntity not supported by this adapter"));
+}
 ```
 
-No default — abstract. `BlockingToReactiveBridge` wraps the blocking delegate:
+`BlockingToReactiveBridge` overrides to wrap the blocking delegate:
 
 ```java
 @Override
@@ -84,12 +94,12 @@ public Uni<Void> eraseEntity(String entityId, String tenantId) {
 | File | Change |
 |------|--------|
 | `platform-api/.../EraseRequest.java` | domain non-nullable |
-| `platform-api/.../CaseMemoryStore.java` | add `eraseEntity()` abstract |
-| `platform/.../NoOpCaseMemoryStore.java` | add `eraseEntity()` no-op |
-| `platform/.../ReactiveCaseMemoryStore.java` | add `eraseEntity()` abstract |
-| `platform/.../BlockingToReactiveBridge.java` | add `eraseEntity()` wrapper |
-| `platform-api/test/.../CaseMemoryStoreSpiTest.java` | add `eraseEntity()` to anonymous impl; update EraseRequest usages |
-| `platform/test/.../NoOpCaseMemoryStoreTest.java` | add eraseEntity tests for store + bridge |
+| `platform-api/.../CaseMemoryStore.java` | add `eraseEntity()` default-throw; update `erase()` Javadoc — remove "null domain erases across ALL domains" (now handled by `eraseEntity()`) |
+| `platform/.../NoOpCaseMemoryStore.java` | add `eraseEntity()` no-op override |
+| `platform/.../ReactiveCaseMemoryStore.java` | add `eraseEntity()` default-fail |
+| `platform/.../BlockingToReactiveBridge.java` | add `eraseEntity()` blocking wrapper |
+| `platform-api/test/.../CaseMemoryStoreSpiTest.java` | add `eraseEntity()` test (default-throw path); update all `EraseRequest` usages to non-null domain |
+| `platform/test/.../NoOpCaseMemoryStoreTest.java` | **Remove** `ERASE_ALL_DOMAINS` static fixture and the tests that use it (`erase_allDomains_doesNotThrow`, `bridge_erase_allDomains_doesNotThrow`) — these tested null-domain erase which is now `eraseEntity()`. Add `eraseEntity_doesNotThrow` and `bridge_eraseEntity_doesNotThrow` in their place. |
 
 ---
 
@@ -107,6 +117,7 @@ memory-inmem/
 **pom.xml key points:**
 - parent: `casehub-platform-parent`
 - compile deps: `casehub-platform-api`, `quarkus-arc`
+- `jandex-maven-plugin` — required for CDI bean discovery when consumed as a JAR by another module
 - no `quarkus-maven-plugin build` goal — library, not application
 - no Flyway, no JDBC
 
@@ -129,11 +140,12 @@ memory-jpa/
 
 **pom.xml key points:**
 - parent: `casehub-platform-parent`
-- compile deps: `casehub-platform-api`, `quarkus-hibernate-orm-panache`, `quarkus-flyway`,
-  `quarkus-jdbc-postgresql` (optional)
-- test deps: `casehub-platform` (verify no-op displacement),
-  `casehub-platform-memory-inmem` (displace JPA in unit tests),
-  `quarkus-jdbc-h2`, `quarkus-junit`
+- compile deps: `casehub-platform-api`, `quarkus-hibernate-orm-panache`, `quarkus-flyway`
+- `quarkus-jdbc-postgresql` — declared with `<optional>true</optional>`; consumers must add
+  their own JDBC driver (postgresql or h2); the optional flag means it does not transitively
+  propagate to consumers
+- test deps: `casehub-platform` (verify no-op displacement), `quarkus-jdbc-h2`, `quarkus-junit`
+- **`casehub-platform-memory-inmem` is NOT in test deps** — see §9.3
 - plugins: `quarkus-maven-plugin` with `build` goal, `jandex-maven-plugin`
 
 ### 3.3 Root pom.xml
@@ -142,18 +154,34 @@ Add `<module>memory-inmem</module>` and `<module>memory-jpa</module>`.
 
 ---
 
-## 4. CDI Priority Ladder
+## 4. CDI Resolution — Precedence and Priority
 
-| Tier | Module | CDI | Active when |
-|------|--------|-----|-------------|
-| 0 | `platform/` | `@DefaultBean @ApplicationScoped` | Nothing on classpath |
-| 0.5 | `memory-inmem/` | `@Alternative @Priority(1)` | Added as dep |
-| 1 | `memory-jpa/` | `@ApplicationScoped` | Added as dep |
-| 2 | `memory-mem0/` (future) | `@Alternative @Priority(1)` | — |
-| 3 | `memory-graphiti/` (future) | `@Alternative @Priority(2)` | — |
+**CDI resolution order (highest wins):**
 
-**Priority conflict note:** `memory-inmem/` and future `memory-mem0/` both use `@Priority(1)`.
-Revisit when mem0 is implemented — tracked in #39.
+| Module | CDI annotation | Beats |
+|--------|---------------|-------|
+| `memory-inmem/` | `@Alternative @Priority(1) @ApplicationScoped` | JPA, no-op |
+| `memory-jpa/` | `@ApplicationScoped` | no-op only |
+| `platform/` | `@DefaultBean @ApplicationScoped` | nothing |
+
+`@Alternative @Priority(1)` (InMem) wins over plain `@ApplicationScoped` (JPA). When both are
+on the classpath, InMem is active. **Tier numbers below refer to capability level, not CDI
+precedence.** A lower tier number means simpler capability, not lower CDI priority.
+
+| Capability tier | Module | Use case |
+|----------------|--------|---------|
+| 0 (no-op) | `platform/` | Nothing installed |
+| 0.5 (ephemeral) | `memory-inmem/` | Tests, demos — always add as test/provided scope |
+| 1 (durable, non-semantic) | `memory-jpa/` | Standard production deployment |
+| 2 (semantic) | `memory-mem0/` (future) | Vector recall quality matters |
+| 3 (temporal) | `memory-graphiti/` (future) | Temporal reasoning required |
+
+**Priority conflict — startup-breaking:** `memory-inmem/` and future `memory-mem0/` cannot both
+be `@Alternative @Priority(1)` for the same type — Quarkus ARC throws
+`AmbiguousResolutionException` at startup. Resolution must be chosen before implementing mem0:
+either demote `memory-inmem/` to test-scope-only convention (documented, enforced by policy
+rather than priority), or assign it a separate lower priority that is always dominated by real
+adapters. Tracked in #39.
 
 ---
 
@@ -185,44 +213,104 @@ CREATE INDEX memory_entry_erase_idx
 - `memory_id VARCHAR(36)` not UUID type — avoids `gen_random_uuid()` H2 incompatibility;
   adapter assigns UUID explicitly before INSERT
 - `attributes TEXT` not JSONB — H2 compatibility; we don't query inside attributes; serialized
-  as standard JSON object (`{"key":"value"}`) by the adapter; deserialized on read
+  as standard JSON object (`{"key":"value"}`) using Jackson `ObjectMapper` (available
+  transitively via Quarkus); deserialized on read via `ObjectMapper.readValue()`
 - No `tsvector` column — FTS computed at query time over the pre-filtered small corpus;
   a GIN index is not justified given the mandatory tenant/entity/domain predicates
 - `memory_entry_erase_idx` covers `eraseEntity()` (`WHERE tenant_id=? AND entity_id=?`)
-- Consumer Flyway config: add `classpath:db/memory/migration` to `quarkus.flyway.locations`
+
+**Consumer Flyway config:**
+```properties
+# Add db/memory/migration alongside all existing locations — do not replace them
+quarkus.flyway.locations=classpath:db/memory/migration,classpath:db/your-existing/migration,...
+```
 
 ---
 
-## 6. `InMemoryMemoryStore`
+## 6. `MemoryEntry` Entity
+
+**Package:** `io.casehub.platform.memory.jpa`
+
+```java
+@Entity
+@Table(name = "memory_entry")
+public class MemoryEntry extends PanacheEntityBase {
+
+    @Id
+    @Column(name = "memory_id", length = 36, nullable = false)
+    public String memoryId;
+
+    @Column(name = "tenant_id", nullable = false)
+    public String tenantId;
+
+    @Column(name = "entity_id", nullable = false)
+    public String entityId;
+
+    @Column(name = "domain", nullable = false)
+    public String domain;      // MemoryDomain.name() — stored as plain string
+
+    @Column(name = "case_id")
+    public String caseId;      // nullable
+
+    @Column(name = "text", nullable = false, columnDefinition = "TEXT")
+    public String text;
+
+    @Column(name = "attributes", nullable = false, columnDefinition = "TEXT")
+    public String attributes;  // JSON string — serialized Map<String,String>
+
+    @Column(name = "created_at", nullable = false)
+    public Instant createdAt;
+}
+```
+
+`domain` is stored as `String` (the `MemoryDomain` name), not as an embedded value type —
+avoids JPA embeddable complexity for a single-field wrapper. Reconstructed as
+`new MemoryDomain(entry.domain)` when building `Memory` return values.
+
+---
+
+## 7. `InMemoryMemoryStore`
 
 **Package:** `io.casehub.platform.memory.inmem`
 
 **CDI:** `@Alternative @Priority(1) @ApplicationScoped`
 
-**Storage:** `ConcurrentHashMap<String, CopyOnWriteArrayList<Memory>>`
+**Storage:** `ConcurrentHashMap<BucketKey, CopyOnWriteArrayList<Memory>>`
 
-**Key structure:** `tenantId + "|" + entityId + "|" + domain.name()` — structural isolation
-matches the JPA adapter's query scoping. Tenant prefix enables prefix-scan in `eraseEntity()`.
+### 7.1 `BucketKey` record
 
-**Constructor injection** (single `@Inject` constructor accepting `CurrentPrincipal`) —
-enables pure JUnit 5 tests without CDI container.
+```java
+record BucketKey(String tenantId, String entityId, MemoryDomain domain) {}
+```
 
-**Method semantics:**
+Typed record key — no string manipulation, no separator-collision risk from values containing
+`|`. Equality and hashing are structural. `eraseEntity()` filters by:
+
+```java
+store.keySet().removeIf(k -> k.tenantId().equals(tenantId) && k.entityId().equals(entityId));
+```
+
+### 7.2 Constructor injection
+
+Single `@Inject` constructor accepting `CurrentPrincipal` — enables pure JUnit 5 tests without
+a CDI container.
+
+### 7.3 Method semantics
 
 | Method | Behaviour |
 |--------|-----------|
 | `store()` | asserts tenant; UUID.randomUUID(); adds to bucket |
-| `query()` | asserts tenant; streams bucket; filters caseId, since; filters question via `text.toLowerCase().contains(q.toLowerCase())`; sorts DESC; limits |
-| `erase()` | asserts tenant; removes from bucket where caseId matches (or all if caseId null) |
-| `eraseById()` | asserts tenant; scans all buckets with tenant prefix; removes matching memoryId |
-| `eraseEntity()` | asserts tenant; `keySet().removeIf(k -> k.startsWith(tenantId + "\|" + entityId + "\|"))` |
+| `query()` | asserts tenant; streams bucket; filters caseId; filters since; **if question non-null**, filters via `text.toLowerCase().contains(question.toLowerCase())` — explicit null-guard: skip filter when question is null; sorts DESC; limits |
+| `erase()` | asserts tenant; removes from bucket where caseId matches (or all entries if caseId null) |
+| `eraseById()` | asserts tenant; scans all buckets where `key.tenantId().equals(tenantId)`; removes matching memoryId |
+| `eraseEntity()` | asserts tenant; `keySet().removeIf(k -> k.tenantId().equals(tenantId) && k.entityId().equals(entityId))` |
 
 **Note on question matching:** simple `contains()`, not real FTS. Callers expecting relevance
 ranking should use `memory-jpa/` (PostgreSQL FTS) or higher tiers.
 
 ---
 
-## 7. `JpaMemoryStore`
+## 8. `JpaMemoryStore`
 
 **Package:** `io.casehub.platform.memory.jpa`
 
@@ -230,25 +318,35 @@ ranking should use `memory-jpa/` (PostgreSQL FTS) or higher tiers.
 
 **Injects:** `CurrentPrincipal`, `MemoryJpaConfig`
 
-### 7.1 `MemoryJpaConfig`
+### 8.1 `MemoryJpaConfig` — nested interface
 
 ```java
 @ConfigMapping(prefix = "casehub.memory.jpa")
 interface MemoryJpaConfig {
-    @WithDefault("true")
-    boolean ftsEnabled();
+    Fts fts();
 
-    @WithName("fts.language")
-    @WithDefault("english")
-    String ftsLanguage();
+    interface Fts {
+        @WithDefault("true")
+        boolean enabled();
+
+        @WithDefault("english")
+        String language();
+    }
 }
 ```
 
-Valid `ftsLanguage` values: any PostgreSQL text search configuration name
-(`english`, `french`, `german`, `spanish`, etc.). Validated by PostgreSQL at query time —
-invalid values produce a `PSQLException`, not a silent wrong result.
+Config keys: `casehub.memory.jpa.fts.enabled` (default `true`),
+`casehub.memory.jpa.fts.language` (default `english`). Nested interface — no `@WithName`
+annotations required; SmallRye maps `fts().enabled()` to `casehub.memory.jpa.fts.enabled`
+naturally.
 
-### 7.2 Transaction boundaries
+Valid `language` values: any PostgreSQL text search configuration name (`english`, `french`,
+`german`, `spanish`, etc.). Validated by PostgreSQL at query time — invalid values produce
+a `PSQLException`, not a silent wrong result.
+
+### 8.2 Transaction boundaries
+
+All annotations are `jakarta.transaction.Transactional` applied at method level.
 
 | Method | `@Transactional` |
 |--------|-----------------|
@@ -258,16 +356,19 @@ invalid values produce a `PSQLException`, not a silent wrong result.
 | `eraseById()` | `TxType.REQUIRED` |
 | `eraseEntity()` | `TxType.REQUIRED` |
 
-### 7.3 `store()`
+### 8.3 `store()`
 
 1. `MemoryPermissions.assertTenant(input.tenantId(), principal)`
 2. Assign `memoryId = UUID.randomUUID().toString()`
 3. Set `createdAt = Instant.now()`
-4. Serialize `attributes` as JSON string
+4. Serialize `attributes` as JSON: `objectMapper.writeValueAsString(input.attributes())`
 5. `MemoryEntry.persist(entry)`
 6. Return `memoryId`
 
-### 7.4 `query()` — two paths
+`ObjectMapper` is injected as a CDI bean (available via `quarkus-jackson`; add as compile dep
+if not already transitive).
+
+### 8.4 `query()` — two paths
 
 **Chronological** (JPQL, H2-compatible):
 ```
@@ -277,8 +378,9 @@ WHERE tenantId = :t AND entityId = :e AND domain = :d
 ORDER BY createdAt DESC
 ```
 
-**FTS** (native SQL, PostgreSQL only — when `ftsEnabled=true` AND `question != null`):
+**FTS** (native SQL, PostgreSQL only — when `fts().enabled()=true` AND `question != null`):
 ```sql
+SELECT * FROM memory_entry
 WHERE tenant_id = :t AND entity_id = :e AND domain = :d
   AND to_tsvector(CAST(:lang AS regconfig), text)
       @@ websearch_to_tsquery(CAST(:lang AS regconfig), :question)
@@ -288,12 +390,18 @@ ORDER BY ts_rank(
     to_tsvector(CAST(:lang AS regconfig), text),
     websearch_to_tsquery(CAST(:lang AS regconfig), :question)
 ) DESC
+LIMIT :limit
 ```
 
-`CAST(:lang AS regconfig)` — language is a named parameter, not string concatenation.
-Prevents SQL injection; PostgreSQL validates the cast against known text search configs.
+`CAST(:lang AS regconfig)` — named parameter, not concatenation. PostgreSQL validates
+the cast against known text search configs.
 
-### 7.5 `erase()` (domain-scoped)
+**Result mapping:** `entityManager.createNativeQuery(sql, MemoryEntry.class)` with named
+parameters — Hibernate maps result columns to `MemoryEntry` fields by column name. `MemoryEntry`
+is then mapped to `Memory` records in the adapter (deserializing attributes, reconstructing
+`MemoryDomain`).
+
+### 8.5 `erase()` (domain-scoped)
 
 ```sql
 DELETE FROM memory_entry
@@ -301,19 +409,19 @@ WHERE tenant_id = :t AND entity_id = :e AND domain = :d
   AND (:caseId IS NULL OR case_id = :caseId)
 ```
 
-Domain is now always non-null — no null-domain handling needed.
+Domain is always non-null — no null-domain handling.
 
-### 7.6 `eraseById()`
+### 8.6 `eraseById()`
 
 ```sql
 DELETE FROM memory_entry
 WHERE memory_id = :id AND tenant_id = :t
 ```
 
-`tenant_id` in the WHERE clause: structural defence-in-depth. Even if a memoryId UUID is
-guessed, deletion across tenant boundaries is architecturally impossible.
+`tenant_id` in the WHERE clause: structural defence-in-depth alongside the `assertTenant`
+check. Cross-tenant deletion is architecturally impossible even if a UUID is guessed.
 
-### 7.7 `eraseEntity()` (GDPR full-entity wipe)
+### 8.7 `eraseEntity()` (GDPR full-entity wipe)
 
 ```sql
 DELETE FROM memory_entry
@@ -324,12 +432,11 @@ Uses `memory_entry_erase_idx`. No domain predicate — wipes all domains atomica
 
 ---
 
-## 8. Permission Enforcement Contract
+## 9. Permission Enforcement Contract
 
 All adapter methods — both `JpaMemoryStore` and `InMemoryMemoryStore` — MUST call
 `MemoryPermissions.assertTenant(tenantId, currentPrincipal)` as the first operation, before
-any backend call. In `JpaMemoryStore`, `CurrentPrincipal` is captured before any `Uni`
-pipeline (not applicable here — blocking adapter — but noted for future reactive adapters).
+any backend call.
 
 Tenant isolation is structural: `tenant_id` is a mandatory `NOT NULL` column and every
 query includes `WHERE tenant_id = :tenantId` as a non-optional predicate. Cross-tenant
@@ -337,21 +444,39 @@ retrieval is architecturally impossible, not just policy-filtered.
 
 ---
 
-## 9. Testing Strategy
+## 10. Testing Strategy
 
-### 9.1 SPI / NoOp tests (existing modules, updated)
+### 10.1 SPI / NoOp tests (existing modules, updated)
 
-- `CaseMemoryStoreSpiTest` — add `eraseEntity()` to anonymous impl (compile enforces it);
-  update `EraseRequest` usages to non-null domain
-- `NoOpCaseMemoryStoreTest` — add `eraseEntity_doesNotThrow` + `bridge_eraseEntity_doesNotThrow`
+- `CaseMemoryStoreSpiTest` — add test for `eraseEntity()` default-throw path (same pattern as
+  `eraseById_defaultThrows`); update all `EraseRequest` usages to non-null domain
+- `NoOpCaseMemoryStoreTest` — **remove** `ERASE_ALL_DOMAINS` static fixture and tests
+  `erase_allDomains_doesNotThrow` / `bridge_erase_allDomains_doesNotThrow` (null domain no
+  longer exists); **add** `eraseEntity_doesNotThrow` and `bridge_eraseEntity_doesNotThrow`
 
-### 9.2 `InMemoryMemoryStoreTest` (pure JUnit 5)
+### 10.2 `InMemoryMemoryStoreTest` (pure JUnit 5)
 
-No `@QuarkusTest`. Instantiate via constructor with a lambda `CurrentPrincipal`.
+No `@QuarkusTest`. Instantiate via constructor with an anonymous `CurrentPrincipal`:
+
+```java
+CurrentPrincipal principal = new CurrentPrincipal() {
+    @Override public String tenancyId() { return "tenant-1"; }
+    // ... remaining methods
+};
+InMemoryMemoryStore sut = new InMemoryMemoryStore(principal);
+```
+
 Covers the full contract: all methods, tenant isolation, domain isolation, caseId filter,
-since filter, limit, eraseEntity cross-domain.
+since filter, limit, eraseEntity cross-domain, eraseEntity tenant boundary.
 
-### 9.3 `JpaMemoryStoreTest` (`@QuarkusTest` + H2)
+### 10.3 `JpaMemoryStoreTest` (`@QuarkusTest` + H2)
+
+**`memory-inmem/` is NOT in `memory-jpa/` test deps.** Adding it would cause
+`InMemoryMemoryStore @Alternative @Priority(1)` to displace `JpaMemoryStore @ApplicationScoped`
+in every `@QuarkusTest`, meaning all tests would run against the wrong implementation.
+
+Instead: where `CaseMemoryStore` injection is needed, inject `JpaMemoryStore` directly as the
+concrete type to avoid CDI ambiguity.
 
 Test `application.properties`:
 ```properties
@@ -377,14 +502,15 @@ Key test cases:
 | `eraseById_removesSpecificMemory` | point delete |
 | `eraseById_doesNotCrossTenantBoundary` | wrong tenantId leaves record intact |
 | `eraseEntity_removesAllDomainsForEntity` | GDPR cross-domain wipe |
+| `eraseEntity_doesNotCrossTenantBoundary` | most destructive op cannot cross tenant lines |
 | `assertTenant_mismatch_throws` | security gate fires before backend |
-| `store_displaces_noOp` | `@Inject CaseMemoryStore` resolves to `JpaMemoryStore` |
+| `store_displaces_noOp` | inject `JpaMemoryStore` directly — confirms `NoOpCaseMemoryStore @DefaultBean` is not active when JPA is on classpath |
 
 FTS integration tests (PostgreSQL Testcontainers) deferred — tracked in #38.
 
 ---
 
-## 10. Consumer Integration
+## 11. Consumer Integration
 
 ### Activating `memory-jpa/`
 
@@ -394,10 +520,16 @@ FTS integration tests (PostgreSQL Testcontainers) deferred — tracked in #38.
     <artifactId>casehub-platform-memory-jpa</artifactId>
     <version>${casehub-platform.version}</version>
 </dependency>
+<!-- Add your JDBC driver — memory-jpa declares postgresql as optional -->
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-jdbc-postgresql</artifactId>
+</dependency>
 ```
 
 ```properties
-quarkus.flyway.locations=classpath:db/memory/migration,...existing locations
+# Add to existing locations — do not replace them
+quarkus.flyway.locations=classpath:db/memory/migration,<existing locations>
 ```
 
 `JpaMemoryStore @ApplicationScoped` displaces `NoOpCaseMemoryStore @DefaultBean` automatically.
@@ -414,16 +546,17 @@ quarkus.flyway.locations=classpath:db/memory/migration,...existing locations
 ```
 
 `InMemoryMemoryStore @Alternative @Priority(1)` displaces both `NoOpCaseMemoryStore` and
-`JpaMemoryStore` when on the classpath.
+`JpaMemoryStore` when on the classpath. **Do not add alongside `memory-jpa/` in production
+scope** — `@Priority(1)` wins and the JPA adapter will be inactive.
 
 ---
 
-## 11. Deferred Items
+## 12. Deferred Items
 
 | Issue | Description |
 |-------|-------------|
 | #37 | `memory-sqlite/` — SQLite adapter for durable pure-Java deployments |
 | #38 | FTS Testcontainers integration test for `memory-jpa/` |
-| #39 | CDI priority revisit when `memory-mem0/` arrives |
+| #39 | CDI priority revisit when `memory-mem0/` arrives — `@Priority(1)` conflict is startup-breaking |
 | #40 | `memory-memori/` REST adapter — pending Memori API stabilisation |
-| casehubio/parent#90 | PLATFORM.md update — casehub-memory now in-platform |
+| casehubio/parent#90 | PLATFORM.md update — memory adapters now in-platform |
