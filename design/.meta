@@ -1,0 +1,8 @@
+branch: issue-45-oidc-group-membership
+project-sha: 62429bbdcf9cc1c557dd9e18ddf3566fc71ccf2e
+date: 2026-05-29
+issue: 45
+issue-repo: casehubio/platform
+flyway-next-v: none
+design-repo: workspace
+design-section-hashes: 
