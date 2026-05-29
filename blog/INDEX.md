@@ -16,3 +16,4 @@
 | [2026-05-25-mdp01-hooks-everywhere.md](2026-05-25-mdp01-hooks-everywhere.md) | 2026-05-25 | Hook infrastructure audit and bulk install across 20+ repos; cc-praxis skill fixes |
 | [2026-05-25-mdp02-already-fixed-still-open.md](2026-05-25-mdp02-already-fixed-still-open.md) | 2026-05-25 | Jandex version normalised; issue #25 closed — already fixed, commit keyword missed |
 | [2026-05-28-mdp01-teaching-platform-to-remember.md](2026-05-28-mdp01-teaching-platform-to-remember.md) | 2026-05-28 | CaseMemoryStore SPI ships — terminology debate, repo placement, @Blocking surprise, review rounds |
+| [2026-05-29-mdp01-the-memori-that-wasnt.md](2026-05-29-mdp01-the-memori-that-wasnt.md) | 2026-05-29 | Pivot from Memori REST to JPA adapter — GDPR SPI smell, two adapters ship, H2 edge cases |
