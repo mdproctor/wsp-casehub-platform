@@ -1,1 +1,1 @@
-# Design Journal — issue-25-jandex-platform
+# Design Journal — issue-32-memori-adapter
