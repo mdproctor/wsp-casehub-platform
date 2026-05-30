@@ -181,7 +181,7 @@ so the OIDC path is not exercised. WireMock stubs the SCIM server only.
 </dependency>
 <dependency>
     <groupId>io.quarkus</groupId>
-    <artifactId>quarkus-rest-client-reactive-jackson</artifactId>
+    <artifactId>quarkus-rest-client-jackson</artifactId>
 </dependency>
 <dependency>
     <groupId>io.quarkus</groupId>
