@@ -143,22 +143,34 @@ interface ScimConfig {
     /** SCIM server base URL. Example: https://keycloak.example.com/realms/myrealm/scim/v2 */
     String baseUrl();
 
-    /** Bearer token for service account. Mutually exclusive with client credentials. */
+    /**
+     * Static bearer token. If present, used directly — no OIDC token fetch.
+     * Suitable for service accounts with long-lived tokens or test environments.
+     */
     Optional<String> token();
-
-    Auth auth();
-
-    interface Auth {
-        /** Client ID for client_credentials flow (alternative to static token). */
-        Optional<String> clientId();
-        Optional<String> clientSecret();
-        Optional<String> tokenEndpoint();
-    }
 }
 ```
 
-Auth priority: static `token` wins if present; otherwise `auth.clientId` + `auth.clientSecret` +
-`auth.tokenEndpoint` are used for client_credentials grant. Exactly one must be configured.
+**Auth resolution in `ScimGroupMembershipProvider`:**
+
+1. If `casehub.platform.scim.token` is present → use it as the `Authorization: Bearer` value directly.
+2. Otherwise → fetch a token via `quarkus-oidc-client` using the named client `"scim"`:
+   ```
+   quarkus.oidc-client.scim.auth-server-url=https://keycloak.example.com/realms/myrealm
+   quarkus.oidc-client.scim.client-id=scim-service-account
+   quarkus.oidc-client.scim.credentials.secret=...
+   quarkus.oidc-client.scim.grant.type=client_credentials
+   ```
+   The OIDC client handles token acquisition and refresh. `ScimGroupMembershipProvider`
+   injects `@OidcClient("scim") Instance<OidcClient>` — `Instance<>` allows conditional
+   resolution; if neither token nor OIDC client is configured, a startup validation check
+   fails fast with a clear error.
+
+The nested `Auth` config interface is removed — client credentials config lives under the
+standard `quarkus.oidc-client.scim.*` prefix, which Quarkus manages natively.
+
+**Tests** configure `casehub.platform.scim.token=test-token` in `application.properties`
+so the OIDC path is not exercised. WireMock stubs the SCIM server only.
 
 ### Dependencies
 
@@ -175,6 +187,10 @@ Auth priority: static `token` wins if present; otherwise `auth.clientId` + `auth
     <groupId>io.quarkus</groupId>
     <artifactId>quarkus-cache</artifactId>
 </dependency>
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-oidc-client</artifactId>
+</dependency>
 <!-- Test -->
 <dependency>
     <groupId>io.quarkus</groupId>
@@ -182,8 +198,8 @@ Auth priority: static `token` wins if present; otherwise `auth.clientId` + `auth
     <scope>test</scope>
 </dependency>
 <dependency>
-    <groupId>io.quarkus</groupId>
-    <artifactId>quarkus-wiremock-devservices</artifactId>
+    <groupId>io.quarkiverse.wiremock</groupId>
+    <artifactId>quarkus-wiremock-test</artifactId>
     <scope>test</scope>
 </dependency>
 ```
@@ -238,7 +254,7 @@ These are in peer repos — file issues there, do not touch them in this session
   (a separate concern from inverse lookup, and @RolesAllowed is not yet wired in casehub)
 - **SCIM write operations** — creating/updating groups; this SPI is read-only
 - **Pagination of SCIM member lists** — initial implementation assumes groups fit in one response
-  (max 1000 members); file an issue if large-group support is needed
+  (max 1000 members); tracked in casehubio/platform#47
 - **Cache invalidation on membership change** — TTL-based expiry is sufficient at this stage
 
 ---
