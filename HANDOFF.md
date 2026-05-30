@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-**Date:** 2026-05-29
+**Date:** 2026-05-30
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -8,38 +8,36 @@
 
 ## Last Session
 
-Shipped `memory-inmem/` (volatile ConcurrentHashMap, 21 tests) and `memory-jpa/` (JPA/Panache, Flyway V1000, PostgreSQL FTS, 20 tests) as Tier 1 `CaseMemoryStore` adapters — platform#32 closed. Breaking SPI change: `EraseRequest.domain` made required; `eraseEntity()` added as `default throw` on `CaseMemoryStore` + `ReactiveCaseMemoryStore`. ADR-0008 amended and #31 closed — adapters live in-platform (not separate repo). Full build green at 268 tests.
+Shipped `casehub-platform-scim` — first real `GroupMembershipProvider` implementation (platform#45, closed). Breaking SPI change: `membersOf()` now returns `Set<GroupMember>` (actorId = OIDC sub = SCIM value UUID; displayName = human label). SCIM 2.0 two-step fetch, `@CacheResult`, static token or OIDC client-credentials auth. All 12 modules green. Pushed to origin and mdproctor fork.
 
 ## Immediate Next Step
 
-`work-start` on **GroupMembership OIDC provider** — deferred three times now.
+`work-start` on **#37 memory-sqlite/** or jump to casehub-work to update `WorkBroker`/`ExclusionPolicy` callers from `Set<String>` → `Set<GroupMember>` (issues filed there; mechanical update).
 
 ## Cross-Module
 
-No active blockers. Consumer adoption for CaseMemoryStore tracked in devtown#43, clinical#33, aml#32 — no platform action needed. PLATFORM.md in parent is stale (parent#90) — update needed there, not here.
+**We're blocking:**
+- `casehub-work` — WorkBroker and ExclusionPolicy call `membersOf()` treating result as `Set<String>`. Mechanical update; issues filed on casehub-work. · S · Low
 
 ## What's Left
 
 - Hook install still pending on 5 repos: `casehub/aml`, `casehub/clinical`, `hortora/garden`, `md-compare`, `casehub-poc` · XS · Low
 - `md-compare` — legacy commit-msg hook in `.git/hooks/`, migrate when branch returns · XS · Low
-- `casehub-parent/docs/repos/casehub-platform.md` — deep-dive needs memory module sync (parent#85) · XS · Low
-- `docs/PLATFORM.md` in parent — stale (casehub-memory refs; filed parent#90) · XS · Low
+- `docs/PLATFORM.md` + `docs/repos/casehub-platform.md` in parent — stale for GroupMember SPI + scim/ module (parent#113 filed) · XS · Low
 
 ## What's Next
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
-| — | GroupMembership OIDC provider | M | Med | Needs directory (Keycloak Admin/LDAP) |
 | #37 | `memory-sqlite/` — SQLite adapter, durable pure-Java | M | Med | Evaluate single-writer concurrency first |
-| #38 | FTS Testcontainers integration test for `memory-jpa/` | S | Low | H2 tests cover chronological only |
-| #39 | CDI priority revisit when `memory-mem0/` arrives — `@Priority(1)` conflict is startup-breaking | S | Med | Block on #33 |
+| #47 | SCIM pagination — groups >1000 members | S | Med | Deferred from #45 |
+| #39 | CDI priority revisit when `memory-mem0/` arrives — `@Priority(1)` conflict | S | Med | Block on #33 |
 | #40 | `memory-memori/` REST adapter — pending Memori API stabilisation | L | Med | Pre-condition: verify DELETE entity_id without process_id |
-| #8 | `preferences-editor/` — admin UI/API write path | XL | High | Parked — no UI work |
+| #8 | `preferences-editor/` — admin UI/API write path | XL | High | Parked |
 
 ## References
 
-- Spec: `docs/specs/2026-05-29-memory-jpa-inmem-design.md`
-- ADR: `adr/0008-casememory-adapter-repository-placement.md` (amended 2026-05-29)
-- Blog: `blog/2026-05-29-mdp01-the-memori-that-wasnt.md`
-- Garden: GE-20260529-8e127e (@TestTransaction), GE-20260529-bc1eaa (TIMESTAMPTZ), GE-20260529-7985ba (flyway.migrate-at-start), GE-0134 revised (build goal omission)
-- Protocol: PP-20260529-57cc3b (casememorystore-adapter-asserttenant-contract), PP-20260529-spi-adapter-placement (universal)
+- Spec: `specs/2026-05-30-scim-group-membership-provider-review.md` (workspace)
+- Blog: `blog/2026-05-30-mdp01-asking-directories-whos-in-the-group.md`
+- Garden: GE-20260530-29545c (Quarkiverse WireMock 1.4.1 + Quarkus 3.32.2 incompatible), GE-20260530-385dbb (@Provider bypasses CDI in REST client filters)
+- Protocol: PP-20260530-88cdf9 (SPI sig change — all in-repo impls same commit, universal)
