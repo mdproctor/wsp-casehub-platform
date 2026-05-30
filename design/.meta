@@ -1,0 +1,8 @@
+branch: issue-37-memory-sqlite
+project-sha: 6b41fd5
+date: 2026-05-30
+issue: 37
+issue-repo: casehubio/platform
+flyway-next-v: none
+design-repo: workspace
+design-section-hashes:
