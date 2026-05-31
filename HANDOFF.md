@@ -22,8 +22,8 @@ Fix `casehub-work` — WorkBroker and ExclusionPolicy callers still treating `me
 ## What's Left
 
 - `erase()` logic inversion in `InMemoryMemoryStore` — null-caseId filter inverted for null-caseId path; passes tests by coincidence. File a separate issue · XS · Low
-- Hook install pending on 5 repos: `casehub/aml`, `casehub/clinical`, `hortora/garden`, `md-compare`, `casehub-poc` · XS · Low
-- `md-compare` — legacy commit-msg hook in `.git/hooks/`, migrate when branch returns · XS · Low
+- Hook install pending on 5 repos: `casehub/aml`, `casehub/clinical`, `hortora/garden`, `casehub/drafthouse`, `casehub-poc` · XS · Low
+- `casehub/drafthouse` — legacy commit-msg hook in `.git/hooks/`, migrate when branch returns · XS · Low
 - parent#130 filed — `docs/PLATFORM.md` + `docs/repos/casehub-platform.md` need memory-sqlite added (peer repo, filed) · XS · Low
 - platform#50 filed — `fts.enabled=false` test profile for `memory-sqlite` · XS · Low
 
