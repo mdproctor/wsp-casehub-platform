@@ -8,13 +8,16 @@
 
 ## Last Session
 
-Completed work-end on issue-35-47-51-small-batch: #35 (reactive storeAll), #47 (SCIM pagination with configurable member-page-size), #51 (erase contract test verified). Branch hygiene: 14+ project branches stamped, two abandoned workspace branches closed, worktree-agent branch stamped via commit-tree. CLAUDE.md synced. Blog published. Two garden entries submitted.
+Two-session summary: (1) #35/#47/#51 small-batch closes (reactive storeAll, SCIM pagination, erase contract test). (2) casehub-platform-identity created — identity SPIs (ActorDIDProvider, DIDResolver, AgentCredentialValidator), model types, CDI events, and all implementations (NoOp*, KeyDIDResolver, WebDIDResolver, ConfiguredActorDIDProvider, ScimActorDIDProvider, AbstractCachingIdentityProvider) extracted from casehub-ledger into new platform module. CLAUDE.md updated. Closes platform#52. Config prefix: casehub.identity.*
 
 ## Immediate Next Step
 
-Identify which repo contains WorkBroker and ExclusionPolicy — `casehub-work` does not exist in casehubio org. Check casehub-engine or casehub-ledger. File issue there, then `/work`.
+Phase 2: casehub-platform-identity — platform#53 (move AgentIdentityVerificationService) is blocked on ledger#113 (signature refactor). Wait for ledger#113 to land, then implement platform#53. Otherwise pick from What's Next below.
 
 ## Cross-Module
+
+**Blocked by:**
+- `casehubio/ledger#113` — AgentIdentityVerificationService signature refactor must land before platform#53 (Phase 2 move) can proceed · M · Med
 
 **We're blocking:**
 - Unknown repo — WorkBroker and ExclusionPolicy call `membersOf()` expecting `Set<String>`. Next session: identify correct repo before filing issue. · S · Low
