@@ -8,11 +8,11 @@
 
 ## Last Session
 
-Three fixes landed on main: (1) Jandex index added to `casehub-platform-api` (#54) — SPI jar was missing `META-INF/jandex.idx`, breaking ARC type resolution in consumers. (2) Keycloak DevServices disabled in SCIM tests (#54) — `quarkus-oidc-client` was spinning up a full Keycloak container even with static token auth; fixing this surfaced a `SRCFG00050` config gap (`member-page-size` not declared in `ScimConfig`), both fixed, SCIM tests now run in 5s. (3) `ScimActorDIDProvider` constructor and `validateEndpoint` widened to public (#53 prep). `AgentIdentityVerificationService` / `ReactiveAgentIdentityVerificationService` with primitive signature added to `casehub-platform-identity` (#53 — now closed). ledger#113 also closed.
+ACL design session. Researched all Quarkus-available options (Keycloak AuthZ, @PermissionsAllowed, OpenFGA, SpiceDB, jCasbin, OPA) and decided on custom flat JPA with implicit inheritance. Case is the natural ACL boundary — every engine entity traces to caseId in one hop. Multi-tenancy stays as a data layer filter (tenancyId already on all engine entities). Worker use cases (quarkus-flow, drools) arriving within 24 hours held implementation — spec written at `docs/specs/2026-06-01-acl-design.md`.
 
 ## Immediate Next Step
 
-Platform#53 and ledger#113 are both closed — identity extraction is complete. Next: pick from What's Next. #49 (CDI emission) needs app feedback first; #39 blocks on #33. Alternatives: hook installs on 5 repos (What's Left) or start #33 (Mem0 adapter).
+quarkus-flow and drools workers are landing imminently. Read the new worker use cases and answer the open questions in §6.5 of `docs/specs/2026-06-01-acl-design.md` before filing a GitHub issue or writing any ACL code.
 
 ## Cross-Module
 
@@ -29,6 +29,7 @@ Platform#53 and ledger#113 are both closed — identity extraction is complete. 
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
+| — | ACL SPI + acl-jpa/ module | L | Med | Blocked on worker use cases — read spec §6.5 first |
 | #49 | CDI emission investigation — Options A/B/C + storeAll batch | M | Med | Needs devtown/clinical/aml app feedback first |
 | #39 | CDI priority revisit when `memory-mem0/` arrives | S | Med | Blocks on #33 |
 | #33 | Mem0 adapter | L | Med | |
@@ -37,7 +38,6 @@ Platform#53 and ledger#113 are both closed — identity extraction is complete. 
 
 ## References
 
-- Blog: `blog/2026-06-01-mdp02-oom-hiding-config-bug.md`
-- Prior blog: `blog/2026-06-01-mdp01-five-closes-one-gotcha.md`
-- Garden: GE-20260601-08a351 (quarkus-oidc-client triggers Keycloak DevServices even with static token auth), revise GE-20260529-5a8158 (OOMKill masks SRCFG00050)
-- Protocols: PP-20260601-b600ee (configmapping-prefix-ownership), revised library-jars-require-jandex to include SPI supertypes
+- ACL spec: `docs/specs/2026-06-01-acl-design.md`
+- Blog: `blog/2026-06-01-mdp03-the-permission-layer.md`
+- Prior blog: `blog/2026-06-01-mdp02-oom-hiding-config-bug.md`
