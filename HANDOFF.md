@@ -56,3 +56,4 @@ Then begin claudony#121 (full tenancy foundation).
 - ACL spec: `docs/specs/2026-06-01-acl-design.md`
 - CI/CD dispatch audit: `blog/2026-06-02-mdp01-the-chain-that-wasnt-there.md`
 - Prior blog: `blog/2026-06-01-mdp03-the-permission-layer.md`
+- Platform module onboarding protocol: `PP-20260602-84e308` in casehub/garden (platform-module-progression.md)
