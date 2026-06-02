@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-06-02-mdp01-the-chain-that-wasnt-there.md](2026-06-02-mdp01-the-chain-that-wasnt-there.md) | 2026-06-02 | The chain that wasn't there |
 | [2026-06-01-mdp03-the-permission-layer.md](2026-06-01-mdp03-the-permission-layer.md) | 2026-06-01 | The Permission Layer |
 | [2026-06-01-mdp02-oom-hiding-config-bug.md](2026-06-01-mdp02-oom-hiding-config-bug.md) | 2026-06-01 | The OOM That Was Hiding a Config Bug |
 | [2026-06-01-mdp01-five-closes-one-gotcha.md](2026-06-01-mdp01-five-closes-one-gotcha.md) | 2026-06-01 | Five closes, one gotcha |
