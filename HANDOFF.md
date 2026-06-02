@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-**Date:** 2026-06-01
+**Date:** 2026-06-02
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -8,22 +8,36 @@
 
 ## Last Session
 
-ACL design session. Researched all Quarkus-available options (Keycloak AuthZ, @PermissionsAllowed, OpenFGA, SpiceDB, jCasbin, OPA) and decided on custom flat JPA with implicit inheritance. Case is the natural ACL boundary — every engine entity traces to caseId in one hop. Multi-tenancy stays as a data layer filter (tenancyId already on all engine entities). Worker use cases (quarkus-flow, drools) arriving within 24 hours held implementation — spec written at `docs/specs/2026-06-01-acl-design.md`.
+Cross-repo CI/CD audit. Claudony was failing because engine-ledger SNAPSHOT on GitHub Packages predated the tenancyId commits. Root cause: engine's dispatch chain was missing claudony (and aml, devtown, life). Also found eidos was dispatching to devtown+claudony instead of engine — wrong repos entirely. Fixed 8 workflow files across platform/ledger/work/connectors/engine/eidos/qhorus/drafthouse. Filed exhaustive multi-tenancy state audit as parent#140. Claudony CI is now green.
 
 ## Immediate Next Step
 
-quarkus-flow and drools workers are landing imminently. Read the new worker use cases and answer the open questions in §6.5 of `docs/specs/2026-06-01-acl-design.md` before filing a GitHub issue or writing any ACL code.
+Fix the protocol violation in `casehub/src/main/java/io/casehub/claudony/casehub/ClaudonyLedgerEventCapture.java` line 67:
+```java
+// Replace this:
+entry.tenancyId = event.tenancyId() != null ? event.tenancyId() : "default";
+// With:
+entry.tenancyId = Objects.requireNonNull(event.tenancyId(), "tenancyId missing from CaseLifecycleEvent — upstream bug");
+```
+Then begin claudony#121 (full tenancy foundation).
 
 ## Cross-Module
 
 **We're blocking:**
 - Unknown repo — `WorkBroker` and `ExclusionPolicy` call `membersOf()` expecting `Set<String>`. Identify correct repo and file issue. · S · Low
 
+**Blocked by:**
+- quarkus-flow and drools worker use cases still pending — gates ACL SPI work. Read spec §6.5 in `docs/specs/2026-06-01-acl-design.md` before any ACL code.
+
 ## What's Left
 
-- Hook install pending on 5 repos: `casehub/aml`, `casehub/clinical`, `hortora/garden`, `casehub/drafthouse`, `casehub-poc` · XS · Low
+- **claudony**: `ClaudonyLedgerEventCapture` null-guard protocol violation — fix before any other claudony work · XS · Low
+- **qhorus**: local main diverged from casehubio upstream — devtown/life dispatch fix stranded locally; needs branch reconciliation · S · Med
+- **engine#411**: NOT NULL enforcement for tenancy_id in V2002/V2003 — Hibernate validate strategy will fail at startup on affected consumers · S · Low
+- Hook install pending on: `casehub/aml`, `casehub/clinical`, `hortora/garden` · XS · Low
 - parent#130 filed — `docs/PLATFORM.md` + `docs/repos/casehub-platform.md` need `memory-sqlite` added · XS · Low
 - Workspace epic branches past deletion dates: `epic-platform-api`, `epic-platform-testing`, `epic-quarkus-alignment`, `epic-platform-config` — kept by user choice
+- `worktree-agent-a9a47edb7a2ab6ca0` — orphaned agent worktree on project repo, worth cleaning up
 
 ## What's Next
 
@@ -38,6 +52,7 @@ quarkus-flow and drools workers are landing imminently. Read the new worker use 
 
 ## References
 
+- Multi-tenancy org audit: `casehubio/parent#140`
 - ACL spec: `docs/specs/2026-06-01-acl-design.md`
-- Blog: `blog/2026-06-01-mdp03-the-permission-layer.md`
-- Prior blog: `blog/2026-06-01-mdp02-oom-hiding-config-bug.md`
+- CI/CD dispatch audit: `blog/2026-06-02-mdp01-the-chain-that-wasnt-there.md`
+- Prior blog: `blog/2026-06-01-mdp03-the-permission-layer.md`
