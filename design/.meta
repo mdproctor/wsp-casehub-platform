@@ -1,0 +1,8 @@
+branch: issue-55-agent-module
+project-sha: 7f7dc24b1cc36750f15e39df6027987fb4fb84cb
+date: 2026-06-02
+issue: 55
+issue-repo: casehubio/platform
+flyway-next-v: none
+design-repo: project
+design-section-hashes:
