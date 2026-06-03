@@ -31,7 +31,6 @@ Then begin claudony#121 (full tenancy foundation).
 
 - **claudony**: `ClaudonyLedgerEventCapture` null-guard protocol violation — fix before any other claudony work · XS · Low
 - **qhorus**: local main diverged from casehubio upstream — devtown/life dispatch fix stranded locally; needs branch reconciliation · S · Med
-- **engine#411**: NOT NULL enforcement for tenancy_id in V2002/V2003 — Hibernate validate strategy will fail at startup on affected consumers · S · Low
 - Hook install pending on: `casehub/aml`, `casehub/clinical`, `hortora/garden` · XS · Low
 - platform#57 — openclaw: assess ClaudeAgentProvider vs tmux WorkerProvisioner · S · Med
 - platform#58 — AgentSession multi-turn (v2, deferred) · L · Med
