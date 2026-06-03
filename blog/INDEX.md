@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-06-03-mdp01-shipping-platform-agent.md](2026-06-03-mdp01-shipping-platform-agent.md) | 2026-06-03 | Shipping casehub-platform-agent — timeout flaw, CDI module separation, JdkFlowAdapter |
 | [2026-06-02-mdp01-the-chain-that-wasnt-there.md](2026-06-02-mdp01-the-chain-that-wasnt-there.md) | 2026-06-02 | The chain that wasn't there |
 | [2026-06-01-mdp03-the-permission-layer.md](2026-06-01-mdp03-the-permission-layer.md) | 2026-06-01 | The Permission Layer |
 | [2026-06-01-mdp02-oom-hiding-config-bug.md](2026-06-01-mdp02-oom-hiding-config-bug.md) | 2026-06-01 | The OOM That Was Hiding a Config Bug |
