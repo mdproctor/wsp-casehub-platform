@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-06-03-mdp02-two-ways-to-launch-claude.md](2026-06-03-mdp02-two-ways-to-launch-claude.md) | 2026-06-03 | Two ways to launch Claude — ClaudeAgentProvider vs tmux, Awaitility semaphore fix |
 | [2026-06-03-mdp01-shipping-platform-agent.md](2026-06-03-mdp01-shipping-platform-agent.md) | 2026-06-03 | Shipping casehub-platform-agent — timeout flaw, CDI module separation, JdkFlowAdapter |
 | [2026-06-02-mdp01-the-chain-that-wasnt-there.md](2026-06-02-mdp01-the-chain-that-wasnt-there.md) | 2026-06-02 | The chain that wasn't there |
 | [2026-06-01-mdp03-the-permission-layer.md](2026-06-01-mdp03-the-permission-layer.md) | 2026-06-01 | The Permission Layer |
