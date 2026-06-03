@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-**Date:** 2026-06-02
+**Date:** 2026-06-03
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -8,16 +8,14 @@
 
 ## Last Session
 
-Cross-repo CI/CD audit. Claudony was failing because engine-ledger SNAPSHOT on GitHub Packages predated the tenancyId commits. Root cause: engine's dispatch chain was missing claudony (and aml, devtown, life). Also found eidos was dispatching to devtown+claudony instead of engine — wrong repos entirely. Fixed 8 workflow files across platform/ledger/work/connectors/engine/eidos/qhorus/drafthouse. Filed exhaustive multi-tenancy state audit as parent#140. Claudony CI is now green.
+Shipped platform#55: `casehub-platform-agent-api` and `casehub-platform-agent-claude`. Five rounds of spec review converged on: `AgentProvider` SPI + `NoOpAgentProvider @DefaultBean`, `ClaudeAgentClient @Startup`, scheduled subprocess closure for wall-clock timeout, `JdkFlowAdapter` for Flux→Multi bridge. All deployed to casehubio/platform main, mdproctor fork, and mdproctor.github.io (4 blog entries). Branch closed and stamped.
 
 ## Immediate Next Step
 
-Fix the protocol violation in `casehub/src/main/java/io/casehub/claudony/casehub/ClaudonyLedgerEventCapture.java` line 67:
+Fix the claudony tenancyId null-guard protocol violation — still unresolved from the previous handover:
+`casehub/src/main/java/io/casehub/claudony/casehub/ClaudonyLedgerEventCapture.java` line 67:
 ```java
-// Replace this:
-entry.tenancyId = event.tenancyId() != null ? event.tenancyId() : "default";
-// With:
-entry.tenancyId = Objects.requireNonNull(event.tenancyId(), "tenancyId missing from CaseLifecycleEvent — upstream bug");
+entry.tenancyId = Objects.requireNonNull(event.tenancyId(), "tenancyId missing from CaseLifecycleEvent");
 ```
 Then begin claudony#121 (full tenancy foundation).
 
@@ -35,9 +33,12 @@ Then begin claudony#121 (full tenancy foundation).
 - **qhorus**: local main diverged from casehubio upstream — devtown/life dispatch fix stranded locally; needs branch reconciliation · S · Med
 - **engine#411**: NOT NULL enforcement for tenancy_id in V2002/V2003 — Hibernate validate strategy will fail at startup on affected consumers · S · Low
 - Hook install pending on: `casehub/aml`, `casehub/clinical`, `hortora/garden` · XS · Low
-- parent#130 filed — `docs/PLATFORM.md` + `docs/repos/casehub-platform.md` need `memory-sqlite` added · XS · Low
+- platform#57 — openclaw: assess ClaudeAgentProvider vs tmux WorkerProvisioner · S · Med
+- platform#58 — AgentSession multi-turn (v2, deferred) · L · Med
+- platform#59 — PLATFORM.md + CLAUDE.md update for agent-api/agent-claude modules · XS · Low
+- platform#60 — `Thread.sleep` in cancellation test → deterministic sync · XS · Low
+- platform#61 — spec BOM groupId typo fix · XS · Low
 - Workspace epic branches past deletion dates: `epic-platform-api`, `epic-platform-testing`, `epic-quarkus-alignment`, `epic-platform-config` — kept by user choice
-- `worktree-agent-a9a47edb7a2ab6ca0` — orphaned agent worktree on project repo, worth cleaning up
 
 ## What's Next
 
@@ -52,8 +53,7 @@ Then begin claudony#121 (full tenancy foundation).
 
 ## References
 
-- Multi-tenancy org audit: `casehubio/parent#140`
+- Downstream migration: platform#55 comments — drafthouse, eidos, engine, devtown, aml, clinical each need `-claude/` module
 - ACL spec: `docs/specs/2026-06-01-acl-design.md`
-- CI/CD dispatch audit: `blog/2026-06-02-mdp01-the-chain-that-wasnt-there.md`
-- Prior blog: `blog/2026-06-01-mdp03-the-permission-layer.md`
-- Platform module onboarding protocol: `PP-20260602-84e308` in casehub/garden (platform-module-progression.md)
+- Agent spec: `docs/superpowers/specs/2026-06-02-agent-module-design.md`
+- Blog: `blog/2026-06-03-mdp01-shipping-platform-agent.md`
