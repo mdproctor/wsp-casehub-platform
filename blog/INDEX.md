@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-06-04-mdp01-mem0-adapter.md](2026-06-04-mdp01-mem0-adapter.md) | 2026-06-04 | Teaching a Java adapter to talk to Mem0 — and what the docs got wrong |
 | [2026-06-03-mdp02-two-ways-to-launch-claude.md](2026-06-03-mdp02-two-ways-to-launch-claude.md) | 2026-06-03 | Two ways to launch Claude — ClaudeAgentProvider vs tmux, Awaitility semaphore fix |
 | [2026-06-03-mdp01-shipping-platform-agent.md](2026-06-03-mdp01-shipping-platform-agent.md) | 2026-06-03 | Shipping casehub-platform-agent — timeout flaw, CDI module separation, JdkFlowAdapter |
 | [2026-06-02-mdp01-the-chain-that-wasnt-there.md](2026-06-02-mdp01-the-chain-that-wasnt-there.md) | 2026-06-02 | The chain that wasn't there |
