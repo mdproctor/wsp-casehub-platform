@@ -41,7 +41,6 @@ Then begin claudony#121 (full tenancy foundation).
 | #49 | CDI emission investigation — Options A/B/C + storeAll batch | M | Med | Needs devtown/clinical/aml feedback first |
 | #39 | CDI priority revisit (memory-mem0/ shipped, unblocked) | S | Med | |
 | #34 | Graphiti adapter (`memory-graphiti/`) | L | Med | |
-| #8 | `preferences-editor/` — admin UI/API write path | XL | High | Parked |
 
 ## References
 
