@@ -1,0 +1,9 @@
+branch: issue-39-memory-cdi-and-priority
+date: 2026-06-05
+issue: 39
+issue-repo: casehubio/platform
+covers: 39,49
+flyway-next-v: none
+design-repo: workspace
+design-section-hashes:
+project-sha: 6037bb11622891837d4218461904ab6e27023801
