@@ -1,0 +1,9 @@
+branch: issue-56-arc42stories
+project-sha: 0efcbe5a81c1271a8d976bf9b226cd06a1c13c30
+date: 2026-06-05
+issue: 56
+issue-repo: casehubio/platform
+covers: 56
+flyway-next-v: none
+design-repo: workspace
+design-section-hashes:

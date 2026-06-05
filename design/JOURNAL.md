@@ -1,4 +1,4 @@
-# Design Journal — issue-45-oidc-group-membership
+# Design Journal — issue-56-arc42stories
 
 ### 2026-05-30 · §CapabilityOwnership · §Modules
 
