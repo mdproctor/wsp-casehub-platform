@@ -32,9 +32,9 @@ Then begin claudony#121 (full tenancy foundation).
 
 ## What's Left
 
-- **claudony**: `ClaudonyLedgerEventCapture` null-guard protocol violation · XS · Low
-- **qhorus**: local main diverged from casehubio upstream · S · Med
-- Hook install pending: `casehub/aml`, `casehub/clinical`, `hortora/garden` · XS · Low
+- **claudony**: `ClaudonyLedgerEventCapture` silently falls back to `"default"` tenancyId instead of failing fast — protocol violation · XS · Low
+- **qhorus**: large uncommitted WIP (15 modified, 5 untracked) — needs review before next session · M · Med
+- Hook install pending: `casehub/clinical` only · XS · Low
 - platform#58 — AgentSession multi-turn (v2, deferred) · L · Med
 - platform#68 — ACL/authorization model: 6 open decisions before design can start (see spec §6.9) · L · High
 - platform#70 — Mem0 storeAll() parallel batch (revisit when Mem0 PRs #4804/#5194 merge) · S · Low
@@ -47,7 +47,7 @@ Then begin claudony#121 (full tenancy foundation).
 |---|-------------|-------|------------|-------|
 | #68 | Authorization model design — resolve 6 open decisions, then implement | L | High | Read spec §6.9 first; flat vs role-based is the gate |
 | — | ACL SPI + `acl-jpa/` module | L | Med | Blocked on #68 decisions |
-| #34 | Graphiti adapter (`memory-graphiti/`) | L | Med | |
+| #34 | Graphiti adapter (`memory-graphiti/`) | L | Med | Implement in platform repo like other memory backends |
 | #70 | Mem0 storeAll() parallel batch | S | Low | Deferred pending Mem0 PRs #4804/#5194 |
 
 ## References
