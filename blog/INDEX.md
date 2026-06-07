@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-06-07-mdp01-storeall-preflight.md](2026-06-07-mdp01-storeall-preflight.md) | 2026-06-07 | The pre-flight pattern: why REST adapters can't rely on transaction rollback — Mem0 batch PRs are client-side parallelism, partial-write bug in InMemory, pre-flight fix |
 | [2026-06-06-mdp01-finding-thirty-five-gaps.md](2026-06-06-mdp01-finding-thirty-five-gaps.md) | 2026-06-06 | Finding Thirty-Five Gaps in a Document I'd Just Written — ARC42STORIES.MD completion, systematic review, root-scope chain, OOM disguising config bug |
 | [2026-06-05-mdp01-storeall-contract.md](2026-06-05-mdp01-storeall-contract.md) | 2026-06-05 | The Contract storeAll() Didn't Enforce — CDI priority tier, @ObservesAsync contradiction in spec, partial write fix |
 | [2026-06-04-mdp02-the-authorization-gap-beneath-the-spec.md](2026-06-04-mdp02-the-authorization-gap-beneath-the-spec.md) | 2026-06-04 | The authorization gap beneath the ACL spec — no actor identity in the case hierarchy, corrected authorization model, platform#68 |
