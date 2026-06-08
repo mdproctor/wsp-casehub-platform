@@ -35,7 +35,6 @@ Falls back to `"default"` instead of failing fast — protocol violation. Fix, t
 ## What's Left
 
 - **claudony**: `ClaudonyLedgerEventCapture` silently falls back to `"default"` tenancyId — protocol violation · XS · Low
-- **qhorus**: large uncommitted WIP (15 modified, 5 untracked) — needs review before next session · M · Med
 - Hook install pending: `casehub/clinical` only · XS · Low
 - platform#58 — AgentSession multi-turn (v2, deferred) · L · Med
 - platform#70 — Mem0 storeAll() parallel batch (revisit when Mem0 PRs #4804/#5194 merge) · S · Low
