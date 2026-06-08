@@ -5,6 +5,7 @@
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
 *Updated: #68 closed — removed from backlog.*
+*Updated: parent#203 closed — removed from backlog.*
 
 ---
 
@@ -42,7 +43,6 @@ Falls back to `"default"` instead of failing fast — protocol violation. Fix, t
 - platform#74 — Graphiti eraseById() deletes episode only; derived facts persist · S · Med
 - platform#75 — Graphiti erase(EraseRequest) domain+caseId scoped deletion not supported · M · High
 - platform#76 — Verify Graphiti REST server exposes validAt/entityTypes in search endpoint · XS · Low
-- parent#203 — PLATFORM.md / casehub-platform deep-dive needs memory-graphiti + GraphCaseMemoryStore entries · S · Low
 - Workspace epic branches past deletion dates — kept by user choice
 
 ## What's Next
