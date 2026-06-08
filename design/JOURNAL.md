@@ -1,19 +1,9 @@
-# Design Journal — issue-45-oidc-group-membership
+# Design Journal — issue-34-graphiti-memory-adapter
 
-### 2026-05-30 · §CapabilityOwnership · §Modules
+### 2026-06-08 · §9.4·L1 · §9.4·L6
 
-`GroupMembershipProvider.membersOf()` now returns `Set<GroupMember>` — a
-breaking SPI change. `GroupMember` carries `actorId` (= OIDC `sub` = SCIM
-`value` UUID, stable identity key) and `displayName` (human label, never used
-as a routing key). The raw `Set<String>` return was insufficient for the
-inverse-membership query: callers need a value that correlates with
-`CurrentPrincipal.actorId()` and a plain string provided no such guarantee.
+Added `MemoryCapability` enum and `MemoryCapabilityException` to `platform-api` as a self-description mechanism: every `CaseMemoryStore` adapter declares `capabilities()` returning the set of operations it supports, and callers use `requireCapability()` to get a typed exception rather than a silent no-op or `UnsupportedOperationException` when an unsupported operation is requested. The `eraseById()` and `eraseEntity()` SPI defaults were changed from `UnsupportedOperationException` to `MemoryCapabilityException` to unify signalling.
 
-New module `scim/` (`casehub-platform-scim`) provides the first real
-implementation: a SCIM 2.0 REST client (`@ApplicationScoped`, Tier 1 CDI
-priority — displaces `@DefaultBean` mock by classpath presence). Two-step
-fetch: Step 1 lists the group with inline members; Step 2 fetches by id when
-members are absent from the list response (common for large groups on some
-servers). Cache via `@CacheResult` prevents per-routing-decision SCIM calls.
-Auth: static bearer token wins; otherwise named OIDC client `"scim"` via
-`quarkus.oidc-client.scim.*` handles token acquisition and refresh.
+`GraphCaseMemoryStore extends CaseMemoryStore` was added to `platform-api` as the graph-native SPI extension. It introduces `graphQuery(GraphMemoryQuery)` — a semantic-only entry point carrying graph-native parameters (`validAt`, `entityTypes`, `resultType`). `NoOpCaseMemoryStore` now implements `GraphCaseMemoryStore`, so no `UnsatisfiedResolutionException` fires when the new injection type is used without a graph adapter present.
+
+`memory-graphiti/` implements `GraphCaseMemoryStore` at `@Alternative @Priority(2)`, backed by the Graphiti OSS REST API (getzep/graphiti). The adapter uses per-entity `POST /search` calls for RELEVANCE queries and per-entity `GET /episodes/{group_id}` for CHRONOLOGICAL, ensuring `Memory.entityId` attribution is always correct. Domain and caseId are not server-side filterable by Graphiti; they are stored in `Message.source_description` for debugging but not declared as supported capabilities. Temporal data (`valid_at`/`invalid_at` from `FactResult`) is surfaced in `Memory.attributes` via the new `VALID_FROM`/`VALID_UNTIL` keys in `MemoryAttributeKeys`. This is the Tier 3 memory backend, completing the four-tier memory stack (volatile → FTS → vector → temporal knowledge graph).
