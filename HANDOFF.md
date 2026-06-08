@@ -4,6 +4,8 @@
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
+*Updated: #68 closed — removed from backlog.*
+
 ---
 
 ## Last Session
@@ -35,7 +37,6 @@ Falls back to `"default"` instead of failing fast — protocol violation. Fix, t
 - **qhorus**: large uncommitted WIP (15 modified, 5 untracked) — needs review before next session · M · Med
 - Hook install pending: `casehub/clinical` only · XS · Low
 - platform#58 — AgentSession multi-turn (v2, deferred) · L · Med
-- platform#68 — ACL/authorization model: 6 open decisions before design can start (see spec §6.9) · L · High
 - platform#70 — Mem0 storeAll() parallel batch (revisit when Mem0 PRs #4804/#5194 merge) · S · Low
 - platform#71 — SQLite storeAll() pre-flight checks item 0 only — cosmetic · XS · Low
 - platform#74 — Graphiti eraseById() deletes episode only; derived facts persist · S · Med
@@ -48,8 +49,6 @@ Falls back to `"default"` instead of failing fast — protocol violation. Fix, t
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
-| #68 | Authorization model design — resolve 6 open decisions, then implement | L | High | Read spec §6.9 first; flat vs role-based is the gate |
-| — | ACL SPI + `acl-jpa/` module | L | Med | Blocked on #68 decisions |
 | #70 | Mem0 storeAll() parallel batch | S | Low | Deferred pending Mem0 PRs #4804/#5194 |
 
 ## References
