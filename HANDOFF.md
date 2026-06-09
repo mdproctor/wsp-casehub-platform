@@ -8,17 +8,17 @@
 
 ## Last Session
 
-Closed platform#71, #74, #76 on branch `issue-71-memory-adapter-fixes`. PR #80 open.
+Closed platform#71, #74, #76 — issues closed, branch marked, PR #81 open to `casehubio/platform` main.
 
-- **#71** SQLite `storeAll()` pre-flight: replaced `inputs.get(0)` check with `inputs.forEach()` — all inputs verified before the JDBC transaction opens.
-- **#74** Graphiti `eraseById()`: removed `ERASE_BY_ID` from `capabilities()`; method now throws `MemoryCapabilityException`. Graphiti `DELETE /episode/{uuid}` only removes the source `EpisodicNode`; derived entity/relationship facts persist — GDPR Art.17 completeness cannot be guaranteed.
-- **#76** Graphiti REST params verified: `POST /search` exposes only `group_ids`/`query`/`max_facts`. `TEMPORAL_GRAPH` works via client-side filtering of returned `validAt`/`invalidAt` fields. `ENTITY_TYPE_FILTER` and `ENTITY_TRAVERSAL` correctly absent. Documented in `capabilities()`.
+- **#71** SQLite `storeAll()`: `inputs.get(0)` → `inputs.forEach()` pre-flight; JDBC transaction opens only after all tenant checks pass.
+- **#74** Graphiti `eraseById()`: removed `ERASE_BY_ID` from `capabilities()`; throws `MemoryCapabilityException`. DELETE /episode/{uuid} leaves derived EntityNode/EntityEdge facts — GDPR Art.17 incomplete. ADR 0010 documents the decision. Protocol PP-20260609-9b403d formalises the rule.
+- **#76** Graphiti REST: `POST /search` exposes only `group_ids/query/max_facts`. `TEMPORAL_GRAPH` correct via client-side `validAt`/`invalidAt` filtering.
 
-Cross-repo: claudony#152 committed on `issue-152-tenancyid-default-fix` — `ClaudonyLedgerEventCapture` no longer defaults `tenancyId` to `"default"` on null; fails fast instead. Filed engine#460 for `CaseLedgerEntry.tenancyId` field shadowing issue. Clinical git hooks installed.
+Cross-repo: claudony#152 committed (fail-fast on null tenancyId). Clinical git hooks installed. engine#460 filed (CaseLedgerEntry field shadowing).
 
 ## Immediate Next Step
 
-Merge PR #80 into `casehubio/platform`. Then merge claudony#152 branch.
+Merge PR #81 (`casehubio/platform`). Then merge claudony#152 branch.
 
 ## Cross-Module
 
@@ -26,11 +26,10 @@ Merge PR #80 into `casehubio/platform`. Then merge claudony#152 branch.
 
 ## What's Left
 
-- claudony#152 branch needs merge
-- engine#460 — `CaseLedgerEntry.tenancyId` field shadowing causes Hibernate NOT NULL violation (blocks claudony test suite)
+- claudony#152 branch needs merge · XS · Low
+- engine#460 — `CaseLedgerEntry.tenancyId` field shadowing causes Hibernate NOT NULL violation (blocks claudony test suite) · S · Med
 - platform#58 — AgentSession multi-turn (v2, deferred) · L · Med
 - platform#70 — Mem0 storeAll() parallel batch (deferred pending Mem0 PRs #4804/#5194) · S · Low
-- platform#74 → closed by PR #80
 - platform#75 — Graphiti erase(EraseRequest) domain+caseId scoped deletion · M · High
 - Workspace epic branches past deletion dates — kept by user choice
 
@@ -43,8 +42,8 @@ Merge PR #80 into `casehubio/platform`. Then merge claudony#152 branch.
 
 ## References
 
-- PR #80: https://github.com/casehubio/platform/pull/80
+- PR #81: https://github.com/casehubio/platform/pull/81
 - claudony#152 branch: `issue-152-tenancyid-default-fix`
 - engine#460: https://github.com/casehubio/engine/issues/460
-- ACL spec: `docs/specs/2026-06-01-acl-design.md`
-- Blog: `blog/2026-06-08-mdp01-graphiti-temporal-memory-adapter.md`
+- ADR 0010: `adr/0010-remove-erase-by-id-from-graphiti-capabilities.md`
+- Blog: `blog/2026-06-09-mdp01-erasing-what-was-extracted.md`
