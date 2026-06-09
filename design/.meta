@@ -1,0 +1,9 @@
+branch: issue-54-xs-s-batch-fixes
+project-sha: c9222c68b94cc8a5f6435dcbd692a168730e8d0b
+date: 2026-06-10
+issue: 54
+issue-repo: casehubio/platform
+covers: 54,62,64,72,79
+flyway-next-v: none
+design-repo: workspace
+design-section-hashes: 
