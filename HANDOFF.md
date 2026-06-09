@@ -1,32 +1,24 @@
 # HANDOFF — casehub-platform
 
-**Date:** 2026-06-08
+**Date:** 2026-06-09
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
-
-*Updated: #68 closed — removed from backlog.*
-*Updated: parent#203 closed — removed from backlog.*
 
 ---
 
 ## Last Session
 
-Closed platform#34. `memory-graphiti/` ships as `@Alternative @Priority(2)` `GraphCaseMemoryStore`
-backed by Graphiti OSS REST API (temporal knowledge graph). Added `MemoryCapability` enum +
-`MemoryCapabilityException` — all adapters now self-declare capabilities, callers use
-`requireCapability()` for typed exceptions. `GraphCaseMemoryStore extends CaseMemoryStore` added to
-`platform-api` for graph-native `graphQuery(GraphMemoryQuery)`. `NoOpCaseMemoryStore` implements the
-new interface. PR #77 open against casehubio/platform. Filed #74 (eraseById partial delete), #75
-(erase domain+caseId unsupported), #76 (Graphiti REST param coverage), parent#203 (PLATFORM.md sync).
+Closed platform#71, #74, #76 on branch `issue-71-memory-adapter-fixes`. PR #80 open.
+
+- **#71** SQLite `storeAll()` pre-flight: replaced `inputs.get(0)` check with `inputs.forEach()` — all inputs verified before the JDBC transaction opens.
+- **#74** Graphiti `eraseById()`: removed `ERASE_BY_ID` from `capabilities()`; method now throws `MemoryCapabilityException`. Graphiti `DELETE /episode/{uuid}` only removes the source `EpisodicNode`; derived entity/relationship facts persist — GDPR Art.17 completeness cannot be guaranteed.
+- **#76** Graphiti REST params verified: `POST /search` exposes only `group_ids`/`query`/`max_facts`. `TEMPORAL_GRAPH` works via client-side filtering of returned `validAt`/`invalidAt` fields. `ENTITY_TYPE_FILTER` and `ENTITY_TRAVERSAL` correctly absent. Documented in `capabilities()`.
+
+Cross-repo: claudony#152 committed on `issue-152-tenancyid-default-fix` — `ClaudonyLedgerEventCapture` no longer defaults `tenancyId` to `"default"` on null; fails fast instead. Filed engine#460 for `CaseLedgerEntry.tenancyId` field shadowing issue. Clinical git hooks installed.
 
 ## Immediate Next Step
 
-Fix the claudony `tenancyId` silent-default protocol violation:
-`casehub/claudony/casehub/src/main/java/io/casehub/claudony/casehub/ClaudonyLedgerEventCapture.java` line 75:
-```java
-entry.tenancyId = event.tenancyId() != null ? event.tenancyId() : "default";
-```
-Falls back to `"default"` instead of failing fast — protocol violation. Fix, then begin claudony#121 (full tenancy foundation).
+Merge PR #80 into `casehubio/platform`. Then merge claudony#152 branch.
 
 ## Cross-Module
 
@@ -34,14 +26,12 @@ Falls back to `"default"` instead of failing fast — protocol violation. Fix, t
 
 ## What's Left
 
-- **claudony**: `ClaudonyLedgerEventCapture` silently falls back to `"default"` tenancyId — protocol violation · XS · Low
-- Hook install pending: `casehub/clinical` only · XS · Low
+- claudony#152 branch needs merge
+- engine#460 — `CaseLedgerEntry.tenancyId` field shadowing causes Hibernate NOT NULL violation (blocks claudony test suite)
 - platform#58 — AgentSession multi-turn (v2, deferred) · L · Med
-- platform#70 — Mem0 storeAll() parallel batch (revisit when Mem0 PRs #4804/#5194 merge) · S · Low
-- platform#71 — SQLite storeAll() pre-flight checks item 0 only — cosmetic · XS · Low
-- platform#74 — Graphiti eraseById() deletes episode only; derived facts persist · S · Med
-- platform#75 — Graphiti erase(EraseRequest) domain+caseId scoped deletion not supported · M · High
-- platform#76 — Verify Graphiti REST server exposes validAt/entityTypes in search endpoint · XS · Low
+- platform#70 — Mem0 storeAll() parallel batch (deferred pending Mem0 PRs #4804/#5194) · S · Low
+- platform#74 → closed by PR #80
+- platform#75 — Graphiti erase(EraseRequest) domain+caseId scoped deletion · M · High
 - Workspace epic branches past deletion dates — kept by user choice
 
 ## What's Next
@@ -49,10 +39,12 @@ Falls back to `"default"` instead of failing fast — protocol violation. Fix, t
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
 | #70 | Mem0 storeAll() parallel batch | S | Low | Deferred pending Mem0 PRs #4804/#5194 |
+| #75 | Graphiti domain+caseId erasure | M | High | Graphiti REST doesn't expose group-scoped delete |
 
 ## References
 
+- PR #80: https://github.com/casehubio/platform/pull/80
+- claudony#152 branch: `issue-152-tenancyid-default-fix`
+- engine#460: https://github.com/casehubio/engine/issues/460
 - ACL spec: `docs/specs/2026-06-01-acl-design.md`
-- Graphiti spec: `docs/superpowers/specs/2026-06-07-graphiti-memory-adapter-design.md`
 - Blog: `blog/2026-06-08-mdp01-graphiti-temporal-memory-adapter.md`
-- PR #77: https://github.com/casehubio/platform/pull/77
