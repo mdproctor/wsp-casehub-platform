@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-06-10-mdp01-the-missing-entity.md](2026-06-10-mdp01-the-missing-entity.md) | 2026-06-10 | Five correctness fixes: async assertTenant bypass (#79), eraseEntity int count (#72), eraseById entityId param + Mem0 preflight (#64), SCIM authToken validation (#62), #54 closed |
 | [2026-06-08-mdp01-graphiti-temporal-memory-adapter.md](2026-06-08-mdp01-graphiti-temporal-memory-adapter.md) | 2026-06-08 | Graphiti temporal memory adapter — GraphCaseMemoryStore SPI, MemoryCapability model, per-entity attribution, six spec review rounds |
 | [2026-06-09-mdp01-erasing-what-was-extracted.md](2026-06-09-mdp01-erasing-what-was-extracted.md) | 2026-06-09 | Erasing What Was Extracted — GDPR erasure honesty, Graphiti episode vs derived facts, storeAll pre-flight, REST param verification |
 | [2026-06-07-mdp01-storeall-preflight.md](2026-06-07-mdp01-storeall-preflight.md) | 2026-06-07 | The pre-flight pattern: why REST adapters can't rely on transaction rollback — Mem0 batch PRs are client-side parallelism, partial-write bug in InMemory, pre-flight fix |
