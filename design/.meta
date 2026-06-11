@@ -1,0 +1,9 @@
+branch: issue-82-scim-test-constructor-https
+project-sha: 2b756f2405c0b5a268aeb7ae118775626790c739
+date: 2026-06-11
+issue: 82
+issue-repo: casehubio/platform
+covers: 82
+flyway-next-v: none
+design-repo: workspace
+design-section-hashes: 
