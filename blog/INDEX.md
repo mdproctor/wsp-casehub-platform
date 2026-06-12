@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-06-12-mdp02-named-endpoints.md](2026-06-12-mdp02-named-endpoints.md) | 2026-06-12 | Named Endpoints — EndpointRegistry SPI, fourth platform primitive, module placement, resolve() priority, EndpointPropertyKeys cross-module rule |
 | [2026-06-12-mdp01-graphiti-domain-scoped-erase.md](2026-06-12-mdp01-graphiti-domain-scoped-erase.md) | 2026-06-12 | Teaching Graphiti to Forget by Domain — domain-level group_id, erase() two-branch design, known-domains eraseEntity(), @ConfigMapping prefix gotcha |
 | [2026-06-08-mdp01-graphiti-temporal-memory-adapter.md](2026-06-08-mdp01-graphiti-temporal-memory-adapter.md) | 2026-06-08 | Graphiti temporal memory adapter — GraphCaseMemoryStore SPI, MemoryCapability model, per-entity attribution, six spec review rounds |
 | [2026-06-09-mdp01-erasing-what-was-extracted.md](2026-06-09-mdp01-erasing-what-was-extracted.md) | 2026-06-09 | Erasing What Was Extracted — GDPR erasure honesty, Graphiti episode vs derived facts, storeAll pre-flight, REST param verification |
