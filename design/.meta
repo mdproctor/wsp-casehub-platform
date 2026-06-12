@@ -1,0 +1,9 @@
+branch: issue-89-endpoint-permissions-config
+project-sha: 6dcb291d788adf7a9d10d6d7a7e2510d6187676a
+date: 2026-06-12
+issue: 89
+issue-repo: casehubio/platform
+covers: 89,88
+flyway-next-v: none
+design-repo: project
+design-section-hashes: 
