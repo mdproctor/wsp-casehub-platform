@@ -12,7 +12,7 @@ Delivered platform#73: EndpointRegistry SPI — fourth platform primitive alongs
 
 ## Immediate Next Step
 
-Check claudony#152 branch (`issue-152-tenancyid-default-fix`) — issue still open, branch needs merge. Confirm and close. (Unchanged from previous handover — claudony repo.)
+Run `/work` to pick up next issue. claudony#152 is closed (removed from backlog). Candidate: platform#88 (endpoints config-backed registrar) or platform#89 (EndpointPermissions write-auth utility).
 
 ## Cross-Module
 
@@ -20,7 +20,6 @@ Check claudony#152 branch (`issue-152-tenancyid-default-fix`) — issue still op
 
 ## What's Left
 
-- claudony#152 — `ClaudonyLedgerEventCapture` tenancyId fail-fast fix; branch committed, issue open · XS · Low
 - platform#58 — AgentSession multi-turn (v2, deferred) · L · Med
 - platform#70 — Mem0 storeAll() parallel batch (deferred pending Mem0 PRs #4804/#5194) · S · Low
 - platform#88 — config-backed registrar (`casehub-platform-endpoints-config`) for multi-tenant endpoint config; filed this session · M · Med
@@ -33,6 +32,10 @@ Check claudony#152 branch (`issue-152-tenancyid-default-fix`) — issue still op
 |---|-------------|-------|------------|-------|
 | #70 | Mem0 storeAll() parallel batch | S | Low | Deferred pending Mem0 PRs #4804/#5194 |
 | #88 | Endpoints config-backed registrar | M | Med | Required for multi-tenant workers; follows casehub-platform-config pattern |
+
+## Cleaned Up
+
+- claudony#152 — fix: ClaudonyLedgerEventCapture silently defaults tenancyId — closed, removed from backlog
 
 ## References
 
