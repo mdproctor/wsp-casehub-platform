@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-06-12-mdp01-graphiti-domain-scoped-erase.md](2026-06-12-mdp01-graphiti-domain-scoped-erase.md) | 2026-06-12 | Teaching Graphiti to Forget by Domain — domain-level group_id, erase() two-branch design, known-domains eraseEntity(), @ConfigMapping prefix gotcha |
 | [2026-06-08-mdp01-graphiti-temporal-memory-adapter.md](2026-06-08-mdp01-graphiti-temporal-memory-adapter.md) | 2026-06-08 | Graphiti temporal memory adapter — GraphCaseMemoryStore SPI, MemoryCapability model, per-entity attribution, six spec review rounds |
 | [2026-06-09-mdp01-erasing-what-was-extracted.md](2026-06-09-mdp01-erasing-what-was-extracted.md) | 2026-06-09 | Erasing What Was Extracted — GDPR erasure honesty, Graphiti episode vs derived facts, storeAll pre-flight, REST param verification |
 | [2026-06-07-mdp01-storeall-preflight.md](2026-06-07-mdp01-storeall-preflight.md) | 2026-06-07 | The pre-flight pattern: why REST adapters can't rely on transaction rollback — Mem0 batch PRs are client-side parallelism, partial-write bug in InMemory, pre-flight fix |
