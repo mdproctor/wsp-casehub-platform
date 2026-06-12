@@ -1,0 +1,9 @@
+branch: issue-73-endpoints
+project-sha: 0d34beebcd2dd3c13e926c41dcb9e5af85919811
+date: 2026-06-12
+issue: 73
+issue-repo: casehubio/platform
+covers: 73
+flyway-next-v: none
+design-repo: project
+design-section-hashes: 
