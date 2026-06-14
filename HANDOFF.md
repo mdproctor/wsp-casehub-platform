@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-**Date:** 2026-06-12
+**Date:** 2026-06-14
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -8,11 +8,11 @@
 
 ## Last Session
 
-Delivered platform#73: EndpointRegistry SPI — fourth platform primitive alongside preferences, identity, and memory. 7 new types in `platform-api` (`io.casehub.platform.api.endpoints`): `EndpointRegistry`, `EndpointDescriptor`, `EndpointQuery`, `EndpointProtocol`, `EndpointType`, `EndpointCapability`, `EndpointPropertyKeys`. `NoOpEndpointRegistry @DefaultBean` in `platform/`. New `endpoints-memory/` module with `InMemoryEndpointRegistry @Alternative @Priority(100)`. `resolve()` two-step priority (tenant-specific > platform-global). `EndpointPropertyKeys` cross-module-only rule formalised as PP-20260612-042941.
+Delivered platform#89 (`EndpointPermissions.assertTenant()`) and platform#88 (`casehub-platform-endpoints-config`) on branch `issue-89-endpoint-permissions-config`. Discussed `AgentProvider` SPI design rationale — why `claude-code-sdk` over the official Anthropic Java SDK (autonomous tool loop vs raw API client), why not LangChain4j (no prompt caching, different execution model). Filed platform#100 (`ChatModel` adapter backed by `AgentSession` with native caching). Recorded design rationale in `docs/repos/casehub-platform.md §Agent Infrastructure` and PLATFORM.md capability entry.
 
 ## Immediate Next Step
 
-Run `/work` to pick up next issue. claudony#152 is closed (removed from backlog). Candidate: platform#88 (endpoints config-backed registrar) or platform#89 (EndpointPermissions write-auth utility).
+Start platform#58 (AgentSession multi-turn API) in a fresh session — run `/work` with issue #58. Then platform#100 (ChatModel adapter) immediately after #58 merges.
 
 ## Cross-Module
 
@@ -20,27 +20,23 @@ Run `/work` to pick up next issue. claudony#152 is closed (removed from backlog)
 
 ## What's Left
 
-- platform#58 — AgentSession multi-turn (v2, deferred) · L · Med
+- platform#58 — AgentSession multi-turn (v2) · M · Med — **do next**
+- platform#100 — ChatModel adapter backed by AgentSession; native Claude prompt caching · S · Low — **do immediately after #58**
 - platform#70 — Mem0 storeAll() parallel batch (deferred pending Mem0 PRs #4804/#5194) · S · Low
-- platform#88 — config-backed registrar (`casehub-platform-endpoints-config`) for multi-tenant endpoint config; filed this session · M · Med
-- platform#89 — `EndpointPermissions.assertTenant()` write-auth utility; filed this session — trigger when casehub-deployment starts runtime registration · S · Low
-- parent#229 — PLATFORM.md capability table + casehub-platform deep-dive sync; filed this session · XS · Low
+- parent#229 — PLATFORM.md capability table + casehub-platform deep-dive sync · XS · Low
 
 ## What's Next
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
+| #58 | AgentSession multi-turn API (v2) | M | Med | Persistent subprocess; state machine CONNECTED→ACTIVE→CONNECTED; semaphore held for session lifetime. SDK supports multi-turn (`ClaudeAsyncClient`). Key constraint: no crash recovery — document as known limitation |
+| #100 | ChatModel adapter backed by AgentSession | S | Low | Blocked by #58. New `agent-claude-langchain4j/` module. Decide session lifetime strategy (idle timeout recommended) before implementing |
 | #70 | Mem0 storeAll() parallel batch | S | Low | Deferred pending Mem0 PRs #4804/#5194 |
-| #88 | Endpoints config-backed registrar | M | Med | Required for multi-tenant workers; follows casehub-platform-config pattern |
-
-## Cleaned Up
-
-- claudony#152 — fix: ClaudonyLedgerEventCapture silently defaults tenancyId — closed, removed from backlog
 
 ## References
 
-- Spec: `docs/specs/2026-06-12-endpoint-registry-design.md`
-- Blog: `blog/2026-06-12-mdp02-named-endpoints.md`
-- Garden: `GE-20260612-889bd4` (path.value() as map key)
-- Protocol: `PP-20260612-042941` (EndpointPropertyKeys cross-module-only)
-- claudony#152 branch: `issue-152-tenancyid-default-fix`
+- Spec (endpoints-config): `docs/superpowers/specs/2026-06-12-endpoint-permissions-config-design.md`
+- Plan (endpoints-config): `docs/superpowers/plans/2026-06-14-endpoint-permissions-config.md`
+- Agent design rationale: `docs/repos/casehub-platform.md §Agent Infrastructure` (casehub-parent)
+- platform#58: https://github.com/casehubio/platform/issues/58
+- platform#100: https://github.com/casehubio/platform/issues/100
