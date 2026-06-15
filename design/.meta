@@ -1,0 +1,9 @@
+branch: issue-58-agent-session-multi-turn
+project-sha: 9d2d206cd190bcd1d23cf8f56c5bc68f94cc4d6c
+date: 2026-06-15
+issue: 58
+issue-repo: casehubio/platform
+covers: 58
+flyway-next-v: none
+design-repo: workspace
+design-section-hashes: 
