@@ -1,0 +1,9 @@
+branch: issue-100-chatmodel-agent-session
+project-sha: 3e7c2080356d6974eb09347d73884326c8087f07
+date: 2026-06-16
+issue: 100
+issue-repo: casehubio/platform
+covers: 100
+flyway-next-v: none
+design-repo: project
+design-section-hashes: 
