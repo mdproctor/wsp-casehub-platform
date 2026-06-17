@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-06-17-mdp01-langchain4j-session-bridge.md](2026-06-17-mdp01-langchain4j-session-bridge.md) | 2026-06-17 | The LangChain4j/AgentSession bridge — stateless + multi-turn ChatModel adapters, engine.Agent incompatibility, diamond override requirement |
 | [2026-06-12-mdp02-named-endpoints.md](2026-06-12-mdp02-named-endpoints.md) | 2026-06-12 | Named Endpoints — EndpointRegistry SPI, fourth platform primitive, module placement, resolve() priority, EndpointPropertyKeys cross-module rule |
 | [2026-06-12-mdp01-graphiti-domain-scoped-erase.md](2026-06-12-mdp01-graphiti-domain-scoped-erase.md) | 2026-06-12 | Teaching Graphiti to Forget by Domain — domain-level group_id, erase() two-branch design, known-domains eraseEntity(), @ConfigMapping prefix gotcha |
 | [2026-06-08-mdp01-graphiti-temporal-memory-adapter.md](2026-06-08-mdp01-graphiti-temporal-memory-adapter.md) | 2026-06-08 | Graphiti temporal memory adapter — GraphCaseMemoryStore SPI, MemoryCapability model, per-entity attribution, six spec review rounds |
