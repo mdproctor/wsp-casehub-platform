@@ -22,7 +22,8 @@ Check `parent#276` (Add cloudevents-core:4.0.1 to casehub-parent BOM) — timing
 
 ## What's Left
 
-- `parent#275` — PLATFORM.md memory capability row needs `eraseEntityAcrossTenants` entries · XS · Low
+*Updated: parent#275 closed — removed from backlog.*
+
 - `parent#285` — PLATFORM.md sync for platform#98 (StreamContext deferral, AMQP enum, STREAM_EVENT_TYPE, repo map entries) · S · Low
 - `platform#101` — document session.close() Mutiny callback thread ordering · XS · Low
 - `platform#102` — add SystemMessage silent-ignore note + test to AgentSessionChatModel · XS · Low
