@@ -1,5 +1,7 @@
 # HANDOFF — casehub-platform
 
+*Updated: parent#249, parent#257, parent#267 closed — removed from backlog.*
+
 **Date:** 2026-06-18
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
@@ -24,9 +26,6 @@ Pick up next issue from the What's Next table. Check if parent#275 (PLATFORM.md 
 - `parent#275` — PLATFORM.md memory capability row needs `eraseEntityAcrossTenants` + `CROSS_TENANT_ERASE` + `assertCrossTenantAdmin` entries [peer repo — issue filed] · XS · Low
 - `platform#101` — document session.close() Mutiny callback thread ordering in ClaudeAgentChatModel · XS · Low
 - `platform#102` — add SystemMessage silent-ignore note + test to AgentSessionChatModel · XS · Low
-- `parent#249` — PLATFORM.md deep-dive sync for platform#88+#89 (EndpointPermissions + endpoints-config) · XS · Low
-- `parent#257` — PLATFORM.md + casehub-platform deep-dive sync for platform#58 (AgentSession multi-turn) · XS · Low
-- `parent#267` — sync casehub-platform.md agent infrastructure section for #100 · XS · Low
 
 ## What's Next
 
