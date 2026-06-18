@@ -1,0 +1,9 @@
+branch: issue-98-cloudEvent-streams
+project-sha: b597fcfa2ae1eb2b07a3dc1e1e337ff885c8784e
+date: 2026-06-18
+issue: 98
+issue-repo: casehubio/platform
+covers: 98
+flyway-next-v: none
+design-repo: workspace
+design-section-hashes: 
