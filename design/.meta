@@ -1,0 +1,9 @@
+branch: issue-101-platform-small-batch
+project-sha: c3be24ea1d9b731bcc9ae815f25251bffe85af5f
+date: 2026-06-19
+issue: 101
+issue-repo: casehubio/platform
+covers: 101,102,63,87,65,67,66
+flyway-next-v: none
+design-repo: workspace
+design-section-hashes: b639b9af:## Module Structure|a0daf1a8:## Path API|e04eb669:## Preferences API|37e1b5d4:## Identity API|bfb8e762:## Mock Implementation Pattern
