@@ -1,8 +1,6 @@
 # HANDOFF — casehub-platform
 
-*Updated: parent#285 closed — removed from backlog.*
-
-**Date:** 2026-06-20
+**Date:** 2026-06-21
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -10,19 +8,24 @@
 
 ## Last Session
 
-Closed all 7 open S/XS issues on one branch (`issue-101-platform-small-batch`). The headline changes: `storeAll()` return type changed from `List<String>` to `StoreAllResult` (breaking — affects all 6 adapters and the reactive bridge, upstream consumers will see compile errors); `CbrCaseEntry` added to platform-api as the CBR Retain step schema; `@Timed` added to all 7 public CaseMemoryStore methods in inmem, jpa, and sqlite (matching pre-existing coverage in mem0 and graphiti); `SystemMessage` now rejected explicitly in `AgentSessionChatModel` rather than silently ignored; Testcontainers IT scaffold created for memory-mem0 (`@Disabled` pending Ollama in CI). All tests pass. Both remotes updated.
+Comprehensive ARC42STORIES.MD audit — document had drifted six weeks behind the code. Added three new chapters (C19: AgentSession + LangChain4j, C20: Stream Ingestion, C21: ACL Phase 1), two new journeys (J5/J6), two new layer entries (L10/L11 with full narratives), nine modules to the deployment table, fifteen glossary terms, two external systems to the context diagram. Stale §12 risks fixed, wrong C20 references corrected. Committed to both remotes (`a58b6b2`).
 
 ## Immediate Next Step
 
-Check `parent#276` (cloudevents-core BOM) — timing: file once any of iot#19, qhorus#279, or connectors#20 starts. Also `parent#285` now has an expanded comment covering the storeAll/StoreAllResult API change, CbrCaseEntry, and @Timed observability — sync PLATFORM.md when time allows.
+No open platform issues in the S/XS range. Options:
+- `#103` — credential resolution for `EndpointRegistry.credentialRef` (M / Med)
+- `#85` — `ScimDIDResolver` synthetic DID from SCIM (M / Med)
+- `#105` — provider-agnostic LangChain4j `AgentProvider` bridge (M / Med)
+
+All three are standalone and unblocked.
 
 ## Cross-Module
 
 **We're enabling:**
-- casehub-engine (engine#477/478) — CbrCaseEntry is now available for the CBR Retain step
-- iot#19, qhorus#279, connectors#20 — CloudEvent adapters still unblocked from platform#98
+- casehub-engine (engine#477/478) — CbrCaseEntry available for CBR Retain step
+- parent#276 closed ✅ — cloudevents-core/api/json-jackson 4.0.1 now in BOM
 
-**Callers of `storeAll()` in consumer repos** will see compile errors — the return type is now `StoreAllResult`. Migration is mechanical: `result.stored()` for the ID list. File issues on consumer repos if not already raised.
+**Callers of `storeAll()` in consumer repos** will see compile errors — return type is `StoreAllResult`. Migration: `result.stored()` for the ID list.
 
 ## What's Left
 
@@ -33,14 +36,14 @@ Check `parent#276` (cloudevents-core BOM) — timing: file once any of iot#19, q
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
-| parent#276 | Add cloudevents-core:4.0.1 to BOM | XS | Low | Do when iot/qhorus/connectors adapters start |
-| iot#19 | StateChangeEvent → CloudEvent adapter | S | Low | Unblocked |
-| qhorus#279 | MessageReceivedEvent → CloudEvent adapter | M | Med | Also covers channel creation SPI |
-| connectors#20 | InboundMessage → CloudEvent adapter | S | Low | Unblocked |
+| #103 | Credential resolution — secrets backend for `credentialRef` | M | Med | Unblocked |
+| #85 | ScimDIDResolver — synthetic DID from SCIM | M | Med | Unblocked |
+| #105 | LangChain4j AgentProvider bridge (provider-agnostic) | M | Med | Unblocked |
+| #84 | JwtVCValidator — W3C VC JWT credential validation | M | High | Unblocked |
 
 ## References
 
-- Diary: `blog/2026-06-20-mdp01-small-issues-not-small-decisions.md`
-- Epic: branch `issue-101-platform-small-batch` (closed)
-- Garden: GE-20260620-29b8fc (Quarkus @Disabled + @QuarkusTestResource eager load)
+- Diary: `blog/2026-06-21-mdp01-the-six-week-gap.md`
+- ARC42 audit commit: `a58b6b2` (casehub-platform main)
+- Garden: GE-20260621-8c93d7 (git stash pop HANDOFF.md conflict)
 - Protocols: PP-20260620-e9355b (@Timed on CaseMemoryStore), PP-20260620-d9675c (SecurityException propagation)
