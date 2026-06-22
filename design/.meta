@@ -1,0 +1,9 @@
+branch: issue-104-governance-types
+project-sha: 61047a173fc04170d528ea4cfaa57fb1437626f3
+date: 2026-06-19
+issue: 104
+issue-repo: casehubio/platform
+covers: 104
+flyway-next-v: none
+design-repo: workspace
+design-section-hashes: 
