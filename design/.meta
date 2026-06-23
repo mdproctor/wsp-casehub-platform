@@ -1,0 +1,9 @@
+branch: issue-111-oidc-alternative-priority
+project-sha: b242c44336a985300a5b24d340a3d342e04c60ae
+date: 2026-06-23
+issue: 111
+issue-repo: casehubio/platform
+covers: 110,111
+flyway-next-v: none
+design-repo: project
+design-section-hashes: 
