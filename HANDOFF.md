@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-**Date:** 2026-06-22
+**Date:** 2026-06-23
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -8,11 +8,11 @@
 
 ## Last Session
 
-Rescued orphaned branch issue-104-governance-types: rebased onto main (7 commits behind), ran tests, code review passed (0 findings), squashed 3→1, pushed to both remotes. Closes platform#104. Adds `ExecutionPolicy`, `RetryPolicy`, `BackoffStrategy` to platform-api and `PolicyEnforcer @ApplicationScoped` (DefaultPolicyEnforcer with shared virtual-thread executor + @PreDestroy) in new `governance/` submodule.
+Closed three XS/S CloudEvent conformance issues (#107, #108, #109). Key finding: GE rule 3 (`.exceptionally()` for CloudEvent dispatch) must NOT be applied in Kafka/AMQP processors that chain `.thenCompose(message.ack())` — it would silently ack messages on dispatch failure. Updated GE-20260621-629712; filed protocol PP-20260623-a0fe15.
 
 ## Immediate Next Step
 
-engine#543 — blocked on platform#104 being on main. Platform is now published (f53015e). engine#543 can proceed.
+No blockers. Pick from What's Next — all four unblocked.
 
 ## What's Next
 
@@ -25,6 +25,6 @@ engine#543 — blocked on platform#104 being on main. Platform is now published 
 
 ## References
 
-- Diary: `blog/2026-06-22-mdp01-three-types-and-a-thread-pool.md`
-- Garden: GE-20260622-71d4de (shared executor + @PreDestroy gotcha)
-- engine#543: unblocked — depends on platform#104 types
+- Diary: `blog/2026-06-23-mdp01-cloudevent-conformance.md`
+- Garden: GE-20260621-629712 (updated — rule 3 ack-chain exception)
+- Protocol: PP-20260623-a0fe15 (reactive-messaging-ack-chain-whenComplete)
