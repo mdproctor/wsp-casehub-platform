@@ -8,22 +8,21 @@
 
 ## Last Session
 
-Shipped #103 — CredentialResolver SPI in platform-api (zero deps), DefaultCredentialResolver @DefaultBean in platform/ (MicroProfile Config, compound sub-key support). Reviewed design against Quarkus CredentialsProvider pattern — Map<String, String> return type, CredentialPropertyKeys separate class, pull model. Filed #116 (Quarkus bridge) and qhorus#308 (Tier 1.5 migration). Garden entry GE-20260625-83ed54 (@Nested + @QuarkusTest classloader gotcha).
+Shipped #116 — `credentials-quarkus/` module. `QuarkusCredentialResolver` bridges `CredentialResolver` SPI to Quarkus `CredentialsProvider`. Key design decisions: `@Any Instance<CredentialsProvider>` for `@Named`-safe injection (direct injection breaks for `@Named`-only beans), `Map.copyOf()` defensive copy, sync-only path (Quarkus async MUST recommendation doesn't apply to consumer-space CDI beans). 62 lines of production code, 6 tests. Pushed to both origin and fork.
 
 ## Immediate Next Step
 
-No blockers. Pick from What's Next — all three unblocked.
+No blockers. Pick from What's Next — both unblocked.
 
 ## What's Next
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
-| #116 | CredentialResolver bridge to Quarkus CredentialsProvider | S | Low | Mechanical delegation — same return type |
 | #85 | ScimDIDResolver — synthetic DID from SCIM | M | Med | Unblocked |
 | #105 | LangChain4j AgentProvider bridge (provider-agnostic) | M | Med | Unblocked |
 
 ## References
 
-- Spec: `docs/specs/issue-103-credential-resolution/2026-06-25-credential-resolution-design.md`
-- Blog: `blog/2026-06-25-mdp01-quarkus-credentialsprovider-shaped-everything.md`
-- Garden: GE-20260625-83ed54 (jvm — @Nested + @QuarkusTest)
+- Spec: `docs/superpowers/specs/2026-06-25-credential-resolver-quarkus-bridge-design.md`
+- Blog: `blog/2026-06-25-mdp02-bridge-not-quite-passthrough.md`
+- Plan: `plans/attic/issue-116-credential-resolver-quarkus-bridge/2026-06-25-credential-resolution.md`
