@@ -8,7 +8,7 @@
 
 ## Last Session
 
-Closed #112 (FixedCurrentPrincipal bumped to @Priority(200), protocol updated, 4 consumer issues filed), #113 (5 consumer CI dispatch issues filed), and #84 (JwtVCValidator — W3C VC JWT credential validation with EdDSA/ES256, file-based credentials, TTL-cached, 8 tests). Garden protocol `oidc-harness-wiring-checklist` step 1 removed.
+Shipped #103 — CredentialResolver SPI in platform-api (zero deps), DefaultCredentialResolver @DefaultBean in platform/ (MicroProfile Config, compound sub-key support). Reviewed design against Quarkus CredentialsProvider pattern — Map<String, String> return type, CredentialPropertyKeys separate class, pull model. Filed #116 (Quarkus bridge) and qhorus#308 (Tier 1.5 migration). Garden entry GE-20260625-83ed54 (@Nested + @QuarkusTest classloader gotcha).
 
 ## Immediate Next Step
 
@@ -18,10 +18,12 @@ No blockers. Pick from What's Next — all three unblocked.
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
-| #103 | Credential resolution — secrets backend for `credentialRef` | M | Med | Unblocked |
+| #116 | CredentialResolver bridge to Quarkus CredentialsProvider | S | Low | Mechanical delegation — same return type |
 | #85 | ScimDIDResolver — synthetic DID from SCIM | M | Med | Unblocked |
 | #105 | LangChain4j AgentProvider bridge (provider-agnostic) | M | Med | Unblocked |
 
 ## References
 
-*Unchanged — `git show HEAD~1:HANDOFF.md`*
+- Spec: `docs/specs/issue-103-credential-resolution/2026-06-25-credential-resolution-design.md`
+- Blog: `blog/2026-06-25-mdp01-quarkus-credentialsprovider-shaped-everything.md`
+- Garden: GE-20260625-83ed54 (jvm — @Nested + @QuarkusTest)
