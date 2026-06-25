@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-06-25-mdp01-quarkus-credentialsprovider-shaped-everything.md](2026-06-25-mdp01-quarkus-credentialsprovider-shaped-everything.md) | 2026-06-25 | The Quarkus CredentialsProvider Shaped Everything — CredentialResolver SPI, MicroProfile Config @DefaultBean, compound sub-key resolution |
 | [2026-06-23-mdp01-cloudevent-conformance.md](2026-06-23-mdp01-cloudevent-conformance.md) | 2026-06-23 | When .exceptionally() breaks your Kafka consumer — ack chain exception to GE rule 3, STREAM_DATA_CONTENT_TYPE, null guard that wasn't |
 | [2026-06-20-mdp01-small-issues-not-small-decisions.md](2026-06-20-mdp01-small-issues-not-small-decisions.md) | 2026-06-20 | Small issues, not small decisions — SystemMessage rejection, CbrCaseEntry, storeAll StoreAllResult API change, @Timed across all adapters |
 | [2026-06-18-mdp01-parallel-batch-cross-tenant-erasure.md](2026-06-18-mdp01-parallel-batch-cross-tenant-erasure.md) | 2026-06-18 | Parallel storeAll and cross-tenant GDPR erasure — Semaphore+Mutiny batch, ReactiveCaseMemoryStore to platform-api, eraseEntityAcrossTenants across six adapters |
