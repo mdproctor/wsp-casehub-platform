@@ -241,8 +241,10 @@ Tests inject `Config` via constructor — no subclassing needed. Use
 - **Wiring into EndpointRegistry** — pull model; the resolver is standalone. No changes
   to EndpointRegistry or EndpointDescriptor
 - **Async variant** — the SPI is sync-only. `Config.getOptionalValue()` is non-blocking.
-  The future bridge module will need to address async for Vault calls
-  (Quarkus CredentialsProvider has no async variant either; this is a known gap)
+  Quarkus `CredentialsProvider` provides `getCredentialsAsync(Uni<Map>)` (default impl
+  offloads sync variant to worker thread; implementations can override for truly
+  non-blocking behaviour). A reactive `CredentialResolver` variant can be added later
+  if needed
 - **Batch resolution** — `resolveAll(Set<String>)` is a predictable evolution point
   when Vault-backed implementations face N round-trips for N endpoints. The SPI can
   add a default method later without breaking existing implementations
