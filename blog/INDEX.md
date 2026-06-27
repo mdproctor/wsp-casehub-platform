@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-06-27-mdp01-two-abstractions-one-architecture.md](2026-06-27-mdp01-two-abstractions-one-architecture.md) | 2026-06-27 | Two abstractions, one architecture — AgentProvider vs ChatModel, @DefaultBean @Priority(10), bidirectional LangChain4j interop |
 | [2026-06-25-mdp01-quarkus-credentialsprovider-shaped-everything.md](2026-06-25-mdp01-quarkus-credentialsprovider-shaped-everything.md) | 2026-06-25 | The Quarkus CredentialsProvider Shaped Everything — CredentialResolver SPI, MicroProfile Config @DefaultBean, compound sub-key resolution |
 | [2026-06-23-mdp01-cloudevent-conformance.md](2026-06-23-mdp01-cloudevent-conformance.md) | 2026-06-23 | When .exceptionally() breaks your Kafka consumer — ack chain exception to GE rule 3, STREAM_DATA_CONTENT_TYPE, null guard that wasn't |
 | [2026-06-20-mdp01-small-issues-not-small-decisions.md](2026-06-20-mdp01-small-issues-not-small-decisions.md) | 2026-06-20 | Small issues, not small decisions — SystemMessage rejection, CbrCaseEntry, storeAll StoreAllResult API change, @Timed across all adapters |
