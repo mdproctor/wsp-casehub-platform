@@ -18,7 +18,7 @@ No blockers. Pick from What's Next — #85 is the only remaining tracked issue (
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
-| #85 | ScimDIDResolver — synthetic DID from SCIM | M | Med | Blocked by ledger#107 |
+| #85 | ScimDIDResolver — synthetic DID from SCIM | M | Med | Unblocked — ledger#107 closed |
 
 ## References
 
