@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-**Date:** 2026-06-29
+**Date:** 2026-06-30
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -8,20 +8,26 @@
 
 ## Last Session
 
-Shipped #125. `ChatModelAgentProvider` now has a fail-fast semaphore (`max-concurrent-sessions`, default 10) gating both `invoke()` and `openSession()`. Sessions hold permits until `close()` via `getAndSet(CLOSED)`. Query failures stay IDLE — stateless HTTP APIs are retry-safe. Five-round adversarial design review drove 14 spec fixes before implementation.
+Shipped #85. ScimDIDResolver constructs synthetic DIDDocuments from SCIM x509Certificates. Deeper finding: replaced the `@Alternative` single-resolver CDI pattern with a `@DIDMethod` qualifier + `CompositeDIDResolver` priority-ordered pipeline. DIDResolver SPI gained `actorId` parameter. Five-round adversarial design review drove 17 spec fixes. Cross-repo ledger#161 filed for enricher update.
 
 ## Immediate Next Step
 
-No blockers. Pick from What's Next — #85 is the only remaining tracked issue (blocked).
+No blockers. ARC42STORIES.MD has stale DIDResolver references (lines 202, 241, 758, 1402-1403) — update to reflect composite pattern. Pick from What's Next otherwise.
+
+## What's Left
+
+- ARC42STORIES.MD stale scan — DIDResolver references need updating for composite architecture · S · Low
+- casehubio/ledger#161 — update DIDResolver callers for actorId parameter · S · Low (blocks on platform SNAPSHOT)
 
 ## What's Next
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
-| #85 | ScimDIDResolver — synthetic DID from SCIM | M | Med | Unblocked — ledger#107 closed |
+| — | No tracked platform issues remain | — | — | ledger#161 is cross-repo |
 
 ## References
 
-- Spec: `docs/superpowers/specs/2026-06-29-chatmodel-concurrency-limiter-design.md`
-- Plan: `docs/superpowers/plans/2026-06-29-chatmodel-concurrency-limiter.md`
-- Blog: `blog/2026-06-29-mdp01-the-semaphore-that-was-already-there.md`
+- Spec: `docs/superpowers/specs/2026-06-29-scim-did-resolver-design.md`
+- Blog: `blog/2026-06-30-mdp01-the-resolver-that-couldnt-see-the-issuer.md`
+- Garden: GE-20260630-9d8cbe (@Priority not @Inherited gotcha)
+- Cross-repo: casehubio/ledger#161, casehubio/platform#127, casehubio/platform#128
