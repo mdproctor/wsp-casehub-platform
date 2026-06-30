@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-06-30-mdp02-the-issue-that-answered-its-own-question.md](2026-06-30-mdp02-the-issue-that-answered-its-own-question.md) | 2026-06-30 | The Issue That Answered Its Own Question — SCIM extension attribute filtering evaluated and closed; use case doesn't exist |
 | [2026-06-28-mdp01-making-tool-calls-visible.md](2026-06-28-mdp01-making-tool-calls-visible.md) | 2026-06-28 | Making Tool Calls Visible — AgentEvent sealed interface extension, v1 design reversal, ToolCallDelta vs ToolCallComplete type safety |
 | [2026-06-25-mdp01-quarkus-credentialsprovider-shaped-everything.md](2026-06-25-mdp01-quarkus-credentialsprovider-shaped-everything.md) | 2026-06-25 | The Quarkus CredentialsProvider Shaped Everything — CredentialResolver SPI, MicroProfile Config @DefaultBean, compound sub-key resolution |
 | [2026-06-23-mdp01-cloudevent-conformance.md](2026-06-23-mdp01-cloudevent-conformance.md) | 2026-06-23 | When .exceptionally() breaks your Kafka consumer — ack chain exception to GE rule 3, STREAM_DATA_CONTENT_TYPE, null guard that wasn't |
