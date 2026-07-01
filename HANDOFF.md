@@ -8,26 +8,24 @@
 
 ## Last Session
 
-Closed #130 (KeyDIDResolver multicodec) and #128 (composite ActorDIDProvider) on one branch. Design review ($20, 7 rounds) caught two correctness bugs — alsoKnownAs missing from did:key documents (would cause IDENTITY_MISMATCH) and P-256 sign selection (~50% wrong decompression). Filed #131 (base58btc), #132 (HTTPS validation), #133 (secp256k1), ledger#165 (IdentityCacheInvalidator). Garden entry GE-20260630-1594e0 (secp256k1 JDK removal).
+Closed #132 (ScimAgentLookup HTTPS validation consolidation). One-line production change: `validate()` called lazily in `loadContext()` after the `isConfigured()` guard. Deleted duplicate `ScimActorDIDProviderValidationTest`, consolidated into `ScimAgentLookupTest`. Net -37 lines.
 
 ## Immediate Next Step
 
-Pick from What's Next — ledger#165 is the most urgent (downstream fix, XS).
+Pick from What's Next — ledger#165 is the most urgent (downstream fix, XS), but lives in the ledger repo. For platform work, #131 (base58btc encoding, M/Med) is next.
 
 ## What's Left
 
 - casehubio/ledger#161 — update DIDResolver callers for actorId parameter · S · Low
 - casehubio/ledger#165 — IdentityCacheInvalidator: use invalidate() instead of instanceof · XS · Low
 - #131 — did:key base58btc vs base64url encoding deviation · M · Med
-- #132 — ScimAgentLookup HTTPS validation consolidation · S · Low
 
 ## What's Next
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
-| #131 | did:key base58btc encoding (W3C spec compliance) | M | Med | pre-existing deviation; no interop impact until external DIDs |
-| #132 | ScimAgentLookup HTTPS validation consolidation | S | Low | PostConstruct removed from ScimActorDIDProvider; validation should move to lookup |
-| #133 | secp256k1 did:key support | M | High | requires BouncyCastle or manual curve params; JDK 15+ removed from SunEC |
+| #131 | did:key base58btc encoding (W3C spec compliance) | M | Med | no interop impact until external DIDs |
+| #133 | secp256k1 did:key support | M | High | requires BouncyCastle or manual curve params |
 
 ## References
 
