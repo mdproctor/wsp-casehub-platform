@@ -16,10 +16,13 @@ Pick from What's Next — #131 (base58btc encoding, M/Med) is the most actionabl
 
 ## What's Left
 
-- Deregistration lifecycle for DataSource — no `DataSourceDeregistered` CDI event, router accumulates stale entries, orphaned subscriptions on upsert · M · Med
-- Marshaller configuration model — `Marshaller<I,O>` interface exists but wiring mechanism (CDI lookup, descriptor property, registration API parameter) is open · S · Med
-- Engine `DataSourceTrigger` — new `Trigger` impl referencing a DataSource for external event reactivity · M · Med
-- MVEL3 real evaluator — replace mock with real transpiler when MVEL3 published to Maven · S · Low (blocked: MVEL3 not on Maven Central)
+**Epic #137 — DataSource SPI follow-up:**
+- #138 Deregistration lifecycle — CDI event, router cleanup, subscription orphan handling · M · Med
+- #139 Marshaller configuration model — wiring mechanism for `Marshaller<I,O>` · S · Med
+- #140 Engine `DataSourceTrigger` — external event reactivity (cross-module: engine) · M · Med
+- #141 MVEL3 real evaluator — blocked on Maven Central publish · S · Low
+
+**Other:**
 - casehubio/ledger#161 — update DIDResolver callers for actorId parameter · S · Low
 - casehubio/ledger#165 — IdentityCacheInvalidator: use invalidate() instead of instanceof · XS · Low
 
