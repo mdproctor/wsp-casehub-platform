@@ -12,7 +12,7 @@ Designed and implemented the DataSource SPI + alpha network event routing system
 
 ## Immediate Next Step
 
-Pick from What's Next — #131 (base58btc encoding, M/Med) is the most actionable platform issue. The DataSource system is complete but has follow-up work: deregistration lifecycle, marshaller configuration, and engine DataSourceTrigger integration.
+Start #135 (in-app notification store) — phase 1 of epic #147 (notification system). Brainstorm the store design, then implement.
 
 ## What's Left
 
@@ -27,6 +27,20 @@ Pick from What's Next — #131 (base58btc encoding, M/Med) is the most actionabl
 - casehubio/ledger#165 — IdentityCacheInvalidator: use invalidate() instead of instanceof · XS · Low
 
 ## What's Next
+
+**Epic #147 — Notification system (implementation order):**
+
+| Phase | # | Description | Scale | Complexity | Notes |
+|-------|---|-------------|-------|------------|-------|
+| 1 | #135 | In-app notification store | M | Med | **current** — terminal sink, no upstream deps |
+| 2 | #142 | Subscription management | L | High | core orchestration, DataSource alpha network integration |
+| 3 | #148 | Target resolution (user/role/team/channel) | M | Med | expands group targets to individual users |
+| 4 | #143 | User channel preferences | S | Low | per-user delivery config |
+| 5 | #145 | Mute and snooze | S | Med | temporary suppression |
+| 6 | #144 | Digest and batching | M | High | timer-driven aggregation |
+| 7 | #146 | Notification center (frontend) | L | Med | can start after #135 API stable |
+
+**Other:**
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
