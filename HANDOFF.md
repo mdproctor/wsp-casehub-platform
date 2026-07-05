@@ -1,3 +1,5 @@
+*Updated: ledger#161, ledger#165 closed — removed from backlog.*
+
 # HANDOFF — casehub-platform
 
 **Date:** 2026-07-05
@@ -25,8 +27,6 @@ Pick from What's Next — #142 (subscription management, L/High) is Phase 2 of e
 **Other:**
 - #149 Minor findings from #135 code review — UUIDv7 wraparound, Thread.sleep in tests, SSE sweep, cursor encoding, spec stale section · XS · Low
 - casehubio/neocortex#101 — bridge-only reactive implementations · M · Med
-- casehubio/ledger#161 — update DIDResolver callers for actorId parameter · S · Low
-- casehubio/ledger#165 — IdentityCacheInvalidator: use invalidate() instead of instanceof · XS · Low
 
 ## What's Next
 
