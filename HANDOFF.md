@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-**Date:** 2026-07-05
+**Date:** 2026-07-06
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -8,11 +8,11 @@
 
 ## Last Session
 
-Designed and implemented notification subscription management (#142) + notification store minor findings (#149). First-principles brainstorming drove two key decisions: filters inline in subscriptions (not separate entities — same reasoning as Drools rules owning their LHS), and POJO-level filtering via DataSource alpha network (not CloudEvent transport layer). Adversarial design review (7 rounds, 25 issues — tenant isolation cross-leak in FilterNode sharing was the critical find). Three new modules: `subscriptions-inmem/`, `subscriptions-jpa/`, `subscriptions/` (engine + REST). MVEL3 mock phase for user constraints; type discrimination and tenant isolation use MethodHandle (MVEL-independent). Two garden entries: alpha network cross-tenant FilterNode leak (GE-20260705-002a78), UUIDv7 clock regression after wraparound (GE-20260705-fa70c8).
+Designed and implemented notification target resolution (#148), user channel preferences (#143), and mute/snooze (#145) — phases 3, 4, 5 of epic #147. Subscription model fixed: userId→ownerId with explicit `List<NotificationTarget>` on every subscription. Delivery pipeline extracted from SubscriptionEngine into NotificationDispatcher (async via CDI fireAsync). Three new modules: notification-settings-inmem/, notification-settings-jpa/, notification-dispatch/. DeliveryChannelRegistry follows DataSourceRegistry/EndpointRegistry pattern. SuppressionEvaluator is a pure function — no injected dependencies. Design review: 5 rounds, 21 issues, all resolved. Four deferred issues filed: #154 (guaranteed delivery), #155 (EventTypeRegistry), #156 (channel subscriber target), #157 (minor findings).
 
 ## Immediate Next Step
 
-Pick from What's Next — #148 (target resolution, M/Med) is Phase 3 of epic #147. Domain module notification bridges (casehub-work, casehub-engine, casehub-iot) need filing as cross-repo issues to make subscriptions functional end-to-end.
+Pick from What's Next — domain notification bridges (casehub-work, casehub-engine, casehub-iot) need filing as cross-repo issues to make the pipeline functional end-to-end. Alternatively, #144 (digest/batching) is the next pipeline stage.
 
 ## What's Left
 
@@ -25,19 +25,23 @@ Pick from What's Next — #148 (target resolution, M/Med) is Phase 3 of epic #14
 **Other:**
 - casehubio/neocortex#101 — bridge-only reactive implementations · M · Med
 - Domain notification bridges (casehub-work, casehub-engine, casehub-iot) — not yet filed · S · Low each
-- PLATFORM.md capability ownership update for subscription management — cross-repo (parent) · XS · Low
+- PLATFORM.md capability ownership update for notification pipeline — cross-repo (parent) · XS · Low
+- #154 Guaranteed delivery + tracking · M · Med
+- #155 EventTypeRegistry · S · Low
+- #156 Channel subscriber target type · S · Med
+- #157 Minor findings from code review · S · Low
 
 ## What's Next
 
-**Epic #147 — Notification system (implementation order):**
+**Epic #147 — Notification system (remaining phases):**
 
 | Phase | # | Description | Scale | Complexity | Notes |
 |-------|---|-------------|-------|------------|-------|
 | ~~1~~ | ~~#135~~ | ~~In-app notification store~~ | ~~M~~ | ~~Med~~ | **done** |
-| ~~2~~ | ~~#142~~ | ~~Subscription management~~ | ~~L~~ | ~~High~~ | **done** — landed as b50ea4b on main |
-| 3 | #148 | Target resolution | M | Med | group → individual expansion |
-| 4 | #143 | User channel preferences | S | Low | per-user delivery config |
-| 5 | #145 | Mute and snooze | S | Med | temporary suppression |
+| ~~2~~ | ~~#142~~ | ~~Subscription management~~ | ~~L~~ | ~~High~~ | **done** |
+| ~~3~~ | ~~#148~~ | ~~Target resolution~~ | ~~M~~ | ~~Med~~ | **done** — landed as 840095d on main |
+| ~~4~~ | ~~#143~~ | ~~User channel preferences~~ | ~~S~~ | ~~Low~~ | **done** — landed as 840095d on main |
+| ~~5~~ | ~~#145~~ | ~~Mute and snooze~~ | ~~S~~ | ~~Med~~ | **done** — landed as 840095d on main |
 | 6 | #144 | Digest and batching | M | High | timer-driven aggregation |
 | 7 | #146 | Notification center (frontend) | L | Med | after #135 API stable |
 
@@ -53,8 +57,7 @@ Pick from What's Next — #148 (target resolution, M/Med) is Phase 3 of epic #14
 
 | Type | Path |
 |------|------|
-| Subscription design spec | `docs/superpowers/specs/2026-07-05-notification-subscription-design.md` |
-| Subscription plan | `docs/superpowers/plans/2026-07-05-notification-subscriptions.md` |
-| Design review | `~/adr/casehub-platform/notification-subscription-*/tracker.md` |
-| Notification store spec | `docs/superpowers/specs/2026-07-05-notification-store-design.md` |
+| Design spec | `docs/superpowers/specs/2026-07-06-notification-target-mute-prefs-design.md` |
+| Design review | `~/adr/casehub-platform/notification-target-mute-prefs-20260706-005946/tracker.md` |
+| Plan | `plans/attic/issue-148-notification-target-mute-prefs/` |
 | ARC42STORIES | `ARC42STORIES.MD` |
