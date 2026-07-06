@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-07-06-mdp02-bom-audit.md](2026-07-06-mdp02-bom-audit.md) | 2026-07-06 | The BOM That Forgot to Grow — full cross-repo BOM audit, 41 missing modules fixed, drift detection CI added |
 | [2026-06-30-mdp02-the-issue-that-answered-its-own-question.md](2026-06-30-mdp02-the-issue-that-answered-its-own-question.md) | 2026-06-30 | The Issue That Answered Its Own Question — SCIM extension attribute filtering evaluated and closed; use case doesn't exist |
 | [2026-06-28-mdp01-making-tool-calls-visible.md](2026-06-28-mdp01-making-tool-calls-visible.md) | 2026-06-28 | Making Tool Calls Visible — AgentEvent sealed interface extension, v1 design reversal, ToolCallDelta vs ToolCallComplete type safety |
 | [2026-06-25-mdp01-quarkus-credentialsprovider-shaped-everything.md](2026-06-25-mdp01-quarkus-credentialsprovider-shaped-everything.md) | 2026-06-25 | The Quarkus CredentialsProvider Shaped Everything — CredentialResolver SPI, MicroProfile Config @DefaultBean, compound sub-key resolution |
