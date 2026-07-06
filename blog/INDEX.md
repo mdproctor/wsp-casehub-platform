@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-07-06-mdp03-digest-batching.md](2026-07-06-mdp03-digest-batching.md) | 2026-07-06 | Digest and Batching — Making External Channels Bearable — timer-driven aggregation, sealed DigestSchedule, polymorphic flush, Jackson isX() gotcha |
 | [2026-07-06-mdp02-bom-audit.md](2026-07-06-mdp02-bom-audit.md) | 2026-07-06 | The BOM That Forgot to Grow — full cross-repo BOM audit, 41 missing modules fixed, drift detection CI added |
 | [2026-06-30-mdp02-the-issue-that-answered-its-own-question.md](2026-06-30-mdp02-the-issue-that-answered-its-own-question.md) | 2026-06-30 | The Issue That Answered Its Own Question — SCIM extension attribute filtering evaluated and closed; use case doesn't exist |
 | [2026-06-28-mdp01-making-tool-calls-visible.md](2026-06-28-mdp01-making-tool-calls-visible.md) | 2026-06-28 | Making Tool Calls Visible — AgentEvent sealed interface extension, v1 design reversal, ToolCallDelta vs ToolCallComplete type safety |
