@@ -1,5 +1,5 @@
-# Branch Closed: issue-135-notification-store
+# Branch Closed: issue-144-notification-digest-batching
 
-**Date:** 2026-07-05
-**Issues:** 135
+**Date:** 2026-07-07
+**Issues:** 144
 **Status:** merged to main
