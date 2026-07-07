@@ -8,11 +8,11 @@
 
 ## Last Session
 
-Implemented EventTypeRegistry SPI (#155) and WeeklyAt digest schedule variant (#160) in a single branch. Both were small, pattern-following additions — no design review needed. All code TDD, full build green, both issues closed.
+Implemented all S/XS issues from Epic #147 in a single branch (issue-157-notification-s-xs-batch). Six issues closed: #157, #163, #159, #161, #162, #156. Design-reviewed spec, 8 subagent-driven implementation tasks, final code review. 41 files, ~1600 lines. Key architectural decisions: store-authoritative mute expiry, "deferred not lost" quiet hours principle, EntityWatcherProvider SPI.
 
 ## Immediate Next Step
 
-Pick from What's Next — domain notification bridges (casehub-work, casehub-engine, casehub-iot) need filing as cross-repo issues to make the notification pipeline functional end-to-end. The EventTypeRegistry gives bridges a place to register their event type metadata at startup. Alternatively, #158 persistent digest buffer or #146 notification center frontend are standalone.
+Pick from What's Next — domain notification bridges (casehub-work, casehub-engine) need filing as cross-repo issues. The EventTypeRegistry + EntityWatcherProvider SPIs give bridges everything they need. Alternatively, #158 persistent digest buffer or #154 guaranteed delivery are standalone.
 
 ## Cross-Module
 
@@ -29,44 +29,28 @@ Pick from What's Next — domain notification bridges (casehub-work, casehub-eng
 
 **Epic #147 — Notification deferred:**
 - #154 Guaranteed delivery + tracking · M · Med
-- #156 Channel subscriber target type · S · Med
-- #157 Minor findings from code review · S · Low
 - #158 Persistent digest buffer (`digest-jpa/`) · M · Med
-- #159 Digest groupBy preference · S · Low
-- #161 Digest status REST endpoint · S · Low
-- #162 Quiet hours → digest integration · S · Med
-- #163 Minor code review findings · S · Low
+- #164 Validate BUFFER_FOR_DIGEST requires digested channel · S · Low
+- #165 Secondary index for pendingKeysForUser · XS · Low (profile first)
 
 **Other:**
 - casehubio/neocortex#101 — bridge-only reactive implementations · M · Med
 - Domain notification bridges (casehub-work, casehub-engine, casehub-iot) — not yet filed · S · Low each
-- PLATFORM.md capability ownership update for notification pipeline · XS · Low
 - Other child repos add `parent` to publish dispatch lists · XS · Low each
 
 ## What's Next
 
-**Epic #147 — Notification system (remaining phases):**
-
-| Phase | # | Description | Scale | Complexity | Notes |
-|-------|---|-------------|-------|------------|-------|
-| ~~1~~ | ~~#135~~ | ~~In-app notification store~~ | ~~M~~ | ~~Med~~ | **done** |
-| ~~2~~ | ~~#142~~ | ~~Subscription management~~ | ~~L~~ | ~~High~~ | **done** |
-| ~~3~~ | ~~#148~~ | ~~Target resolution~~ | ~~M~~ | ~~Med~~ | **done** |
-| ~~4~~ | ~~#143~~ | ~~User channel preferences~~ | ~~S~~ | ~~Low~~ | **done** |
-| ~~5~~ | ~~#145~~ | ~~Mute and snooze~~ | ~~S~~ | ~~Med~~ | **done** |
-| ~~6~~ | ~~#144~~ | ~~Digest and batching~~ | ~~M~~ | ~~High~~ | **done** |
-| 7 | #146 | Notification center (frontend) | L | Med | after #135 API stable |
-
-**Other:**
-
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
+| #146 | Notification center frontend | L | Med | Remaining: blocks-ui#33 (sub editor), blocks-ui#34 (preferences UI) |
+| #158 | Persistent digest buffer | M | Med | JPA-backed DigestBuffer |
+| #154 | Guaranteed delivery + tracking | M | Med | Delivery audit trail |
 | #138 | DataSource deregistration lifecycle | M | Med | CDI event, router cleanup |
 | #140 | Engine DataSourceTrigger | M | Med | Cross-module engine integration |
-| #158 | Persistent digest buffer | M | Med | JPA-backed DigestBuffer |
 
 ## References
 
 | Type | Path |
 |------|------|
-| Blog | `blog/2026-07-07-mdp01-fourth-registry.md` |
+| Blog | `blog/2026-07-07-mdp01-deferred-not-lost.md` |
+| Spec | `docs/specs/2026-07-07-notification-s-xs-batch-design.md` |
