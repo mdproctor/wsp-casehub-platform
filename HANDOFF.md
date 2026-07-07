@@ -8,11 +8,11 @@
 
 ## Last Session
 
-Designed, reviewed, and implemented notification digest and batching (#144, epic #147 phase 6). Sealed `DigestSchedule` interface with polymorphic `isFlushDue()`, `DigestBuffer` SPI, `InMemoryDigestBuffer` (ConcurrentHashMap, max-size eviction), `ChannelRouter` digest routing, `NotificationDispatcher` three-path delivery loop, `DigestFlushScheduler` (@Scheduled tick). 3-round adversarial design review (13 issues, all resolved). 8 implementation tasks. Final code review: 3 Important fixed, 6 Minor filed as #163. 6 deferred issues filed (#158–#162, #163). Two garden entries submitted (Jackson isX() phantom property gotcha, ConcurrentHashMap.compute() inner-collection technique).
+Implemented EventTypeRegistry SPI (#155) and WeeklyAt digest schedule variant (#160) in a single branch. Both were small, pattern-following additions — no design review needed. All code TDD, full build green, both issues closed.
 
 ## Immediate Next Step
 
-Pick from What's Next — domain notification bridges (casehub-work, casehub-engine, casehub-iot) need filing as cross-repo issues to make the digest pipeline functional end-to-end. Alternatively, #144's deferred issues (#158 persistent buffer, #160 weekly schedule) are standalone.
+Pick from What's Next — domain notification bridges (casehub-work, casehub-engine, casehub-iot) need filing as cross-repo issues to make the notification pipeline functional end-to-end. The EventTypeRegistry gives bridges a place to register their event type metadata at startup. Alternatively, #158 persistent digest buffer or #146 notification center frontend are standalone.
 
 ## Cross-Module
 
@@ -21,15 +21,27 @@ Pick from What's Next — domain notification bridges (casehub-work, casehub-eng
 
 ## What's Left
 
-*Unchanged — retrieve with: `git show HEAD~1:HANDOFF.md`*
+**Epic #137 — DataSource SPI follow-up:**
+- #138 Deregistration lifecycle · M · Med
+- #139 Marshaller configuration model · S · Med
+- #140 Engine DataSourceTrigger · M · Med
+- #141 MVEL3 real evaluator · S · Low (blocked on Maven Central publish)
 
-**Added:**
+**Epic #147 — Notification deferred:**
+- #154 Guaranteed delivery + tracking · M · Med
+- #156 Channel subscriber target type · S · Med
+- #157 Minor findings from code review · S · Low
 - #158 Persistent digest buffer (`digest-jpa/`) · M · Med
 - #159 Digest groupBy preference · S · Low
-- #160 Weekly schedule variant (`WeeklyAt`) · XS · Low
 - #161 Digest status REST endpoint · S · Low
 - #162 Quiet hours → digest integration · S · Med
-- #163 Minor code review findings (test names, Javadoc, jackson-annotations policy) · S · Low
+- #163 Minor code review findings · S · Low
+
+**Other:**
+- casehubio/neocortex#101 — bridge-only reactive implementations · M · Med
+- Domain notification bridges (casehub-work, casehub-engine, casehub-iot) — not yet filed · S · Low each
+- PLATFORM.md capability ownership update for notification pipeline · XS · Low
+- Other child repos add `parent` to publish dispatch lists · XS · Low each
 
 ## What's Next
 
@@ -42,17 +54,19 @@ Pick from What's Next — domain notification bridges (casehub-work, casehub-eng
 | ~~3~~ | ~~#148~~ | ~~Target resolution~~ | ~~M~~ | ~~Med~~ | **done** |
 | ~~4~~ | ~~#143~~ | ~~User channel preferences~~ | ~~S~~ | ~~Low~~ | **done** |
 | ~~5~~ | ~~#145~~ | ~~Mute and snooze~~ | ~~S~~ | ~~Med~~ | **done** |
-| ~~6~~ | ~~#144~~ | ~~Digest and batching~~ | ~~M~~ | ~~High~~ | **done** — landed as 028fd4d on main |
+| ~~6~~ | ~~#144~~ | ~~Digest and batching~~ | ~~M~~ | ~~High~~ | **done** |
 | 7 | #146 | Notification center (frontend) | L | Med | after #135 API stable |
 
-*Other items unchanged — retrieve with: `git show HEAD~1:HANDOFF.md`*
+**Other:**
+
+| # | Description | Scale | Complexity | Notes |
+|---|-------------|-------|------------|-------|
+| #138 | DataSource deregistration lifecycle | M | Med | CDI event, router cleanup |
+| #140 | Engine DataSourceTrigger | M | Med | Cross-module engine integration |
+| #158 | Persistent digest buffer | M | Med | JPA-backed DigestBuffer |
 
 ## References
 
 | Type | Path |
 |------|------|
-| Design spec | `docs/superpowers/specs/2026-07-06-notification-digest-batching-design.md` |
-| Design review | `~/adr/casehub-platform/notification-digest-batching-20260706-203703/tracker.md` |
-| Plan | `plans/attic/issue-144-notification-digest-batching/` |
-| Garden entries | `jvm/GE-20260706-261904.md` (Jackson isX() phantom), `jvm/GE-20260706-ab4bc8.md` (compute() inner collection) |
-| Blog | `blog/2026-07-06-mdp03-digest-batching.md` |
+| Blog | `blog/2026-07-07-mdp01-fourth-registry.md` |
