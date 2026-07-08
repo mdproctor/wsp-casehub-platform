@@ -2,6 +2,7 @@
 
 | File | Date | Title |
 |------|------|-------|
+| [2026-07-08-mdp01-drain-that-eats-its-own.md](2026-07-08-mdp01-drain-that-eats-its-own.md) | 2026-07-08 | Per-Statement Snapshots and the Drain That Eats Its Own — CDI module extraction, READ COMMITTED drain race, JPA digest buffer |
 | [2026-07-07-mdp01-deferred-not-lost.md](2026-07-07-mdp01-deferred-not-lost.md) | 2026-07-07 | Deferred, Not Lost — store-authoritative expiry, quiet hours digest buffering, EntityWatcherProvider SPI |
 | [2026-07-06-mdp03-digest-batching.md](2026-07-06-mdp03-digest-batching.md) | 2026-07-06 | Digest and Batching — Making External Channels Bearable — timer-driven aggregation, sealed DigestSchedule, polymorphic flush, Jackson isX() gotcha |
 | [2026-07-06-mdp02-bom-audit.md](2026-07-06-mdp02-bom-audit.md) | 2026-07-06 | The BOM That Forgot to Grow — full cross-repo BOM audit, 41 missing modules fixed, drift detection CI added |
