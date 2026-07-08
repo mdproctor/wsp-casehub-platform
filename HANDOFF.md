@@ -1,3 +1,5 @@
+*Updated: #158 closed — removed from backlog.*
+
 # HANDOFF — casehub-platform
 
 **Date:** 2026-07-08
