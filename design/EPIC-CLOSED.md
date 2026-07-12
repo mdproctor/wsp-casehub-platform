@@ -1,5 +1,5 @@
-# Branch Closed: issue-135-notification-store
+# Branch Closed: issue-138-datasource-deregistration
 
-**Date:** 2026-07-05
-**Issues:** 135
+**Date:** 2026-07-12
+**Issues:** 138
 **Status:** merged to main
