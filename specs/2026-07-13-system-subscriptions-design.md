@@ -222,7 +222,8 @@ Same scope-aware logic as JPA:
 | Layer | Files | Change |
 |-------|-------|--------|
 | platform-api | `SubscriptionScope` (new) | New enum |
-| platform-api | `Subscription`, `SubscriptionInput`, `SubscriptionUpdate`, `SubscriptionQuery` | Add scope field |
+| platform-api | `Subscription`, `SubscriptionInput`, `SubscriptionQuery` | Add scope field |
+| platform-api | `SubscriptionConstants` | Add `SYSTEM_SUBSCRIPTION_ADMIN_GROUP` constant |
 | platform-api | `SubscriptionStoreContractTest`, `SubscriptionSpiTest` | SYSTEM scope cases |
 | platform (no-op) | `NoOpSubscriptionStore`, `NoOpReactiveSubscriptionStore` | Pass-through scope |
 | subscriptions-inmem | `InMemorySubscriptionStore`, `InMemoryReactiveSubscriptionStore` | Scope-aware auth |
