@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-**Date:** 2026-07-12
+**Date:** 2026-07-13
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -8,16 +8,18 @@
 
 ## Last Session
 
-Closed 8 issues in a single batch branch (#171, #139, #172, #164, #165, #167, #168, #169). Created 3 new modules (datasource-alpha, datasource-jpa, delivery-channel-inmem), added MarshallerRegistry SPI and DataSource descriptor update mechanism, relocated UUIDv7, added digest buffer retention and BUFFER_FOR_DIGEST validation. Two design reviews ($17.46 spec review + $6.27 final review) caught 40 issues total — all resolved. Landed as b0e873f on main.
+Delivered `Vectors` utility in `platform-api` (#134) — cosine similarity, dot product, magnitude for `float[]` arrays. Explicit `(double)` promotion for precision on high-dimensional embedding vectors. Design spec adversarially reviewed (5 rounds, $12.38). 18 tests. Landed as 1e77c33 on main.
 
 ## Immediate Next Step
 
-Pick from What's Next — #146 notification center frontend or #170 delivery engagement tracking. Domain notification bridges (casehub-work, casehub-engine) still need filing as cross-repo issues.
+Pick from What's Next — #146 notification center frontend or #170 delivery engagement tracking. Consumer migration issues filed: engine#713, work#302.
 
 ## Cross-Module
 
 **We're blocking:**
 - `casehub-work` — `WorkEventTypeTest` needs updating for new notification/subscription event types + marshallerKeys parameter on DataSourceDescriptor · S · Low
+- `casehub-engine` — engine#713: migrate `SemanticAgentRoutingStrategy` to `Vectors.cosineSimilarity()` · XS · Low
+- `casehub-work` — work#302: migrate `EmbeddingSkillMatcher` to `Vectors.cosineSimilarity()` · XS · Low
 
 ## What's Left
 
@@ -43,7 +45,5 @@ Pick from What's Next — #146 notification center frontend or #170 delivery eng
 
 | Type | Path |
 |------|------|
-| Spec | `docs/specs/2026-07-12-spi-batch-cleanup-design.md` |
-| Review | `~/adr/casehub-platform/spi-batch-cleanup-20260712-170638/` (spec) |
-| Review | `~/adr/casehub-platform/spi-batch-cleanup-final-20260712-220652/` (final) |
-| Garden | `GE-20260712-44faae` — ide_move_file bulk moves leave stale intra-package imports |
+| Spec | `docs/specs/2026-07-13-embedding-similarity-utility-design.md` |
+| Review | `~/adr/casehub-platform/embedding-similarity-utility-*` (spec review) |
