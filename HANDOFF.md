@@ -8,7 +8,7 @@
 
 ## Last Session
 
-Delivered `Vectors` utility in `platform-api` (#134) — cosine similarity, dot product, magnitude for `float[]` arrays. Explicit `(double)` promotion for precision on high-dimensional embedding vectors. Design spec adversarially reviewed (5 rounds, $12.38). 18 tests. Landed as 1e77c33 on main.
+Closed 4 S-scale issues in a single batch branch. Identity: fixed base58btc encoding (#131) and added secp256k1 did:key support (#133) — manual SPKI ASN.1, no JCA. Subscriptions: added SubscribableEvent compile-time contract (#153) replacing MethodHandle reflection, plus glob matching for event type patterns (#152). Landed as 0fd6273 on main.
 
 ## Immediate Next Step
 
@@ -17,9 +17,9 @@ Pick from What's Next — #146 notification center frontend or #170 delivery eng
 ## Cross-Module
 
 **We're blocking:**
-- `casehub-work` — `WorkEventTypeTest` needs updating for new notification/subscription event types + marshallerKeys parameter on DataSourceDescriptor · S · Low
-- `casehub-engine` — engine#713: migrate `SemanticAgentRoutingStrategy` to `Vectors.cosineSimilarity()` · XS · Low
-- `casehub-work` — work#302: migrate `EmbeddingSkillMatcher` to `Vectors.cosineSimilarity()` · XS · Low
+- `casehub-engine` — engine#713: migrate to `Vectors.cosineSimilarity()` · XS · Low
+- `casehub-work` — work#302: migrate to `Vectors.cosineSimilarity()` · XS · Low
+- `casehub-work` — `WorkEventTypeTest` needs updating for SubscribableEvent + marshallerKeys · S · Low
 
 ## What's Left
 
@@ -45,5 +45,4 @@ Pick from What's Next — #146 notification center frontend or #170 delivery eng
 
 | Type | Path |
 |------|------|
-| Spec | `docs/specs/2026-07-13-embedding-similarity-utility-design.md` |
-| Review | `~/adr/casehub-platform/embedding-similarity-utility-*` (spec review) |
+| Garden | `GE-20260713-14473f` — LEB128 varint gotcha |
