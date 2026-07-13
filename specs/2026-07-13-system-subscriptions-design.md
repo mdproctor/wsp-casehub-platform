@@ -47,7 +47,16 @@ public record Subscription(
 
 `ownerId` semantics: USER scope = the user who owns it. SYSTEM scope = the admin who created it (audit trail, not authorisation).
 
-**SubscriptionInput** — add `scope` (defaults to `USER`).
+**SubscriptionInput** — add `scope` (defaults to `USER`):
+
+```java
+public SubscriptionInput {
+    // ... existing validations ...
+    scope = scope != null ? scope : SubscriptionScope.USER;
+}
+```
+
+Jackson deserializes a missing `scope` field as `null`; the compact constructor normalises null to `USER` for backward compatibility with existing API clients.
 
 **SubscriptionUpdate** — no scope field. Scope is immutable after creation — it is an authorisation model selector, not a mutable property. Changing scope mid-life conflates two distinct authorisation models on the same record. To change scope, delete and recreate.
 
@@ -134,6 +143,28 @@ Do NOT inject `GroupMembershipProvider` — that SPI is for expanding notificati
 
 Non-admin attempting SYSTEM scope write → 403 Forbidden.
 
+**SYSTEM scope mutation enforcement (PATCH, DELETE, enable, disable):**
+
+The OR disjunction in the store (§Store Authorisation) means `store.update()` and `store.delete()` succeed for any tenant user on SYSTEM subscriptions. The REST layer must enforce the admin gate before calling the store. Every mutation endpoint on an existing subscription uses a two-phase pattern:
+
+```java
+// Phase 1: lookup to determine scope
+return store.findById(id, principal.actorId(), principal.tenancyId())
+    .chain(opt -> {
+        if (opt.isEmpty()) return Uni.createFrom().item(Response.status(404).build());
+        var sub = opt.get();
+        // Phase 2: admin gate for SYSTEM scope
+        if (sub.scope() == SYSTEM && !principal.hasGroup(ADMIN_GROUP)) {
+            return Uni.createFrom().item(Response.status(403).build());
+        }
+        return store.update(id, principal.actorId(), principal.tenancyId(), update)
+            .map(result -> result.map(s -> Response.ok(s).build())
+                .orElse(Response.status(404).build()));
+    });
+```
+
+This applies to: `update()`, `delete()`, `enable()`, `disable()`. The `POST` endpoint does not need this pattern — scope comes from the request body and is checked directly. `GET` endpoints do not need it — the spec allows any tenant user to read SYSTEM subscriptions.
+
 ### JPA Migration
 
 **V3__subscription_scope.sql:**
@@ -142,7 +173,7 @@ Non-admin attempting SYSTEM scope write → 403 Forbidden.
 ALTER TABLE subscription ADD COLUMN scope VARCHAR(10) NOT NULL DEFAULT 'USER';
 
 CREATE INDEX idx_subscription_scope_tenant
-    ON subscription (scope, tenancy_id) WHERE scope = 'SYSTEM';
+    ON subscription (tenancy_id) WHERE scope = 'SYSTEM';
 ```
 
 Default `'USER'` backfills all existing rows. Partial index on `scope = 'SYSTEM'` optimises the system subscription tenant query.
@@ -169,7 +200,20 @@ Same scope-aware logic as JPA:
 ## Testing
 
 - **Contract tests** (`SubscriptionStoreContractTest`): SYSTEM scope store, findById across users in same tenant, cross-tenant isolation, update/delete without ownerId match
-- **REST tests** (`SubscriptionResourceTest`): admin creates SYSTEM scope, non-admin gets 403, any user lists/reads SYSTEM subscriptions, admin updates/deletes
+- **REST tests** (`SubscriptionResourceTest`):
+  - Admin creates SYSTEM scope subscription → 201
+  - Non-admin creates SYSTEM scope subscription → 403
+  - Any tenant user lists SYSTEM subscriptions → 200
+  - Any tenant user reads SYSTEM subscription by ID → 200
+  - Admin updates SYSTEM subscription → 200
+  - Non-admin updates SYSTEM subscription → 403
+  - Admin deletes SYSTEM subscription → 204
+  - Non-admin deletes SYSTEM subscription → 403
+  - Non-admin enables SYSTEM subscription → 403
+  - Non-admin disables SYSTEM subscription → 403
+  - SYSTEM scope creation with empty targets → 400
+  - SYSTEM scope creation with `$me` constraint → 400
+  - USER scope creation without `scope` field (backward compat) → 201 with `scope=USER`
 - **Engine test**: SYSTEM subscription wired and fires SubscriptionMatched (no engine changes needed — regression test)
 - **Integration**: admin creates system subscription targeting GROUP, event fires, group members receive notifications
 
