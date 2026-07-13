@@ -8,11 +8,11 @@
 
 ## Last Session
 
-Closed 4 S-scale issues in a single batch branch. Identity: fixed base58btc encoding (#131) and added secp256k1 did:key support (#133) — manual SPKI ASN.1, no JCA. Subscriptions: added SubscribableEvent compile-time contract (#153) replacing MethodHandle reflection, plus glob matching for event type patterns (#152). Landed as 0fd6273 on main.
+Added system subscriptions (#150) — SubscriptionScope discriminator (USER/SYSTEM) with admin authorization. SYSTEM scope subscriptions are tenant-wide, managed by subscription-admins group, visible to all tenant users. OR-disjunction store queries, CHECK constraint on scope column, REST admin gate with $me and empty-targets validation. Design-reviewed (14 issues, all verified) and final-reviewed (9 issues, all fixed). Landed as 99f9b68 on main.
 
 ## Immediate Next Step
 
-Pick from What's Next — #146 notification center frontend or #170 delivery engagement tracking. Consumer migration issues filed: engine#713, work#302.
+Pick from What's Next — #170 delivery engagement tracking or #151 expression-based subscription filters. Consumer migration issues still open: engine#713, work#302.
 
 ## Cross-Module
 
@@ -28,6 +28,7 @@ Pick from What's Next — #146 notification center frontend or #170 delivery eng
 
 **Epic #147 — Notification deferred:**
 - #170 Open/engagement tracking · M · Med
+- #151 Expression-based subscription filters · S · Med
 
 **Other:**
 - casehubio/neocortex#101 — bridge-only reactive implementations · M · Med
@@ -37,12 +38,15 @@ Pick from What's Next — #146 notification center frontend or #170 delivery eng
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
-| #146 | Notification center frontend | L | Med | Remaining: blocks-ui#33, blocks-ui#34 |
 | #170 | Open/engagement tracking | M | Med | Email opens, push taps — deferred from #154 |
+| #151 | Expression-based subscription filters | S | Med | JQ path works now; MVEL path blocked |
+| #146 | Notification center frontend | L | Med | Remaining: blocks-ui#33, blocks-ui#34 |
 | #141 | MVEL3 real evaluator | S | Low | Blocked on Maven Central publish |
 
 ## References
 
 | Type | Path |
 |------|------|
+| Spec | `specs/2026-07-13-system-subscriptions-design.md` |
+| Review | `~/adr/casehub-platform/system-subscriptions-20260713-203449/` |
 | Garden | `GE-20260713-14473f` — LEB128 varint gotcha |
