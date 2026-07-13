@@ -17,6 +17,8 @@ Add a `SubscriptionScope` discriminator (`USER` | `SYSTEM`) to the existing Subs
 - Separate `SystemSubscription` model — one record type with a scope discriminator
 - Policy-based materialisation — too complex for the use case
 
+**Issue #150 scope:** The issue body mentions both `scope` and `targetType`. This spec delivers `scope` only. `targetType` is not needed — `TargetType.GROUP` with an organisation-wide group from the identity provider already covers "all users" targeting via `GroupMembershipProvider.membersOf()`. Update issue #150 to reflect that `targetType` changes are unnecessary.
+
 ## Design
 
 ### SPI Model (platform-api)
@@ -47,11 +49,34 @@ public record Subscription(
 
 **SubscriptionInput** — add `scope` (defaults to `USER`).
 
-**SubscriptionUpdate** — add nullable `SubscriptionScope scope` (null = unchanged).
+**SubscriptionUpdate** — no scope field. Scope is immutable after creation — it is an authorisation model selector, not a mutable property. Changing scope mid-life conflates two distinct authorisation models on the same record. To change scope, delete and recreate.
 
-**SubscriptionQuery** — add nullable `SubscriptionScope scope`:
-- `null` or `USER` → filter by ownerId + tenancyId (backward compatible)
-- `SYSTEM` → filter by tenancyId only (all system subscriptions for the tenant)
+**SubscriptionQuery** — add `SubscriptionScope scope` and make `ownerId` conditionally nullable:
+
+```java
+public record SubscriptionQuery(
+        String ownerId,          // required for USER scope, nullable for SYSTEM
+        String tenancyId,        // always required
+        SubscriptionScope scope, // null defaults to USER
+        Boolean enabled,
+        String cursor,
+        int limit
+) {
+    public SubscriptionQuery {
+        Objects.requireNonNull(tenancyId, "tenancyId");
+        var effectiveScope = scope != null ? scope : SubscriptionScope.USER;
+        if (effectiveScope == SubscriptionScope.USER) {
+            Objects.requireNonNull(ownerId, "ownerId required for USER scope");
+        }
+        if (limit <= 0) {
+            throw new IllegalArgumentException("limit must be positive");
+        }
+    }
+}
+```
+
+- `scope` null or `USER` → `ownerId` required, filter by ownerId + tenancyId (backward compatible)
+- `scope` `SYSTEM` → `ownerId` nullable (not used in query), filter by tenancyId + scope only
 
 ### Store Authorisation (scope-aware)
 
@@ -63,19 +88,32 @@ public record Subscription(
 | `delete(id, ownerId, tenancyId)` | ownerId + tenancyId match | tenancyId match only |
 | `findAllEnabled()` | unchanged | unchanged |
 
-For SYSTEM scope, the `ownerId` parameter is still passed (it's the requesting user) but not used for authorisation — any user in the tenant can read, only admins can write (enforced at REST layer).
+**Query-level scope resolution:** The SPI method signatures do not change — `findById`, `update`, and `delete` still receive `(id, ownerId, tenancyId)`. The store resolves scope at the query level using an OR disjunction:
+
+- **JPA:** `WHERE id = ?1 AND tenancyId = ?3 AND (ownerId = ?2 OR scope = 'SYSTEM')`
+- **InMemory:** `.filter(s -> s.tenancyId().equals(tenancyId)).filter(s -> s.ownerId().equals(ownerId) || s.scope() == SubscriptionScope.SYSTEM)`
+
+This eliminates the chicken-and-egg problem: the store does not need to know the subscription's scope before fetching it — the query finds the record if the caller owns it (USER) or if the record is tenant-wide (SYSTEM). The `ownerId` parameter is still passed for USER scope authorisation; for SYSTEM scope it is present but not load-bearing.
+
+Admin-only write access for SYSTEM scope is enforced at the REST layer, not the store. The store allows any tenant user to find/update/delete SYSTEM subscriptions; the REST layer gates mutation to admins.
 
 Cross-tenant isolation is unconditional in both scopes.
 
+**SPI Javadoc update:** Both `SubscriptionStore` and `ReactiveSubscriptionStore` interface Javadoc must be updated. The current "User Ownership Enforcement" documentation describes ownerId as unconditionally enforced. Update to describe scope-dependent authorisation: USER scope enforces ownerId at the SPI boundary; SYSTEM scope uses tenancyId-only filtering at the SPI boundary with admin authorisation enforced at the REST layer.
+
 ### REST Layer
 
-Admin authorisation for SYSTEM scope writes: check membership in a well-known group. Add to `SubscriptionConstants`:
+Admin authorisation for SYSTEM scope writes: use `CurrentPrincipal.hasGroup()` to check membership in a well-known group. This follows the platform's groups-as-roles contract (`CurrentPrincipal.roles()` delegates to `groups()` — see ARC42STORIES.MD). No new dependency injection needed; `CurrentPrincipal` is already injected into `SubscriptionResource`.
+
+Add to `SubscriptionConstants`:
 
 ```java
 public static final String SYSTEM_SUBSCRIPTION_ADMIN_GROUP = "subscription-admins";
 ```
 
-Inject `GroupMembershipProvider` into `SubscriptionResource`.
+Admin check: `principal.hasGroup(SYSTEM_SUBSCRIPTION_ADMIN_GROUP)`.
+
+Do NOT inject `GroupMembershipProvider` — that SPI is for expanding notification targets at dispatch time, not for authorisation checks. `CurrentPrincipal.hasGroup()` checks JWT claims, consistent with the platform's groups-as-roles authorisation model.
 
 | Endpoint | USER scope | SYSTEM scope |
 |----------|-----------|-------------|
@@ -88,7 +126,11 @@ Inject `GroupMembershipProvider` into `SubscriptionResource`.
 | `PATCH /subscriptions/{id}/enable` | owner only | admin only |
 | `PATCH /subscriptions/{id}/disable` | owner only | admin only |
 
-On `POST` with `scope=SYSTEM`: do not default empty targets to `[USER(principal)]` — system subscriptions must have explicit targets.
+**SYSTEM scope creation validation (`POST` with `scope=SYSTEM`):**
+
+1. Do not default empty targets to `[USER(principal)]` — system subscriptions must have explicit targets.
+2. Empty or null targets → 400 Bad Request. A SYSTEM subscription with no targets is a silent no-op (stored but never delivers notifications).
+3. Reject any constraint with value `$me` → 400 Bad Request. `$me` resolves to the creating admin's ownerId, which is semantically wrong for a tenant-wide subscription (see §What Doesn't Change, ConstraintCompiler).
 
 Non-admin attempting SYSTEM scope write → 403 Forbidden.
 
@@ -118,7 +160,7 @@ Same scope-aware logic as JPA:
 ### What Doesn't Change
 
 - **SubscriptionEngine** — `findAllEnabled()` returns all enabled subscriptions. System subscriptions are wired into the alpha network identically. No changes.
-- **ConstraintCompiler** — `$me` resolves to admin's ownerId in SYSTEM scope. Not useful in SYSTEM constraints but not broken. Document as "not meaningful for SYSTEM scope."
+- **ConstraintCompiler** — `$me` substitution resolves to the subscription's `ownerId`. For SYSTEM scope, this is the creating admin's ID, which is almost never the intended filter subject. Rather than allowing a latent semantic trap (especially once MVEL activates), creation-time validation in the REST layer rejects SYSTEM scope constraints containing `$me` (see §REST Layer). The ConstraintCompiler itself is unchanged — validation is at the input boundary.
 - **TargetResolver** — resolves targets identically regardless of scope.
 - **NotificationDispatcher** — observes SubscriptionMatched, scope-unaware.
 - **SuppressionEvaluator** — users mute/snooze notifications from system subscriptions via existing mechanism.
@@ -143,3 +185,5 @@ Same scope-aware logic as JPA:
 | subscriptions-jpa | `SubscriptionEntity`, `JpaSubscriptionStore`, `JpaReactiveSubscriptionStore` | Scope column + queries |
 | subscriptions-jpa | `V3__subscription_scope.sql` | Migration |
 | subscriptions | `SubscriptionResource`, `SubscriptionResourceTest` | Admin auth, scope param |
+| platform-api | `SubscriptionStore`, `ReactiveSubscriptionStore` | Javadoc: scope-dependent authorisation |
+| docs | `ARC42STORIES.MD` | New `SubscriptionScope` enum in SPI layer taxonomy |
