@@ -14,6 +14,10 @@ Added system subscriptions (#150) — SubscriptionScope discriminator (USER/SYST
 
 Pick from What's Next — #170 delivery engagement tracking or #151 expression-based subscription filters. Consumer migration issues still open: engine#713, work#302.
 
+## Cross-Repo Changes (from other sessions)
+
+- **Branch:** `issue-77-promote-preference-types` — `e74a86d` — adds `DoublePreference` and `IntPreference` to `io.casehub.platform.api.preferences` (platform-api). Promoted from engine-api and desiredstate-api duplicates. Filed from desiredstate session for casehubio/casehub-desiredstate#77. Needs merge to main.
+
 ## Cross-Module
 
 **We're blocking:**
