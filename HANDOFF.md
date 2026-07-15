@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-**Date:** 2026-07-14
+**Date:** 2026-07-16
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -8,13 +8,11 @@
 
 ## Last Session
 
-Promoted generic expression evaluation SPI to platform-api (#141). `CompiledExpression<C, R>` runtime contract, `ExpressionEngine` factory, `ExpressionEngineRegistry` dispatcher. Three evaluator types: JQ, MVEL, Lambda. MVEL3 engine wraps the MVEL3 transpiler with lazy compilation. ConstraintCompiler converted from static utility to CDI bean with parameterized MVEL expressions (injection prevention). Design-reviewed (4 rounds, 14 issues, all resolved). Landed as 82d1172 on main.
-
-Also landed: DoublePreference/IntPreference (desiredstate#77, 33c2208), SIGNING_SECRET CredentialPropertyKey (#345, 6d758b5), JBoss Nexus snapshots repo added to parent BOM (parent#372).
+Replaced `Constraint(field, op, value)` model with `List<ExpressionEvaluator>` in notification subscriptions (#151). Deleted Constraint, ConstraintOp, ConstraintCompiler — the structured model was a dead-end DSL over what MVEL already provides. SubscriptionEngine now compiles filters directly via ExpressionEngineRegistry with $me variable binding and tenant isolation. Jackson serializer/deserializer module for polymorphic ExpressionEvaluator round-trip. Alpha network collapsed sharing unchanged. PR #179 open against casehubio/platform. Landed as 0a55b5f on main.
 
 ## Immediate Next Step
 
-Pick from What's Next — #170 delivery engagement tracking, #151 expression-based subscription filters (MVEL path now unblocked), or #176 engine expression migration. Consumer migration issues still open: engine#713, work#302.
+Pick from What's Next — #170 delivery engagement tracking or #176 engine expression migration. PR #179 is open for review.
 
 ## Cross-Module
 
@@ -28,7 +26,6 @@ Pick from What's Next — #170 delivery engagement tracking, #151 expression-bas
 
 **Epic #147 — Notification deferred:**
 - #170 Open/engagement tracking · M · Med
-- #151 Expression-based subscription filters · S · Med (MVEL path now unblocked)
 
 **Expression SPI deferred:**
 - #176 Engine-api expression types migrate to platform SPI · M · Med
@@ -45,13 +42,14 @@ Pick from What's Next — #170 delivery engagement tracking, #151 expression-bas
 |---|-------------|-------|------------|-------|
 | #176 | Engine expression migration to platform SPI | M | Med | Engine adapts ExpressionEngine/Registry to platform's |
 | #170 | Delivery engagement tracking | M | Med | Email opens, push taps |
-| #151 | Expression-based subscription filters | S | Med | JQ + MVEL both work now |
 | #146 | Notification center frontend | L | Med | Remaining: blocks-ui#33, #34 |
 
 ## References
 
 | Type | Path |
 |------|------|
-| Spec | `docs/specs/2026-07-14-expression-spi-mvel3-design.md` |
-| Review | `~/adr/casehub-platform/expression-spi-mvel3-20260714-134939/` |
+| Spec | `docs/specs/2026-07-15-expression-subscription-filters-design.md` |
+| Blog | `blog/2026-07-15-mdp01-killing-the-constraint-model.md` |
+| Garden | `GE-20260715-01a695` — MVEL3 single-quoted strings fail |
 | Garden | `GE-20260714-550161` — MVEL3 contains keyword conflict |
+| PR | casehubio/platform#179 |
