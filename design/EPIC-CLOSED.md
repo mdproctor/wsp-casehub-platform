@@ -1,5 +1,5 @@
-# Branch Closed: issue-135-notification-store
+# Branch Closed: issue-151-expression-subscription-filters
 
-**Date:** 2026-07-05
-**Issues:** 135
+**Date:** 2026-07-16
+**Issues:** 151
 **Status:** merged to main
