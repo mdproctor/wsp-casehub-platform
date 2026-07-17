@@ -1,5 +1,7 @@
 # HANDOFF — casehub-platform
 
+*Updated: #170 closed, PR #182 merged — removed from backlog.*
+
 **Date:** 2026-07-17
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
@@ -8,11 +10,11 @@
 
 ## Last Session
 
-Implemented delivery engagement tracking (#170) — channel-agnostic engagement events (OPENED, CLICKED, DISMISSED, REPLIED, CONVERTED) on DeliveryAttempt. Three recording paths converge on EngagementRecorder: SPI callback handler, direct REST, programmatic. In-app bridge via CDI observer. Deployment opt-in gate. PR #182 open against casehubio/platform.
+Implemented delivery engagement tracking (#170) — channel-agnostic engagement events (OPENED, CLICKED, DISMISSED, REPLIED, CONVERTED) on DeliveryAttempt. Three recording paths converge on EngagementRecorder: SPI callback handler, direct REST, programmatic. In-app bridge via CDI observer. Deployment opt-in gate. Merged via PR #182.
 
 ## Immediate Next Step
 
-Pick from What's Next — #176 engine expression migration or #177 MVEL Map/List context. PR #182 is open for review.
+Pick from What's Next — #176 engine expression migration or #177 MVEL Map/List context.
 
 ## Cross-Module
 
@@ -23,9 +25,6 @@ Pick from What's Next — #176 engine expression migration or #177 MVEL Map/List
 - `casehub-engine` — #176: engine-api expression types migrate to platform SPI · M · Med
 
 ## What's Left
-
-**Epic #147 — Notification deferred:**
-- #170 delivered this session; PR #182 open for review
 
 **Expression SPI deferred:**
 - #176 Engine-api expression types migrate to platform SPI · M · Med
@@ -50,6 +49,6 @@ Pick from What's Next — #176 engine expression migration or #177 MVEL Map/List
 |------|------|
 | Spec | `docs/specs/2026-07-16-delivery-engagement-tracking-design.md` |
 | Blog | `blog/2026-07-17-mdp01-engagement-tracking-missing-half.md` |
-| PR | casehubio/platform#182 |
+| PR | casehubio/platform#182 (merged) |
 | Review | `~/adr/casehub-platform/delivery-engagement-tracking-20260716-180937/` (spec review) |
 | Review | `~/adr/casehub-platform/delivery-engagement-tracking-final-20260717-141212/` (final review) |
