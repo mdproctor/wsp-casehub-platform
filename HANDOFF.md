@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-**Date:** 2026-07-16
+**Date:** 2026-07-17
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -8,11 +8,11 @@
 
 ## Last Session
 
-Replaced `Constraint(field, op, value)` model with `List<ExpressionEvaluator>` in notification subscriptions (#151). Deleted Constraint, ConstraintOp, ConstraintCompiler — the structured model was a dead-end DSL over what MVEL already provides. SubscriptionEngine now compiles filters directly via ExpressionEngineRegistry with $me variable binding and tenant isolation. Jackson serializer/deserializer module for polymorphic ExpressionEvaluator round-trip. Alpha network collapsed sharing unchanged. PR #179 open against casehubio/platform. Landed as 0a55b5f on main.
+Implemented delivery engagement tracking (#170) — channel-agnostic engagement events (OPENED, CLICKED, DISMISSED, REPLIED, CONVERTED) on DeliveryAttempt. Three recording paths converge on EngagementRecorder: SPI callback handler, direct REST, programmatic. In-app bridge via CDI observer. Deployment opt-in gate. PR #182 open against casehubio/platform.
 
 ## Immediate Next Step
 
-Pick from What's Next — #170 delivery engagement tracking or #176 engine expression migration. PR #179 is open for review.
+Pick from What's Next — #176 engine expression migration or #177 MVEL Map/List context. PR #182 is open for review.
 
 ## Cross-Module
 
@@ -25,7 +25,7 @@ Pick from What's Next — #170 delivery engagement tracking or #176 engine expre
 ## What's Left
 
 **Epic #147 — Notification deferred:**
-- #170 Open/engagement tracking · M · Med
+- #170 delivered this session; PR #182 open for review
 
 **Expression SPI deferred:**
 - #176 Engine-api expression types migrate to platform SPI · M · Med
@@ -40,16 +40,16 @@ Pick from What's Next — #170 delivery engagement tracking or #176 engine expre
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
-| #176 | Engine expression migration to platform SPI | M | Med | Engine adapts ExpressionEngine/Registry to platform's |
-| #170 | Delivery engagement tracking | M | Med | Email opens, push taps |
-| #146 | Notification center frontend | L | Med | Remaining: blocks-ui#33, #34 |
+| #176 | Engine expression migration to platform SPI | M | Med | Engine adapts to platform's ExpressionEngine/Registry |
+| #177 | MVEL Map and List context support | S | Low | |
+| #178 | MVEL block expressions | S | Low | |
 
 ## References
 
 | Type | Path |
 |------|------|
-| Spec | `docs/specs/2026-07-15-expression-subscription-filters-design.md` |
-| Blog | `blog/2026-07-15-mdp01-killing-the-constraint-model.md` |
-| Garden | `GE-20260715-01a695` — MVEL3 single-quoted strings fail |
-| Garden | `GE-20260714-550161` — MVEL3 contains keyword conflict |
-| PR | casehubio/platform#179 |
+| Spec | `docs/specs/2026-07-16-delivery-engagement-tracking-design.md` |
+| Blog | `blog/2026-07-17-mdp01-engagement-tracking-missing-half.md` |
+| PR | casehubio/platform#182 |
+| Review | `~/adr/casehub-platform/delivery-engagement-tracking-20260716-180937/` (spec review) |
+| Review | `~/adr/casehub-platform/delivery-engagement-tracking-final-20260717-141212/` (final review) |
