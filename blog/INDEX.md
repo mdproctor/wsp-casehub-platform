@@ -46,3 +46,4 @@
 | [2026-05-29-mdp01-the-memori-that-wasnt.md](2026-05-29-mdp01-the-memori-that-wasnt.md) | 2026-05-29 | Pivot from Memori REST to JPA adapter — GDPR SPI smell, two adapters ship, H2 edge cases |
 | [2026-05-30-mdp02-the-api-that-told-the-truth.md](2026-05-30-mdp02-the-api-that-told-the-truth.md) | 2026-05-30 | SPI evolution from devtown feedback: MemoryOrder enum, attribute keys, multi-entity query |
 | [2026-05-31-mdp01-durable-memory-no-server.md](2026-05-31-mdp01-durable-memory-no-server.md) | 2026-05-31 | memory-sqlite/ — SQLite CaseMemoryStore adapter with HikariCP, FTS5, WAL mode, programmatic Flyway |
+| [2026-07-17-mdp01-engagement-tracking-missing-half.md](2026-07-17-mdp01-engagement-tracking-missing-half.md) | 2026-07-17 | Engagement tracking on DeliveryAttempt — EngagementType vocabulary, callback SPI, in-app bridge, opt-in gate |
