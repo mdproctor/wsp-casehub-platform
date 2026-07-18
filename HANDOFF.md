@@ -1,8 +1,6 @@
 # HANDOFF — casehub-platform
 
-*Updated: #170 closed, PR #182 merged — removed from backlog.*
-
-**Date:** 2026-07-17
+**Date:** 2026-07-18
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -10,28 +8,23 @@
 
 ## Last Session
 
-Implemented delivery engagement tracking (#170) — channel-agnostic engagement events (OPENED, CLICKED, DISMISSED, REPLIED, CONVERTED) on DeliveryAttempt. Three recording paths converge on EngagementRecorder: SPI callback handler, direct REST, programmatic. In-app bridge via CDI observer. Deployment opt-in gate. Merged via PR #182.
+Delivered CloudEvent type dispatch (#174), MVEL POJO context + block expressions (#177, #178), and engine migration readiness (#176). PR #183 open against casehubio/platform. Discovered three MVEL3 transpiler bugs (pojo() NPE, block return, list declarations) — all captured in the garden. CDI `Event.select()` qualifier removal prevents double-processing without guards.
 
 ## Immediate Next Step
 
-Pick from What's Next — #176 engine expression migration or #177 MVEL Map/List context.
+Engine migration: 4 issues filed against casehub-engine (engine#747, #748, #749, #750). These make engine-api expression types thin wrappers over platform SPI. Do them in order: #747 (ExpressionEvaluator extends), #748 (ExpressionEngine wraps), #749 (LambdaExpressionEvaluator → LambdaExpression), #750 (registry delegates).
 
 ## Cross-Module
 
 **We're blocking:**
+- `casehub-engine` — engine#747-750: expression type migration to platform SPI · M · Med (filed this session)
 - `casehub-engine` — engine#713: migrate to `Vectors.cosineSimilarity()` · XS · Low
 - `casehub-work` — work#302: migrate to `Vectors.cosineSimilarity()` · XS · Low
 - `casehub-work` — `WorkEventTypeTest` needs updating for SubscribableEvent + marshallerKeys · S · Low
-- `casehub-engine` — #176: engine-api expression types migrate to platform SPI · M · Med
+- `casehub-neocortex` — neocortex#142: wire CbrOutcomeConsumer to @CloudEventType observer · S · Low (unblocked by #174)
 
 ## What's Left
 
-**Expression SPI deferred:**
-- #176 Engine-api expression types migrate to platform SPI · M · Med
-- #177 MvelExpressionEngine Map and List context support · S · Low
-- #178 MVEL block expressions · S · Low
-
-**Other:**
 - casehubio/neocortex#101 — bridge-only reactive implementations · M · Med
 - Domain notification bridges (casehub-work, casehub-engine, casehub-iot) — not yet filed · S · Low each
 
@@ -39,16 +32,15 @@ Pick from What's Next — #176 engine expression migration or #177 MVEL Map/List
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
-| #176 | Engine expression migration to platform SPI | M | Med | Engine adapts to platform's ExpressionEngine/Registry |
-| #177 | MVEL Map and List context support | S | Low | |
-| #178 | MVEL block expressions | S | Low | |
+| #175 | Generic queue toolkit — AbstractQueueEntity, QueueSubject SPI | L | Med | New platform-queue module |
+| #8 | Preferences-editor module — admin UI/API | XL | High | Write path for preferences; long-standing |
 
 ## References
 
 | Type | Path |
 |------|------|
-| Spec | `docs/specs/2026-07-16-delivery-engagement-tracking-design.md` |
-| Blog | `blog/2026-07-17-mdp01-engagement-tracking-missing-half.md` |
-| PR | casehubio/platform#182 (merged) |
-| Review | `~/adr/casehub-platform/delivery-engagement-tracking-20260716-180937/` (spec review) |
-| Review | `~/adr/casehub-platform/delivery-engagement-tracking-final-20260717-141212/` (final review) |
+| Spec | `docs/specs/2026-07-17-cloudevent-dispatch-expression-context-design.md` |
+| Blog | `blog/2026-07-18-mdp01-cloudevent-dispatch-mvel-context.md` |
+| PR | casehubio/platform#183 |
+| Review | `~/adr/casehub-platform/cloudevent-dispatch-expression-context-*/` (spec review) |
+| Engine issues | engine#747, #748, #749, #750 |
