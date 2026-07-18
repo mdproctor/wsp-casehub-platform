@@ -42,6 +42,6 @@ Engine migration remains the highest priority: engine#747-750 (expression type m
 | Type | Path |
 |------|------|
 | Spec | `docs/specs/2026-07-18-subject-view-toolkit-design.md` |
-| Blog | `blog/2026-07-18-mdp01-cloudevent-dispatch-mvel-context.md` (prior session) |
+| Blog | `blog/2026-07-18-mdp01-the-queue-that-wasnt.md` |
 | PR | casehubio/platform#183 |
 | Review | `~/adr/casehub-platform/subject-view-toolkit-20260718-032257/` |
