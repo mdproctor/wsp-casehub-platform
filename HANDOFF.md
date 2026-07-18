@@ -8,39 +8,40 @@
 
 ## Last Session
 
-Delivered CloudEvent type dispatch (#174), MVEL POJO context + block expressions (#177, #178), and engine migration readiness (#176). PR #183 open against casehubio/platform. Discovered three MVEL3 transpiler bugs (pojo() NPE, block return, list declarations) — all captured in the garden. CDI `Event.select()` qualifier removal prevents double-processing without guards.
+Delivered the subject view toolkit (#175) — generalized casehub-work-queues' filtered view pattern into reusable platform infrastructure. Three new modules: platform-view (evaluator), platform-view-inmem, platform-view-jpa (Criteria API query helper). Design spec went through 5-round adversarial review ($16.59, 28 issues verified). PR #183 updated on casehubio/platform.
 
 ## Immediate Next Step
 
-Engine migration: 4 issues filed against casehub-engine (engine#747, #748, #749, #750). These make engine-api expression types thin wrappers over platform SPI. Do them in order: #747 (ExpressionEvaluator extends), #748 (ExpressionEngine wraps), #749 (LambdaExpressionEvaluator → LambdaExpression), #750 (registry delegates).
+Engine migration remains the highest priority: engine#747-750 (expression type migration to platform SPI). These are the next in-order items from the prior session's handover. Run `/work` to start on engine#747.
 
 ## Cross-Module
 
 **We're blocking:**
-- `casehub-engine` — engine#747-750: expression type migration to platform SPI · M · Med (filed this session)
+- `casehub-engine` — engine#747-750: expression type migration to platform SPI · M · Med
 - `casehub-engine` — engine#713: migrate to `Vectors.cosineSimilarity()` · XS · Low
-- `casehub-work` — work#302: migrate to `Vectors.cosineSimilarity()` · XS · Low
+- `casehub-engine` — engine#730: case queue implementation (now uses subject view toolkit) · M · Med
 - `casehub-work` — `WorkEventTypeTest` needs updating for SubscribableEvent + marshallerKeys · S · Low
-- `casehub-neocortex` — neocortex#142: wire CbrOutcomeConsumer to @CloudEventType observer · S · Low (unblocked by #174)
+- `casehub-work` — work-queues migration to platform-view (future issue, not yet filed) · L · Med
+- `casehub-neocortex` — neocortex#142: wire CbrOutcomeConsumer to @CloudEventType observer · S · Low
 
 ## What's Left
 
 - casehubio/neocortex#101 — bridge-only reactive implementations · M · Med
 - Domain notification bridges (casehub-work, casehub-engine, casehub-iot) — not yet filed · S · Low each
+- IoT CBR spec §4-5 update to use subject view toolkit — not yet filed · S · Low
+- MongoDB backend for subject view toolkit — not yet filed · M · Med
 
 ## What's Next
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
-| #175 | Generic queue toolkit — AbstractQueueEntity, QueueSubject SPI | L | Med | New platform-queue module |
 | #8 | Preferences-editor module — admin UI/API | XL | High | Write path for preferences; long-standing |
 
 ## References
 
 | Type | Path |
 |------|------|
-| Spec | `docs/specs/2026-07-17-cloudevent-dispatch-expression-context-design.md` |
-| Blog | `blog/2026-07-18-mdp01-cloudevent-dispatch-mvel-context.md` |
+| Spec | `docs/specs/2026-07-18-subject-view-toolkit-design.md` |
+| Blog | `blog/2026-07-18-mdp01-cloudevent-dispatch-mvel-context.md` (prior session) |
 | PR | casehubio/platform#183 |
-| Review | `~/adr/casehub-platform/cloudevent-dispatch-expression-context-*/` (spec review) |
-| Engine issues | engine#747, #748, #749, #750 |
+| Review | `~/adr/casehub-platform/subject-view-toolkit-20260718-032257/` |
