@@ -1,7 +1,5 @@
 # HANDOFF — casehub-platform
 
-*Updated: neocortex#101 closed — removed from backlog.*
-
 **Date:** 2026-07-19
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
@@ -10,7 +8,7 @@
 
 ## Last Session
 
-Delivered subject view toolkit improvements (#184) — 7 items across 5 modules, design-reviewed ($27.74, 9 rounds). Filed casehubio/work#312 for work-queues migration. Landed #186 (SubjectViewStore.delete()→boolean + CrossTenantSubjectViewStore) directly on main. Commented on engine#730 clarifying queues-are-views architecture.
+Delivered #187 — generic label infrastructure (LabelAction, LabelRule) in `platform-api/io.casehub.platform.api.label`, plus JQ engine fix (MapAdaptedJQExpression honours contextType contract). Design-reviewed ($20.05, 7 rounds). 41 tests, single squashed commit landed on main.
 
 ## Immediate Next Step
 
@@ -21,7 +19,7 @@ Engine expression migration: engine#747-750 (expression type migration to platfo
 **We're blocking:**
 - `casehub-engine` — engine#747-750: expression type migration to platform SPI · M · Med
 - `casehub-engine` — engine#713: migrate to `Vectors.cosineSimilarity()` · XS · Low
-- `casehub-engine` — engine#730: case queue implementation (comment posted clarifying view toolkit usage) · M · Med
+- `casehub-engine` — engine#730: case queue implementation (now unblocked — label infrastructure landed) · M · Med
 - `casehub-work` — work#312: work-queues migration to platform-view · L · Med
 - `casehub-neocortex` — neocortex#142: wire CbrOutcomeConsumer · S · Low
 
@@ -42,7 +40,5 @@ Engine expression migration: engine#747-750 (expression type migration to platfo
 
 | Type | Path |
 |------|------|
-| Spec | `docs/specs/2026-07-18-subject-view-improvements-design.md` |
-| Blog | `blog/2026-07-19-mdp01-seven-cuts-before-migration.md` |
-| Review | `~/adr/casehub-platform/subject-view-improvements-20260718-232017/` |
-| Work issue | casehubio/work#312 |
+| Spec | `docs/specs/2026-07-19-label-infrastructure-design.md` |
+| Review | `~/adr/casehub-platform/label-infrastructure-20260719-135103/` |
