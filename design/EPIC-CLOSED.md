@@ -1,5 +1,5 @@
-# Branch Closed: issue-135-notification-store
+# Branch Closed: issue-184-subject-view-improvements
 
-**Date:** 2026-07-05
-**Issues:** 135
+**Date:** 2026-07-19
+**Issues:** 184
 **Status:** merged to main
