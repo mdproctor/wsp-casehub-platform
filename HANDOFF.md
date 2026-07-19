@@ -8,29 +8,28 @@
 
 ## Last Session
 
-Delivered subject view toolkit improvements (#184) — 7 items across 5 modules to unblock casehub-work-queues migration. CHANGED event type, additionalConditions field, bulk membership tracker, scope-aware evaluation, SubjectViewOrchestrator (evaluator + store + tracker composition with TTL caching), InMemorySubjectViewQuerySupport. Design-reviewed ($27.74, 9 rounds, 16 issues). Filed casehubio/work#312 for the work-queues migration itself.
+Delivered subject view toolkit improvements (#184) — 7 items across 5 modules, design-reviewed ($27.74, 9 rounds). Filed casehubio/work#312 for work-queues migration. Landed #186 (SubjectViewStore.delete()→boolean + CrossTenantSubjectViewStore) directly on main. Commented on engine#730 clarifying queues-are-views architecture.
 
 ## Immediate Next Step
 
-Engine expression migration remains highest priority: engine#747-750 (expression type migration to platform SPI). Run `/work` to start on engine#747.
+Engine expression migration: engine#747-750 (expression type migration to platform SPI). Run `/work` to start on engine#747.
 
 ## Cross-Module
 
 **We're blocking:**
 - `casehub-engine` — engine#747-750: expression type migration to platform SPI · M · Med
 - `casehub-engine` — engine#713: migrate to `Vectors.cosineSimilarity()` · XS · Low
-- `casehub-engine` — engine#730: case queue implementation (now uses subject view toolkit) · M · Med
+- `casehub-engine` — engine#730: case queue implementation (comment posted clarifying view toolkit usage) · M · Med
 - `casehub-work` — work#312: work-queues migration to platform-view · L · Med
-- `casehub-work` — `WorkEventTypeTest` needs updating for SubscribableEvent + marshallerKeys · S · Low
-- `casehub-neocortex` — neocortex#142: wire CbrOutcomeConsumer to @CloudEventType observer · S · Low
+- `casehub-neocortex` — neocortex#142: wire CbrOutcomeConsumer · S · Low
 
 ## What's Left
 
 - casehubio/neocortex#101 — bridge-only reactive implementations · M · Med
-- Domain notification bridges (casehub-work, casehub-engine, casehub-iot) — not yet filed · S · Low each
-- IoT CBR spec §4-5 update to use subject view toolkit — not yet filed · S · Low
+- casehubio/platform#185 — view-deletion membership cleanup · S · Med
+- Domain notification bridges (work, engine, iot) — not yet filed · S · Low each
+- IoT CBR spec §4-5 update for subject view toolkit — not yet filed · S · Low
 - MongoDB backend for subject view toolkit — not yet filed · M · Med
-- casehubio/platform#185 — view-deletion membership cleanup (deferred from #184 design review) · S · Med
 
 ## What's Next
 
