@@ -1,5 +1,7 @@
 # HANDOFF — casehub-platform
 
+*Updated: neocortex#101 closed — removed from backlog.*
+
 **Date:** 2026-07-19
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
@@ -25,7 +27,6 @@ Engine expression migration: engine#747-750 (expression type migration to platfo
 
 ## What's Left
 
-- casehubio/neocortex#101 — bridge-only reactive implementations · M · Med
 - casehubio/platform#185 — view-deletion membership cleanup · S · Med
 - Domain notification bridges (work, engine, iot) — not yet filed · S · Low each
 - IoT CBR spec §4-5 update for subject view toolkit — not yet filed · S · Low
