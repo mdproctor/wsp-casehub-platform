@@ -47,3 +47,4 @@
 | [2026-05-30-mdp02-the-api-that-told-the-truth.md](2026-05-30-mdp02-the-api-that-told-the-truth.md) | 2026-05-30 | SPI evolution from devtown feedback: MemoryOrder enum, attribute keys, multi-entity query |
 | [2026-05-31-mdp01-durable-memory-no-server.md](2026-05-31-mdp01-durable-memory-no-server.md) | 2026-05-31 | memory-sqlite/ — SQLite CaseMemoryStore adapter with HikariCP, FTS5, WAL mode, programmatic Flyway |
 | [2026-07-17-mdp01-engagement-tracking-missing-half.md](2026-07-17-mdp01-engagement-tracking-missing-half.md) | 2026-07-17 | Engagement tracking on DeliveryAttempt — EngagementType vocabulary, callback SPI, in-app bridge, opt-in gate |
+| [2026-07-20-mdp01-commit-between-the-cracks.md](2026-07-20-mdp01-commit-between-the-cracks.md) | 2026-07-20 | The commit that fell between the cracks — orphaned branch commit, handover three-bucket split, notification connector bridge |
