@@ -1,5 +1,5 @@
-# Branch Closed: issue-135-notification-store
+# Branch Closed: issue-185-view-cleanup-jq-resulttype
 
-**Date:** 2026-07-05
-**Issues:** 135
+**Date:** 2026-07-20
+**Issues:** 185,190
 **Status:** merged to main
