@@ -50,14 +50,22 @@ returns events.
 
 Sequence:
 1. `viewStore.findById(viewId)` — get spec (for tenancyId, name)
-2. `tracker.getSubjectsByView(viewId)` — get all member subject IDs
-3. Build `SubjectViewEvent(subjectId, viewId, name, REMOVED, tenancyId)` for each
-4. `tracker.removeMembershipByView(viewId)` — bulk remove membership
-5. `viewStore.delete(viewId)` — delete view definition
+2. If empty → return `List.of()` (view doesn't exist, nothing to do)
+3. `tracker.getSubjectsByView(viewId)` — get all member subject IDs
+4. Build `SubjectViewEvent(subjectId, viewId, name, REMOVED, tenancyId)` for each
+5. `viewStore.delete(viewId)` — delete view definition first
 6. `invalidateViewCache(tenancyId)`
-7. Return events
+7. `tracker.removeMembershipByView(viewId)` — clean up membership records
+8. Return events
 
-Empty list means view didn't exist or had no members.
+Deletion ordering: the view definition is deleted (step 5) before membership
+cleanup (step 7). Any concurrent `evaluateAndTrack` that loads views after
+step 5 will not find the deleted view and will not create new membership
+records for it. If membership cleanup fails after view deletion, orphaned
+records self-correct — the next `evaluateAndTrack` per affected subject will
+not find the view, will produce REMOVED events, and will update membership.
+This matches the existing non-transactional coordination pattern across all
+orchestrator methods.
 
 #### Implementations
 
@@ -68,20 +76,23 @@ Empty list means view didn't exist or had no members.
 **InMemoryViewMembershipTracker:**
 - `getSubjectsByView` → scan ConcurrentHashMap entries, collect subject IDs
   whose membership map contains the viewId
-- `removeMembershipByView` → iterate all entries, remove viewId from each
-  subject's map, remove the subject entry entirely if its map becomes empty
+- `removeMembershipByView` → iterate all entries; for each entry whose
+  immutable inner map (`Map.copyOf`) contains the viewId, create a new map
+  with viewId filtered out; if the new map is empty, `remove()` the entry;
+  otherwise `replace()` with the new immutable map
 
 **JpaViewMembershipTracker:**
 - `getSubjectsByView` → `SELECT DISTINCT e.subjectId FROM ViewMembershipEntity e
   WHERE e.viewId = :vid`
-- `removeMembershipByView` → entity-managed removal (find + `em.remove()` per
-  entity), consistent with `updateMembership` pattern (not bulk JPQL DELETE)
+- `removeMembershipByView` → bulk JPQL DELETE, consistent with
+  `removeMembership(UUID)` pattern:
+  `DELETE FROM ViewMembershipEntity e WHERE e.viewId = :vid`
 
 #### Cross-repo ripple
 
 Engine's `CaseQueueViewManager.deleteQueueView()` calls
 `views.deleteView(viewId)` and returns the result as `boolean`. The return type
-change will require an engine update — file as a downstream issue.
+change will require an engine update (wsp-casehub-platform#1).
 
 ---
 
@@ -135,17 +146,33 @@ Null semantics: empty result → null, null JsonNode → null. String uses
 `asText()` (handles all node types). Everything else uses
 `ObjectMapper.convertValue`.
 
-#### Compile method — three-way branch
+#### Compile method — complete updated method body
 
 ```java
-if (resultType == Boolean.class) {
-    jqExpr = new BooleanJQExpression(query, rootScope);
-} else if (resultType == List.class) {
-    jqExpr = new ListJQExpression(query, rootScope);
-} else {
-    jqExpr = new ScalarJQExpression<>(query, rootScope, resultType, MAPPER);
-}
+var key = new CacheKey(expression, contextType, resultType);
+return (CompiledExpression<C, R>) expressionCache.computeIfAbsent(key, k -> {
+    JsonQuery query = compileQuery(expression);
+    CompiledExpression<JsonNode, ?> jqExpr;
+    if (resultType == Boolean.class) {
+        jqExpr = new BooleanJQExpression(query, rootScope);
+    } else if (resultType == List.class) {
+        jqExpr = new ListJQExpression(query, rootScope);
+    } else {
+        jqExpr = new ScalarJQExpression<>(query, rootScope, resultType, MAPPER);
+    }
+
+    if (contextType == JsonNode.class) {
+        return jqExpr;
+    }
+    return new MapAdaptedJQExpression<>(jqExpr, MAPPER);
+});
 ```
+
+`MapAdaptedJQExpression` wraps any expression type when
+`contextType != JsonNode.class`. Its mapper handles context conversion
+(Map→JsonNode); `ScalarJQExpression`'s mapper handles result conversion
+(JsonNode→R). Both reference the same static `MAPPER` instance — each serves
+a distinct purpose in the pipeline.
 
 #### What doesn't change
 
@@ -158,8 +185,7 @@ if (resultType == Boolean.class) {
 #### Cross-repo ripple
 
 RAS's `JqResultUnwrapper` becomes redundant. `SituationDefinitionRegistry`
-can compile directly with the target type. File as a downstream issue for
-casehub-ras.
+can compile directly with the target type (wsp-casehub-platform#2).
 
 ---
 
@@ -180,6 +206,8 @@ casehub-ras.
   - `deleteView` returns empty list for non-existent view
   - `deleteView` returns empty list for view with no members
   - `deleteView` invalidates view cache
+  - `deleteView` events carry correct `viewName` from `SubjectViewSpec`
+  - `deleteView` events carry correct `tenancyId` from `SubjectViewSpec`
 
 ### #190 tests
 
