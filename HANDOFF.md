@@ -1,5 +1,7 @@
 # HANDOFF — casehub-platform
 
+*Updated: engine#730, work#312 closed — removed from backlog.*
+
 **Date:** 2026-07-20
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
@@ -19,8 +21,6 @@ Engine expression migration: engine#747-750. Run `/work` to start on engine#747.
 **Enabled** (we delivered, downstream work is ready):
 - `casehub-engine` — engine#747-750: expression type migration to platform SPI · M · Med
 - `casehub-engine` — engine#713: migrate to `Vectors.cosineSimilarity()` · XS · Low
-- `casehub-engine` — engine#730: case queue implementation · M · Med
-- `casehub-work` — work#312: work-queues migration to platform-view · L · Med
 - `casehub-work` — work#315: migrate work-notifications to platform subscription engine · L · Med
 - `casehub-neocortex` — neocortex#142: wire CbrOutcomeConsumer · S · Low
 - `casehub-connectors` — connectors#86: notification delivery bridge · M · Med
