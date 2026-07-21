@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-**Date:** 2026-07-20
+**Date:** 2026-07-21
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -8,7 +8,7 @@
 
 ## Last Session
 
-Closed epics #137 (DataSource SPI follow-up) and #147 (notification system) — all platform children landed, verified in codebase. Implemented #185 (deleteView proactive membership cleanup with REMOVED events) and #190 (JQExpressionEngine ScalarJQExpression for scalar resultType). Design-reviewed (8 issues, all resolved). Squashed and pushed to upstream.
+Branch stamp audit (parent#390): discovered 48 branches across 12 repos with false "landed on main" stamps. Recovered stranded CloudEventType + MVEL POJO content (51f282d). Landed DestinationResolver SPI (1db72c6). Fixed work-end skill with verify_stamp.py content gate. Re-stamped all 48 branches. Files-only audit of 796 old-format stamps — structural migration noise, no genuinely lost content.
 
 ## Immediate Next Step
 
@@ -19,11 +19,10 @@ Engine expression migration: engine#747-750. Run `/work` to start on engine#747.
 **Enabled** (we delivered, downstream work is ready):
 - `casehub-engine` — engine#747-750: expression type migration to platform SPI · M · Med
 - `casehub-engine` — engine#713: migrate to `Vectors.cosineSimilarity()` · XS · Low
-- `casehub-engine` — CaseQueueViewManager.deleteQueueView() return type update (deleteView now returns List<SubjectViewEvent>) · XS · Low
+- `casehub-neocortex` — neocortex#142: wire CbrOutcomeConsumer (unblocked by CloudEventType recovery) · S · Low
+- `casehub-connectors` — connectors#86: DestinationResolver now published · M · Med
 - `casehub-ras` — JqResultUnwrapper deletion (ScalarJQExpression makes it redundant) · XS · Low
 - `casehub-work` — work#315: migrate work-notifications to platform subscription engine · L · Med
-- `casehub-neocortex` — neocortex#142: wire CbrOutcomeConsumer · S · Low
-- `casehub-connectors` — connectors#86: notification delivery bridge · M · Med — **branch `issue-86-destination-resolver` ready on platform**: adds `DestinationResolver` SPI + `DeliveryChannels.WHATSAPP` to platform-api. Merge before connectors PR #87.
 - `casehub-qhorus` — qhorus#375: migrate notification bridge to SubscribableEvent · M · Med
 - `casehub-iot` — iot#67: household notifications via platform subscription engine · M · Med
 
