@@ -23,7 +23,7 @@ Engine expression migration: engine#747-750. Run `/work` to start on engine#747.
 - `casehub-ras` — JqResultUnwrapper deletion (ScalarJQExpression makes it redundant) · XS · Low
 - `casehub-work` — work#315: migrate work-notifications to platform subscription engine · L · Med
 - `casehub-neocortex` — neocortex#142: wire CbrOutcomeConsumer · S · Low
-- `casehub-connectors` — connectors#86: notification delivery bridge · M · Med
+- `casehub-connectors` — connectors#86: notification delivery bridge · M · Med — **branch `issue-86-destination-resolver` ready on platform**: adds `DestinationResolver` SPI + `DeliveryChannels.WHATSAPP` to platform-api. Merge before connectors PR #87.
 - `casehub-qhorus` — qhorus#375: migrate notification bridge to SubscribableEvent · M · Med
 - `casehub-iot` — iot#67: household notifications via platform subscription engine · M · Med
 
