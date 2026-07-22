@@ -34,7 +34,7 @@ Engine expression migration: engine#747-750. Run `/work` to start on engine#747.
 
 | # | Description | Scale | Complexity | Notes |
 |---|-------------|-------|------------|-------|
-| #8 | Preferences-editor module — admin UI/API | XL | High | Write path for preferences; long-standing |
+| #193 | Preferences-editor REST API module | L | Med | Write surface for preferences; split from #8. Blocks blocks-ui#92 |
 
 ## References
 
