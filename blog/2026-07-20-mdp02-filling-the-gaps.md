@@ -1,3 +1,13 @@
+---
+layout: post
+title: "Filling the gaps"
+date: 2026-07-20
+entry_type: note
+subtype: diary
+projects: [casehub-platform]
+tags: [jq, expression-engine, platform-cleanup]
+---
+
 # Filling the Gaps
 
 Two platform gaps that have been quietly accruing workarounds got fixed today.

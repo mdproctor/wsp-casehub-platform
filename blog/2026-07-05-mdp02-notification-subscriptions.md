@@ -1,9 +1,9 @@
 ---
+layout: post
 title: "Subscription Management: From CloudEvents to POJOs"
 date: 2026-07-05
-author: Mark Proctor
-type: diary
-phase: phase-update
+entry_type: note
+subtype: diary
 projects: [casehub-platform]
 tags: [notifications, subscriptions, alpha-network, datasource, design-review]
 ---

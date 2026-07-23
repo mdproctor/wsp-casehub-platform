@@ -1,3 +1,13 @@
+---
+layout: post
+title: "From Drools alpha networks to CaseHub DataSources"
+date: 2026-07-04
+entry_type: note
+subtype: diary
+projects: [casehub-platform]
+tags: [datasource, alpha-network, rete, event-routing]
+---
+
 # From Drools Alpha Networks to CaseHub DataSources
 
 The platform needed event routing. Not the kind where a CDI observer catches everything and filters manually — the kind where you declare what you care about and the infrastructure does the rest.
