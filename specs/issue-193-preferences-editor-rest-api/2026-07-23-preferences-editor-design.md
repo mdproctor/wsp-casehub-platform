@@ -78,7 +78,7 @@ Consistent with `EndpointPermissions.assertTenant()` and `MemoryPermissions.asse
 public record PreferenceChanged(String tenancyId, Path scope, String namespace) {}
 ```
 
-Backend implementations fire `Event<PreferenceChanged>.fire()` after successful `set()`, `delete()`, and `deleteAll()`. Consistent with `EndpointRegistered` pattern. Enables future cache invalidation and reactive preference reload. The no-op `@DefaultBean` MUST NOT fire this event — consistent with `NoOpEndpointRegistry` not firing `EndpointRegistered`.
+Backend implementations fire `Event<PreferenceChanged>.fireAsync()` after successful `set()`, `delete()`, and `deleteAll()`. Consistent with `EndpointRegistered` pattern (`InMemoryEndpointRegistry.register()` uses `fireAsync()`, `CamelStreamProcessor` observes via `@ObservesAsync`). Asynchronous dispatch is required because synchronous `fire()` inside a `@Transactional` method executes observers before the transaction commits — a rollback would leave observers reacting to a phantom change. `fireAsync()` decouples the observer from the transaction lifecycle. Enables future cache invalidation and reactive preference reload. The no-op `@DefaultBean` MUST NOT fire this event — consistent with `NoOpEndpointRegistry` not firing `EndpointRegistered`.
 
 ### 2. `SettingsScope` gains tenancyId
 
@@ -120,7 +120,7 @@ Both `PreferenceProvider.resolve()` and `PreferenceStore` operations filter by t
 
 **JPA (`persistence-jpa/`)**
 
-`JpaPreferenceStore @ApplicationScoped` alongside the existing `JpaPreferenceProvider`. Reuses the same `PreferenceEntry` JPA entity (which gains `tenancyId`). Injects `CurrentPrincipal` and calls `PreferencePermissions.assertTenant()` before every write. Fires `Event<PreferenceChanged>` after successful writes.
+`JpaPreferenceStore @ApplicationScoped` alongside the existing `JpaPreferenceProvider`. Reuses the same `PreferenceEntry` JPA entity (which gains `tenancyId`). Injects `CurrentPrincipal` and calls `PreferencePermissions.assertTenant()` before every write. Fires `Event<PreferenceChanged>.fireAsync()` after successful writes.
 
 - `set()` → `INSERT ... ON CONFLICT (tenancy_id, scope, namespace, pref_name, sub_key) DO UPDATE`
 - `delete()` → delete by composite key
@@ -130,6 +130,8 @@ Both `PreferenceProvider.resolve()` and `PreferenceStore` operations filter by t
 **MongoDB (`persistence-mongodb/`)**
 
 `MongoPreferenceStore @Alternative @Priority(1)` — same CDI priority ladder as `MongoPreferenceProvider`. Same operations against the Mongo document model. Same tenant assertion and event pattern.
+
+The existing `MongoPreferenceDocument.compoundId()` (`scope|namespace|name|subKey`) must be updated to include `tenancyId` as the leading segment: `tenancyId|scope|namespace|name|subKey`. The `_id` IS the uniqueness mechanism in MongoDB (no separate unique index); without `tenancyId` in the compound key, two tenants storing the same preference would collide on `_id`, silently overwriting across tenant boundaries.
 
 **Default no-op (`platform/`)**
 
@@ -142,11 +144,14 @@ New module. `@Path("/preferences")` JAX-RS resource. Depends on both `Preference
 Scope is passed as a `@QueryParam`, not embedded in the URL path. Hierarchical scope values (e.g. `casehubio/devtown`) contain `/` which conflicts with JAX-RS path segment parsing — `@PathParam("scope")` only captures a single segment, and regex capture `{scope:.+}` creates structural ambiguity with downstream path parameters (e.g. `/preferences/casehubio/devtown/namespace` is unparseable). Query parameters eliminate this entirely.
 
 ```
-PUT    /preferences?scope=casehubio/devtown              — set a preference (upsert)
-DELETE /preferences?scope=casehubio/devtown&namespace=... — delete (single or all-in-namespace)
-GET    /preferences?scope=casehubio/devtown              — list raw records at a scope
-GET    /preferences/resolved?scope=casehubio/devtown     — resolved/effective values after scope inheritance
+PUT    /preferences?scope=casehubio/devtown                                       — set a preference (upsert)
+DELETE /preferences?scope=X&namespace=ns&name=key[&subKey=sk]                     — delete a single preference
+DELETE /preferences/by-namespace?scope=casehubio/devtown&namespace=devtown         — delete all in a namespace
+GET    /preferences?scope=casehubio/devtown                                       — list raw records at a scope
+GET    /preferences/resolved?scope=casehubio/devtown                              — resolved/effective values
 ```
+
+Single-delete and namespace-delete are separate endpoints to prevent accidental bulk deletion. `DELETE /preferences` requires `name` (returns 400 without it) — an omitted `name` parameter cannot silently escalate a surgical delete into a namespace wipe. `subKey` is optional, defaulting to `""` (the convention for single-value preferences).
 
 TenancyId comes from `CurrentPrincipal.tenancyId()`. No cross-tenant override — consistent with `EndpointPermissions.assertTenant()` strict equality check. Cross-tenant admins operate within their own tenancyId (`PLATFORM_TENANT_ID`). A cross-tenant admin write API (with explicit target tenancyId and `isCrossTenantAdmin()` guard) is out of scope.
 
@@ -160,9 +165,25 @@ Request body for PUT:
 }
 ```
 
-DELETE dispatches based on query parameters: if `name` is present, deletes a single preference (`store.delete()`); if only `namespace` is present, deletes all in namespace (`store.deleteAll()`).
+The `GET /preferences/resolved` endpoint returns a `ResolvedPreferencesResponse` DTO:
 
-The `GET /preferences/resolved` endpoint returns `Preferences` (the resolved map after scope inheritance) via `PreferenceProvider.resolve(SettingsScope.of(tenancyId, scope))`. This lets the editor UI show both what is explicitly set at this scope (raw records from `GET /preferences`) and the effective values after inheritance (from `GET /preferences/resolved`).
+```java
+public record ResolvedPreferencesResponse(String scope, Map<String, String> values) {}
+```
+
+```json
+{
+  "scope": "casehubio/devtown",
+  "values": {
+    "devtown.humanApprovalThreshold": "0.85",
+    "devtown.maxRetries": "3"
+  }
+}
+```
+
+Values are always strings — `Preferences.asMap()` returns the raw stored strings; type conversion happens at `PreferenceKey<T>.parse()` call sites, not at the REST layer. The wrapper object (vs a bare map) allows future extension (e.g. adding `inheritedFrom` metadata per key) without breaking the response contract.
+
+The endpoint resolves via `PreferenceProvider.resolve(SettingsScope.of(tenancyId, scope))` and serializes `Preferences.asMap()` into the `values` field. This lets the editor UI show both what is explicitly set at this scope (raw records from `GET /preferences`) and the effective values after inheritance (from `GET /preferences/resolved`).
 
 No pagination — preferences at a single scope are bounded (tens, not thousands).
 
