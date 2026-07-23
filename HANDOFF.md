@@ -1,5 +1,7 @@
 # HANDOFF — casehub-platform
 
+*Updated: #193 closed — removed from What's Next.*
+
 **Date:** 2026-07-23
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
@@ -34,7 +36,7 @@ Engine expression migration: engine#747-750. Run `/work` to start on engine#747.
 
 ## What's Next
 
-*Unchanged — `git show HEAD~1:HANDOFF.md`*
+*No platform-local issues queued. Next work is cross-module: engine#747-750, then downstream consumer migrations.*
 
 ## References
 
