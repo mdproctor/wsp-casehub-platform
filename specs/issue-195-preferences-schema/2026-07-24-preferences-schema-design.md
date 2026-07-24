@@ -57,13 +57,27 @@ and is tracked as casehubio/platform#197.
 
 #### Preference — toSerializedValue()
 
-The `Preference` marker interface gains a serialization method for producing
-string representations suitable for REST responses and round-tripping through
-`parse()`:
+`Preference` changes from a marker interface to a behavioural interface. This is
+a breaking change: every implementation of `Preference` must now provide
+`toSerializedValue()`. The method produces string representations suitable for
+REST responses and round-tripping through `parse()`.
 
 ```java
 public interface Preference {
     String toSerializedValue();
+}
+```
+
+**Existing type migration pattern** (representative example — `IntPreference`):
+
+```java
+public record IntPreference(int value) implements SingleValuePreference {
+    // ... existing of() and parse() methods unchanged ...
+
+    @Override
+    public String toSerializedValue() {
+        return String.valueOf(value);
+    }
 }
 ```
 
@@ -78,6 +92,21 @@ Each implementing record provides its conversion:
 
 This avoids relying on Java record `toString()` output (which produces
 `IntPreference[value=24]`, not the raw value needed by the REST API).
+
+**Migration impact:** Adding `toSerializedValue()` to `Preference` breaks all
+existing implementations that don't provide it. The full scope:
+
+| Location | Files | Types |
+|----------|-------|-------|
+| `platform-api/` (production) | 3 | `IntPreference`, `DoublePreference`, `DurationPreference` |
+| `casehub-engine` (cross-repo) | 2 | `io.casehub.api.spi.routing.IntPreference`, `io.casehub.api.spi.routing.DoublePreference` |
+| `platform` test records | ~8 | Records in `MockBeansTest`, `PreferenceKeyTest`, `MapPreferencesTest`, `ConfigFilePreferenceProviderTest`, `MongoPreferenceProviderTest`, `JpaPreferenceProviderTest` |
+
+The engine's routing-level preference types (`io.casehub.api.spi.routing.IntPreference`,
+`DoublePreference`) are separate records in a different repository. They must add
+`toSerializedValue()` to compile against the updated `Preference` interface. Test
+records need the same mechanical addition. All migrations are one-line methods —
+the pattern is identical to the `IntPreference` example above.
 
 #### BooleanPreference
 
@@ -182,6 +211,7 @@ public record PreferenceSchemaDescriptor(
         Objects.requireNonNull(qualifiedName, "qualifiedName");
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(label, "label");
+        Objects.requireNonNull(defaultValue, "defaultValue");
         // description is nullable — consistent with EventTypeDescriptor
         constraints = constraints == null ? Map.of() : Map.copyOf(constraints);
         options = options == null ? List.of() : List.copyOf(options);
@@ -307,9 +337,9 @@ GET /preferences/schema                          → List<PreferenceSchemaDescri
 GET /preferences/schema?namespace=casehub.work    → filtered by namespace
 ```
 
-`@RunOnVirtualThread` for consistency with the module. No tenant filtering — schema
-is global metadata, not per-tenant data. Response is the descriptor list serialized
-directly by Jackson — the record shape matches the issue's JSON spec.
+No tenant filtering — schema is global metadata, not per-tenant data. Response is
+the descriptor list sorted by `qualifiedName` for deterministic output, then
+serialized directly by Jackson — the record shape matches the issue's JSON spec.
 
 ## Testing
 
@@ -326,7 +356,7 @@ directly by Jackson — the record shape matches the issue's JSON spec.
   - Explicit type override
   - Enum options
   - Constraints map with `PreferenceConstraintKeys`
-  - Null checks on required fields (namespace, name, qualifiedName, type)
+  - Null checks on required fields (namespace, name, qualifiedName, type, defaultValue)
   - Nullability: description nullable, constraints defaults to empty map, options defaults to empty list
   - Default value uses `toSerializedValue()` (not record toString)
 
@@ -339,7 +369,8 @@ directly by Jackson — the record shape matches the issue's JSON spec.
 
 - `@QuarkusTest` with a test `@Startup` bean that registers sample descriptors
 - `GET /preferences/schema` returns all registered entries with correct JSON shape
-  (including `multiValue` field, null `description`, empty `constraints`/`options`)
+  (including `multiValue` field, null `description`, empty `constraints`/`options`),
+  sorted by `qualifiedName`
 - `GET /preferences/schema?namespace=X` filters correctly
 - `GET /preferences/schema?namespace=nonexistent` returns empty list
 
