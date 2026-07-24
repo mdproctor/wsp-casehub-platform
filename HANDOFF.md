@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-*Updated: 2026-07-24 — #384 neocortex reactive retirement completed (PR opened)*
+*Updated: 2026-07-24 — #195 PreferenceSchemaRegistry SPI + GET /preferences/schema (PR #200)*
 
 **Date:** 2026-07-24
 **Project:** `/Users/mdproctor/claude/casehub/platform`
@@ -10,45 +10,29 @@
 
 ## Last Session
 
-Completed neocortex reactive retirement (casehubio/parent#384) from platform slot 30. Converted 3 reactive-primary backends (Qdrant CBR, Mem0, Graphiti) to blocking, deleted 61 reactive files (-8596 net lines), removed Mutiny from 11 POMs. PR: casehubio/neocortex#177.
+Delivered `GET /preferences/schema` endpoint (#195) — type metadata so the blocks-ui preferences editor can render typed inputs. Three-layer SPI following the `EventTypeRegistry` pattern: SPI in platform-api, `@DefaultBean` no-op in platform, `InMemoryPreferenceSchemaRegistry` in preferences-editor.
 
-Key finding: neocortex was only partially reactive-primary (3 backend modules). RAG, decorators, and in-memory stubs all had independent blocking implementations — straight deletion, not conversion.
+Breaking change: `Preference` gains `toSerializedValue()` (marker → behavioral interface). All implementations migrated in-repo. Engine cross-repo fix filed as casehubio/engine#776 (two one-line additions).
 
-## #384 Status — All Repos
+Design review (4 rounds, 17 issues) caught five bugs before implementation: broken `toString()` serialization, silent `Boolean.parseBoolean()` corruption, missing integer/number type distinction, missing multiValue cardinality, untyped constraint vocabulary.
 
-| Repo | Status |
-|------|--------|
-| platform | Merged (#194) |
-| ras | Merged (#54) |
-| connectors, claudony, openclaw, blocks | Clean (zero reactive) |
-| ledger, eidos, qhorus | Committed locally |
-| ops | PR #63 |
-| desiredstate | PR #88 (CI failing: SettingsScope API) |
-| iot | PR #70 (CI failing: Worker.Builder) |
-| **neocortex** | **PR #177 (ready for review)** |
-
-Once all PRs merge → close casehubio/parent#384.
-
-## Immediate Next Step
-
-Engine expression migration: engine#747-750. Run `/work` to start on engine#747.
+PR: casehubio/platform#200.
 
 ## Cross-Module
 
 **Enabled** (we delivered, downstream work is ready):
+- `casehub-engine` — engine#776: add `toSerializedValue()` to routing IntPreference/DoublePreference · XS · Low
 - `casehub-engine` — engine#747-750: expression type migration to platform SPI · M · Med
-- `casehub-engine` — engine#713: migrate to `Vectors.cosineSimilarity()` · XS · Low
-- `casehub-neocortex` — neocortex#142: wire CbrOutcomeConsumer · S · Low
-- `casehub-connectors` — connectors#86: DestinationResolver now published · M · Med
+- `casehub-blocks-ui` — blocks-ui#92: preferences editor UI component (now has schema endpoint) · L · Med
 - `casehub-work` — work#315: migrate work-notifications to platform subscription engine · L · Med
-- `casehub-qhorus` — qhorus#375: migrate notification bridge to SubscribableEvent · M · Med
-- `casehub-iot` — iot#67: household notifications via platform subscription engine · M · Med
-- `casehub-blocks-ui` — blocks-ui#92: preferences editor UI component · L · Med
-- **All consuming repos** — SettingsScope tenancyId breaking change · S · Low per repo
+- **Domain modules** — platform#197: register preference schemas via the SPI · varies
 
 ## What's Left
 
 - MongoDB backend for subject view toolkit — not yet filed · M · Med
+- platform#196: server-side preference validation using schema constraints
+- platform#198: schema versioning
+- platform#199: custom/composite preference types
 
 ## References
 
