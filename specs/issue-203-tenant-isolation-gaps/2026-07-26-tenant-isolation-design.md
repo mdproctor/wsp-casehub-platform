@@ -107,6 +107,23 @@ private boolean shouldFilterByTenant() {
 }
 ```
 
+**Known limitation — parent hierarchy traversal**: The cross-tenant admin
+bypass covers direct grants only. The parent hierarchy lookup in
+`canAccessWithCandidates()` uses `ResourceParentEntity.findById(new
+ResourceParentKey(resourceId, principal.tenancyId()))` — a composite key
+lookup scoped to the admin's own tenant. If the target resource's parent
+mapping exists only in a different tenant, inherited permissions are
+invisible to the cross-tenant admin.
+
+This is intentional: cross-tenant hierarchy fan-out (traversing all
+tenants' parent mappings when bypassed) produces ambiguous results —
+the admin would not know which tenant's hierarchy contributed to a
+`true` result — and the recursive traversal fans out at each depth
+level. The clean resolution is adding an explicit `tenancyId` parameter
+to the `AccessControlProvider` SPI (a future scope item), which lets
+the admin specify the target tenant and traverse that tenant's hierarchy
+deterministically. A GitHub issue will be filed to track this.
+
 ### InMemoryAccessControlProvider changes
 
 - Inject `CurrentPrincipal` (new dependency, added to constructor)
