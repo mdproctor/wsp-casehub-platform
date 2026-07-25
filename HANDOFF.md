@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-*Updated: 2026-07-25 — #384 reactive retirement COMPLETE across all 13 repos. Slot 30 archived.*
+*Updated: 2026-07-25 — #202 ACL reactive retirement (last piece of #384). ARC42 stale scan cleaned reactive references.*
 
 **Date:** 2026-07-25
 **Project:** `/Users/mdproctor/claude/casehub/platform`
@@ -10,11 +10,7 @@
 
 ## Last Session
 
-Completed casehubio/parent#384 — reactive tier retirement across all 13 repos. Neocortex was the main conversion work (3 reactive-primary backends: Qdrant CBR, Mem0, Graphiti). All other repos were mechanical deletion. Cross-repo API adaptation required for SettingsScope.root(tenancyId), WorkerResult generics, FeatureVectorCbrCase trust fields, and LedgerConfig.reactive().
-
-Final stats: ~250+ files deleted, ~30,000+ lines of reactive code removed across platform, ledger, neocortex, eidos, qhorus, blocks, ras, desiredstate, iot. Mutiny dependencies removed from all module POMs.
-
-Slot 30 archived to attic. All branches stamped as closed.
+Completed #202 — retired Hibernate Reactive from the ACL subsystem, the last reactive holdout in the platform repo. Converted `AccessControlProvider` SPI from `CompletionStage` to blocking returns, swapped `acl-jpa` from Hibernate Reactive Panache to standard Hibernate ORM Panache with `@Transactional`, stripped `CompletableFuture` wrappers from `acl-inmem`. Zero cross-repo callers — fully self-contained. ARC42STORIES.MD cleaned of stale reactive references (`BlockingToReactiveBridge`, reactive bridge mentions).
 
 ## Cross-Module
 
