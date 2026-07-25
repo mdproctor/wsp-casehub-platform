@@ -71,6 +71,14 @@ already-injected `CurrentPrincipal`. Both implementations centralize the
 cross-tenant admin check in a private `shouldFilterByTenant()` helper that
 reads `principal.isCrossTenantAdmin()` per request via the CDI proxy.
 
+The bypass applies to **read operations only** (`canAccess`,
+`accessibleResources`) — a cross-tenant admin needs visibility across all
+tenants. **Mutation operations** (`grant`, `revoke`, `revokeAll`,
+`registerParent`) always scope to `principal.tenancyId()`. A cross-tenant
+admin who revokes a grant must affect exactly one tenant, not all of them.
+This is consistent: `grant()` already stores `principal.tenancyId()`
+unconditionally — mutations are always tenant-scoped by design.
+
 Protocol PP-20260520-e6a5f0 prescribes checking `isCrossTenantAdmin()` once
 at CDI injection time via a Quarkus producer. This mechanism is designed for
 `@RequestScoped` repositories where injection time equals request time.
@@ -86,10 +94,10 @@ exception.
 | Method | Change |
 |--------|--------|
 | `canAccess()` | Add `AND e.tenancyId = ?` to count query in `canAccessWithCandidates`; skip when `shouldFilterByTenant()` is false |
-| `grant()` | Add `AND tenancyId = ?` to existence check query; already stores `principal.tenancyId()` on new entries |
-| `revoke()` | Add `AND tenancyId = ?` to delete WHERE; skip when `shouldFilterByTenant()` is false |
-| `revokeAll()` | Add `AND tenancyId = ?` to list and delete WHERE; skip when `shouldFilterByTenant()` is false |
-| `registerParent()` | Add `AND tenancyId = ?` to findById; already stores tenancyId; skip when `shouldFilterByTenant()` is false |
+| `grant()` | Add `AND tenancyId = ?` to existence check query; always stores `principal.tenancyId()` on new entries |
+| `revoke()` | Add `AND tenancyId = ?` to delete WHERE; always scoped to `principal.tenancyId()` |
+| `revokeAll()` | Add `AND tenancyId = ?` to list and delete WHERE; always scoped to `principal.tenancyId()` |
+| `registerParent()` | Replace `findById()` with `find()` query using composite key `(childResourceId, tenancyId)`; always scoped to `principal.tenancyId()` |
 | `accessibleResources()` | Add `AND e.tenancyId = ?` to query; skip when `shouldFilterByTenant()` is false |
 
 Add private helper:
@@ -104,8 +112,10 @@ private boolean shouldFilterByTenant() {
 - Inject `CurrentPrincipal` (new dependency, added to constructor)
 - Add tenancyId to `GrantKey`: `record GrantKey(String actorId, String resourceId, AclAction action, String tenancyId)`
 - Store `principal.tenancyId()` on `AclEntry` in `grant()` and use it as the 4th GrantKey component
+- Change `parents` map key to include tenancyId: `record ParentKey(String childResourceId, String tenancyId)` or equivalent
 - Add private `shouldFilterByTenant()` helper (same pattern as JPA)
-- Filter by tenancyId in `canAccessWithCandidates()`, `accessibleResources()`, `revoke()`, `revokeAll()`; skip when `shouldFilterByTenant()` is false
+- **Reads** (`canAccessWithCandidates`, `accessibleResources`): filter by tenancyId; skip when `shouldFilterByTenant()` is false
+- **Mutations** (`revoke`, `revokeAll`, `registerParent`): always scope to `principal.tenancyId()` — construct GrantKey/ParentKey with the current tenant
 
 ### Tests
 
@@ -245,9 +255,55 @@ Inject `CredentialResolver` and `@Context HttpHeaders`.
 - Update `InMemoryAccessControlProvider` description: add "constructor-injected CurrentPrincipal"
 - Update `GroupMembershipProvider` in package structure: remove stale method signatures
 
-### No Flyway migrations
+### Flyway migration (`acl-jpa/`)
 
-Schema is unchanged — all filtering uses existing columns.
+`V2__acl_tenant_isolation.sql`:
+
+```sql
+-- Include tenancy_id in unique constraint so the same (actor, resource, action)
+-- tuple can exist in different tenants.
+ALTER TABLE acl_entry DROP CONSTRAINT uq_acl_entry;
+ALTER TABLE acl_entry ADD CONSTRAINT uq_acl_entry
+    UNIQUE (actor_id, resource_id, action, tenancy_id);
+
+-- Include tenancy_id in primary key so different tenants can register
+-- parent mappings for the same child resource.
+ALTER TABLE resource_parent DROP CONSTRAINT resource_parent_pkey;
+ALTER TABLE resource_parent ADD CONSTRAINT resource_parent_pkey
+    PRIMARY KEY (child_resource_id, tenancy_id);
+```
+
+### JPA entity changes (`acl-jpa/`)
+
+**`AclEntryEntity`**: Update `@UniqueConstraint` to include `tenancy_id`:
+```java
+@UniqueConstraint(
+    name = "uq_acl_entry",
+    columnNames = {"actor_id", "resource_id", "action", "tenancy_id"})
+```
+
+**`ResourceParentEntity`**: Change to composite primary key via `@IdClass`:
+```java
+@IdClass(ResourceParentKey.class)
+@Entity
+@Table(name = "resource_parent", ...)
+public class ResourceParentEntity extends PanacheEntityBase {
+    @Id @Column(name = "child_resource_id")
+    public String childResourceId;
+
+    @Id @Column(name = "tenancy_id", nullable = false)
+    public String tenancyId;
+
+    @Column(name = "parent_resource_id", nullable = false)
+    public String parentResourceId;
+}
+
+public record ResourceParentKey(String childResourceId, String tenancyId)
+    implements Serializable {}
+```
+
+All `ResourceParentEntity.findById(childResourceId)` calls become
+`ResourceParentEntity.findById(new ResourceParentKey(childResourceId, principal.tenancyId()))`.
 
 ### No cross-repo impact
 
