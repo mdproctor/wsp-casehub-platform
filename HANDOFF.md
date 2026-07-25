@@ -1,10 +1,8 @@
 # HANDOFF — casehub-platform
 
-*Updated: #201 closed, engine#776/747-750 closed, blocks-ui#92 closed — removed from backlog.*
+*Updated: 2026-07-25 — #384 reactive retirement COMPLETE across all 13 repos. Slot 30 archived.*
 
-*Updated: 2026-07-24 — #195 PreferenceSchemaRegistry SPI + GET /preferences/schema (PR #200)*
-
-**Date:** 2026-07-24
+**Date:** 2026-07-25
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -12,13 +10,11 @@
 
 ## Last Session
 
-Delivered `GET /preferences/schema` endpoint (#195) — type metadata so the blocks-ui preferences editor can render typed inputs. Three-layer SPI following the `EventTypeRegistry` pattern: SPI in platform-api, `@DefaultBean` no-op in platform, `InMemoryPreferenceSchemaRegistry` in preferences-editor.
+Completed casehubio/parent#384 — reactive tier retirement across all 13 repos. Neocortex was the main conversion work (3 reactive-primary backends: Qdrant CBR, Mem0, Graphiti). All other repos were mechanical deletion. Cross-repo API adaptation required for SettingsScope.root(tenancyId), WorkerResult generics, FeatureVectorCbrCase trust fields, and LedgerConfig.reactive().
 
-Breaking change: `Preference` gains `toSerializedValue()` (marker → behavioral interface). All implementations migrated in-repo. Engine cross-repo fix filed as casehubio/engine#776 (two one-line additions).
+Final stats: ~250+ files deleted, ~30,000+ lines of reactive code removed across platform, ledger, neocortex, eidos, qhorus, blocks, ras, desiredstate, iot. Mutiny dependencies removed from all module POMs.
 
-Design review (4 rounds, 17 issues) caught five bugs before implementation: broken `toString()` serialization, silent `Boolean.parseBoolean()` corruption, missing integer/number type distinction, missing multiValue cardinality, untyped constraint vocabulary.
-
-PR: casehubio/platform#200.
+Slot 30 archived to attic. All branches stamped as closed.
 
 ## Cross-Module
 
