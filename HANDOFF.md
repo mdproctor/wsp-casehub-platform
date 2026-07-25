@@ -1,5 +1,7 @@
 # HANDOFF — casehub-platform
 
+*Updated: #201 closed, engine#776/747-750 closed, blocks-ui#92 closed — removed from backlog.*
+
 *Updated: 2026-07-24 — #195 PreferenceSchemaRegistry SPI + GET /preferences/schema (PR #200)*
 
 **Date:** 2026-07-24
@@ -21,9 +23,6 @@ PR: casehubio/platform#200.
 ## Cross-Module
 
 **Enabled** (we delivered, downstream work is ready):
-- `casehub-engine` — engine#776: add `toSerializedValue()` to routing IntPreference/DoublePreference · XS · Low
-- `casehub-engine` — engine#747-750: expression type migration to platform SPI · M · Med
-- `casehub-blocks-ui` — blocks-ui#92: preferences editor UI component (now has schema endpoint) · L · Med
 - `casehub-work` — work#315: migrate work-notifications to platform subscription engine · L · Med
 - **Domain modules** — platform#197: register preference schemas via the SPI · varies
 
