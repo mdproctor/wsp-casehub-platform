@@ -1,8 +1,8 @@
 # HANDOFF — casehub-platform
 
-*Updated: 2026-07-25 — #202 ACL reactive retirement (last piece of #384). ARC42 stale scan cleaned reactive references.*
+*Updated: 2026-07-26 — #203/#204/#205/#206 tenant isolation closed. Parent docs synced.*
 
-**Date:** 2026-07-25
+**Date:** 2026-07-26
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -10,7 +10,7 @@
 
 ## Last Session
 
-Completed #202 — retired Hibernate Reactive from the ACL subsystem, the last reactive holdout in the platform repo. Converted `AccessControlProvider` SPI from `CompletionStage` to blocking returns, swapped `acl-jpa` from Hibernate Reactive Panache to standard Hibernate ORM Panache with `@Transactional`, stripped `CompletableFuture` wrappers from `acl-inmem`. Zero cross-repo callers — fully self-contained. ARC42STORIES.MD cleaned of stale reactive references (`BlockingToReactiveBridge`, reactive bridge mentions).
+Two branches landed. First: #202 — retired Hibernate Reactive from acl-jpa (last reactive holdout). Second: #203-206 — closed four tenant isolation gaps found during audit: GroupMembershipProvider tenancyId, AccessControlProvider tenant-filtered queries (Flyway V2, composite PK), DeliveryAttemptStore tenant-scoped methods, webhook authentication (HMAC headers + bearer token validation). Design review (4 rounds, 15 issues) caught Flyway migration need, mutation bypass bug, and SecurityException catch ordering. Zero cross-repo callers for all SPIs. Parent docs synced (capability-ownership.md, auth.md).
 
 ## Cross-Module
 
