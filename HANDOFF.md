@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-*Updated: 2026-07-30 — #208 CI fix landed. Epic #210 S-batch closed: #211-#216 (action hierarchy, bulk grant/revoke, retention purges, pagination, inherited children). Parent docs synced.*
+*Updated: 2026-07-30 — #196 closed — removed from backlog.*
 
 **Date:** 2026-07-30
 **Project:** `/Users/mdproctor/claude/casehub/platform`
@@ -26,7 +26,6 @@ Fixed jackson-jq CI compilation failure (#208 — generic return type ambiguity 
 - platform#220: identity propagation through PropagationContext · L · High (engine cross-repo)
 - platform#221: worker rights model and authorization service SPI · XL · High (engine cross-repo)
 - MongoDB backend for subject view toolkit — not yet filed · M · Med
-- platform#196: server-side preference validation using schema constraints
 - platform#198: schema versioning
 - platform#199: custom/composite preference types
 
