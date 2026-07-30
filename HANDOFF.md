@@ -1,8 +1,8 @@
 # HANDOFF — casehub-platform
 
-*Updated: 2026-07-26 — #203/#204/#205/#206 tenant isolation closed. Parent docs synced.*
+*Updated: 2026-07-30 — #208 CI fix landed. Epic #210 S-batch closed: #211-#216 (action hierarchy, bulk grant/revoke, retention purges, pagination, inherited children). Parent docs synced.*
 
-**Date:** 2026-07-26
+**Date:** 2026-07-30
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -10,7 +10,7 @@
 
 ## Last Session
 
-Two branches landed. First: #202 — retired Hibernate Reactive from acl-jpa (last reactive holdout). Second: #203-206 — closed four tenant isolation gaps found during audit: GroupMembershipProvider tenancyId, AccessControlProvider tenant-filtered queries (Flyway V2, composite PK), DeliveryAttemptStore tenant-scoped methods, webhook authentication (HMAC headers + bearer token validation). Design review (4 rounds, 15 issues) caught Flyway migration need, mutation bypass bug, and SecurityException catch ordering. Zero cross-repo callers for all SPIs. Parent docs synced (capability-ownership.md, auth.md).
+Fixed jackson-jq CI compilation failure (#208 — generic return type ambiguity with Scope.setValue overloads). Then filed epic #210 with 11 child issues for ACL completion, implemented all 6 S-sized items in one branch: action hierarchy (AclAction.satisfiedBy()), bulk grant/revoke (GrantRequest + grantBatch/revokeBatch), expired entry and audit log retention purges (AclRetentionPurge @Scheduled), accessibleResources pagination (AclQuery/AclPage), and inherited children in accessibleResources (recursive CTE). 45 contract tests across both backends.
 
 ## Cross-Module
 
@@ -20,6 +20,11 @@ Two branches landed. First: #202 — retired Hibernate Reactive from acl-jpa (la
 
 ## What's Left
 
+- platform#217: wildcard type-level grants (`case:*`) · M · Med
+- platform#218: ACL administration REST API · M · Med
+- platform#219: wire Case Definition authorization YAML to ACL grants · L · Med (engine cross-repo)
+- platform#220: identity propagation through PropagationContext · L · High (engine cross-repo)
+- platform#221: worker rights model and authorization service SPI · XL · High (engine cross-repo)
 - MongoDB backend for subject view toolkit — not yet filed · M · Med
 - platform#196: server-side preference validation using schema constraints
 - platform#198: schema versioning
