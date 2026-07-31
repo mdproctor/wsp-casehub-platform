@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-*Updated: 2026-07-31 — #217 closed (wildcard type-level grants + deny entries). #198 landed by parallel session.*
+*Updated: 2026-07-31 — #217 + #218 closed this session. ACL epic #210 has 3 remaining items (all cross-repo).*
 
 **Date:** 2026-07-31
 **Project:** `/Users/mdproctor/claude/casehub/platform`
@@ -10,7 +10,7 @@
 
 ## Last Session
 
-Implemented wildcard type-level grants and deny entries for ACL (#217). Added `AclEntryType` (ALLOW/DENY), `deniedBy()` cascade on `AclAction`, specificity-based evaluation (instance > wildcard, deny before grant at same level), parent chain applies full resolveAt at each level. Renamed `GrantRequest` → `AclEntryRequest`. Flyway V3 migration. 33 new contract tests across both backends. Adversarial design review (5 rounds, 14 verified issues, $17.35) significantly improved the design — added specificity semantics, deny cascade via `deniedBy()`, parent chain full evaluation.
+Two ACL issues closed from epic #210. First: #217 — wildcard type-level grants (`case:*`) and deny entries with specificity-based evaluation, `deniedBy()` cascade, parent chain full resolveAt. Adversarial design review (5 rounds, $17.35) significantly improved the design. 33 new contract tests. Second: #218 — new `acl-admin/` module providing REST API over the ACL SPI (`/acl/grants`, `/acl/denies`, `/acl/parents`, `/acl/check`, `/acl/accessible`). `@RolesAllowed("admin")` on mutations, self-access guard on queries. 21 REST-assured tests.
 
 ## Cross-Module
 
@@ -20,7 +20,6 @@ Implemented wildcard type-level grants and deny entries for ACL (#217). Added `A
 
 ## What's Left
 
-- platform#218: ACL administration REST API · M · Med
 - platform#219: wire Case Definition authorization YAML to ACL grants · L · Med (engine cross-repo)
 - platform#220: identity propagation through PropagationContext · L · High (engine cross-repo)
 - platform#221: worker rights model and authorization service SPI · XL · High (engine cross-repo)
