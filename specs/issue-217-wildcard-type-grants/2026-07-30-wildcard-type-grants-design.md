@@ -61,10 +61,10 @@ run in order:
 
 ```
 resolveAt(candidates, resourceId, action):
-  1. Instance deny (exact resourceId, deniedBy, not expired, tenant-filtered) → DENY
-  2. Instance grant (exact resourceId, satisfiedBy, not expired, tenant-filtered) → ALLOW
-  3. Wildcard deny (type:*, deniedBy, not expired, tenant-filtered) → DENY
-  4. Wildcard grant (type:*, satisfiedBy, not expired, tenant-filtered) → ALLOW
+  1. Instance deny (any candidate, exact resourceId, action ∈ deniedBy, not expired, tenant-filtered) → DENY
+  2. Instance grant (any candidate, exact resourceId, action ∈ satisfiedBy, not expired, tenant-filtered) → ALLOW
+  3. Wildcard deny (any candidate, type:*, action ∈ deniedBy, not expired, tenant-filtered) → DENY
+  4. Wildcard grant (any candidate, type:*, action ∈ satisfiedBy, not expired, tenant-filtered) → ALLOW
   5. → CONTINUE
 
 canAccess(actorId, resourceId, action):
@@ -101,7 +101,8 @@ Key semantics:
 
 - Collects instance grants matching `type:` prefix (existing behavior)
 - Checks for `type:*` grant — includes `"case:*"` in results if present
-- Filters out any resourceId with a matching deny entry (instance-level denies, using `deniedBy`)
+- Filters out any resourceId where any candidate has a matching deny entry (instance-level
+  denies, action ∈ `deniedBy`)
 - If a wildcard deny exists for the requested action (or any action in `deniedBy`), the wildcard
   grant is suppressed (no `"case:*"` in results); instance grants still returned individually
 
@@ -172,8 +173,9 @@ All tests in `AccessControlProviderContractTest`, run by both backends.
 - `deny_blocksInstanceGrant`
 - `deny_blocksWildcardGrant`
 - `deny_wildcardDeny_blocksAllOfType`
-- `deny_actionSpecific`
-- `deny_doesNotImplyHigherActions`
+- `deny_actionSpecific_claimDenyDoesNotBlockRead`
+- `deny_cascadesViadeniedBy_readDenyBlocksWriteAndAdmin`
+- `deny_cascadesViadeniedBy_writeDenyBlocksAdminNotRead`
 - `deny_respectsExpiry`
 - `deny_respectsTenantIsolation`
 - `deny_respectsGroupMembership`
@@ -184,6 +186,7 @@ All tests in `AccessControlProviderContractTest`, run by both backends.
 - `accessibleResources_excludesDeniedInstances`
 - `accessibleResources_wildcardGrantWithDeny_wildcardPlusDeniedExcluded`
 - `accessibleResources_wildcardDeny_suppressesWildcardGrant`
+- `deny_wildcardDenyPlusWildcardGrant_denyWinsAtSameLevel`
 
 **Deny + parent chain interaction (5 tests):**
 
