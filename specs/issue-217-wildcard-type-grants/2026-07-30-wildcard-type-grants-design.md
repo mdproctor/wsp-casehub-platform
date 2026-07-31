@@ -168,7 +168,7 @@ All tests in `AccessControlProviderContractTest`, run by both backends.
 - `accessibleResources_wildcardGrant_paginatedIncludesWildcard`
 - `accessibleResourcesIncludingInherited_wildcardGrant_passesThrough`
 
-**Deny entries (15 tests):**
+**Deny entries (17 tests):**
 
 - `deny_blocksInstanceGrant`
 - `deny_blocksWildcardGrant`
