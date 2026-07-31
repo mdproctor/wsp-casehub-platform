@@ -23,37 +23,77 @@ New default methods on `AccessControlProvider`:
 ```java
 void deny(String actorId, String resourceId, AclAction action, Instant expires)
 void removeDeny(String actorId, String resourceId, AclAction action)
-void denyBatch(Collection<GrantRequest> requests)
-void removeDenyBatch(Collection<GrantRequest> requests)
+void denyBatch(Collection<AclEntryRequest> requests)
+void removeDenyBatch(Collection<AclEntryRequest> requests)
 ```
 
-`GrantRequest` is reused for deny operations — same fields apply.
+`GrantRequest` is renamed to `AclEntryRequest` — the record is semantically neutral and used
+by all four batch methods: `grantBatch`, `revokeBatch`, `denyBatch`, `removeDenyBatch`.
+
+New method on `AclAction`:
+
+```java
+public Set<AclAction> deniedBy() {
+    return switch (this) {
+        case READ  -> Set.of(READ);
+        case WRITE -> Set.of(READ, WRITE);
+        case ADMIN -> Set.of(READ, WRITE, ADMIN);
+        case CLAIM -> Set.of(CLAIM);
+    };
+}
+```
+
+`deniedBy()` is the dual of `satisfiedBy()`: it returns the set of actions that, when denied,
+cascade to also deny this action. `deny(actor, resource, READ)` blocks READ, WRITE, and ADMIN
+checks (since all three include read-level access). `deny(actor, resource, CLAIM)` blocks only
+CLAIM (orthogonal to the READ/WRITE/ADMIN hierarchy).
 
 `revokeAll(actorId, resourceId)` expands to also remove deny entries for that
 actor+resource pair.
 
 ### canAccess Evaluation Order
 
-Both backends implement the same six-step chain:
+Both backends implement a specificity-based evaluation. Instance entries take precedence
+over wildcard entries; within the same specificity level, deny is checked before grant.
 
-1. Check instance deny (exact resourceId, all candidates, not expired, tenant-filtered) → **false**
-2. Check wildcard deny (`type:*`, candidates, not expired, tenant-filtered) → **false**
-3. Check instance grant (exact resourceId, candidates, satisfiedBy, not expired, tenant-filtered) → **true**
-4. Walk parent chain (recursive, depth guard 20) → **true**
-5. Check wildcard grant (`type:*`, candidates, satisfiedBy, not expired, tenant-filtered) → **true**
-6. → **false**
+At each resource level (the requested resource, then each parent in the chain), four checks
+run in order:
+
+```
+resolveAt(candidates, resourceId, action):
+  1. Instance deny (exact resourceId, deniedBy, not expired, tenant-filtered) → DENY
+  2. Instance grant (exact resourceId, satisfiedBy, not expired, tenant-filtered) → ALLOW
+  3. Wildcard deny (type:*, deniedBy, not expired, tenant-filtered) → DENY
+  4. Wildcard grant (type:*, satisfiedBy, not expired, tenant-filtered) → ALLOW
+  5. → CONTINUE
+
+canAccess(actorId, resourceId, action):
+  candidates = {actorId} ∪ {group:<g> for g in groupsOf(actorId)}
+  result = resolveAt(candidates, resourceId, action)
+  if result ≠ CONTINUE: return result
+  Walk parent chain (recursive, depth guard 20):
+    result = resolveAt(candidates, parentResourceId, action)
+    if result ≠ CONTINUE: return result
+  → false
+```
 
 Key semantics:
 
-- **Deny always wins** — a deny on `case:abc` blocks access even if `case:*` ADMIN grant exists
-- **Deny is action-specific** — `deny(actor, "case:abc", READ)` blocks READ but not WRITE
-- **Deny does not imply higher actions** — deny on READ does not block ADMIN checks
-- **Wildcard deny** — `deny(actor, "case:*", READ)` blocks READ on all resources of that type
+- **Specificity wins** — instance entries (deny or grant) take precedence over wildcard entries.
+  `deny(actor, "case:*", READ)` + `grant(actor, "case:abc", READ)` → allowed (instance grant
+  overrides wildcard deny). This enables the "deny-all-except" pattern.
+- **Within same level, deny wins** — `deny(actor, "case:abc", READ)` +
+  `grant(group:managers, "case:abc", READ)` → denied (both instance-level, deny checked first)
+- **Deny cascades via `deniedBy`** — `deny(actor, "case:abc", READ)` blocks READ, WRITE, and
+  ADMIN checks on `case:abc`, because WRITE and ADMIN include read-level access.
+  `deny(actor, "case:abc", WRITE)` blocks WRITE and ADMIN but not READ.
+  `deny(actor, "case:abc", CLAIM)` blocks only CLAIM (orthogonal).
+- **Parent chain applies full evaluation** — at each parent level, the same four-step check
+  runs. A deny on a parent blocks inherited access; a grant on a parent grants inherited access.
+  A direct grant on a child overrides a deny on its parent (the child's instance grant resolves
+  before the parent chain is walked).
 - **Wildcard extraction** — type prefix is everything before the first `:`. ResourceIds with no
   colon have no type prefix and cannot participate in wildcard matching
-- **Wildcard grants use satisfiedBy** — `grant(actor, "case:*", ADMIN)` satisfies a READ check
-- **Wildcard denies do NOT use satisfiedBy** — `deny(actor, "case:*", READ)` blocks only READ,
-  not WRITE or ADMIN
 
 ### accessibleResources Behavior
 
@@ -61,9 +101,9 @@ Key semantics:
 
 - Collects instance grants matching `type:` prefix (existing behavior)
 - Checks for `type:*` grant — includes `"case:*"` in results if present
-- Filters out any resourceId with a matching deny entry (instance-level denies)
-- If a wildcard deny exists for the requested action, the wildcard grant is suppressed
-  (no `"case:*"` in results); instance grants still returned individually
+- Filters out any resourceId with a matching deny entry (instance-level denies, using `deniedBy`)
+- If a wildcard deny exists for the requested action (or any action in `deniedBy`), the wildcard
+  grant is suppressed (no `"case:*"` in results); instance grants still returned individually
 
 `accessibleResources(AclQuery)` (paginated):
 
@@ -73,11 +113,16 @@ Key semantics:
 `accessibleResourcesIncludingInherited`:
 
 - Same as `accessibleResources` plus existing children traversal
+- Deny filtering applies to traversed children: children with instance deny entries (using
+  `deniedBy`) are excluded from results. If a wildcard deny exists for the child's type,
+  children of that type are excluded.
 - No children are registered under `case:*` as a parent, so the wildcard entry passes
   through without expansion
 
-The caller interprets `case:*` as "all of this type" and uses `canAccess` for
-authoritative per-resource checks (which catch individual denies).
+**Non-authoritative wildcard entries:** When results contain `case:*`, this signals "all of
+this type" — the caller must expand to concrete instances and verify each with `canAccess`.
+Concrete instance results (non-wildcard) are authoritative after deny filtering. SPI Javadoc
+must document this contract.
 
 ### Storage
 
@@ -98,6 +143,12 @@ authoritative per-resource checks (which catch individual denies).
 - Grant queries add `AND entry_type = 'ALLOW'`; deny queries add `AND entry_type = 'DENY'`
 - Audit log operations: `DENY` and `REVOKE_DENY` alongside existing `GRANT` and `REVOKE`
 - Retention purge: expired deny entries purged alongside expired allow entries (same schedule)
+
+**`condition` column:** The existing `condition TEXT` column on `acl_entry` (from V1) is
+reserved for Phase 2 ABAC — conditional grant/deny evaluation via the expression engine
+(ARC42STORIES.MD §C21, original ACL design spec §8). Not evaluated by current code. Deny
+entries will also support conditions when Phase 2 is implemented. No schema change needed —
+the column already exists on all rows including future deny entries.
 
 ### Contract Tests
 
@@ -134,6 +185,18 @@ All tests in `AccessControlProviderContractTest`, run by both backends.
 - `accessibleResources_wildcardGrantWithDeny_wildcardPlusDeniedExcluded`
 - `accessibleResources_wildcardDeny_suppressesWildcardGrant`
 
+**Deny + parent chain interaction (5 tests):**
+
+- `deny_onParent_blocksChildInheritance`
+- `deny_onParent_directGrantOnChild_allowed`
+- `deny_wildcardOnParentType_blocksChildInheritance`
+- `deny_wildcardOnParentType_instanceGrantOnParent_childInherits`
+- `deny_onParent_groupGrantOnParent_actorDenied`
+
+**Wildcard CLAIM (1 test):**
+
+- `canAccess_wildcardGrant_claimAction_satisfiesOnlyClaim`
+
 ### CLAUDE.md Updates
 
 After implementation:
@@ -142,7 +205,7 @@ After implementation:
 - `AclEntryType` enum added to package listing
 - `acl-inmem` module description: mention deny support
 - `acl-jpa` module description: mention deny support, Flyway V3
-- `.meta` flyway-next-v updated from `none` to the allocated version
+- `.meta` flyway-next-v updated from `unknown` to the allocated version
 
 ### Out of Scope
 
