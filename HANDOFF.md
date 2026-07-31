@@ -1,8 +1,8 @@
 # HANDOFF — casehub-platform
 
-*Updated: 2026-07-30 — #196 closed — removed from backlog.*
+*Updated: 2026-07-31 — #217 closed (wildcard type-level grants + deny entries). #198 landed by parallel session.*
 
-**Date:** 2026-07-30
+**Date:** 2026-07-31
 **Project:** `/Users/mdproctor/claude/casehub/platform`
 **Workspace:** `/Users/mdproctor/claude/public/casehub/platform`
 
@@ -10,7 +10,7 @@
 
 ## Last Session
 
-Fixed jackson-jq CI compilation failure (#208 — generic return type ambiguity with Scope.setValue overloads). Then filed epic #210 with 11 child issues for ACL completion, implemented all 6 S-sized items in one branch: action hierarchy (AclAction.satisfiedBy()), bulk grant/revoke (GrantRequest + grantBatch/revokeBatch), expired entry and audit log retention purges (AclRetentionPurge @Scheduled), accessibleResources pagination (AclQuery/AclPage), and inherited children in accessibleResources (recursive CTE). 45 contract tests across both backends.
+Implemented wildcard type-level grants and deny entries for ACL (#217). Added `AclEntryType` (ALLOW/DENY), `deniedBy()` cascade on `AclAction`, specificity-based evaluation (instance > wildcard, deny before grant at same level), parent chain applies full resolveAt at each level. Renamed `GrantRequest` → `AclEntryRequest`. Flyway V3 migration. 33 new contract tests across both backends. Adversarial design review (5 rounds, 14 verified issues, $17.35) significantly improved the design — added specificity semantics, deny cascade via `deniedBy()`, parent chain full evaluation.
 
 ## Cross-Module
 
@@ -20,13 +20,11 @@ Fixed jackson-jq CI compilation failure (#208 — generic return type ambiguity 
 
 ## What's Left
 
-- platform#217: wildcard type-level grants (`case:*`) · M · Med
 - platform#218: ACL administration REST API · M · Med
 - platform#219: wire Case Definition authorization YAML to ACL grants · L · Med (engine cross-repo)
 - platform#220: identity propagation through PropagationContext · L · High (engine cross-repo)
 - platform#221: worker rights model and authorization service SPI · XL · High (engine cross-repo)
 - MongoDB backend for subject view toolkit — not yet filed · M · Med
-- platform#198: schema versioning
 - platform#199: custom/composite preference types
 
 ## References
