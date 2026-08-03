@@ -1,6 +1,6 @@
 # HANDOFF — casehub-platform
 
-*Updated: 2026-07-31 — #217 + #218 closed this session. ACL epic #210 has 3 remaining items (all cross-repo).*
+*Updated: #219, #199 closed — removed from backlog.*
 
 **Date:** 2026-07-31
 **Project:** `/Users/mdproctor/claude/casehub/platform`
@@ -20,11 +20,9 @@ Two ACL issues closed from epic #210. First: #217 — wildcard type-level grants
 
 ## What's Left
 
-- platform#219: wire Case Definition authorization YAML to ACL grants · L · Med (engine cross-repo)
 - platform#220: identity propagation through PropagationContext · L · High (engine cross-repo)
 - platform#221: worker rights model and authorization service SPI · XL · High (engine cross-repo)
 - MongoDB backend for subject view toolkit — not yet filed · M · Med
-- platform#199: custom/composite preference types
 
 ## References
 
