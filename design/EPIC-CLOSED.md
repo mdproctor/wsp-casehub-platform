@@ -1,5 +1,5 @@
-# Branch Closed: issue-135-notification-store
+# Branch Closed: issue-197-register-preference-schemas
 
-**Date:** 2026-07-05
-**Issues:** 135
+**Date:** 2026-08-03
+**Issues:** 197
 **Status:** merged to main
