@@ -1,5 +1,5 @@
-# Branch Closed: issue-135-notification-store
+# Branch Closed: issue-223-preference-schemas-identity
 
-**Date:** 2026-07-05
-**Issues:** 135
+**Date:** 2026-08-04
+**Issues:** 223,220
 **Status:** merged to main
