@@ -13,3 +13,11 @@ flyway-next-v: none
 
 ## Queue
 - [ ] #241 — Issue #241 ← active
+  - [ ] Batch 1: SPI+NoOp
+    - [ ] Task 1: SPI types in platform-api
+    - [ ] Task 2: NoOp default in platform
+  - [ ] Batch 2: Bridge
+    - [ ] Task 3: McpResourceRegistryBridge
+  - [ ] Batch 3: DomainResources
+    - [ ] Task 4: DomainContentFormatter+DomainResourceRegistrar
+    - [ ] Task 5: Doc updates and full build
