@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-241-mcp-resource-subscription
-state: scaffolded
+state: closing:review
 project-sha: 926effdfc7c8a820dbfb7002f2e9fbb5e6c09977
 date: 2026-08-20
 issue-repo: casehubio/platform
