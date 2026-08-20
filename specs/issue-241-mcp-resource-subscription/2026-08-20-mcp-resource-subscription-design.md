@@ -154,17 +154,17 @@ when null.
 ```java
 @FunctionalInterface
 public interface McpResourceHandler {
-    McpResourceContent read(McpResourceReadRequest request);
+    McpResourceContent read(McpResourceReadRequest request) throws Exception;
 }
 ```
 
-Blocking. The bridge wraps this with `setHandler(fn, true)` to run on a virtual
+Blocking. `throws Exception` permits handlers to call methods like
+`ObjectMapper.writeValueAsString()` without wrapping. The bridge adapter
+catches all exceptions: `IllegalArgumentException` returns an MCP error
+response; unexpected exceptions are logged and returned as MCP error
+responses. This matches `DynamicToolRegistrar`'s error handling pattern.
+The bridge wraps handlers with `setHandler(fn, true)` to run on a virtual
 thread, avoiding event-loop blocking.
-
-When the handler throws `IllegalArgumentException` (e.g., unknown domain), the
-bridge adapter catches it and returns an MCP error response. Unexpected
-exceptions are logged and returned as MCP error responses. This matches
-`DynamicToolRegistrar`'s error handling pattern.
 
 **`McpResourceHandle`** — returned from registration:
 
@@ -181,7 +181,10 @@ literal URI. For TEMPLATE resources, it's a resolved URI (e.g.,
 `iot://devices/123/state`).
 
 `deregister()` removes the resource from the MCP server and cleans up any
-completion registrations.
+completion registrations. Idempotent — calling `deregister()` twice is a no-op
+on the second call. After `deregister()`, `notifyUpdate()` is a no-op.
+`McpResourceRegistry.deregister(name)` invalidates any outstanding handle for
+that name — the handle's subsequent operations become no-ops.
 
 **`McpResourceRegistry`** — SPI interface:
 
@@ -235,6 +238,26 @@ public record McpResourceRegistered(McpResourceDescriptor descriptor) {
 
 Fired by non-no-op implementations via `fireAsync()` after successful
 registration. Follows the `EndpointRegistered` pattern.
+
+**`McpResourceUpdated`** — CDI event for decoupled notification:
+
+```java
+public record McpResourceUpdated(String uri) {
+    public McpResourceUpdated {
+        Objects.requireNonNull(uri, "uri");
+    }
+}
+```
+
+Domain repos that cannot hold a `McpResourceHandle` reference (e.g., the data
+producer is in a different CDI bean from the registrar) fire this event instead.
+The bridge observes `@ObservesAsync McpResourceUpdated` and delegates to the
+appropriate handle's `notifyUpdate(uri)`. If no resource is registered for the
+URI, the event is silently ignored.
+
+Both notification paths coexist — `handle.notifyUpdate(uri)` for the co-located
+case (more efficient, no CDI overhead) and `McpResourceUpdated` event for the
+decoupled case.
 
 ### 3.2 platform/ — NoOp default
 
@@ -318,8 +341,13 @@ public class McpResourceRegistryBridge implements McpResourceRegistry {
 
 **Registration flow (TEMPLATE):**
 
+0. **Guard:** If `descriptor.subscribable()` is `true`, throw
+   `IllegalArgumentException` — quarkus-mcp-server 1.11.1 does not support
+   `resources/subscribe` on template-resolved URIs. Advertising subscribability
+   on a template would be a protocol-level lie. Domains needing subscription
+   on template-resolved URIs should register individual STATIC resources.
 1. Call `resourceTemplateManager.newResourceTemplate(descriptor.name())`
-2. `.setUriTemplate(descriptor.uri())`
+2. `.setUriTemplate(descriptor.uriTemplate())`
 3. `.setTitle(descriptor.description())`
 4. `.setMimeType(descriptor.mimeType())` if non-null
 5. `.setDescription(descriptor.description())`
@@ -358,9 +386,10 @@ private Function<ResourceArguments, ResourceResponse> adaptStaticHandler(
     return args -> {
         var request = McpResourceReadRequest.of(args.requestUri().value());
         var content = handler.read(request);
+        String mime = content.mimeType() != null
+                ? content.mimeType() : descriptor.mimeType();
         return new ResourceResponse(
-            new TextResourceContents(content.uri(), content.text(),
-                content.mimeType()));
+            new TextResourceContents(content.uri(), content.text(), mime));
     };
 }
 ```
@@ -373,9 +402,10 @@ private Function<ResourceTemplateArguments, ResourceResponse> adaptTemplateHandl
         var request = new McpResourceReadRequest(
             args.requestUri().value(), args.args());
         var content = handler.read(request);
+        String mime = content.mimeType() != null
+                ? content.mimeType() : descriptor.mimeType();
         return new ResourceResponse(
-            new TextResourceContents(content.uri(), content.text(),
-                content.mimeType()));
+            new TextResourceContents(content.uri(), content.text(), mime));
     };
 }
 ```
@@ -508,9 +538,11 @@ No duplication.
 ### In scope
 
 **Batch 1 — SPI and bridge:**
-- `McpResourceDescriptor`, `McpResourceReadRequest`, `McpResourceContent`,
+- `McpResourceDescriptor` (sealed: `StaticResourceDescriptor`,
+  `TemplateResourceDescriptor`), `McpResourceReadRequest`, `McpResourceContent`,
   `McpResourceHandler`, `McpResourceHandle`, `McpResourceRegistry`,
-  `McpResourceRegistered` in `platform-api`
+  `McpResourceRegistration`, `McpResourceRegistered`, `McpResourceUpdated`
+  in `platform-api`
 - `NoOpMcpResourceRegistry @DefaultBean` in `platform/`
 - `McpResourceRegistryBridge @ApplicationScoped` in `mcp/`
 - Tests for SPI types, NoOp, and bridge
@@ -536,6 +568,13 @@ No duplication.
   support `resources/subscribe` on template-resolved URIs. File upstream
   issue when IoT consumer needs it. Workaround: register individual STATIC
   resources per entity
+- Path-based resource discovery (issue #241 requirement #2) — MCP resources
+  use URI-based discovery natively via `resources/list` and
+  `resources/templates/list`. The platform's `Path` hierarchy is designed
+  for endpoint routing, not MCP resource organization. If Path-based
+  organization is needed in the future (e.g., grouping resources by domain
+  path prefix), it can be layered on top of the URI scheme without SPI
+  changes. Deferred — no current consumer needs it
 
 ## 5. Testing Strategy
 
@@ -575,8 +614,9 @@ No dependency changes. `NoOpMcpResourceRegistry` is a new source file only.
 
 No new dependencies. `mcp/` already depends on `casehub-platform-api` and
 `quarkus-mcp-server-core`. `ResourceManager`, `ResourceTemplateManager`,
-`ResourceTemplateCompletionManager`, and `NotificationManager` are all in
-`quarkus-mcp-server-core` 1.11.1.
+and `ResourceTemplateCompletionManager` are all in
+`quarkus-mcp-server-core` 1.11.1. Notifications use
+`ResourceInfo.sendUpdateAndForget()` — no `NotificationManager` needed.
 
 ## 8. Document Updates
 
@@ -597,8 +637,10 @@ Update `platform-api` package structure to include:
         McpResourceContent (record: uri, text, mimeType),
         McpResourceHandler (functional interface: read(McpResourceReadRequest) → McpResourceContent),
         McpResourceHandle (interface: notifyUpdate(uri), deregister()),
-        McpResourceRegistry (SPI: register/register-with-completions/deregister/resolve/list),
-        McpResourceRegistered (CDI event record: descriptor)
+        McpResourceRegistry (SPI: newResource/deregister/resolve/list),
+        McpResourceRegistration (builder: handler/completion/serverName/register),
+        McpResourceRegistered (CDI event record: descriptor),
+        McpResourceUpdated (CDI event record: uri — decoupled notification relay)
 ```
 
 ### ARC42STORIES.MD
