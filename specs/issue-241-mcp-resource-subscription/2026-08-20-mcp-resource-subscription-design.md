@@ -144,6 +144,11 @@ public interface McpResourceHandler {
 Blocking. The bridge wraps this with `setHandler(fn, true)` to run on a virtual
 thread, avoiding event-loop blocking.
 
+When the handler throws `IllegalArgumentException` (e.g., unknown domain), the
+bridge adapter catches it and returns an MCP error response. Unexpected
+exceptions are logged and returned as MCP error responses. This matches
+`DynamicToolRegistrar`'s error handling pattern.
+
 **`McpResourceHandle`** — returned from registration:
 
 ```java
@@ -351,12 +356,29 @@ For STATIC resources, `notifyUpdate(uri)` delegates to
 `ResourceInfo.sendUpdateAndForget()`. The URI parameter is validated against
 the registered URI.
 
-For TEMPLATE resources, `notifyUpdate(uri)` needs the `ResourceManager` to
-look up the dynamically-resolved resource. Since quarkus-mcp-server's
-`ResourceManagerImpl.sendUpdateNotifications()` works by URI lookup in its
-subscriber map, and template-resolved URIs are tracked there, the bridge calls
-`resourceManager.getResource(uri)` and then `sendUpdateAndForget()` on the
-result. If no resource exists for that URI (no subscriber), this is a no-op.
+For TEMPLATE resources, `notifyUpdate(uri)` is a **known limitation** of
+quarkus-mcp-server 1.11.1. The `ResourceManagerImpl.subscribe()` method
+requires `getResource(uri)` to return a statically registered resource.
+Template-resolved URIs (e.g., `iot://devices/123/state`) are not in the
+`uriToResource` map — they're resolved dynamically by the template manager
+at read time. This means clients **cannot subscribe** to template-resolved
+URIs in quarkus-mcp-server 1.11.1.
+
+For STATIC resources with `subscribable=true`, notifications work correctly:
+`handle.notifyUpdate(descriptor.uri())` delegates to
+`ResourceInfo.sendUpdateAndForget()`, which sends
+`notifications/resources/updated` to all subscribers of that URI.
+
+For TEMPLATE resources, the handle's `notifyUpdate(uri)` is a no-op in this
+implementation. When quarkus-mcp-server adds template subscription support
+(or we contribute a fix upstream), the bridge can be updated to delegate.
+Until then, domains needing subscription on template-resolved URIs should
+register individual STATIC resources instead of a TEMPLATE.
+
+This limitation does not block any in-scope consumer: domain metadata is
+`subscribable=false`. The IoT consumer (iot#77) will need to evaluate
+whether to register one STATIC resource per device or wait for upstream
+template subscription support.
 
 **Deregistration:**
 
@@ -480,6 +502,10 @@ No duplication.
 - Resource-level access control — no tenant-scoping on resources yet
 - Subscription-based notification for domain metadata (subscribable=false) —
   domain catalog is static after startup
+- Template subscription workaround — quarkus-mcp-server 1.11.1 does not
+  support `resources/subscribe` on template-resolved URIs. File upstream
+  issue when IoT consumer needs it. Workaround: register individual STATIC
+  resources per entity
 
 ## 5. Testing Strategy
 
