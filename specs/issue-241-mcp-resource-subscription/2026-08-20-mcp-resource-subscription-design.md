@@ -31,10 +31,13 @@ Two consumers are identified:
 |---|----------|--------|
 | D1 | Resource serving direction | Platform-serves-content — domains contribute content through a platform SPI |
 | D2 | SPI location | `platform-api` (`io.casehub.platform.api.mcp`) — pure Java, zero deps |
-| D3 | SPI shape | `McpResourceRegistry` with `register(descriptor, handler)` returning `McpResourceHandle` |
-| D4 | Resource type representation | Single `McpResourceDescriptor` record with `Kind` enum (STATIC/TEMPLATE) |
+| D3 | SPI shape | `McpResourceRegistry` with `newResource(descriptor)` → builder → `register()` → `McpResourceHandle` |
+| D4 | Resource type representation | Sealed `McpResourceDescriptor` with `StaticResourceDescriptor` / `TemplateResourceDescriptor` records |
 | D5 | Branch scope | SPI + bridge + domain metadata resources + tests. IoT deferred to iot#77 |
-| D6 | Template completions | On the descriptor via optional `completions` parameter on `register()` |
+| D6 | Template completions | Via `.completion(argName, supplier)` calls on the registration builder |
+| D7 | EndpointRegistry divergence | MCP resource contribution uses `McpResourceRegistry`, not `EndpointRegistry` |
+| D8 | Server scoping | Config-driven default with optional per-resource `.serverName()` override on builder |
+| D9 | Notification model | Push-only — no subscriber awareness in SPI |
 
 ## 3. Changes
 
@@ -42,47 +45,61 @@ Two consumers are identified:
 
 Package: `io.casehub.platform.api.mcp`
 
-**`McpResourceDescriptor`** — immutable record describing a resource:
+**`McpResourceDescriptor`** — sealed interface with two record implementations:
 
 ```java
-public record McpResourceDescriptor(
-    String name,
-    String uri,
-    String mimeType,
-    String description,
-    Kind kind,
-    boolean subscribable
-) {
-    public enum Kind { STATIC, TEMPLATE }
+public sealed interface McpResourceDescriptor
+        permits StaticResourceDescriptor, TemplateResourceDescriptor {
 
-    public McpResourceDescriptor {
+    String name();
+    String mimeType();
+    String description();
+    boolean subscribable();
+
+    static StaticResourceDescriptor of(
+            String name, String uri, String mimeType, String description) {
+        return new StaticResourceDescriptor(name, uri, mimeType, description, false);
+    }
+
+    static TemplateResourceDescriptor template(
+            String name, String uriTemplate, String mimeType, String description) {
+        return new TemplateResourceDescriptor(name, uriTemplate, mimeType, description, false);
+    }
+}
+
+public record StaticResourceDescriptor(
+    String name, String uri, String mimeType, String description, boolean subscribable
+) implements McpResourceDescriptor {
+    public StaticResourceDescriptor {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(uri, "uri");
         Objects.requireNonNull(description, "description");
-        Objects.requireNonNull(kind, "kind");
     }
 
-    public static McpResourceDescriptor of(
-            String name, String uri, String mimeType, String description) {
-        return new McpResourceDescriptor(name, uri, mimeType, description,
-                Kind.STATIC, false);
+    public StaticResourceDescriptor withSubscribable(boolean subscribable) {
+        return new StaticResourceDescriptor(name, uri, mimeType, description, subscribable);
+    }
+}
+
+public record TemplateResourceDescriptor(
+    String name, String uriTemplate, String mimeType, String description, boolean subscribable
+) implements McpResourceDescriptor {
+    public TemplateResourceDescriptor {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(uriTemplate, "uriTemplate");
+        Objects.requireNonNull(description, "description");
     }
 
-    public static McpResourceDescriptor template(
-            String name, String uriTemplate, String mimeType, String description) {
-        return new McpResourceDescriptor(name, uriTemplate, mimeType, description,
-                Kind.TEMPLATE, false);
-    }
-
-    public McpResourceDescriptor withSubscribable(boolean subscribable) {
-        return new McpResourceDescriptor(name, uri, mimeType, description,
-                kind, subscribable);
+    public TemplateResourceDescriptor withSubscribable(boolean subscribable) {
+        return new TemplateResourceDescriptor(name, uriTemplate, mimeType, description, subscribable);
     }
 }
 ```
 
-`mimeType` is nullable — when null, the bridge omits it from the quarkus
-registration (the MCP protocol treats mimeType as optional).
+Sealed hierarchy gives compile-time field safety (`StaticResourceDescriptor.uri()` vs
+`TemplateResourceDescriptor.uriTemplate()`), exhaustiveness checking on switch, and
+prevents invalid states. `mimeType` is nullable — when null, the bridge omits it from
+the quarkus registration (the MCP protocol treats mimeType as optional).
 
 **`McpResourceReadRequest`** — input to the handler:
 
@@ -170,12 +187,7 @@ completion registrations.
 
 ```java
 public interface McpResourceRegistry {
-    McpResourceHandle register(McpResourceDescriptor descriptor,
-                               McpResourceHandler handler);
-
-    McpResourceHandle register(McpResourceDescriptor descriptor,
-                               McpResourceHandler handler,
-                               Map<String, Supplier<List<String>>> completions);
+    McpResourceRegistration newResource(McpResourceDescriptor descriptor);
 
     void deregister(String name);
 
@@ -185,14 +197,31 @@ public interface McpResourceRegistry {
 }
 ```
 
-The two-arg `register()` is for resources without completions (static resources
-and templates that don't need argument completion). The three-arg overload adds
-completions for template variables — each map entry is variable name →
-supplier of valid values.
+**`McpResourceRegistration`** — builder for registration-time concerns:
+
+```java
+public interface McpResourceRegistration {
+    McpResourceRegistration handler(McpResourceHandler handler);
+    McpResourceRegistration completion(String argumentName,
+                                       Supplier<List<String>> values);
+    McpResourceRegistration serverName(String serverName);
+    McpResourceHandle register();
+}
+```
+
+`newResource(descriptor)` creates a registration builder. `.handler(h)` sets
+the content handler (required — `register()` throws if omitted).
+`.completion(argName, supplier)` adds per-variable template completions
+(optional, repeatable). `.serverName(name)` overrides the default MCP server
+(optional — defaults to bridge config). `.register()` completes registration,
+fires `McpResourceRegistered` event, and returns the handle.
 
 `deregister(String name)` removes by resource name. No-op if not found.
 `resolve(String name)` and `list()` return descriptors only (not handlers) —
 for introspection and discovery.
+
+Builder pattern parallels `ResourceManager.newResource(name).setUri(...).register()`
+and `ToolManager.newTool(name).setHandler(...).register()` from quarkus-mcp-server.
 
 **`McpResourceRegistered`** — CDI event record:
 
@@ -221,14 +250,8 @@ public class NoOpMcpResourceRegistry implements McpResourceRegistry {
     };
 
     @Override
-    public McpResourceHandle register(McpResourceDescriptor d, McpResourceHandler h) {
-        return NOOP_HANDLE;
-    }
-
-    @Override
-    public McpResourceHandle register(McpResourceDescriptor d, McpResourceHandler h,
-                                       Map<String, Supplier<List<String>>> c) {
-        return NOOP_HANDLE;
+    public McpResourceRegistration newResource(McpResourceDescriptor d) {
+        return new NoOpRegistration();
     }
 
     @Override
@@ -241,6 +264,13 @@ public class NoOpMcpResourceRegistry implements McpResourceRegistry {
 
     @Override
     public List<McpResourceDescriptor> list() { return List.of(); }
+
+    private static class NoOpRegistration implements McpResourceRegistration {
+        @Override public McpResourceRegistration handler(McpResourceHandler h) { return this; }
+        @Override public McpResourceRegistration completion(String n, Supplier<List<String>> v) { return this; }
+        @Override public McpResourceRegistration serverName(String n) { return this; }
+        @Override public McpResourceHandle register() { return NOOP_HANDLE; }
+    }
 }
 ```
 
@@ -408,37 +438,37 @@ public class DomainResourceRegistrar {
 
     void onScanComplete(@Observes ModelScanComplete event) {
         // 1. Register domain index (static resource)
-        resourceRegistry.register(
-            McpResourceDescriptor.of(
+        resourceRegistry.newResource(McpResourceDescriptor.of(
                 "casehub-domain-index",
                 "casehub://domain-index",
                 "application/json",
-                "Lists all CaseHub domains with summaries and operation counts"),
-            request -> {
+                "Lists all CaseHub domains with summaries and operation counts"))
+            .handler(request -> {
                 var domains = modelRegistry.getDomains().stream()
                     .map(this::domainSummary)
                     .toList();
                 String json = mapper.writeValueAsString(Map.of("domains", domains));
                 return McpResourceContent.of(request.uri(), json, "application/json");
-            });
+            })
+            .register();
 
         // 2. Register per-domain template with completions
-        resourceRegistry.register(
-            McpResourceDescriptor.template(
+        resourceRegistry.newResource(McpResourceDescriptor.template(
                 "casehub-domains",
                 "casehub://domains/{domain}",
                 "application/json",
-                "Domain detail: operations, params, state, events"),
-            request -> {
+                "Domain detail: operations, params, state, events"))
+            .handler(request -> {
                 String domainName = request.templateArgs().get("domain");
                 var domain = modelRegistry.getDomain(domainName)
                     .orElseThrow(() -> new IllegalArgumentException(
                         "Unknown domain: " + domainName));
                 String json = mapper.writeValueAsString(domainDetail(domain));
                 return McpResourceContent.of(request.uri(), json, "application/json");
-            },
-            Map.of("domain", () -> modelRegistry.getDomains().stream()
-                .map(DomainModel::name).toList()));
+            })
+            .completion("domain", () -> modelRegistry.getDomains().stream()
+                .map(DomainModel::name).toList())
+            .register();
     }
 
     // domainSummary() and domainDetail() produce the same JSON structure
