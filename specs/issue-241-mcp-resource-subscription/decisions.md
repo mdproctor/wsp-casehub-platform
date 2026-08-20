@@ -46,3 +46,53 @@
 **Exploration:** quick
 **Depends on:** D1 (resource serving direction), D2 (SPI location)
 **Status:** captured
+
+## D4: Resource type representation
+
+**Choice:** Single `McpResourceDescriptor` record with `Kind` enum (`STATIC`/`TEMPLATE`). Factory methods `McpResourceDescriptor.of(...)` and `McpResourceDescriptor.template(...)` for ergonomic construction. The `mcp/` bridge routes to `ResourceManager` or `ResourceTemplateManager` based on kind.
+
+**Alternatives:**
+- Sealed hierarchy (`StaticResource`/`TemplateResource` records) — type-safe at compile time but more types to maintain for minimal benefit. Pattern matching adds verbosity at every call site.
+
+**Rationale:** Single record is simpler. The `uri` field carries either a literal URI or a URI template — the `kind` field disambiguates. Factory methods enforce correct construction. The bridge is the only consumer that needs to distinguish; domains just call the appropriate factory.
+
+**Trade-offs:** `uri` field is overloaded (literal or template). Mitigated by factory methods and Javadoc.
+
+**Sources:** `ResourceManager` vs `ResourceTemplateManager` (quarkus-mcp-server), `McpResourceDescriptor` preview
+**Exploration:** quick
+**Depends on:** D3 (SPI shape)
+**Status:** captured
+
+## D5: Branch scope
+
+**Choice:** SPI types in `platform-api` + bridge implementation in `mcp/` + domain metadata resources (from #240 Batch 2: `DomainResourceRegistrar` with `casehub://domain-index` and `casehub://domains/{domain}` template + completions) + tests. IoT consumer stays in casehubio/iot#77.
+
+**Alternatives:**
+- SPI + bridge only — too thin to validate the design; domain metadata is the simplest real consumer and proves the infrastructure works
+- Full stack including IoT — cross-repo; IoT is a separate issue with its own lifecycle
+
+**Rationale:** Domain metadata resources from #240 Batch 2 are the ideal first consumer: static data, same repo, validates the full registration→read path without subscription complexity. IoT adds subscription/notification — a natural follow-up that the infrastructure enables but doesn't require for validation.
+
+**Trade-offs:** Subscription/notification relay is wired but not exercised by the first consumer. Tests will exercise it synthetically.
+
+**Sources:** Issue #241 "Platform domain metadata" section, #240 spec §3.5, iot#77
+**Exploration:** quick
+**Depends on:** D1 (resource serving direction)
+**Status:** captured
+
+## D6: Template completions on descriptor
+
+**Choice:** Completions provided at registration time via an optional `Map<String, Supplier<List<String>>>` parameter on `register()`. Each entry maps a template variable name to a supplier of valid values. The bridge registers completions with `ResourceTemplateCompletionManager`.
+
+**Alternatives:**
+- Defer completions — misses an explicit requirement from #240 design review
+- Separate `registerCompletions()` API — more flexible but more API surface; domains would need two calls instead of one
+
+**Rationale:** Completions are needed for the domain metadata consumer (`{domain}` variable needs valid domain names). Providing them at registration time keeps the API cohesive — one `register()` call sets up the resource, handler, and completions together. `Supplier<List<String>>` allows dynamic values (domain list can change at runtime if hot-deploy ever lands).
+
+**Trade-offs:** `register()` method gets a third parameter. Use overloads: `register(desc, handler)` for no completions, `register(desc, handler, completions)` for templates with completions.
+
+**Sources:** #240 spec §3.5 (template completions), `ResourceTemplateCompletionManager` (quarkus-mcp-server 1.11.1)
+**Exploration:** quick
+**Depends on:** D4 (resource type representation)
+**Status:** captured
