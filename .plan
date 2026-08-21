@@ -12,4 +12,9 @@ design-section-hashes: 4d2cc5ab:## §1 Introduction and Goals|4f6b26ef:## §2 Co
 flyway-next-v: none
 
 ## Queue
-- [ ] #242 — Issue #242 ← active
+- [ ] casehubio/platform#242 — Issue #242 ← active
+  - [ ] Batch 1: Registry+Close
+    - [ ] Task 1: SessionRegistry bean
+    - [ ] Task 2: Idempotent close + registry wiring
+  - [ ] Batch 2: Reaper+Config
+    - [ ] Task 3: Reaper config + SessionLeakReaper
