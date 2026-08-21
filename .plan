@@ -13,8 +13,8 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#242 — Issue #242 ← active
-  - [ ] Batch 1: Registry+Close
-    - [ ] Task 1: SessionRegistry bean
-    - [ ] Task 2: Idempotent close + registry wiring
-  - [ ] Batch 2: Reaper+Config
-    - [ ] Task 3: Reaper config + SessionLeakReaper
+  - [x] Batch 1: Registry+Close
+    - [x] Task 1: SessionRegistry bean
+    - [x] Task 2: Idempotent close + registry wiring
+  - [x] Batch 2: Reaper+Config
+    - [x] Task 3: Reaper config + SessionLeakReaper
