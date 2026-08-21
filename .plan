@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-242-gated-session-leak-reaper
-state: closing:review
+state: closing:promoted
 project-sha: 17b37bf22275b4e3827c3251bfda62a2f9287de9
 date: 2026-08-20
 issue-repo: casehubio/platform
