@@ -138,10 +138,21 @@ class SessionRegistryTest {
 
     private static GatedAgentSession dummySession() {
         return new GatedAgentSession(
-                new GatedAgentSessionTest.StubSession(),
+                new NoOpSession(),
                 java.util.List.of(), java.util.List.of(),
                 Duration.ofSeconds(5),
                 new SessionRegistry(), 0);
+    }
+
+    private static class NoOpSession implements io.casehub.platform.agent.AgentSession {
+        @Override public io.smallrye.mutiny.Multi<io.casehub.platform.agent.AgentEvent> query(String prompt) {
+            return io.smallrye.mutiny.Multi.createFrom().empty();
+        }
+        @Override public io.smallrye.mutiny.Uni<Void> interrupt() {
+            return io.smallrye.mutiny.Uni.createFrom().voidItem();
+        }
+        @Override public void close(Duration maxWait) {}
+        @Override public void close() { close(Duration.ofSeconds(30)); }
     }
 }
 ```
@@ -324,6 +335,10 @@ final class GatedAgentSession implements AgentSession {
 
     @Override
     public Multi<AgentEvent> query(String prompt) {
+        if (closed.get()) {
+            return Multi.createFrom().failure(
+                    new IllegalStateException("GatedAgentSession has been closed"));
+        }
         if (!queryStrategies.isEmpty()) {
             GatedAgentProvider.acquireAll(queryStrategies, queryAcquireTimeout);
         }
@@ -489,9 +504,6 @@ public interface AgentGateProperties {
     Reaper reaper();
 
     interface Reaper {
-        @WithDefault("60s")
-        Duration scanInterval();
-
         @WithDefault("5m")
         Duration warnThreshold();
 
@@ -605,14 +617,16 @@ class SessionLeakReaperTest {
     }
 
     @Test
-    void scanEvictsSessionExceedingMaxRegistryAge() {
-        var session = registerOldSession(Duration.ofHours(25));
+    void scanEvictsAndClosesSessionExceedingMaxRegistryAge() {
+        var closedFlag = new AtomicBoolean(false);
+        var session = registerOldSession(Duration.ofHours(25), closedFlag);
         var reaper = createReaper(Duration.ofMinutes(5), false, Duration.ofMinutes(30), Duration.ofHours(24));
 
         assertThat(registry.snapshot()).hasSize(1);
         reaper.scan();
         assertThat(registry.snapshot()).isEmpty();
-        assertThat(logMessages).anyMatch(msg -> msg.contains("Evicting stale"));
+        assertThat(closedFlag.get()).isTrue();
+        assertThat(logMessages).anyMatch(msg -> msg.contains("Evicted stale"));
     }
 
     @Test
@@ -728,15 +742,16 @@ package io.casehub.platform.agent.gate;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.jboss.logging.Logger;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @ApplicationScoped
 public class SessionLeakReaper {
 
-    private static final Logger LOG = Logger.getLogger(SessionLeakReaper.class);
+    private static final Logger LOG = Logger.getLogger(SessionLeakReaper.class.getName());
     private static final Duration FORCE_CLOSE_TIMEOUT = Duration.ofSeconds(5);
 
     private final SessionRegistry registry;
@@ -764,6 +779,18 @@ public class SessionLeakReaper {
         this.forceCloseEnabled = forceCloseEnabled;
         this.forceCloseThreshold = forceCloseThreshold;
         this.maxRegistryAge = maxRegistryAge;
+        validateThresholds();
+    }
+
+    private void validateThresholds() {
+        if (warnThreshold.compareTo(forceCloseThreshold) > 0) {
+            throw new IllegalArgumentException(
+                "reaper.warn-threshold (" + warnThreshold + ") must be <= force-close-threshold (" + forceCloseThreshold + ")");
+        }
+        if (forceCloseThreshold.compareTo(maxRegistryAge) > 0) {
+            throw new IllegalArgumentException(
+                "reaper.force-close-threshold (" + forceCloseThreshold + ") must be <= max-registry-age (" + maxRegistryAge + ")");
+        }
     }
 
     @Scheduled(every = "${casehub.platform.agent.gate.reaper.scan-interval:60s}",
@@ -779,31 +806,38 @@ public class SessionLeakReaper {
             Duration held = Duration.between(entry.createdAt(), now);
 
             if (held.compareTo(maxRegistryAge) > 0) {
-                LOG.warnf("Evicting stale GatedAgentSession from registry:"
-                        + " sessionId=%d, held for %s — semaphore slot permanently leaked",
-                        entry.id(), held);
-                registry.deregister(entry.id());
+                try {
+                    entry.session().close(FORCE_CLOSE_TIMEOUT);
+                    LOG.warning(String.format(
+                        "Evicted stale GatedAgentSession: sessionId=%d, held for %s — closed and semaphore recovered",
+                        entry.id(), held));
+                } catch (Exception e) {
+                    registry.deregister(entry.id());
+                    LOG.log(Level.WARNING, String.format(
+                        "Evicted stale GatedAgentSession: sessionId=%d, held for %s — close failed, semaphore slot permanently leaked",
+                        entry.id(), held), e);
+                }
                 continue;
             }
 
             if (forceCloseEnabled && held.compareTo(forceCloseThreshold) > 0) {
                 try {
                     entry.session().close(FORCE_CLOSE_TIMEOUT);
-                    LOG.warnf("Force-closing leaked GatedAgentSession:"
-                            + " sessionId=%d, held for %s, created at %s",
-                            entry.id(), held, entry.createdAt());
+                    LOG.warning(String.format(
+                        "Force-closed leaked GatedAgentSession: sessionId=%d, held for %s, created at %s",
+                        entry.id(), held, entry.createdAt()));
                 } catch (Exception e) {
-                    LOG.warnf(e, "Failed to force-close leaked GatedAgentSession:"
-                            + " sessionId=%d, held for %s",
-                            entry.id(), held);
+                    LOG.log(Level.WARNING, String.format(
+                        "Failed to force-close leaked GatedAgentSession: sessionId=%d, held for %s",
+                        entry.id(), held), e);
                 }
                 continue;
             }
 
             if (held.compareTo(warnThreshold) > 0) {
-                LOG.warnf("Leaked GatedAgentSession detected:"
-                        + " sessionId=%d, held for %s, created at %s",
-                        entry.id(), held, entry.createdAt());
+                LOG.warning(String.format(
+                    "Leaked GatedAgentSession detected: sessionId=%d, held for %s, created at %s",
+                    entry.id(), held, entry.createdAt()));
             }
         }
     }
