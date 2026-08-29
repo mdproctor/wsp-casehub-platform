@@ -1,0 +1,2 @@
+{"event":"promote","branch":"issue-247-shared-yaml-core","files":[],"timestamp":"2026-08-29T03:16:01.867648+00:00"}
+{"event":"land","repo":"platform","branch":"issue-247-shared-yaml-core","base_branch":"main","landed_sha":"d866b3fe03c82e3bd91c3be71986fabe6296ff79","push_target":"upstream","mirrored":true,"stamped":true,"timestamp":"2026-08-29T03:23:37.368327+00:00"}
