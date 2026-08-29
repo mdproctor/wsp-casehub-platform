@@ -13,3 +13,11 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#247 — Issue #247 ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: Maven module + leaf types
+    - [ ] Task 2: VariableResolver
+  - [ ] Batch 2: Expansion
+    - [ ] Task 3: CSV data source
+    - [ ] Task 4: ForEach expansion
+  - [ ] Batch 3: Schema
+    - [ ] Task 5: JSON Schema fragments + full build
