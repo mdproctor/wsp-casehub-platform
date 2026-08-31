@@ -32,6 +32,17 @@
 **Exploration:** quick
 **Status:** captured
 
+## D5: withModuleScope() on VariableResolver for module parameter resolution
+
+**Choice:** Add `withModuleScope(Map<String, String> moduleScope)` to VariableResolver. Module parameters get highest priority in `var.*` resolution — checked before other VariableSources. `ModuleExpander` returns resolved scopes; the consumer wires them into the resolver.
+**Alternatives:**
+- Reuse `withScope("var", VariableSource.chain(moduleParams, existing))` — no API change, but priority semantics are implicit in chain order rather than explicit in the resolver. Module scope as a first-class concept disappears into generic chaining.
+**Rationale:** Module parameter scope is a first-class concept in the module system. Making it explicit on the resolver documents the priority (module params > inline vars > config) and matches the desiredstate pattern that works in production. The immutable-child pattern is already established.
+**Trade-offs:** One more field on VariableResolver's private constructor. Minimal — consistent with existing `eachContext`, `eachRowContext`.
+**Sources:** desiredstate VariableResolver.withModuleScope(), ModuleExpander.expand() (returns moduleScopes map)
+**Exploration:** quick
+**Status:** captured
+
 ## D2: Deferred prefix diagnostics via DeferredPrefixHandler callback
 
 **Choice:** Add `@FunctionalInterface DeferredPrefixHandler` with `withDeferredPrefixHandler()` on VariableResolver
