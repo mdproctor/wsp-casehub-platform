@@ -21,6 +21,17 @@
 **Exploration:** quick
 **Status:** captured
 
+## D4: ParameterValidator throws ParameterValidationException (collect-all)
+
+**Choice:** `ParameterValidator.validate()` collects all violations and throws `ParameterValidationException(List<ParameterViolation>)` if any exist. Silent return on success.
+**Alternatives:**
+- Return `ValidationResult(boolean valid, List<ParameterViolation>)` — functional style, caller decides whether to throw. More composable but every caller will throw — parameter validation failures are always fatal at the module boundary. Ceremony for a choice that doesn't exist.
+**Rationale:** A module can't expand with invalid parameters. A `ValidationResult` that every caller converts to a throw is ceremony for a choice that doesn't exist. The exception is the natural API: call `validate()`, get either silence (valid) or a thrown collection of everything wrong. If a linting/dry-run mode ever needs quiet inspection, `validateQuietly()` returning `List<ParameterViolation>` is a one-line addition alongside the throwing `validate()`. YAGNI until then.
+**Trade-offs:** Can't inspect violations without catching an exception. Acceptable — no consumer needs this today.
+**Sources:** casehubio/platform#252, desiredstate GraphInvariantViolationsException (consistent collect-all pattern)
+**Exploration:** quick
+**Status:** captured
+
 ## D2: Deferred prefix diagnostics via DeferredPrefixHandler callback
 
 **Choice:** Add `@FunctionalInterface DeferredPrefixHandler` with `withDeferredPrefixHandler()` on VariableResolver
