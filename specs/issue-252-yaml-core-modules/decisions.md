@@ -21,27 +21,28 @@
 **Exploration:** quick
 **Status:** captured
 
-## D4: ParameterValidator throws ParameterValidationException (collect-all)
+## D4: ParameterValidator — dual API: validate() returns, validateOrThrow() throws
 
-**Choice:** `ParameterValidator.validate()` collects all violations and throws `ParameterValidationException(List<ParameterViolation>)` if any exist. Silent return on success.
+**Choice:** `List<ParameterViolation> validate()` (primitive — returns violations, empty list on success) + `void validateOrThrow()` (convenience — calls validate(), throws `ParameterValidationException` if non-empty). Collect-all in both cases.
 **Alternatives:**
-- Return `ValidationResult(boolean valid, List<ParameterViolation>)` — functional style, caller decides whether to throw. More composable but every caller will throw — parameter validation failures are always fatal at the module boundary. Ceremony for a choice that doesn't exist.
-**Rationale:** A module can't expand with invalid parameters. A `ValidationResult` that every caller converts to a throw is ceremony for a choice that doesn't exist. The exception is the natural API: call `validate()`, get either silence (valid) or a thrown collection of everything wrong. If a linting/dry-run mode ever needs quiet inspection, `validateQuietly()` returning `List<ParameterViolation>` is a one-line addition alongside the throwing `validate()`. YAGNI until then.
-**Trade-offs:** Can't inspect violations without catching an exception. Acceptable — no consumer needs this today.
-**Sources:** casehubio/platform#252, desiredstate GraphInvariantViolationsException (consistent collect-all pattern)
+- Throw-only API (`validate()` throws, no return) — simpler surface but forces catch-and-extract for testing and any non-throwing use case. Testing assertions on a returned list are cleaner than catching exceptions to inspect violations.
+- Return `ValidationResult(boolean, List)` — unnecessary wrapper; the list IS the result.
+**Rationale:** The composable primitive is `List<ParameterViolation>`. The throwing convenience is built on top. Most callers use `validateOrThrow()` — parameter failures are always fatal at the module boundary. But `validate()` makes testing straightforward and leaves the door open for linting/dry-run without a second method.
+**Trade-offs:** Two methods where one would suffice for the common case. Acceptable — the primitive is 3 lines and makes tests cleaner.
+**Sources:** casehubio/platform#252, desiredstate GraphInvariantViolationsException (consistent collect-all pattern), R1-02 decision review finding
 **Exploration:** quick
-**Status:** captured
+**Status:** revised (R1-02 — primitive should be the return value, not the exception)
 
-## D5: withModuleScope() on VariableResolver for module parameter resolution
+## D5: Module parameter resolution via VariableSource.chain() — no withModuleScope()
 
-**Choice:** Add `withModuleScope(Map<String, String> moduleScope)` to VariableResolver. Module parameters get highest priority in `var.*` resolution — checked before other VariableSources. `ModuleExpander` returns resolved scopes; the consumer wires them into the resolver.
+**Choice:** Module parameters are resolved via `VariableSource.chain(moduleParams::get, existingVarSource)` passed to `withScope("var", ...)`. No new `withModuleScope()` method on VariableResolver.
 **Alternatives:**
-- Reuse `withScope("var", VariableSource.chain(moduleParams, existing))` — no API change, but priority semantics are implicit in chain order rather than explicit in the resolver. Module scope as a first-class concept disappears into generic chaining.
-**Rationale:** Module parameter scope is a first-class concept in the module system. Making it explicit on the resolver documents the priority (module params > inline vars > config) and matches the desiredstate pattern that works in production. The immutable-child pattern is already established.
-**Trade-offs:** One more field on VariableResolver's private constructor. Minimal — consistent with existing `eachContext`, `eachRowContext`.
-**Sources:** desiredstate VariableResolver.withModuleScope(), ModuleExpander.expand() (returns moduleScopes map)
+- Add `withModuleScope(Map<String, String>)` as a first-class resolver field — makes priority explicit but splits the resolution model between compositional (VariableSources) and special-case (moduleScope). Module scope IS a VariableSource; `Map<String, String>::get` already satisfies the `@FunctionalInterface`. Chain order IS the priority mechanism — the defining semantic of chaining, not an implicit side effect.
+**Rationale:** `VariableSource.chain()` already handles priority — that's its design purpose. Adding `withModuleScope()` creates two resolution paths for `var.*` variables (module scope check AND prefix source dispatch), splitting the resolution model. The consumer wires the chain: `ModuleExpander` returns resolved parameter maps, the consumer creates `VariableSource.chain(moduleParams::get, existingVarSource)` and passes it via `withScope("var", ...)`.
+**Trade-offs:** Priority is expressed in chain order rather than a named method. Acceptable — chain order is how VariableSource composition works everywhere.
+**Sources:** desiredstate VariableResolver.withModuleScope() (production pattern being retired), VariableSource.chain() (existing composition mechanism), R1-01 decision review finding
 **Exploration:** quick
-**Status:** captured
+**Status:** revised (R1-01 — module scope IS a VariableSource, chain order IS the priority mechanism)
 
 ## D6: ParameterValidator in yaml-core with separate ParameterType enum
 
