@@ -39,6 +39,11 @@ LinkedHashMap<String, E> allElements = new LinkedHashMap<>();
 // ...
 allElements.put(stampedId, adapter.stamp(element, stampedId, eachResolver));
 // ...
+if (allElements.containsKey(stampedId)) {
+    throw new IllegalStateException("Duplicate stamped ID '" + stampedId
+            + "' — forEach values must be unique within each template.");
+}
+// ...
 return new ExpansionResult<>(allElements, Set.copyOf(excludedIds));
 ```
 
@@ -51,13 +56,23 @@ public interface DeferredPrefixHandler {
 }
 ```
 
-Added to `VariableResolver` via the immutable-child pattern:
+Added to `VariableResolver` via the immutable-child pattern. The private
+constructor gains a 5th parameter. **All existing `with*()` methods must
+propagate the handler** — `withEachContext()`, `withEachRowContext()`, and
+`withScope()` all pass the handler through the 5-argument constructor:
 
 ```java
 public VariableResolver withDeferredPrefixHandler(DeferredPrefixHandler handler) {
     return new VariableResolver(prefixSources, deferredPrefixes,
             eachContext, eachRowContext, handler);
 }
+
+// All existing with*() methods updated to propagate handler:
+public VariableResolver withEachContext(Map<String, String> eachContext) {
+    return new VariableResolver(prefixSources, deferredPrefixes,
+            eachContext, eachRowContext, deferredPrefixHandler);
+}
+// ... same pattern for withEachRowContext(), withScope()
 ```
 
 In `lookupVariable()`, when a deferred prefix is hit:
@@ -180,8 +195,13 @@ public enum ParameterType {
 ```
 
 Parsing is transient — for validation only. Interpolation stays string-based.
-This is a deliberate JSON Schema subset scoped to what the module system needs
+Parsing is a deliberate JSON Schema subset scoped to what the module system needs
 (D6, R1-04).
+
+**LIST limitation:** comma is the delimiter; commas within values are not supported.
+Empty string produces a single-element list with an empty value, not an empty list.
+If a use case needs commas in values, the consumer should use STRING type with its
+own parsing.
 
 ### ParameterValidator — collect-all, dual API
 
@@ -266,6 +286,22 @@ public record YamlModuleFile(
 }
 ```
 
+Field named `module` (not `header`) to match the YAML key `module:` and the
+existing desiredstate convention. `toModule()` discards the `imports` field —
+nested imports must be resolved by the consumer before calling `toModule()`.
+
+```java
+public record YamlModuleFile(
+        YamlModuleHeader module,    // matches YAML key "module:"
+        Map<String, Map<String, Object>> sections,
+        List<YamlImport> imports) {
+    // ...
+    public YamlModule toModule() {
+        return new YamlModule(module.name(), module.parameters(), sections);
+    }
+}
+```
+
 ### ModuleExpander — structural expansion
 
 ```java
@@ -284,18 +320,41 @@ public record ExpandedModule(
         Map<String, Map<String, String>> moduleScopes) {}
 ```
 
+**Import structural validation (preconditions — checked before expansion):**
+- Unknown module — import references a module name not in `availableModules`
+- Missing alias — `as` is null or blank
+- Dot in alias — alias contains `.` (reserved as the ID separator in `alias.entryKey`)
+- Duplicate alias — two imports use the same alias
+- Unknown parameters — provided params not declared in the module (typo detection)
+
+All violations collected and thrown as `ParameterValidationException`.
+
 **What ModuleExpander handles:**
+- Import structural validation (above)
 - Parameter resolution — import params merged with defaults
 - Parameter validation — via `ParameterValidator.validateOrThrow()`
 - Alias prefixing — section entry keys prefixed with `import.as + "."`
 - Import merging — module sections merged into existing sections
-- Conditional imports — `when` propagated to expanded entries
 
 **What stays in the consumer:**
+- `when` propagation — the expander returns per-import `when` values in
+  `ExpandedModule`; the consumer applies them to entries with domain knowledge
+  of which sections support conditional inclusion. The expander does not inject
+  `when` into opaque maps — that would contradict the "passes values through" design.
 - Domain-specific dependency rewriting (desiredstate wires internal deps between
   aliased nodes)
-- Section content interpretation (casting `Map<String, Object>` to domain types)
+- Section content interpretation (`objectMapper.convertValue()` to domain types)
 - JSON array parsing from variable-resolved values (needs ObjectMapper)
+- Nested import resolution — `ModuleExpander` handles single-level imports only;
+  recursive resolution is the consumer's responsibility (call `toModule()` on
+  inner modules after resolving their imports)
+
+```java
+public record ExpandedModule(
+        Map<String, Map<String, Object>> sections,
+        Map<String, Map<String, String>> moduleScopes,
+        Map<String, String> importConditions) {}  // alias → when value (null if unconditional)
+```
 
 ### Module parameter resolution via VariableSource.chain()
 
@@ -319,10 +378,13 @@ mechanism.
 | Test | Coverage |
 |------|----------|
 | `ExpansionResult` returns map keyed by stamped ID | verify `.elements().get("node.us-east")` works |
+| Duplicate stampedId throws | forEach with `["a", "a"]` throws IllegalStateException |
 | Existing forEach tests updated to use map API | all 15 tests adapted |
 | `DeferredPrefixHandler` invoked on deferred hit | handler receives correct prefix, key, context |
 | Handler can throw domain-specific exception | exception propagates from resolveString |
 | No handler = silent pass-through (default) | current behaviour preserved |
+| Handler survives `withEachContext()` chain | set handler, call withEachContext, verify handler still fires |
+| Handler survives `withScope()` chain | set handler, call withScope, verify handler still fires |
 
 ### #252 tests (module system)
 
@@ -330,7 +392,7 @@ mechanism.
 |------|----------|
 | `ParameterValidatorTest` | required check, type validation, minLength/maxLength (string + list), pattern, minimum/maximum, collect-all (multiple violations), validate() returns list, validateOrThrow() throws |
 | `ParameterTypeTest` | parse each type, parse errors with messages |
-| `ModuleExpanderTest` | alias prefixing on section keys, parameter resolution from import, default parameter values, conditional imports (when propagation), multiple imports, existing section preservation, unknown module error, missing required parameter error |
+| `ModuleExpanderTest` | alias prefixing on section keys, parameter resolution from import, default parameter values, multiple imports, existing section preservation, unknown module error, missing required parameter error, missing alias error, dot-in-alias error, duplicate alias error, unknown parameter error (typo detection), importConditions returned for conditional imports |
 | `YamlModuleFileTest` | toModule() conversion, header parsing |
 
 ## Downstream Migration Path
@@ -339,7 +401,11 @@ mechanism.
   `ModuleExpander`, `YamlImport`, `YamlModuleFile` with yaml-core's. Create
   `VariableSource` adapters for inline variables and MicroProfile Config. Register
   `match`/`fault` as deferred prefixes with a `DeferredPrefixHandler` that throws
-  in node-spec context. Keep dependency rewriting in the domain.
+  in node-spec context. Keep dependency rewriting and `when` propagation in the domain.
+  **Jackson note:** yaml-core's `YamlModuleParameter` uses `defaultValue` as the field
+  name (no `@JsonProperty` — yaml-core is Jackson-free). Consumers deserializing YAML
+  with `default:` as the key must register a Jackson mixin or custom deserializer to
+  map `default` → `defaultValue` (since `default` is a Java reserved word).
 
 ## References
 
