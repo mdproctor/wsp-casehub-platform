@@ -9,3 +9,14 @@
 **Sources:** casehubio/platform#253, ForEachExpander.java (stampedId already computed at line 104), casehubio/casehub-desiredstate#128 (migration identified the regression)
 **Exploration:** quick
 **Status:** captured
+
+## D2: Deferred prefix diagnostics via DeferredPrefixHandler callback
+
+**Choice:** Add `@FunctionalInterface DeferredPrefixHandler` with `withDeferredPrefixHandler()` on VariableResolver
+**Alternatives:**
+- Per-prefix error messages (`Map<String, String> deferredPrefixMessages`) — simpler for the common case but can't distinguish contexts; would force desiredstate to create two sets of deferred prefixes (throwing for node specs, silent for rule specs), replicating the same complexity as the dual-API it replaced
+**Rationale:** The handler is context-dependent — desiredstate wants to throw in node-spec resolution but leave `${match.X}` as-is in rule/fault spec resolution. A static message per prefix can't distinguish those contexts. The callback receives `(prefix, key, elementContext)` and the consumer decides based on how the resolver was constructed. Default: silent (current behaviour). Consistent with the immutable-child pattern (`withScope()`, `withEachContext()`).
+**Trade-offs:** Slightly more complex API surface — one more method on VariableResolver. But the `@FunctionalInterface` makes the simple case trivial.
+**Sources:** casehubio/platform#253, casehubio/casehub-desiredstate#128 (identified lost error context), desiredstate VariableResolver (local version threw context-specific messages)
+**Exploration:** quick
+**Status:** captured
