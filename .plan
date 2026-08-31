@@ -13,3 +13,11 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#252 — Issue #252 ← active
+  - [ ] Batch 1: API Fixes
+    - [ ] Task 1: ExpansionResult Map + duplicate ID detection
+    - [ ] Task 2: DeferredPrefixHandler callback
+  - [ ] Batch 2: Module Model
+    - [ ] Task 3: Module model types + ParameterType
+    - [ ] Task 4: ParameterValidator + error types
+  - [ ] Batch 3: Module Expansion
+    - [ ] Task 5: ModuleExpander + ExpandedModule
