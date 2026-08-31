@@ -1,1 +1,1 @@
-# Design Journal — issue-247-shared-yaml-core
+# Design Journal — issue-252-yaml-core-modules
