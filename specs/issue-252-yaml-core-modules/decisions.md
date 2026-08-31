@@ -10,6 +10,17 @@
 **Exploration:** quick
 **Status:** captured
 
+## D3: Generic sections map — no type parameter on YamlModule
+
+**Choice:** `YamlModule(String name, Map<String, YamlModuleParameter> parameters, Map<String, Map<String, Object>> sections)` — content sections are opaque maps keyed by section name
+**Alternatives:**
+- Type-parameterised `YamlModule<N>` — compile-time safety on content but propagates type parameter through `ModuleExpander<N>`, `YamlModuleFile<N>`, `YamlImport`, every utility. Jackson can't deserialize without concrete `TypeReference` at every parse site — constant boilerplate.
+**Rationale:** The module system operates on keys (for alias prefixing) and passes values through opaquely. It never inspects section content — parameter resolution, alias prefixing, and import merging all work on the structural envelope. The type parameter adds friction everywhere for safety that only matters at the consumer boundary. The consumer casts after the fact: `sections.get("nodes")`.
+**Trade-offs:** No compile-time type safety on section content within the module system. Runtime ClassCastException if consumer casts wrong. Acceptable because the cast happens exactly once per consumer, at the boundary.
+**Sources:** casehubio/platform#252, desiredstate YamlModule.java (tightly coupled to YamlNode/YamlRule/YamlInvariant)
+**Exploration:** quick
+**Status:** captured
+
 ## D2: Deferred prefix diagnostics via DeferredPrefixHandler callback
 
 **Choice:** Add `@FunctionalInterface DeferredPrefixHandler` with `withDeferredPrefixHandler()` on VariableResolver
