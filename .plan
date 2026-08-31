@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-252-yaml-core-modules
-state: scaffolded
+state: active
 project-sha: 8c4abe8e1de8f6f15bc9696ff317e4076938f0e0
 date: 2026-08-31
 issue-repo: casehubio/platform
@@ -13,11 +13,11 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#252 — Issue #252 ← active
-  - [ ] Batch 1: API Fixes
-    - [ ] Task 1: ExpansionResult Map + duplicate ID detection
-    - [ ] Task 2: DeferredPrefixHandler callback
-  - [ ] Batch 2: Module Model
-    - [ ] Task 3: Module model types + ParameterType
-    - [ ] Task 4: ParameterValidator + error types
-  - [ ] Batch 3: Module Expansion
-    - [ ] Task 5: ModuleExpander + ExpandedModule
+  - [x] Batch 1: API Fixes
+    - [x] Task 1: ExpansionResult Map + duplicate ID detection
+    - [x] Task 2: DeferredPrefixHandler callback
+  - [x] Batch 2: Module Model
+    - [x] Task 3: Module model types + ParameterType
+    - [x] Task 4: ParameterValidator + error types
+  - [x] Batch 3: Module Expansion
+    - [x] Task 5: ModuleExpander + ExpandedModule
