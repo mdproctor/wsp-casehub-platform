@@ -1,1 +1,1 @@
-# Design Journal — issue-252-yaml-core-modules
+# Design Journal — issue-258-schema-generator-plugin

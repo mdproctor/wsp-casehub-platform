@@ -1,0 +1,15 @@
+# Work Plan — issue-258-schema-generator-plugin
+
+## State
+branch: issue-258-schema-generator-plugin
+state: scaffolded
+project-sha: c13736e53e46d8f3a5374dcf1839a4b34438eaa5
+date: 2026-09-01
+issue-repo: casehubio/platform
+covers: 258
+design-repo: project
+design-section-hashes: 
+flyway-next-v: unknown
+
+## Queue
+- [ ] casehubio/platform#258 — Issue #258 ← active
