@@ -43,6 +43,18 @@
 **Exploration:** quick
 **Status:** captured
 
+## D6: ParameterValidator in yaml-core with separate ParameterType enum
+
+**Choice:** `ParameterValidator` lives in yaml-core (not in consumer build-time processors). `ParameterType` enum (STRING, LIST, INTEGER, NUMBER, BOOLEAN) is separate from `CsvColumnType`.
+**Alternatives:**
+- Validation in consumer build-time processor — desiredstate's current approach, but constraint validation is generic (not domain-specific) and the whole point of extraction is sharing
+- Reuse `CsvColumnType` for parameter types — shares three names (STRING, INTEGER, BOOLEAN) but the two type systems parse differently (CSV stores typed values persistently; parameters validate transiently then discard), evolve differently, and serve different lifecycle stages. Unifying creates coupling that costs more to maintain than the five lines it saves.
+**Rationale:** Parameter constraints (minLength, maxLength, pattern, minimum, maximum) are generic — no domain knowledge needed. yaml-core owns the module model, so it should own the validation. Separate `ParameterType` keeps concerns clean: CSV types are parse-and-store, parameter types are validate-then-discard.
+**Trade-offs:** Two enums with overlapping names. Acceptable — the shared names are coincidence, not identity.
+**Sources:** casehubio/platform#252, CsvColumnType.java (existing CSV type system), desiredstate YamlDesiredStateProcessor.validateImports() (current required-only validation)
+**Exploration:** quick
+**Status:** captured
+
 ## D2: Deferred prefix diagnostics via DeferredPrefixHandler callback
 
 **Choice:** Add `@FunctionalInterface DeferredPrefixHandler` with `withDeferredPrefixHandler()` on VariableResolver
