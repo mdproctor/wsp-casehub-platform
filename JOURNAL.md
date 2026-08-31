@@ -1,1 +1,1 @@
-# Design Journal — issue-252-yaml-core-modules
+# Design Journal — issue-255-yaml-core-api-parity
