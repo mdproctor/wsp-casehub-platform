@@ -43,3 +43,14 @@
 **Exploration:** quick
 **Depends on:** D2 (outputs resolved during expansion), D3 (typed outputs — resolved values are strings post-template-resolution)
 **Status:** captured
+
+## D5: Output templates restricted to ${var.*} — no cross-module or cross-scope references
+
+**Choice:** Output value templates may only reference `${var.*}` (the module's own parameters). References to `${module.*}`, `${each.*}`, or any other prefix are a build-time error.
+**Alternatives:**
+- Allow `${module.*}` in output templates — enables output-to-output chaining within a single module definition, but creates a DAG resolution problem with potential cycles and makes outputs order-dependent within a single module
+**Rationale:** Outputs are a pure function of the module's own parameters. This makes each module's outputs resolvable in isolation given its parameter scope — no dependency on other modules' outputs during template resolution. Circular reference detection becomes trivially unnecessary. Matches the issue's explicit constraint: "Output templates must only reference the module's own parameters."
+**Trade-offs:** A module can't derive one output from another (`host` can't reference `connection_url`). Acceptable — the module author duplicates the relevant `${var.*}` references in each output template.
+**Sources:** casehubio/platform#256 §Validation, R1-08 decision review
+**Exploration:** quick
+**Status:** captured
