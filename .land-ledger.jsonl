@@ -1,0 +1,2 @@
+{"event":"promote","branch":"issue-260-yaml-structural-type-checks","files":[],"timestamp":"2026-09-01T10:51:40.721065+00:00"}
+{"event":"land","repo":"platform","branch":"issue-260-yaml-structural-type-checks","base_branch":"main","landed_sha":"8657cb358eca96325fa5a34d165b37505444b995","push_target":"upstream","mirrored":true,"stamped":true,"timestamp":"2026-09-01T10:53:20.086059+00:00"}
