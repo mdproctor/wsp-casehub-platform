@@ -13,3 +13,6 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#260 — Issue #260 ← active
+  - [ ] Batch 1: Structural type checking
+    - [ ] Task 1: ParameterType.canAccept — type compatibility matrix
+    - [ ] Task 2: validateModuleRefs — collect-all module reference validation
