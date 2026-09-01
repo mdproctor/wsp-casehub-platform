@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-255-yaml-core-api-parity
-state: scaffolded
+state: active
 project-sha: ab945b5beb263b43f715c29dd66fde84f648abc5
 date: 2026-08-31
 issue-repo: casehubio/platform
