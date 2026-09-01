@@ -1,2 +1,3 @@
 default=promoted
 platform:issue-252-yaml-core-modules=stamped
+platform:issue-255-yaml-core-api-parity=stamped
