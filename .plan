@@ -10,16 +10,13 @@ covers: 258
 design-repo: project
 design-section-hashes: 
 flyway-next-v: unknown
-
 evidence-era: true
+
 ## Queue
 - [ ] casehubio/platform#258 — Issue #258 ← active
-  - [x] Batch 1: Foundation
-    - [x] Task 1: SchemaParser+TypeGraph
-  - [x] Batch 2: RecordEmission
-    - [x] Task 2: MappingConfig
-    - [x] Task 3: RecordEmitter
-  - [x] Batch 3: PluginWiring
-    - [x] Task 4: PojoEmitter+Mojo
-  - [x] Batch 4: Validation
-    - [x] Task 5: EngineSchemaValidation
+  - [ ] Batch 1: Model
+    - [ ] Task 1: YamlModuleOutput + YamlModule update
+  - [ ] Batch 2: Resolution
+    - [ ] Task 2: Output resolution + validation in ModuleExpander
+  - [ ] Batch 3: Chaining
+    - [ ] Task 3: Cross-module output chaining
