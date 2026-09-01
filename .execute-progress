@@ -1,2 +1,3 @@
 default=promoted
 platform:issue-260-yaml-structural-type-checks=stamped
+platform:issue-257-yaml-core-enhancements=stamped
