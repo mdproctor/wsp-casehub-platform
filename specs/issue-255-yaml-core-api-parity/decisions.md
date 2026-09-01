@@ -1,16 +1,18 @@
-## D1: sourceFor(prefix) accessor on VariableResolver
+## D1: sourceFor(prefix) + withChainedScope() on VariableResolver
 
-**Choice:** Add `VariableSource sourceFor(String prefix)` returning the registered source for a prefix, or null
-**Alternatives:** none — this is a missing accessor, not a design choice
-**Rationale:** Module scope application via `VariableSource.chain(moduleScope::get, resolver.sourceFor("var"))` is self-contained. Without it, callers must carry the original VariableSource as a separate variable to chain on top — fragile and verbose.
-**Trade-offs:** Exposes internal state (prefix→source mapping). Acceptable — the mapping is the resolver's public contract.
-**Sources:** casehubio/platform#255 §1, casehubio/casehub-desiredstate#128
+**Choice:** Add both: `VariableSource sourceFor(String prefix)` (primitive — returns registered source or null) and `VariableResolver withChainedScope(String prefix, VariableSource source)` (convenience — chains new source ahead of existing).
+**Alternatives:**
+- sourceFor only — caller reassembles chain manually; more general but verbose for the overwhelmingly common module-scope-layering case
+- withChainedScope only — captures the intent but doesn't expose the raw source for less common patterns
+**Rationale:** `withChainedScope("var", moduleScope::get)` captures the actual intent (layer a source ahead of the existing one) rather than exposing an accessor and requiring the caller to reassemble. `sourceFor` is the primitive for less common patterns. Dual API follows the precedent of `validate()` + `validateOrThrow()` from D4/#252.
+**Trade-offs:** Two methods where one would suffice. Acceptable — the convenience makes the common case a one-liner.
+**Sources:** casehubio/platform#255 §1, casehubio/casehub-desiredstate#128, R1-03 decision review
 **Exploration:** quick
-**Status:** captured
+**Status:** revised (R1-03 — withChainedScope is more intent-revealing than sourceFor alone)
 
-## D2: IterationValueResolver callback on ForEachExpander
+## D2: IterationValueExpander callback on ForEachExpander
 
-**Choice:** Add `@FunctionalInterface IterationValueResolver` with `List<String> resolve(String resolvedValue, String groupContext)`. New overload of `expand()` accepts it. Called after variable resolution on each iteration value — consumer can parse JSON arrays or other formats. Default: single-element list (current behaviour).
+**Choice:** Add `@FunctionalInterface IterationValueExpander` with `List<String> expand(String resolvedValue, String groupContext)`. New overload of `expand()` accepts it. Called after variable resolution on each iteration value — consumer can parse JSON arrays or other formats. Default: single-element list (current behaviour).
 **Alternatives:**
 - Build JSON parsing into yaml-core — violates zero-dep constraint
 - Let consumer pre-process IterationGroups before calling expand — works but duplicates the variable resolution step
@@ -31,8 +33,10 @@
 **Trade-offs:** Values stored as Object references internally. The cast in `section()` is unchecked but safe — the consumer registered the deserializer that produced those objects. Without the accessor, every access point becomes a manual cast.
 **Sources:** casehubio/platform#255 (issue creator's update on type safety regression), D3 from #252 decisions (generic sections model), desiredstate YamlModule.java (typed fields in local version)
 **Exploration:** deep-analysis
-**Depends on:** D3 from #252 (generic sections model — this decision extends, not replaces, the original choice)
-**Status:** captured
+**Pipeline timing (R1-01):** Deserialization IS compatible with unresolved variables for domain types that use `Map<String, Object>` or `String` for variable-carrying fields. Desiredstate's `YamlNode` uses `Map<String, Object> spec` — `${var.apiEndpoint}` survives as a string value. Jackson deserializes it fine. This holds for any consumer whose typed records carry variable content in Object-typed fields.
+**Boundary shift (R1-02):** Acknowledged. #252 said "section content interpretation stays in the consumer." This decision deliberately shifts that boundary: yaml-core now orchestrates consumer-delegated transformation via callbacks. The boundary is "yaml-core doesn't know the types" (still true — it calls opaque callbacks), not "yaml-core never touches values" (no longer true).
+**Depends on:** D3 from #252 (generic sections model — this decision extends the original choice with consumer-delegated typed access)
+**Status:** captured (R1-01 resolved, R1-02 acknowledged as deliberate)
 
 ## D4: SectionContentRewriter receives typed objects
 
