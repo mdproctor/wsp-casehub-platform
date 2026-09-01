@@ -170,6 +170,10 @@ types:
 | `jsonProperty` | Add `@JsonProperty("X")` and rename the component |
 | `skip` | Omit this field from the generated record |
 
+### Additional Fields (schema-incomplete types)
+
+When the JSON Schema doesn't include all fields that the YAML deserialization layer needs (e.g., engine's `Worker` type has `agent`, `react`, `a2a`, `mcp` fields not in the schema), the mapping file declares them alongside override fields. Any mapping entry whose key doesn't match a schema property name (and isn't a `jsonProperty` of a schema property) is treated as an additional field and appended to the generated record after the schema-derived fields. The `type` field is required for additional fields (no schema type to infer from); it defaults to `JsonNode` if omitted.
+
 ### `globalAnnotations`
 
 Class-level annotations applied to every generated record. The default includes `@JsonIgnoreProperties(ignoreUnknown = true)`.
