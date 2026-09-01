@@ -13,3 +13,7 @@ flyway-next-v: unknown
 
 ## Queue
 - [ ] casehubio/platform#258 — Issue #258 ← active
+  - [ ] Batch 1: API Parity
+    - [ ] Task 1: sourceFor + withChainedScope
+    - [ ] Task 2: IterationValueExpander callback
+    - [ ] Task 3: SectionDeserializer + SectionContentRewriter + typed accessor
