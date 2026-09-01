@@ -80,26 +80,55 @@ public record YamlModuleHeader(
 }
 ```
 
-`toModule()` passes outputs through.
+`toModule()` passes outputs through:
+
+```java
+public YamlModule toModule() {
+    return new YamlModule(module.name(), module.parameters(),
+            module.outputs(), sections);
+}
+```
+
+**Prerequisites:** casehubio/platform#255 (API parity — SectionDeserializer,
+SectionContentRewriter, sourceFor, withChainedScope) must land first. The
+expand() signature below assumes #255's 5-parameter form.
 
 ## Resolution
 
 ### Output resolution during expansion (D2)
 
 `ModuleExpander.expand()` resolves output templates as each import is processed.
-For each import:
+The per-import loop, in order:
 
-1. Resolve parameters (existing — merge provided + defaults)
-2. Validate parameters (existing — `ParameterValidator.validateOrThrow()`)
-3. **NEW: Resolve output templates** — create a `VariableResolver` with the
-   module's parameter scope, resolve each output's `value` template
-4. **NEW: Validate resolved outputs** — parse each resolved value against its
-   declared `ParameterType`. Type mismatch is a build-time error.
-5. **NEW: Store resolved outputs** — add to the accumulating `moduleOutputs` map
-6. Prefix section keys and merge (existing)
+1. **Resolve `${module.*}` in parameter values** — scan import parameter values
+   for `${module.alias.*}` references. Resolve using already-resolved outputs
+   from earlier imports. Forward references (alias not yet processed) are a
+   build-time error with actionable message: *"Import 'web-app' references
+   ${module.cache.url}, but 'cache' is imported after 'web-app'. Move 'cache'
+   before 'web-app'."*
+2. **Merge with defaults** — resolved parameter values + module defaults
+3. **Validate parameters** — `ParameterValidator.validateOrThrow()` on RESOLVED
+   values (not raw `${module.*}` strings). This ordering is critical — validation
+   must see the actual values, not unresolved references.
+4. **Validate output templates** — scan each output's `value` template for
+   `${` references. Only `${var.*}` is allowed (D5). Any other prefix is a
+   build-time error. This covers #260 item 2.
+5. **Resolve output templates** — create a `VariableResolver` with the module's
+   parameter scope, resolve each output's `value` template
+6. **Validate resolved outputs** — parse each resolved value against its declared
+   `ParameterType`. Type mismatch is a build-time error.
+7. **Store resolved outputs** — add to the accumulating `moduleOutputs` map.
+   Immediately available for step 1 of subsequent imports.
+8. **Prefix section keys and merge** (existing — plus SectionDeserializer/Rewriter)
 
-Resolved outputs from import N are available as `${module.alias.*}` in import
-N+1's parameter values. This enables chaining.
+### Output name validation
+
+Output names are validated alongside import validation (collect-all):
+- Must not be null or blank
+- Must not contain `.` (dots are the alias/name separator in `${module.alias.name}`)
+- Must not contain `${` (would create confusion with variable references)
+
+### Output template scope restriction (D5)
 
 ### Output template scope restriction (D5)
 
@@ -192,111 +221,66 @@ Consumer wires: `resolver.withScope("module", expanded.outputSource())`.
 
 ## ModuleExpander changes
 
-The `expand()` method gains output resolution in its per-import loop. The
-method now needs a `VariableResolver` to resolve output templates:
+No new parameters on `expand()` — the expander creates resolvers internally.
+The expand() API stays as a single call with all imports; chaining is handled
+inside the per-import loop.
+
+### Definitive per-import loop
 
 ```java
-public static ExpandedModule expand(
-        List<YamlImport> imports,
-        Map<String, YamlModule> availableModules,
-        Map<String, Map<String, Object>> existingSections,
-        SectionDeserializer deserializer,
-        SectionContentRewriter rewriter) { ... }
-```
+Map<String, Map<String, String>> allOutputs = new LinkedHashMap<>();
 
-No new parameter needed — the expander creates a temporary resolver internally
-for each import using the module's resolved parameter scope:
+for (YamlImport imp : imports) {
+    YamlModule module = availableModules.get(imp.module());
 
-```java
-// For each import, after parameter resolution:
-Map<String, String> paramScope = resolveParameters(module, imp);
-VariableResolver outputResolver = new VariableResolver(
-        Map.of("var", paramScope::get), Set.of());
+    // 1. Resolve ${module.*} in parameter values using earlier outputs
+    VariableSource moduleSource = buildModuleSource(allOutputs);
+    Map<String, String> resolvedParams = resolveModuleRefsInParams(
+            imp.parameters(), moduleSource, imp.as(), allOutputs.keySet());
 
-Map<String, String> resolvedOutputs = new LinkedHashMap<>();
-for (var outputEntry : module.outputs().entrySet()) {
-    YamlModuleOutput output = outputEntry.getValue();
+    // 2. Merge with defaults
+    Map<String, String> paramScope = mergeWithDefaults(module, resolvedParams);
 
-    // Validate template scope — only ${var.*} allowed
-    validateOutputTemplateScope(output.value(), outputEntry.getKey(), module.name());
+    // 3. Validate resolved parameter values
+    ParameterValidator.validateOrThrow(module.parameters(), paramScope);
 
-    // Resolve template
-    String resolved = outputResolver.resolveString(output.value(),
-            "output." + module.name() + "." + outputEntry.getKey());
+    // 4-6. Validate + resolve + validate output templates
+    Map<String, String> resolvedOutputs = resolveOutputs(module, paramScope);
+    allOutputs.put(imp.as(), resolvedOutputs);
 
-    // Validate resolved value against declared type
-    try {
-        output.type().parse(resolved);
-    } catch (Exception e) {
-        throw new IllegalArgumentException(
-                "Output '" + outputEntry.getKey() + "' in module '"
-                + module.name() + "': resolved value '" + resolved
-                + "' is not valid " + output.type(), e);
-    }
+    // 7. Store module scope + import condition (existing)
+    moduleScopes.put(imp.as(), paramScope);
+    importConditions.put(imp.as(), imp.when());
 
-    resolvedOutputs.put(outputEntry.getKey(), resolved);
+    // 8. Prefix section keys + deserialize + rewrite (existing)
+    expandSections(module, imp, mergedSections, deserializer, rewriter);
 }
-allOutputs.put(imp.as(), Map.copyOf(resolvedOutputs));
 ```
 
-For chaining, the output resolver for import N+1 includes earlier outputs:
+`resolveModuleRefsInParams` scans each parameter value for `${module.*}`
+references. For each reference, it verifies the alias exists in
+`allOutputs.keySet()` (already processed). If not, it throws a forward-reference
+error with actionable guidance. If found, it resolves via the module source.
 
-```java
-// Build resolver that includes already-resolved outputs for chaining
-VariableSource moduleSource = /* outputSource() logic using allOutputs */;
-VariableResolver paramResolver = new VariableResolver(
-        Map.of("var", paramScope::get, "module", moduleSource),
-        Set.of());
-```
+`resolveOutputs` creates a `VariableResolver` with `Map.of("var", paramScope::get)`
+and `Set.of()` (no deferred prefixes). For each output: validates template scope
+(var-only), resolves template, validates resolved value against declared type.
 
-Wait — this contradicts D5 (output templates only use `${var.*}`). The chaining
-happens in PARAMETER VALUES, not output templates:
+### Conditional imports and outputs
 
-```yaml
-- module: cache
-  parameters:
-    backend_url: "${module.app-db.connection_url}"   # parameter value, not output template
-```
+Outputs from conditional imports (`when` field set) are always resolved and
+available to later imports. The `when` condition is evaluated at runtime by the
+consumer — expansion-time output resolution is unconditional. This matches
+Terraform's behaviour: conditional resources are always planned, conditions
+are evaluated at apply time.
 
-The parameter value `${module.app-db.connection_url}` is resolved by the
-consumer's resolver (which has the `module` source wired). This doesn't require
-ModuleExpander to resolve `${module.*}` — the consumer resolves parameter values
-before passing them to the import.
+### LIST and BOOLEAN output types
 
-**Revised flow for chaining:** ModuleExpander doesn't resolve `${module.*}` in
-parameter values. Instead:
-1. ModuleExpander resolves each module's outputs (using `${var.*}` only)
-2. Returns `moduleOutputs` in `ExpandedModule`
-3. Consumer wires `outputSource()` into their resolver
-4. Consumer resolves parameter values containing `${module.*}` using their resolver
-5. Consumer passes resolved parameter values to the next ModuleExpander call
-
-This keeps ModuleExpander as a structural expander — it resolves output templates
-(pure `${var.*}` → resolved strings) but doesn't resolve cross-module references.
-The consumer orchestrates chaining.
-
-**But this means the consumer must call `expand()` once per import** (or in
-batches where later imports' parameters reference earlier outputs). The current
-single-call-all-imports API can't support chaining because parameter values
-with `${module.*}` aren't resolved until after expansion.
-
-Two options:
-
-**Option A — Single expand() call, consumer pre-resolves parameters:**
-Consumer resolves `${module.*}` in parameter values before calling expand().
-This requires the consumer to process imports sequentially, calling
-`ParameterValidator` and output resolution for each import manually. Defeats
-the purpose of ModuleExpander orchestrating the loop.
-
-**Option B — ModuleExpander resolves chained parameter values internally:**
-ModuleExpander processes imports in order. For each import, it resolves
-parameter values that contain `${module.*}` using already-resolved outputs.
-The expand() API stays as a single call with all imports.
-
-Option B is cleaner — the consumer calls expand() once and gets chaining for
-free. ModuleExpander resolves `${module.*}` in parameter values (not in output
-templates — D5 holds). The resolver inside ModuleExpander has access to both
-`var` (for output templates) and `module` (for parameter value chaining).
+Output type validation confirms the resolved value is well-formed for the
+declared type. The stored and referenced value is always the raw string.
+LIST consumers re-parse via comma-split; BOOLEAN consumers re-parse via
+`Truthiness.isTruthy()`. Both sides use the same parser, so round-tripping
+is safe.
 
 ## Circular reference detection
 
@@ -325,6 +309,12 @@ No explicit cycle detection needed in ModuleExpander.
 | outputSource() returns null for missing alias/output | graceful null |
 | Multiple imports with outputs all resolve | 3-import chain |
 | ExpandedModule.moduleOutputs contains resolved values | programmatic access |
+| Chaining: parameter with `${module.*}` resolves before validation | integer param with `${module.a.port}` passes when port="5432" |
+| Forward reference gives actionable error | error names both aliases and suggests reorder |
+| Output name with dot rejected | validation error like alias dot check |
+| Output name blank rejected | validation error |
+| Conditional import outputs still available | `when`-gated import's outputs resolve for later imports |
+| Multiple outputs on same module | all resolve from same param scope |
 
 ## References
 
