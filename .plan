@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-261-yaml-core-type-safety
-state: scaffolded
+state: active
 project-sha: 2c08b7bfc777b26d01c11f5ef8c2a386cd4356ed
 date: 2026-09-01
 issue-repo: casehubio/platform
