@@ -20,3 +20,26 @@
 **Exploration:** quick
 **Depends on:** D1 (module prefix — outputs are referenced via ${module.alias.name})
 **Status:** captured
+
+## D3: Typed outputs — YamlModuleOutput with ParameterType + value template
+
+**Choice:** `YamlModuleOutput(ParameterType type, String value)` — outputs declare a type and a value template. `YamlModule` gains `Map<String, YamlModuleOutput> outputs`. After template resolution, the resolved value is validated against the declared type using `ParameterType.parse()`. Build-time validation catches type mismatches between output declarations, their template sources, and consumer parameter declarations.
+**Alternatives:**
+- Untyped outputs (`Map<String, String>` — raw templates, no type declaration) — simpler but no contract; consumers discover type mismatches at runtime deep in their pipeline, not at module expansion time
+**Rationale:** Outputs are a module's public interface. A typed interface catches mismatches early — if a module declares `port: integer` as an output but the template resolves to `"abc"`, that's a build-time error, not a runtime ClassCastException in the consumer. Reuses `ParameterType` (STRING/LIST/INTEGER/NUMBER/BOOLEAN) — no new type system needed.
+**Trade-offs:** More verbose YAML (`{type: integer, value: "..."}` vs just `"..."`). Acceptable — the verbosity documents the contract.
+**Sources:** casehubio/platform#256, ParameterType.java (reused for output type validation)
+**Exploration:** quick
+**Status:** captured
+
+## D4: moduleOutputs on ExpandedModule + outputSource() convenience
+
+**Choice:** `ExpandedModule` gains `Map<String, Map<String, String>> moduleOutputs` (alias → outputName → resolvedValue). Add `VariableSource outputSource()` that creates a VariableSource resolving `alias.outputName` lookups against the map. Consumer wires: `resolver.withScope("module", expanded.outputSource())`.
+**Alternatives:**
+- Only VariableSource, no raw map — simpler API but consumers can't inspect outputs programmatically (logging, debugging, passing to callbacks)
+**Rationale:** The raw map is useful for debugging and programmatic access. The `outputSource()` convenience saves the consumer from writing the two-level map lookup.
+**Trade-offs:** One more field on ExpandedModule. Minimal.
+**Sources:** casehubio/platform#256 §Implementation, ExpandedModule.java (existing record)
+**Exploration:** quick
+**Depends on:** D2 (outputs resolved during expansion), D3 (typed outputs — resolved values are strings post-template-resolution)
+**Status:** captured
