@@ -8,3 +8,15 @@
 **Sources:** ModuleExpander.java (checkForwardRefs at line 176, resolveModuleRefsInParams at line 142), ParameterValidator.java (collect-all pattern), issue #260
 **Exploration:** quick
 **Status:** captured
+
+## D2: Embedded vs whole-value reference handling
+
+**Choice:** Whole-value type compatibility check PLUS embedded STRING constraint. When the entire parameter value is `${module.alias.name}`, check output type against parameter type using the compatibility matrix. When a parameter value contains embedded `${module.*}` references (string interpolation), flag it as a structural error if the parameter is typed as INTEGER/NUMBER/BOOLEAN/LIST — string interpolation always produces STRING.
+**Alternatives:**
+- Whole-value only — type compatibility fires only on exact `${module.alias.name}` matches. Simpler, but lets embedded-reference type mismatches fall through to ParameterValidator with confusing parse errors.
+**Rationale:** Maximise compile-time safety. String interpolation (`"prefix-${module.db.port}"`) always produces a string. If the target parameter is INTEGER, this is structurally guaranteed to fail — catching it here gives a clear message ("parameter 'port' (INTEGER) uses string interpolation, which always produces STRING") instead of the downstream "expected INTEGER, got 'prefix-5432'".
+**Trade-offs:** Slightly more logic in the validation pass — must distinguish whole-value from embedded references. But the regex scan already identifies reference positions, so this is a substring check.
+**Depends on:** D1 (collect-all validation pass)
+**Sources:** ModuleExpander.java (resolveModuleRefsInParams), ParameterType.java, issue #260 compatibility matrix
+**Exploration:** quick
+**Status:** captured
