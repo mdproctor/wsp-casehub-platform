@@ -13,3 +13,7 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#255 — Issue #255 ← active
+  - [ ] Batch 1: API Parity
+    - [ ] Task 1: sourceFor + withChainedScope✓
+    - [ ] Task 2: IterationValueExpander✓
+    - [ ] Task 3: SectionDeserializer + SectionContentRewriter✓
