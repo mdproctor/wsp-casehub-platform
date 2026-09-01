@@ -23,3 +23,27 @@
 **Sources:** engine api/model/converter/yaml/*.java (15 annotation overrides catalogued), engine#977 (TypeScriptWriter sharing same schema)
 **Exploration:** quick
 **Status:** captured
+
+## D3: Polymorphic type handling (oneOf)
+
+**Choice:** Opaque + deserializer — for oneOf fields, emit the type declared in the mapping file (or JsonNode if unmapped). The @JsonDeserialize annotation from the mapping file handles parsing. Generator doesn't model polymorphism.
+**Alternatives:**
+- Sealed interface generation — more type-safe but significantly more complex (discriminator detection, per-variant records, @JsonTypeInfo wiring). Overkill when hand-written deserializers already exist.
+- JsonNode fallback — simple but loses type safety. Acceptable for truly opaque fields (outcomePolicy, context) but not for typed polymorphics like Trigger.
+**Rationale:** Matches the existing hand-written pattern exactly. The 5 polymorphic deserializers (Trigger, CaseCompletion, CbrConfig, AdaptationConfig, SubCaseMapping) are domain logic that belongs in the consumer, not the generator. Generator's job is structural mapping only.
+**Trade-offs:** Consumer must maintain deserializers separately. Acceptable because these deserializers encode domain semantics that can't be derived from schema structure.
+**Sources:** engine api/model/converter/deser/ (5 deserializers), engine api/model/converter/yaml/YamlBinding.java:32, YamlCaseSpec.java:35-46
+**Exploration:** quick
+**Status:** captured
+
+## D4: Module placement
+
+**Choice:** New sibling module `yaml-codegen` in platform, alongside `yaml-core`. Published as a Maven plugin. Package: `io.casehub.yaml.codegen`.
+**Alternatives:**
+- Add to yaml-core directly — breaks yaml-core's zero-dependency, J2CL-transpilable constraint by introducing jsonschema2pojo dependency
+- Standalone repo — unnecessary isolation for a module that logically belongs with yaml-core
+**Rationale:** yaml-core is zero-dep by design (variable resolution, forEach, modules). The codegen module needs jsonschema2pojo as a dependency. Sibling module keeps the namespace coherent while preserving yaml-core's constraints.
+**Trade-offs:** Two modules instead of one. Acceptable — they have fundamentally different dependency profiles (runtime zero-dep vs build-time with jsonschema2pojo).
+**Sources:** platform yaml-core/pom.xml (zero dependencies), yaml-core description ("Zero dependencies, J2CL-transpilable")
+**Exploration:** quick
+**Status:** captured
