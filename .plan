@@ -13,7 +13,12 @@ flyway-next-v: unknown
 
 ## Queue
 - [ ] casehubio/platform#258 — Issue #258 ← active
-  - [ ] Batch 1: API Parity
-    - [ ] Task 1: sourceFor + withChainedScope
-    - [ ] Task 2: IterationValueExpander callback
-    - [ ] Task 3: SectionDeserializer + SectionContentRewriter + typed accessor
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: SchemaParser+TypeGraph
+  - [ ] Batch 2: RecordEmission
+    - [ ] Task 2: MappingConfig
+    - [ ] Task 3: RecordEmitter
+  - [ ] Batch 3: PluginWiring
+    - [ ] Task 4: PojoEmitter+Mojo
+  - [ ] Batch 4: Validation
+    - [ ] Task 5: EngineSchemaValidation
