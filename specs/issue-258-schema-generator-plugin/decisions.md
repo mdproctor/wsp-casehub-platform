@@ -47,3 +47,16 @@
 **Sources:** platform yaml-core/pom.xml (zero dependencies), yaml-core description ("Zero dependencies, J2CL-transpilable")
 **Exploration:** quick
 **Status:** captured
+
+## D5: Unified multi-output plugin (replaces engine codegen/)
+
+**Choice:** yaml-codegen is a single unified plugin supporting multiple output formats from one schema. Two formats in v1: `pojo` (replaces engine's CasehubCodegen) and `record` (new). Each output has its own targetPackage, prefix, and format-specific config. Schema is parsed once, emitted N times.
+**Alternatives:**
+- Keep engine codegen/ separate — two independent generators reading the same schema, diverging over time
+- Record-only plugin — leaves POJO generation in engine, misses the unification opportunity; TypeScript (engine#977) would need yet another tool
+**Rationale:** One schema read, multiple outputs. Engine's codegen/ module (CasehubCodegen + CasehubRuleFactory) moves into yaml-codegen as the `pojo` format backend — consumer-provided RuleFactory class name is a config parameter. Future formats (TypeScript for engine#977) add as new backends without new tools.
+**Trade-offs:** Plugin is more complex than a record-only tool. Engine's codegen/ module becomes a platform dependency — engine must coordinate releases with platform for POJO generation changes. Acceptable because the schema is already shared; coupling is inherent.
+**Depends on:** D1 (jsonschema2pojo as parsing library), D4 (yaml-codegen module)
+**Sources:** engine codegen/CasehubCodegen.java, engine schema/pom.xml (exec-maven-plugin wiring), engine#977 (TypeScriptWriter)
+**Exploration:** quick
+**Status:** captured
