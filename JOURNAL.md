@@ -1,1 +1,1 @@
-# Design Journal — issue-260-yaml-structural-type-checks
+# Design Journal — issue-257-yaml-core-enhancements
