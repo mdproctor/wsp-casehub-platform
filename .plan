@@ -13,3 +13,9 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#257 — Issue #257 ← active
+  - [ ] Batch 1: allowedValues + constraintDescription
+    - [ ] Task 1: ParameterViolation.technicalDetail + ParameterValidator allowedValues + constraintDescription
+  - [ ] Batch 2: ForEach reference rewriting
+    - [ ] Task 2: ForEachAdapter Reference + ForEachExpander rewriting pass
+  - [ ] Batch 3: Schema generator
+    - [ ] Task 3: PlatformSchemaGenerator module + modules
