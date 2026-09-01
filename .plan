@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-257-yaml-core-enhancements
-state: scaffolded
+state: active
 project-sha: 8657cb358eca96325fa5a34d165b37505444b995
 date: 2026-09-01
 issue-repo: casehubio/platform
@@ -13,9 +13,9 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#257 — Issue #257 ← active
-  - [ ] Batch 1: allowedValues + constraintDescription
-    - [ ] Task 1: ParameterViolation.technicalDetail + ParameterValidator allowedValues + constraintDescription
-  - [ ] Batch 2: ForEach reference rewriting
-    - [ ] Task 2: ForEachAdapter Reference + ForEachExpander rewriting pass
-  - [ ] Batch 3: Schema generator
-    - [ ] Task 3: PlatformSchemaGenerator module + modules
+  - [x] Batch 1: allowedValues + constraintDescription
+    - [x] Task 1: ParameterViolation.technicalDetail + ParameterValidator allowedValues + constraintDescription
+  - [x] Batch 2: ForEach reference rewriting
+    - [x] Task 2: ForEachAdapter Reference + ForEachExpander rewriting pass
+  - [x] Batch 3: Schema generator
+    - [x] Task 3: PlatformSchemaGenerator module + modules
