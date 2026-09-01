@@ -9,6 +9,17 @@
 **Exploration:** quick
 **Status:** captured
 
+## D3: Type compatibility method on ParameterType
+
+**Choice:** Add `boolean isAssignableFrom(ParameterType outputType)` on `ParameterType`. STRING accepts any type (widening), NUMBER accepts INTEGER (widening), all others must match exactly. LIST only accepts LIST.
+**Alternatives:**
+- Standalone `TypeCompatibility` utility class — unnecessary indirection for a simple matrix lookup
+**Rationale:** `ParameterType` already owns `parse()` (value-level type behaviour). Type compatibility is the structural complement — it belongs on the same type. Reads naturally: `STRING.isAssignableFrom(INTEGER)` → true.
+**Trade-offs:** None significant — the matrix is small and stable.
+**Sources:** issue #260 compatibility matrix, ParameterType.java
+**Exploration:** quick
+**Status:** captured
+
 ## D2: Embedded vs whole-value reference handling
 
 **Choice:** Whole-value type compatibility check PLUS embedded STRING constraint. When the entire parameter value is `${module.alias.name}`, check output type against parameter type using the compatibility matrix. When a parameter value contains embedded `${module.*}` references (string interpolation), flag it as a structural error if the parameter is typed as INTEGER/NUMBER/BOOLEAN/LIST — string interpolation always produces STRING.
