@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-260-yaml-structural-type-checks
-state: scaffolded
+state: active
 project-sha: 532628ccaf43a2255bb37e1a3cce8b9c389569c2
 date: 2026-09-01
 issue-repo: casehubio/platform
@@ -13,6 +13,6 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#260 — Issue #260 ← active
-  - [ ] Batch 1: Structural type checking
-    - [ ] Task 1: ParameterType.canAccept — type compatibility matrix
-    - [ ] Task 2: validateModuleRefs — collect-all module reference validation
+  - [x] Batch 1: Structural type checking
+    - [x] Task 1: ParameterType.canAccept — type compatibility matrix
+    - [x] Task 2: validateModuleRefs — collect-all module reference validation
