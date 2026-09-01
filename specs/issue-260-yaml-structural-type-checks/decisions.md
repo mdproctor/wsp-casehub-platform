@@ -20,6 +20,18 @@
 **Exploration:** quick
 **Status:** captured
 
+## D4: validateModuleRefs receives available context directly
+
+**Choice:** `validateModuleRefs` receives `availableModules`, the processed imports (alias → module name mapping), and the current module's parameter declarations as explicit parameters. No new intermediate types.
+**Alternatives:**
+- Build a `Map<String, Map<String, ParameterType>>` (alias → output name → type) alongside `allOutputs` — redundant data structure when `availableModules` already carries the output declarations
+**Rationale:** The method runs inside the import loop where all context is already in scope. Explicit parameters keep the method a simple static function with clear dependencies. No new types or data structures needed.
+**Trade-offs:** Method signature has more parameters than the current `resolveModuleRefsInParams`. Acceptable — the method does more work (three validation checks) and the parameters are all already available at the call site.
+**Depends on:** D1 (collect-all validation pass)
+**Sources:** ModuleExpander.java (expand() loop at line 46, resolveModuleRefsInParams at line 142)
+**Exploration:** quick
+**Status:** captured
+
 ## D2: Embedded vs whole-value reference handling
 
 **Choice:** Whole-value type compatibility check PLUS embedded STRING constraint. When the entire parameter value is `${module.alias.name}`, check output type against parameter type using the compatibility matrix. When a parameter value contains embedded `${module.*}` references (string interpolation), flag it as a structural error if the parameter is typed as INTEGER/NUMBER/BOOLEAN/LIST — string interpolation always produces STRING.
