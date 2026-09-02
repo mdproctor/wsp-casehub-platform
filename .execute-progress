@@ -1,2 +1,3 @@
 default=promoted
 platform:issue-261-yaml-core-type-safety=stamped
+platform:issue-266-yaml-core-api-polish=stamped

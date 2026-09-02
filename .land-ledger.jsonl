@@ -1,2 +1,3 @@
 {"event":"promote","branch":"issue-261-yaml-core-type-safety","files":[],"timestamp":"2026-09-02T05:44:38.898249+00:00"}
 {"event":"land","repo":"platform","branch":"issue-261-yaml-core-type-safety","base_branch":"main","landed_sha":"3dd897a8c4941475f7e5c76247b769eabaa4de47","push_target":"upstream","mirrored":true,"stamped":true,"timestamp":"2026-09-02T05:46:17.681413+00:00"}
+{"event":"land","repo":"platform","branch":"issue-266-yaml-core-api-polish","base_branch":"main","landed_sha":"aeb4a6cbf731bd7210bc1bedcff872079da1c9a8","push_target":"upstream","mirrored":true,"stamped":true,"timestamp":"2026-09-02T09:27:21.543475+00:00"}
