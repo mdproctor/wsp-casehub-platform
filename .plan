@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-268-capacity-redistribution
-state: active
+state: transitioning
 issue-repo: casehubio/platform
 covers: 268
 Current: casehubio/platform#268 — feat: capacity signal SPI + redistribution policy framework
@@ -10,12 +10,6 @@ date: 2026-09-02
 queue_fix: casehubio/qhorus#428
 
 ## Queue
-- [ ] casehubio/platform#268 — feat: capacity signal SPI + redistribution policy framework ← active
-  - [x] Batch 1: SPI Types
-    - [x] Task 1: Value types + SPIs + ActorStateAccumulator extension
-  - [x] Batch 2: Implementations
-    - [x] Task 2: AggregatingActorCapacityView
-    - [x] Task 3: DefaultRedistributionPolicy
-    - [x] Task 4: CapacityPressureMonitor + ActorState bridge
+- [x] casehubio/platform#268 — feat: capacity signal SPI + redistribution policy framework
 - [x] casehubio/platform#151 — feat: expression-based subscription filters — raw MVEL/JQ as alternative to structured constraints
-- [ ] casehubio/qhorus#428 — feat: capacity signal source + redistribution executor
+- [ ] casehubio/qhorus#428 — feat: capacity signal source + redistribution executor ← active
