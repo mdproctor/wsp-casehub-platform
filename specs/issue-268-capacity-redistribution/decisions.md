@@ -72,3 +72,17 @@
 **Sources:** `ActorStateAccumulator.java` (platform-api), `ActorStateAccumulatorImpl.java` (engine/actor-state)
 **Exploration:** deep-analysis
 **Status:** captured
+
+## D7: Stateless fire-and-forget executor with sweep-based re-evaluation
+
+**Choice:** The redistribution executor uses fire-and-forget compression (option 1) with sweep-based re-evaluation. The executor is stateless across sweeps — all state lives in the commitment store (obligations), capacity view (pressure), and ledger (signal freshness). Two guards ensure eventual consistency: (1) compression freshness guard (`countMessagesSince()` before `triggerUpdate()`) prevents wasteful LLM calls, (2) routing failure escalation (if policy says Redistribute and zero HANDOFFs succeed, fire Escalate) prevents infinite stuck loops. The grace period field on `RedistributionDecision.Redistribute` is ignored — the sweep interval (60s) provides natural coordination.
+**Alternatives:**
+- Synchronous wait (option 2) — executor blocks during LLM-driven compression, re-evaluates, then HANDOFFs. Clean sequential flow but holds a managed `@ObservesAsync` executor thread for seconds to minutes per channel. Shared thread pool — one slow redistribution delays all other async CDI event processing.
+- Two-phase event (option 3) — executor fires `CompressionRequestedEvent`, re-evaluates on `CompressionCompletedEvent`. Non-blocking with precise timing, but requires cross-event state correlation, two new CDI event types, and timeout handling. The sweep cycle already provides this coordination for free.
+- Drop compression entirely (option 4) — treat Compress as Hold, only act on Redistribute and Escalate. Simplest executor but discards a potentially effective intervention. Channel summaries directly reduce context window tokens for multi-channel agents (the common case).
+**Rationale:** The sweep cycle is the re-evaluation mechanism — it runs every 60s, queries ground truth (current obligations and pressure), and re-triggers the policy. Compression gets a fair shot (one sweep interval), and if it doesn't help, the policy naturally escalates via pressure thresholds. The two guards cover the only STUCK failure mode (F6: no routing targets) and prevent waste (F3/F5: repeated compression). 10 failure modes were analyzed; 1 STUCK (fixed by guard #2), 4 WASTEFUL (3 fixed by guard #1, 1 harmless), 5 HARMLESS (self-correcting). Crash recovery is free — next sweep reads current state.
+**Trade-offs:** 60s delay between compression and re-evaluation (acceptable — summaries are background artifacts). Grace period field is unused (the sweep interval is longer than any configured grace, making the field redundant in this model). Stale signals (F4) can cause wasteful redistribution but not corruption — could add observedAt age check as a future refinement.
+**Depends on:** D2 (domain executor as context composer), D3 (max-pressure aggregation), D5 (circular guard is executor concern)
+**Sources:** `ChannelSummaryService.triggerUpdate()` (qhorus), `CommitmentService.delegate()` (qhorus), `RoutingBridge.resolve()` (qhorus), GE-20260605-373190 (@ObservesAsync + @RequestScoped), GE-20260512-6887c9 (@ObservesAsync + @Transactional), GE-20260517-e10a0f (HANDOFF commitment gotcha), GE-20260602-6941d6 (separate @Transactional delegate)
+**Exploration:** deep-analysis
+**Status:** captured
