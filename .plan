@@ -1,10 +1,5 @@
 # Work Plan — issue-268-capacity-redistribution
 
-## Queue
-- [ ] casehubio/platform#268 — feat: capacity signal SPI + redistribution policy framework ← active
-- [ ] casehubio/platform#151 — feat: expression-based subscription filters — raw MVEL/JQ as alternative to structured constraints
-- [ ] casehubio/platform#428 — Issue #428
-
 ## State
 branch: issue-268-capacity-redistribution
 state: active
@@ -12,3 +7,8 @@ issue-repo: casehubio/platform
 covers: 268
 Current: casehubio/platform#268 — feat: capacity signal SPI + redistribution policy framework
 date: 2026-09-02
+
+## Queue
+- [ ] casehubio/platform#268 — feat: capacity signal SPI + redistribution policy framework ← active
+- [x] casehubio/platform#151 — feat: expression-based subscription filters — raw MVEL/JQ as alternative to structured constraints
+- [ ] casehubio/platform#428 — Issue #428
