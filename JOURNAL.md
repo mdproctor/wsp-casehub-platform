@@ -1,1 +1,1 @@
-# Design Journal — issue-266-yaml-core-api-polish
+# Design Journal — issue-270-module-bridge-dynamic-sections
