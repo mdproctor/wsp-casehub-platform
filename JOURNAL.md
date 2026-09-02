@@ -1,1 +1,1 @@
-# Design Journal — issue-261-yaml-core-type-safety
+# Design Journal — issue-266-yaml-core-api-polish
