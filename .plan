@@ -10,5 +10,11 @@ date: 2026-09-02
 
 ## Queue
 - [ ] casehubio/platform#268 — feat: capacity signal SPI + redistribution policy framework ← active
+  - [ ] Batch 1: SPI Types
+    - [ ] Task 1: Value types + SPIs + ActorStateAccumulator extension
+  - [ ] Batch 2: Implementations
+    - [ ] Task 2: AggregatingActorCapacityView
+    - [ ] Task 3: DefaultRedistributionPolicy
+    - [ ] Task 4: CapacityPressureMonitor + ActorState bridge
 - [x] casehubio/platform#151 — feat: expression-based subscription filters — raw MVEL/JQ as alternative to structured constraints
 - [ ] casehubio/platform#428 — Issue #428
