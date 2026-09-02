@@ -34,3 +34,14 @@ interface ModuleBridge<T> {
     }
 }
 ```
+
+## D3: Dynamic section capture via Jackson builder in yaml-jackson/
+
+**Choice:** `YamlModuleFile` stays an immutable record in yaml-core. The yaml-jackson/ module provides a `YamlModuleFileBuilder` with `@JsonAnySetter` that accumulates unknown top-level keys as sections, then constructs the record. A mixin wires `@JsonDeserialize(builder = YamlModuleFileBuilder.class)` to the record type.
+**Alternatives:**
+- Change `YamlModuleFile` from record to class with native builder — adds mutability to yaml-core for a Jackson concern, pollutes the zero-dep API
+**Rationale:** The builder is a Jackson deserialization concern, not a yaml-core modelling concern. Records are the right representation for immutable data. The mixin + builder pattern keeps the Jackson layer self-contained.
+**Trade-offs:** Builder class adds a file to yaml-jackson/. Consumers who don't use Jackson never see it.
+**Sources:** Jackson `@JsonDeserialize(builder = ...)` support for records, `YamlModuleFile` current record
+**Exploration:** quick
+**Status:** captured
