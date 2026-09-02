@@ -57,3 +57,38 @@ interface ModuleBridge<T> {
 **Sources:** `ExpandedModule` current record (section(), typedSection(), outputSource())
 **Exploration:** quick
 **Status:** captured
+
+## D5: Case-insensitive enum deserialization via ObjectMapper feature
+
+**Choice:** yaml-jackson/ module enables `ACCEPT_CASE_INSENSITIVE_ENUMS` on its Jackson Module configuration. No per-enum mixin needed.
+**Alternatives:**
+- `@JsonCreator` factory method on each enum — verbose, not scalable, only warranted when JSON values differ from constant names (e.g., `"in-progress"` → `IN_PROGRESS`)
+- `@JsonProperty` per constant — same verbosity problem
+**Rationale:** Industry consensus: `ACCEPT_CASE_INSENSITIVE_ENUMS` is the standard for pure case differences. `@JsonCreator` is for custom string mappings. Available since Jackson 2.9+.
+**Trade-offs:** Applies to all enums deserialized through this module. That's the desired behavior.
+**Sources:** Jackson `DeserializationFeature.ACCEPT_CASE_INSENSITIVE_ENUMS`, Baeldung, jackson-databind#1313
+**Exploration:** quick (internet search)
+**Status:** captured
+
+## D6: Top-level only — drop sections: wrapper
+
+**Choice:** Dynamic section capture is top-level only. The `YamlModuleFileBuilder` treats `module:` and `imports:` as known fields; all other top-level keys are captured as sections. No `sections:` wrapper support.
+**Alternatives:**
+- Support both `sections:` wrapper and top-level keys — two code paths, merge/precedence rules, tech debt for a migration that doesn't exist
+- Support both, error if both present — still two code paths
+**Rationale:** Pre-release, no consumers to migrate. We own both authoring and consumption. One format, zero ambiguity.
+**Trade-offs:** None — no existing files to break.
+**Sources:** Issue #270 backward compat section (overridden by pre-release status)
+**Exploration:** quick
+**Status:** captured
+
+## D7: No identity bridge
+
+**Choice:** No `RawModuleBridge` or identity bridge shipped. Consumers use either the raw API (ExpansionOptions) or the typed API (ModuleBridge<T>). No transition wrapper.
+**Alternatives:**
+- Ship an identity bridge for transition — unnecessary, pre-release, no one is transitioning
+**Rationale:** Pre-release means no tech debt. Two clean APIs, consumers pick one.
+**Trade-offs:** None.
+**Sources:** Pre-release project maturity
+**Exploration:** quick
+**Status:** captured
