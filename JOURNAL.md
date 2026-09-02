@@ -1,1 +1,1 @@
-# Design Journal — issue-266-yaml-core-api-polish
+# Design Journal — issue-268-capacity-redistribution
