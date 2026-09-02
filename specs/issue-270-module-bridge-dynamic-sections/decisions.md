@@ -45,3 +45,15 @@ interface ModuleBridge<T> {
 **Sources:** Jackson `@JsonDeserialize(builder = ...)` support for records, `YamlModuleFile` current record
 **Exploration:** quick
 **Status:** captured
+
+## D4: Separate TypedExpandedModule<T> rather than generifying ExpandedModule
+
+**Choice:** New `TypedExpandedModule<T>` record with `T content()` for the bridge path. `ExpandedModule` stays unchanged for raw consumers. Shared fields (`moduleScopes`, `importConditions`, `moduleOutputs`, `outputSource()`) duplicated across both records.
+**Alternatives:**
+- Generify `ExpandedModule<T>` — carries dead methods (`section()`, `typedSection()`) on typed variant, forces `ExpandedModule<Map<String, Map<String, Object>>>` at every existing call site, noisy with no value
+- Extract shared fields into a base class — four fields, not worth the abstraction
+**Rationale:** API clarity (each type has exactly the methods that make sense), zero churn on existing consumers, and avoids the verbosity of `ExpandedModule<Map<String, Map<String, Object>>>` at call sites. "Typed" prefix signals the bridge path vs the raw path, paralleling the two `expand()` overloads.
+**Trade-offs:** Field duplication across two records. Four fields — trivial.
+**Sources:** `ExpandedModule` current record (section(), typedSection(), outputSource())
+**Exploration:** quick
+**Status:** captured
