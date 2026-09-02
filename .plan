@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-268-capacity-redistribution
-state: transitioning
+state: active
 issue-repo: casehubio/platform
 covers: 268
 Current: casehubio/platform#268 — feat: capacity signal SPI + redistribution policy framework
