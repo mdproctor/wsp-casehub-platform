@@ -59,3 +59,16 @@
 **Sources:** Draft spec open questions #2 and #3, qhorus `CIRCULAR_DELEGATION` watchdog
 **Exploration:** quick
 **Status:** captured
+
+## D6: Bridge capacity into ActorState via contributor + accumulator method
+
+**Choice:** Add `capacity(double aggregatePressure, Map<String, Double> pressureBySignalType)` to `ActorStateAccumulator`. Ship a `CapacityActorStateContributor` in platform that injects `ActorCapacityView` and writes capacity data into the accumulator. The capacity SPI remains independent; the contributor is a bridge.
+**Alternatives:**
+- Add fleet-wide query methods to `ActorStateContributor` — leaks capacity-specific semantics (threshold, overloaded) into a general-purpose SPI. "Above threshold" has no meaning for trust scores or work items.
+- Keep capacity entirely separate, no bridge — dashboard endpoint misses capacity data, operators must query two endpoints for a complete actor view.
+**Rationale:** The two SPIs serve different purposes (D1) but describe the same actors. The dashboard should show capacity alongside trust and workload. A contributor bridge connects them without merging the SPI contracts.
+**Trade-offs:** Adds one method to `ActorStateAccumulator` (breaking change — pre-release, cost is zero). `ActorStateAccumulatorImpl` in engine-actor-state must implement the new method.
+**Depends on:** D1 (separate SPIs — the bridge only makes sense because they're separate)
+**Sources:** `ActorStateAccumulator.java` (platform-api), `ActorStateAccumulatorImpl.java` (engine/actor-state)
+**Exploration:** deep-analysis
+**Status:** captured
