@@ -10,8 +10,8 @@ date: 2026-09-02
 
 ## Queue
 - [ ] casehubio/platform#268 — feat: capacity signal SPI + redistribution policy framework ← active
-  - [ ] Batch 1: SPI Types
-    - [ ] Task 1: Value types + SPIs + ActorStateAccumulator extension
+  - [x] Batch 1: SPI Types
+    - [x] Task 1: Value types + SPIs + ActorStateAccumulator extension
   - [ ] Batch 2: Implementations
     - [ ] Task 2: AggregatingActorCapacityView
     - [ ] Task 3: DefaultRedistributionPolicy
