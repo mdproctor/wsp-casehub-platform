@@ -101,14 +101,45 @@ Signals are tenant-agnostic — an agent's context window and session slots are 
 ### CapacitySignalSource
 
 ```java
+/**
+ * SPI for observing capacity pressure signals from a specific domain.
+ *
+ * <p>CDI discovery: implementations annotate {@code @ApplicationScoped}.
+ * The aggregator collects all beans via {@code @Any Instance<CapacitySignalSource>}.
+ *
+ * <p>Thread-safety: implementations must be safe for concurrent access —
+ * the monitor sweep and ad-hoc queries may invoke methods concurrently.
+ */
 public interface CapacitySignalSource {
+
+    /**
+     * Stable signal type identifier for this source.
+     * Must be unique across all sources — two sources must not share a signal type.
+     * Use constants from {@link CapacitySignalTypes} where applicable.
+     */
     String signalType();
+
+    /**
+     * Observe the current capacity pressure for a specific actor.
+     *
+     * @param actorId the actor identity string
+     * @return the current signal, or {@code Optional.empty()} for actors
+     *         this source does not monitor. Never null.
+     */
     Optional<CapacitySignal> observe(String actorId);
+
+    /**
+     * Return all actors whose pressure is at or above the threshold.
+     *
+     * <p>Semantics: return signals where {@code pressure >= threshold},
+     * consistent with {@link ActorCapacity#isOverloaded(double)}.
+     *
+     * @param threshold the pressure threshold (inclusive lower bound)
+     * @return all overloaded signals; empty list if none. Never null.
+     */
     List<CapacitySignal> observeOverloaded(double threshold);
 }
 ```
-
-CDI discovery: implementations annotate `@ApplicationScoped`. The aggregator collects via `@Any Instance<CapacitySignalSource>`.
 
 ### CapacitySignalTypes
 
@@ -149,13 +180,37 @@ public record ActorCapacity(
 ### ActorCapacityView
 
 ```java
+/**
+ * Aggregated view of actor capacity pressure across all signal sources.
+ *
+ * <p>All methods return non-null values. For unknown or unmonitored actors,
+ * {@link #getCapacity} returns zero aggregate pressure with an empty signal type map.
+ *
+ * <p>Separate from {@code ActorStateContributor}/{@code ActorStateAccumulator} (D1) —
+ * different query model (multi-actor scan vs single-actor push), different purpose
+ * (operational monitoring vs dashboard read model), different consumers
+ * ({@code @Scheduled} sweep vs REST endpoint).
+ */
 public interface ActorCapacityView {
+
+    /**
+     * Get the aggregated capacity for a specific actor.
+     *
+     * @param actorId the actor identity string
+     * @return non-null capacity; zero pressure with empty signals for unknown actors
+     */
     ActorCapacity getCapacity(String actorId);
+
+    /**
+     * Find all actors whose aggregate pressure is at or above the threshold.
+     *
+     * @param threshold the pressure threshold (inclusive, consistent with
+     *                  {@link ActorCapacity#isOverloaded(double)})
+     * @return all overloaded actors; empty list if none. Never null.
+     */
     List<ActorCapacity> getOverloaded(double threshold);
 }
 ```
-
-Separate from `ActorStateContributor`/`ActorStateAccumulator` (D1) — different query model (multi-actor scan vs single-actor push), different purpose (operational monitoring vs dashboard read model), different consumers (`@Scheduled` sweep vs REST endpoint).
 
 ---
 
