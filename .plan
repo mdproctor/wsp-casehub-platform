@@ -7,6 +7,7 @@ issue-repo: casehubio/platform
 covers: 268
 Current: casehubio/platform#268 — feat: capacity signal SPI + redistribution policy framework
 date: 2026-09-02
+queue_fix: casehubio/qhorus#428
 
 ## Queue
 - [ ] casehubio/platform#268 — feat: capacity signal SPI + redistribution policy framework ← active
@@ -17,4 +18,4 @@ date: 2026-09-02
     - [x] Task 3: DefaultRedistributionPolicy
     - [x] Task 4: CapacityPressureMonitor + ActorState bridge
 - [x] casehubio/platform#151 — feat: expression-based subscription filters — raw MVEL/JQ as alternative to structured constraints
-- [ ] casehubio/platform#428 — Issue #428
+- [ ] casehubio/qhorus#428 — feat: capacity signal source + redistribution executor
