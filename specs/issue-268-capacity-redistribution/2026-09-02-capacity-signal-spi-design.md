@@ -25,12 +25,22 @@ What Batch 1 provides:
 - A unified capacity view that aggregates signals across domains
 - A policy SPI that decides what to do when an actor is overloaded
 - A `@Scheduled` monitor that sweeps and fires CDI events
-- No-op defaults for all SPIs — existing deployments see no change
+- `@DefaultBean` defaults for all SPIs — existing deployments see no change (aggregator with zero sources returns 0.0, default policy handles all pressure levels)
 
 What Batch 1 does NOT provide:
 - Domain signal source implementations (qhorus, engine, platform-gate)
 - Redistribution executors (domain-specific)
 - Eidos selection enrichment (`SelectionContext.capacityView`)
+
+### Deferred Work — GitHub Issue Tracking
+
+| Batch | Work Item | Repo | Issue |
+|-------|-----------|------|-------|
+| 2 | Eidos `SelectionContext.capacityView` + `Overloaded` probe | eidos | casehubio/eidos#151 |
+| 3 | Qhorus `ContextPressureCapacitySource` + redistribution executor | qhorus | casehubio/qhorus#428 |
+| 3 | Platform gate `SessionCapacitySource` | platform | TBD — file before Batch 1 merge |
+| 4 | Engine `WorkloadCapacitySource` | engine | TBD — file before Batch 1 merge |
+| — | Engine `ActorStateAccumulatorImpl.capacity()` override | engine | TBD — file before Batch 1 merge |
 
 ---
 
@@ -112,7 +122,7 @@ public final class CapacitySignalTypes {
 }
 ```
 
-String constants, not an enum — consistent with `EndpointPropertyKeys`, `DeliveryChannels`, `MemoryAttributeKeys`. Extensible by domain repos.
+String constants, not an enum — consistent with `EndpointPropertyKeys`, `DeliveryChannels`. Extensible by domain repos.
 
 ### ActorCapacity
 
@@ -131,7 +141,7 @@ public record ActorCapacity(
     }
 
     public boolean isOverloaded(double threshold) {
-        return aggregatePressure > threshold;
+        return aggregatePressure >= threshold;
     }
 }
 ```
@@ -146,6 +156,12 @@ public interface ActorCapacityView {
 ```
 
 Separate from `ActorStateContributor`/`ActorStateAccumulator` (D1) — different query model (multi-actor scan vs single-actor push), different purpose (operational monitoring vs dashboard read model), different consumers (`@Scheduled` sweep vs REST endpoint).
+
+---
+
+## Layer 1: Select — Eidos Enrichment (Batch 2, deferred)
+
+Deferred to Batch 2. `SelectionContext.capacityView` enrichment enables load-aware agent selection — `CapabilityHealth` gains an `Overloaded` probe step. See casehubio/eidos#151.
 
 ---
 
@@ -199,6 +215,17 @@ The decision says WHAT to do. HOW MUCH to redistribute and circular guard logic 
 ### CapacityPressureEvent
 
 ```java
+/**
+ * CDI event fired by CapacityPressureMonitor for each overloaded actor.
+ *
+ * <p>Observers receive this event via @ObservesAsync on a managed thread pool
+ * where @RequestScoped context is not active. Do not inject @RequestScoped
+ * beans (e.g., CurrentPrincipal) in observers. Use @ActivateRequestContext
+ * if request-scoped access is required.
+ *
+ * <p>triggerSignalType is the highest-pressure signal type, with lexicographic
+ * tie-breaking when multiple signals share the same max pressure.
+ */
 public record CapacityPressureEvent(
     String actorId,
     ActorCapacity capacity,
@@ -218,8 +245,11 @@ CDI event fired by `CapacityPressureMonitor`. Raw observation only — carries n
 ### AggregatingActorCapacityView
 
 ```java
+@DefaultBean
 @ApplicationScoped
 public class AggregatingActorCapacityView implements ActorCapacityView {
+
+    private static final Logger LOG = Logger.getLogger(AggregatingActorCapacityView.class);
 
     @Any Instance<CapacitySignalSource> sources;
 
@@ -228,8 +258,13 @@ public class AggregatingActorCapacityView implements ActorCapacityView {
         Map<String, Double> pressures = new LinkedHashMap<>();
 
         for (var source : sources) {
-            source.observe(actorId).ifPresent(signal ->
-                pressures.put(signal.signalType(), signal.pressure()));
+            try {
+                source.observe(actorId).ifPresent(signal ->
+                    pressures.put(signal.signalType(), signal.pressure()));
+            } catch (Exception e) {
+                LOG.warnf("Signal source %s failed for actorId=%s: %s",
+                        source.signalType(), actorId, e.getMessage());
+            }
         }
 
         double aggregate = pressures.values().stream()
@@ -245,9 +280,14 @@ public class AggregatingActorCapacityView implements ActorCapacityView {
         Map<String, Map<String, Double>> byActor = new LinkedHashMap<>();
 
         for (var source : sources) {
-            for (var signal : source.observeOverloaded(threshold)) {
-                byActor.computeIfAbsent(signal.actorId(), k -> new LinkedHashMap<>())
-                        .put(signal.signalType(), signal.pressure());
+            try {
+                for (var signal : source.observeOverloaded(threshold)) {
+                    byActor.computeIfAbsent(signal.actorId(), k -> new LinkedHashMap<>())
+                            .put(signal.signalType(), signal.pressure());
+                }
+            } catch (Exception e) {
+                LOG.warnf("Signal source %s failed during sweep: %s",
+                        source.signalType(), e.getMessage());
             }
         }
 
@@ -330,10 +370,10 @@ public class DefaultRedistributionPolicy implements RedistributionPolicy {
 |----------|-----------------|----------|
 | any, inactive > 5m | any | Escalate |
 | < 0.7 | any | Hold |
-| 0.7–0.85 | any | Compress |
-| 0.85–0.95 | > 0 | Redistribute (grace 30s) |
-| > 0.95 | > 0 | Redistribute (immediate) |
-| > 0.85 | 0 | Hold (nothing to move) |
+| \>= 0.7 and < 0.85 | any | Compress |
+| \>= 0.85 and < 0.95 | > 0 | Redistribute (grace 30s) |
+| \>= 0.95 | > 0 | Redistribute (immediate) |
+| \>= 0.85 | 0 | Hold (nothing to move) |
 
 ### CapacityPressureMonitor
 
@@ -346,18 +386,19 @@ public class CapacityPressureMonitor {
     @Inject ActorCapacityView capacityView;
     @Inject Event<CapacityPressureEvent> pressureEvent;
 
-    @ConfigProperty(name = "casehub.capacity.pressure-threshold",
+    @ConfigProperty(name = "casehub.capacity.redistribution.compress-threshold",
                     defaultValue = "0.7")
-    double pressureThreshold;
+    double sweepThreshold;
 
     @Scheduled(every = "${casehub.capacity.sweep-interval:60s}",
                identity = "capacity-pressure-sweep")
     void sweep() {
-        List<ActorCapacity> overloaded = capacityView.getOverloaded(pressureThreshold);
+        List<ActorCapacity> overloaded = capacityView.getOverloaded(sweepThreshold);
 
         for (var capacity : overloaded) {
             String trigger = capacity.pressureBySignalType().entrySet().stream()
-                    .max(Map.Entry.comparingByValue())
+                    .max(Map.Entry.<String, Double>comparingByValue()
+                            .thenComparing(Map.Entry.comparingByKey()))
                     .map(Map.Entry::getKey)
                     .orElse("unknown");
 
@@ -365,7 +406,7 @@ public class CapacityPressureMonitor {
                     capacity.actorId(), capacity.aggregatePressure(), trigger);
 
             pressureEvent.fireAsync(new CapacityPressureEvent(
-                    capacity.actorId(), capacity, pressureThreshold, trigger));
+                    capacity.actorId(), capacity, sweepThreshold, trigger));
         }
     }
 }
@@ -394,49 +435,30 @@ public class CapacityActorStateContributor implements ActorStateContributor {
 }
 ```
 
-Bridges capacity data into the actor state dashboard (D6). When signal sources are present, the dashboard shows capacity alongside trust scores and work items. When no sources exist, `NoOpActorCapacityView` returns 0.0 — the contributor reports zero pressure.
+Bridges capacity data into the actor state dashboard (D6). When signal sources are present, the dashboard shows capacity alongside trust scores and work items. When no sources exist, `AggregatingActorCapacityView` returns 0.0 — the contributor reports zero pressure.
 
 ### ActorStateAccumulator extension (platform-api)
 
-Add one method to the existing `ActorStateAccumulator` interface:
+Add one default method to the existing `ActorStateAccumulator` interface:
 
 ```java
-void capacity(double aggregatePressure, Map<String, Double> pressureBySignalType);
+default void capacity(double aggregatePressure, Map<String, Double> pressureBySignalType) {}
 ```
 
-`ActorStateAccumulatorImpl` in engine-actor-state must implement this method. Pre-release — breaking change costs nothing.
+Default no-op follows the visitor pattern evolution convention — "if you don't have data for this dimension, contribute nothing." `ActorStateAccumulatorImpl` in engine-actor-state should override this method to surface capacity data in `ActorStateResponse`. Engine-side changes (tracked in casehubio/engine#TBD):
+1. `ActorStateAccumulatorImpl` — new `ConcurrentHashMap<String, Double>` field + method override
+2. `ActorStateResponse` — new `double aggregatePressure` + `Map<String, Double> pressureBySignalType` fields
+3. `ActorStateAccumulatorImpl.build()` — pass new fields to response record
 
 ### No-Op Defaults
 
 ```java
 // platform-api — NoOpCapacitySignalSource not needed (Instance<> is empty when no sources)
-// platform — NoOpActorCapacityView @DefaultBean
-@DefaultBean
-@ApplicationScoped
-public class NoOpActorCapacityView implements ActorCapacityView {
-    @Override
-    public ActorCapacity getCapacity(String actorId) {
-        return new ActorCapacity(actorId, 0.0, Map.of(), Instant.now());
-    }
-
-    @Override
-    public List<ActorCapacity> getOverloaded(double threshold) {
-        return List.of();
-    }
-}
-
-// platform — NoOpRedistributionPolicy @DefaultBean
-@DefaultBean
-@ApplicationScoped
-public class NoOpRedistributionPolicy implements RedistributionPolicy {
-    @Override
-    public RedistributionDecision evaluate(RedistributionContext context) {
-        return new RedistributionDecision.Hold("no redistribution policy configured");
-    }
-}
 ```
 
-`AggregatingActorCapacityView` displaces `NoOpActorCapacityView` when signal sources exist. `DefaultRedistributionPolicy` displaces `NoOpRedistributionPolicy` when the capacity module is on the classpath.
+No separate NoOp beans needed for `ActorCapacityView` or `RedistributionPolicy`:
+- `AggregatingActorCapacityView` is `@DefaultBean` — with zero signal sources, it returns 0.0 pressure and empty overloaded list (inherently no-op). Domain repos can override with `@ApplicationScoped`.
+- `DefaultRedistributionPolicy` is `@DefaultBean` — handles all pressure levels including below-threshold (`Hold("within tolerance")`). Domain repos can override with `@ApplicationScoped`.
 
 ---
 
@@ -453,8 +475,6 @@ public class NoOpRedistributionPolicy implements RedistributionPolicy {
 | `RedistributionContext` | platform-api | `io.casehub.platform.api.capacity` |
 | `RedistributionDecision` | platform-api | `io.casehub.platform.api.capacity` |
 | `CapacityPressureEvent` | platform-api | `io.casehub.platform.api.capacity` |
-| `NoOpActorCapacityView` | platform | `io.casehub.platform.capacity` |
-| `NoOpRedistributionPolicy` | platform | `io.casehub.platform.capacity` |
 | `AggregatingActorCapacityView` | platform | `io.casehub.platform.capacity` |
 | `DefaultRedistributionPolicy` | platform | `io.casehub.platform.capacity` |
 | `CapacityActorStateContributor` | platform | `io.casehub.platform.capacity` |
@@ -467,8 +487,7 @@ public class NoOpRedistributionPolicy implements RedistributionPolicy {
 | Key | Default | Where |
 |-----|---------|-------|
 | `casehub.capacity.sweep-interval` | `60s` | platform |
-| `casehub.capacity.pressure-threshold` | `0.7` | platform |
-| `casehub.capacity.redistribution.compress-threshold` | `0.7` | platform |
+| `casehub.capacity.redistribution.compress-threshold` | `0.7` | platform (also used by `CapacityPressureMonitor` as sweep threshold) |
 | `casehub.capacity.redistribution.redistribute-threshold` | `0.85` | platform |
 | `casehub.capacity.redistribution.immediate-threshold` | `0.95` | platform |
 | `casehub.capacity.redistribution.grace-period` | `PT30S` | platform |
@@ -490,6 +509,7 @@ All tests are CDI-free plain JUnit — following the dual-constructor pattern fr
    - Multiple sources, multiple actors — deduplication in `getOverloaded()`
    - No sources — returns 0.0 pressure
    - Source returns empty for `observe()` — skipped, no NPE
+   - Exception in one source doesn't prevent aggregation of others
 4. **`DefaultRedistributionPolicyTest`**
    - Each row in the decision table
    - Boundary conditions at threshold values
@@ -500,7 +520,7 @@ All tests are CDI-free plain JUnit — following the dual-constructor pattern fr
    - Zero pressure when no signal sources exist
 6. **`CapacityPressureMonitorTest`**
    - Fires event for each overloaded actor
-   - Identifies highest-pressure signal type as trigger
+   - Identifies highest-pressure signal type as trigger (lexicographic tie-break)
    - No overloaded actors → no events fired
    - Exception in one source doesn't prevent sweep of others
 
@@ -535,6 +555,6 @@ All tests are CDI-free plain JUnit — following the dual-constructor pattern fr
 - `eidos/api/src/main/java/io/casehub/eidos/api/SelectionContext.java` — 3-field record (Batch 2 adds capacityView)
 - GE-20260602-c4a68a — dual-constructor aggregator pattern for CDI-free testing
 - GE-20260602-047ac4 — visitor/accumulator pattern for thread-safe multi-backend aggregation
-- `docs/platform/boundary-rules.md` — validated: no boundary violations
-- `docs/platform/capability-ownership.md` — validated: no existing capacity capability
+- `~/casehub/parent/docs/platform/boundary-rules.md` — validated: no boundary violations
+- `~/casehub/parent/docs/platform/capability-ownership.md` — validated: no existing capacity capability
 - `wsp-casehub-qhorus/specs/cross-platform-capacity-redistribution/2026-09-02-capacity-redistribution-design.md` — cross-platform parent spec
