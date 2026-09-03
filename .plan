@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-270-module-bridge-dynamic-sections
-state: scaffolded
+state: active
 project-sha: dc7693ec6724fa3d6270d6614e4609b4dff855e3
 date: 2026-09-02
 issue-repo: casehubio/platform
@@ -13,8 +13,8 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#270 — Issue #270 ← active
-  - [ ] Batch 1: Foundation
-    - [ ] Task 1: ModuleBridge interface + TypedExpandedModule
-    - [ ] Task 2: Typed expand overload on ModuleExpander
-  - [ ] Batch 2: yaml-jackson
-    - [ ] Task 3: Module scaffold + builder + mixins + tests
+  - [x] Batch 1: Foundation
+    - [x] Task 1: ModuleBridge interface + TypedExpandedModule
+    - [x] Task 2: Typed expand overload on ModuleExpander
+  - [x] Batch 2: yaml-jackson
+    - [x] Task 3: Module scaffold + builder + mixins + tests
