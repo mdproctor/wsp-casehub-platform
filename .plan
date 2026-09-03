@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-269-module-extension-extends
-state: scaffolded
+state: active
 project-sha: 1e6c19d9df9caf69be5d8129958f08f7d4f714ba
 date: 2026-09-03
 issue-repo: casehubio/platform
@@ -13,8 +13,8 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#269 — Issue #269 ← active
-  - [ ] Batch 1: Foundation
-    - [ ] Task 1: Add extendsModule to YamlModuleHeader
-    - [ ] Task 2: Implement resolveExtensions with tests
+  - [x] Batch 1: Foundation
+    - [x] Task 1: Add extendsModule to YamlModuleHeader
+    - [x] Task 2: Implement resolveExtensions with tests
   - [ ] Batch 2: Jackson
     - [ ] Task 3: Add YamlModuleHeaderMixin and integration test
