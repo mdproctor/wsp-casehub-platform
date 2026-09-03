@@ -13,3 +13,9 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#271 — Issue #271 ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: ActorType prefix and fromPrefix
+    - [ ] Task 2: Identity sealed interface and PrincipalId
+    - [ ] Task 3: Complete ActorId and ParticipantId
+  - [ ] Batch 2: Documentation
+    - [ ] Task 4: Consumer guide and glossary updates
