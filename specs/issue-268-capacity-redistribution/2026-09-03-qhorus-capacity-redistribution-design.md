@@ -23,7 +23,7 @@ This spec delivers:
 - `MessageLedgerEntryRepository.findLatestContextPressureGlobal()` — cross-channel query
 
 This spec does NOT deliver:
-- `Channel.routingCapacityThreshold` (eidos per-channel threshold — separate issue)
+- `Channel.routingCapacityThreshold` — belongs with Batch 2 (eidos `OVERLOADED` probe), not Batch 3. The threshold is consumed by the eidos probe step, which this spec does not deliver. Cross-platform spec to be updated: move `routingCapacityThreshold` from Batch 3 to Batch 2 scope. Filed as casehubio/qhorus#TBD.
 - Engine `WorkloadCapacitySource` (batch 4)
 - Platform gate `SessionCapacitySource` (batch 3)
 
@@ -170,8 +170,9 @@ public class RedistributionDelegate {
     @Inject ChannelSummaryService summaryService;
     @Inject MessageService messageService;
     @Inject RoutingBridge routingBridge;
-    @Inject ChannelService channelService;
+    @Inject CrossTenantChannelStore channelStore;
     @Inject CrossTenantCommitmentStore commitmentStore;
+    @Inject MessageStore messageStore;
     @Inject Event<RedistributionExecutedEvent> executedEvents;
 
     @Transactional
@@ -221,10 +222,13 @@ public class RedistributionDelegate {
 
 ### Compress execution
 
+**Prerequisite:** `ChannelSummaryService.triggerUpdate()` internally calls `channelService.findById()` which uses tenant-scoped `JpaChannelStore.find()`. This fails in `@ObservesAsync` context. Update `triggerUpdate()` to use `CrossTenantChannelStore.findById()` for the channel lookup. Also make `countMessagesSince()` public (currently package-private, inaccessible from `io.casehub.qhorus.runtime.capacity`).
+
 ```
 1. For each unique channelId in obligations:
    a. summary = summaryService.getSummary(channelId)
-   b. if (summary.isEmpty() || countMessagesSince(channelId, summary.get().lastUpdatedMessageId()) > 0):
+   b. if (summary.isPresent()
+        && summaryService.countMessagesSince(channelId, summary.get().lastUpdatedMessageId()) > 0):
       summaryService.triggerUpdate(channelId)    // freshness guard (D7 guard #1)
 2. Fire RedistributionExecutedEvent(actorId, COMPRESSED, channelCount)
 ```
@@ -237,30 +241,58 @@ public class RedistributionDelegate {
        .toList()
 2. successCount = 0
 3. For each commitment in redistributable:
-   a. channel = channelService.findById(commitment.channelId())
-   b. try:
-        // Build HANDOFF dispatch
-        dispatch = MessageDispatch.builder()
-            .channelId(commitment.channelId())
-            .sender("system:redistribution")
-            .type(MessageType.HANDOFF)
-            .content("Capacity redistribution: pressure " + event.capacity().aggregatePressure())
-            .correlationId(commitment.correlationId())
-            .target("role:" + commitment.capabilityTag())
-            .tenancyId(commitment.tenancyId())
-            .actorType(ActorType.SYSTEM)
-            .build()
-        messageService.dispatch(dispatch)
-        successCount++
+   a. // Resolve inReplyTo — find original COMMAND/QUERY message
+      originalMessages = messageStore.scan(MessageQuery.builder()
+          .channelId(commitment.channelId())
+          .correlationId(commitment.correlationId())
+          .limit(1).build())
+      if (originalMessages.isEmpty()):
+          LOG.warnf("No original message for correlation %s — skipping",
+                    commitment.correlationId())
+          continue
+      inReplyTo = originalMessages.get(0).id()
+
+   b. // Pre-check routing — self-delegation guard
+      channel = channelStore.findById(commitment.channelId()).orElse(null)
+      if (channel == null): continue
+      dispatch = MessageDispatch.builder()
+          .channelId(commitment.channelId())
+          .sender("system:redistribution")
+          .type(MessageType.HANDOFF)
+          .content("Capacity redistribution: pressure " + event.capacity().aggregatePressure())
+          .correlationId(commitment.correlationId())
+          .target("role:" + commitment.capabilityTag())
+          .inReplyTo(inReplyTo)
+          .tenancyId(commitment.tenancyId())
+          .actorType(ActorType.SYSTEM)
+          .build()
+      try:
+          routingOutcome = routingBridge.resolve(dispatch, channel, commitment.tenancyId())
       catch (RoutingRejectedException e):
-        LOG.warnf("Cannot redistribute %s — no target for capability '%s': %s",
-                  commitment.correlationId(), commitment.capabilityTag(), e.getMessage())
+          LOG.warnf("Cannot redistribute %s — no target for capability '%s': %s",
+                    commitment.correlationId(), commitment.capabilityTag(), e.getMessage())
+          continue
+      if (routingOutcome == null):
+          continue
+      if (routingOutcome.resolvedTarget().equals(actorId)):
+          LOG.debugf("Self-delegation prevented for %s", commitment.correlationId())
+          continue
+
+   c. // Dispatch HANDOFF with pre-resolved target
+      dispatch = dispatch.withTarget(routingOutcome.resolvedTarget())
+      try:
+          messageService.dispatch(dispatch)
+          successCount++
       catch (Exception e):
-        LOG.warnf("Redistribution failed for %s: %s",
-                  commitment.correlationId(), e.getMessage())
+          LOG.warnf("Redistribution failed for %s: %s",
+                    commitment.correlationId(), e.getMessage())
 4. Fire RedistributionExecutedEvent(actorId, REDISTRIBUTED, successCount, redistributable.size())
 5. Return RedistributionResult(successCount, redistributable.size())
 ```
+
+**Self-delegation guard rationale:** The executor pre-checks routing via `RoutingBridge.resolve()` before dispatching. If the only available target is the overloaded actor itself, the commitment is skipped and counted as a routing failure. This guard is necessary until Batch 2 ships the eidos `OVERLOADED` probe, which will systemically exclude overloaded agents from selection. The `excludeActors` field from `RedistributionDecision.Redistribute` is consumed here — the executor checks `routingOutcome.resolvedTarget()` against the source actor (which is always the sole member of `excludeActors`).
+
+**Pre-resolved target:** The dispatch uses `withTarget(resolvedTarget)` to set the agent ID directly. Since the target no longer starts with `role:`, `MessageService.dispatch()` skips re-routing — no double routing. The HANDOFF triggers `commitmentService.delegate(correlationId, resolvedTarget)` which creates the child commitment on the resolved agent.
 
 ### Escalation
 
@@ -327,9 +359,54 @@ public record Commitment(
 ) { ... }
 ```
 
-### Population
+### Population — `open()` update
 
-The wiring point is `MessageService.dispatch()`, which holds both the original target (pre-resolution) and calls `commitmentService.open()`. `MessageService` extracts the capability from the original target before RoutingBridge resolution: if `dispatch.target() != null && dispatch.target().startsWith("role:")`, pass `dispatch.target().substring("role:".length())` as the `capabilityTag` parameter to `commitmentService.open()`. Otherwise pass null. `CommitmentService.open()` gains a `String capabilityTag` parameter and passes it through to the Commitment builder.
+`CommitmentService.open()` gains two parameters: `String tenancyId` and `String capabilityTag`.
+
+New signature:
+```java
+public Commitment open(UUID commitmentId, String correlationId, UUID channelId,
+                       MessageType type, String requester, String obligor,
+                       Instant expiresAt, String tenancyId, String capabilityTag)
+```
+
+The single production caller is `MessageService.dispatch()` (line 418). Updated call:
+```java
+String capabilityTag = dispatch.target() != null && dispatch.target().startsWith("role:")
+        ? dispatch.target().substring("role:".length())
+        : null;
+commitmentService.open(
+        storedCommitmentId, dispatch.correlationId(), dispatch.channelId(),
+        dispatch.type(), dispatch.sender(), dispatch.target(),
+        effectiveDeadline, effectiveTenancyId, capabilityTag);
+```
+
+`capabilityTag` extraction happens BEFORE `dispatch = dispatch.withTarget(routingOutcome.resolvedTarget())` (line 206), so it reads the original `role:X` target.
+
+`tenancyId` is `effectiveTenancyId` (already computed at line 129), fixing the pre-existing bug where `open()` never set `tenancyId` and the entity defaulted to `DEFAULT_TENANT_ID`.
+
+No other production callers exist (verified via call hierarchy — all others are tests).
+
+### Population — `delegate()` update
+
+`CommitmentService.delegate()` creates a child commitment (lines 271-280) that currently omits `capabilityTag` and `tenancyId`. Both must be copied from the parent:
+
+```java
+Commitment child = Commitment.builder()
+        .correlationId(correlationId)
+        .channelId(c.channelId())
+        .messageType(c.messageType())
+        .requester(c.requester())
+        .obligor(delegatedTo)
+        .expiresAt(c.expiresAt())
+        .state(CommitmentState.OPEN)
+        .parentCommitmentId(c.id())
+        .tenancyId(c.tenancyId())           // R1-05: copy from parent
+        .capabilityTag(c.capabilityTag())    // R1-04: copy from parent
+        .build();
+```
+
+Without `capabilityTag` on the child, redistribution chains beyond depth 1 silently fail — the executor's `c.capabilityTag() != null` filter skips the child. Without `tenancyId`, the child defaults to `DEFAULT_TENANT_ID` via `CommitmentEntity.fromDomain()`, causing wrong tenant on subsequent HANDOFF dispatches.
 
 ### Migration
 
@@ -407,7 +484,8 @@ sweep (60s) → detect → fire event → executor acts → effect → sweep →
 
 | Guard | Prevents | Mechanism |
 |-------|----------|-----------|
-| Compression freshness | Wasteful LLM calls on repeat sweeps | `countMessagesSince()` before `triggerUpdate()` |
+| Compression freshness | Wasteful LLM calls on repeat sweeps | `summaryService.countMessagesSince()` before `triggerUpdate()` |
+| Self-delegation | Overloaded actor selected as own HANDOFF target | Pre-routing via `routingBridge.resolve()`, check `resolvedTarget != actorId` |
 | Routing failure escalation | Infinite stuck loop when no targets available | Boolean flag: zero successes + Redistribute → Escalate |
 | Grace period cooldown | Oscillation (redistribute → new work → redistribute) | `findLatestDelegatedByObligor()` + `resolvedAt` comparison |
 
@@ -416,6 +494,7 @@ sweep (60s) → detect → fire event → executor acts → effect → sweep →
 | Mode | Class | Resolution |
 |------|-------|------------|
 | Concurrent sweeps, same actor | WASTEFUL | Commitment state machine prevents double HANDOFF |
+| Self-delegation (target = source) | PREVENTED | Pre-routing guard checks resolvedTarget vs actorId |
 | HANDOFF cascades overload target | HARMLESS | CIRCULAR_DELEGATION watchdog catches cycles |
 | Threshold oscillation | WASTEFUL | Freshness guard makes repeated compress a no-op |
 | Stale context_window_pct | WASTEFUL | Moves work that didn't need moving, no corruption |
@@ -472,6 +551,11 @@ All tests are CDI-free plain JUnit — dual-constructor pattern (GE-20260602-c4a
 2. Redistribute dispatches HANDOFF with correct target, correlation, tenancy
 3. Redistribute catches RoutingRejectedException per commitment, continues
 4. Escalate fires event with reason
+5. **inReplyTo resolution**: HANDOFF dispatch carries the original COMMAND/QUERY message ID as `inReplyTo`
+6. **Self-delegation guard**: routing resolves overloaded actor as target → commitment skipped, not dispatched
+7. **Cross-tenant channel access**: delegate uses `CrossTenantChannelStore.findById()`, not `ChannelService` — no `CurrentPrincipal` dependency
+8. **Allowed-writers ACL**: `system:redistribution` sender against channel with allowed_writers ACL → HANDOFF not blocked (system senders bypass ACL per `AllowedWritersPolicy.isAllowedWriter()` — sender contains `:`)
+9. **Redistribution chain depth > 1**: redistributed commitment's child has `capabilityTag` and `tenancyId` → second-hop redistribution succeeds
 
 ### Commitment.capabilityTag tests
 
