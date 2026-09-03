@@ -13,3 +13,8 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#270 — Issue #270 ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: ModuleBridge interface + TypedExpandedModule
+    - [ ] Task 2: Typed expand overload on ModuleExpander
+  - [ ] Batch 2: yaml-jackson
+    - [ ] Task 3: Module scaffold + builder + mixins + tests
