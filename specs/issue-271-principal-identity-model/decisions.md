@@ -58,3 +58,15 @@
 **Sources:** User direction — "file as separate issue, neocortex just needs the types right now"
 **Exploration:** quick
 **Status:** captured
+
+## D6: PrincipalType enum — reuse ActorType, rename later
+
+**Choice:** PrincipalId uses the existing ActorType enum (HUMAN, AGENT, SYSTEM). Rename ActorType → PrincipalType tracked as a separate cross-repo refactor issue (slot-based, IntelliJ rename across all consumer repos).
+**Alternatives:**
+- New PrincipalType enum alongside ActorType — duplicate enums with identical values until migration completes
+**Rationale:** Avoids parallel enums. The rename is a mechanical IntelliJ refactor across all consumer repos.
+**Trade-offs:** Naming mismatch until the refactor lands — PrincipalId.type() returns ActorType. Acceptable as temporary state.
+**Depends on:** D4
+**Sources:** ActorType.java, user direction
+**Exploration:** quick
+**Status:** captured
