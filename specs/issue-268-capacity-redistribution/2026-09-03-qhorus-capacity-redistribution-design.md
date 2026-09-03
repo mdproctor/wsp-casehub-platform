@@ -124,6 +124,12 @@ public List<MessageLedgerEntry> findLatestContextPressureGlobal() {
     // across ALL channels and tenants
     // GROUP BY actorId, MAX(sequenceNumber) — most recent per actor (D8)
 }
+
+public Optional<MessageLedgerEntry> findLatestEntryByActor(String actorId) {
+    // Latest entry of ANY type for this actor across ALL channels and tenants
+    // Used by the executor to derive timeSinceLastActivity
+    // ORDER BY sequenceNumber DESC, LIMIT 1
+}
 ```
 
 **Index requirement (D8):** The global query needs an index with `actorId` as a leading column for efficient GROUP BY. Without it, the query degrades to a sequential scan on the ledger table. Add as a Flyway migration.
@@ -186,8 +192,9 @@ public class RedistributionDelegate {
 1. actorId = event.actorId()
 2. obligations = commitmentStore.findOpenByObligor(actorId)
        .stream().filter(c -> c.state().isActive()).toList()
-3. timeSinceLastActivity = derive from messageRepo
-       (latest entry by actorId across channels, Duration.between(entry.createdAt(), now))
+3. timeSinceLastActivity = messageRepo.findLatestEntryByActor(actorId)
+       .map(e -> Duration.between(e.createdAt(), Instant.now()))
+       .orElse(Duration.ofDays(365))  // unknown → treat as long-inactive
 4. context = new RedistributionContext(actorId, event.capacity(),
        event.triggerSignalType(), obligations.size(), timeSinceLastActivity)
 5. decision = policy.evaluate(context)
@@ -279,10 +286,26 @@ public record RedistributionExecutedEvent(
     Instant occurredAt
 ) {
     public enum Outcome { COMPRESSED, REDISTRIBUTED, ESCALATED }
+
+    public static RedistributionExecutedEvent compressed(String actorId, int channelCount) {
+        return new RedistributionExecutedEvent(actorId, Outcome.COMPRESSED,
+                channelCount, channelCount, null, Instant.now());
+    }
+
+    public static RedistributionExecutedEvent redistributed(String actorId,
+                                                             int successCount, int totalCount) {
+        return new RedistributionExecutedEvent(actorId, Outcome.REDISTRIBUTED,
+                successCount, totalCount, null, Instant.now());
+    }
+
+    public static RedistributionExecutedEvent escalated(String actorId, String reason) {
+        return new RedistributionExecutedEvent(actorId, Outcome.ESCALATED,
+                0, 0, reason, Instant.now());
+    }
 }
 ```
 
-Fired by the executor after every action. Observed by the notification bridge for alerting.
+Fired by the executor after every action. Factory methods ensure consistent construction per outcome type. Observed by the notification bridge for alerting.
 
 ---
 
@@ -306,9 +329,7 @@ public record Commitment(
 
 ### Population
 
-In `CommitmentService.open()`, the `capabilityTag` is populated from the dispatch's resolved target. `MessageService.dispatch()` already resolves `role:X` targets via `RoutingBridge` before opening the commitment — the original `role:X` target string is available at that point.
-
-Extract the capability from the target: if `target.startsWith("role:")`, set `capabilityTag = target.substring("role:".length())`. Otherwise null.
+The wiring point is `MessageService.dispatch()`, which holds both the original target (pre-resolution) and calls `commitmentService.open()`. `MessageService` extracts the capability from the original target before RoutingBridge resolution: if `dispatch.target() != null && dispatch.target().startsWith("role:")`, pass `dispatch.target().substring("role:".length())` as the `capabilityTag` parameter to `commitmentService.open()`. Otherwise pass null. `CommitmentService.open()` gains a `String capabilityTag` parameter and passes it through to the Commitment builder.
 
 ### Migration
 
@@ -498,3 +519,4 @@ All tests are CDI-free plain JUnit — dual-constructor pattern (GE-20260602-c4a
 - GE-20260627-f3476f — scope-safe CurrentPrincipal delegation
 - GE-20260602-6941d6 — separate @Transactional delegate pattern
 - GE-20260517-5de55b — dispatch auto-opens commitment
+- `api/src/main/java/io/casehub/qhorus/api/store/CrossTenantCommitmentStore.java` — extended with two new methods
