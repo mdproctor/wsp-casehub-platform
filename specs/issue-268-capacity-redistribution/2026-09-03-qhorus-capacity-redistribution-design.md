@@ -172,11 +172,13 @@ public class RedistributionDelegate {
     @Inject CrossTenantChannelStore channelStore;
     @Inject CrossTenantCommitmentStore commitmentStore;
     @Inject MessageStore messageStore;
+    @Inject InboundTenancyContext inboundTenancyContext;
     @Inject Event<RedistributionExecutedEvent> executedEvents;
 
     @Transactional
     public void compress(String actorId, List<Commitment> obligations) { ... }
 
+    @ActivateRequestContext
     @Transactional
     public RedistributionResult redistribute(String actorId,
                                               List<Commitment> obligations,
@@ -240,6 +242,9 @@ public class RedistributionDelegate {
        .toList()
 2. successCount = 0
 3. For each commitment in redistributable:
+   a0. // Establish tenant context for this commitment's dispatch
+       inboundTenancyContext.set(commitment.tenancyId())
+
    a. // Resolve inReplyTo — find original COMMAND/QUERY message
       originalMessages = messageStore.scan(MessageQuery.builder()
           .channelId(commitment.channelId())
@@ -293,6 +298,15 @@ public class RedistributionDelegate {
 **Self-delegation guard rationale:** The executor pre-checks routing via `RoutingBridge.resolve()` before dispatching. If the resolved target is in `decision.excludeActors()`, the commitment is skipped and counted as a routing failure. This guard is necessary until Batch 2 ships the eidos `OVERLOADED` probe, which will systemically exclude overloaded agents from selection. The `excludeActors` field from `RedistributionDecision.Redistribute` is consumed directly — the default policy sets `excludeActors = Set.of(context.actorId())`, but custom policies can exclude additional actors (e.g. recently-overloaded agents from the same pool).
 
 **Pre-resolved target:** The dispatch uses `withTarget(resolvedTarget)` to set the agent ID directly. Since the target no longer starts with `role:`, `MessageService.dispatch()` skips re-routing — no double routing. The HANDOFF triggers `commitmentService.delegate(correlationId, resolvedTarget)` which creates the child commitment on the resolved agent.
+
+**Tenant context bridging (D11 revised):** `messageService.dispatch()` internally calls `CorrelationIntegrityChecker` and `CommitmentService.delegate()`, both of which use tenant-scoped `CommitmentStore` (via `CurrentPrincipal.tenancyId()`). In `@ObservesAsync` context, no `@RequestScoped` context exists. The delegate bridges this gap:
+1. `@ActivateRequestContext` on `redistribute()` creates a CDI request scope
+2. `InboundTenancyContext.set(commitment.tenancyId())` per-commitment establishes the tenant identity that `QhorusInboundCurrentPrincipal.tenancyId()` returns
+3. `messageService.dispatch()` then executes within the correct tenant context
+
+The "No `CurrentPrincipal` injection" rule (D11) remains correct for the delegate's own queries — those use `CrossTenantCommitmentStore`. The `InboundTenancyContext.set()` call establishes context for `messageService.dispatch()` internals only.
+
+**OIDC deployment note:** In deployments with `SecurityIdentityCurrentPrincipal @Alternative @Priority(100)`, the activated request scope creates an anonymous `SecurityIdentity` which returns `DEFAULT_TENANT_ID`. This is correct for the current single-tenant deployment. Multi-tenant OIDC redistribution requires a platform-level `SystemTenantScope` mechanism — tracked separately (not blocking for Batch 3).
 
 ### Escalation
 
@@ -557,6 +571,7 @@ All tests are CDI-free plain JUnit — dual-constructor pattern (GE-20260602-c4a
 7. **Cross-tenant channel access**: delegate uses `CrossTenantChannelStore.findById()`, not `ChannelService` — no `CurrentPrincipal` dependency
 8. **Allowed-writers ACL**: `system:redistribution` sender against channel with restrictive allowed_writers ACL (no `role:system`) → HANDOFF dispatch throws `IllegalStateException` → caught by redistribute loop → commitment skipped, counted as routing failure
 9. **Redistribution chain depth > 1**: redistributed commitment's child has `capabilityTag` and `tenancyId` → second-hop redistribution succeeds
+10. **Tenant context bridging**: `redistribute()` in `@ObservesAsync` context → `@ActivateRequestContext` creates request scope → `InboundTenancyContext.set(commitment.tenancyId())` → `messageService.dispatch()` succeeds (no `ContextNotActiveException` from `CorrelationIntegrityChecker` or `CommitmentService.delegate()`)
 
 ### Commitment.capabilityTag tests
 
@@ -601,7 +616,9 @@ All tests are CDI-free plain JUnit — dual-constructor pattern (GE-20260602-c4a
 - GE-20260512-6887c9 — @ObservesAsync + @Transactional delegate pattern
 - GE-20260517-e10a0f — HANDOFF commitment child/parent gotcha
 - GE-20260512-0fe012 — fireAsync transaction timing
-- GE-20260627-f3476f — scope-safe CurrentPrincipal delegation
+- GE-20260627-f3476f — scope-safe CurrentPrincipal delegation (scope-checking pattern; redistribution uses @ActivateRequestContext instead)
+- `runtime/src/main/java/io/casehub/qhorus/runtime/identity/InboundTenancyContext.java` — @RequestScoped tenant holder with set() method
+- `runtime/src/main/java/io/casehub/qhorus/runtime/message/CorrelationIntegrityChecker.java:19` — TERMINAL_TYPES includes HANDOFF
 - GE-20260602-6941d6 — separate @Transactional delegate pattern
 - GE-20260517-5de55b — dispatch auto-opens commitment
 - `api/src/main/java/io/casehub/qhorus/api/store/CrossTenantCommitmentStore.java` — extended with two new methods
