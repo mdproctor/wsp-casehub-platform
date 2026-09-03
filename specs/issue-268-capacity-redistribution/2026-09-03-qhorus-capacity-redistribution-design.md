@@ -23,7 +23,7 @@ This spec delivers:
 - `MessageLedgerEntryRepository.findLatestContextPressureGlobal()` — cross-channel query
 
 This spec does NOT deliver:
-- `Channel.routingCapacityThreshold` — belongs with Batch 2 (eidos `OVERLOADED` probe), not Batch 3. The threshold is consumed by the eidos probe step, which this spec does not deliver. Cross-platform spec to be updated: move `routingCapacityThreshold` from Batch 3 to Batch 2 scope. Filed as casehubio/qhorus#TBD.
+- `Channel.routingCapacityThreshold` — belongs with Batch 2 (eidos `OVERLOADED` probe), not Batch 3. The threshold is consumed by the eidos probe step, which this spec does not deliver. Cross-platform spec to be updated: move `routingCapacityThreshold` from Batch 3 to Batch 2 scope (casehubio/qhorus#430).
 - Engine `WorkloadCapacitySource` (batch 4)
 - Platform gate `SessionCapacitySource` (batch 3)
 
@@ -89,10 +89,9 @@ public class ContextPressureCapacitySource implements CapacitySignalSource {
 
     @Override
     public List<CapacitySignal> observeOverloaded(double threshold) {
-        int pctThreshold = (int) (threshold * 100);
         return messageRepo.findLatestContextPressureGlobal().stream()
                 .filter(entry -> entry.contextWindowPct != null
-                                 && entry.contextWindowPct >= pctThreshold)
+                                 && entry.contextWindowPct / 100.0 >= threshold)
                 .map(entry -> new CapacitySignal(
                         entry.actorId,
                         CapacitySignalTypes.CONTEXT_PRESSURE,
@@ -222,7 +221,7 @@ public class RedistributionDelegate {
 
 ### Compress execution
 
-**Prerequisite:** `ChannelSummaryService.triggerUpdate()` internally calls `channelService.findById()` which uses tenant-scoped `JpaChannelStore.find()`. This fails in `@ObservesAsync` context. Update `triggerUpdate()` to use `CrossTenantChannelStore.findById()` for the channel lookup. Also make `countMessagesSince()` public (currently package-private, inaccessible from `io.casehub.qhorus.runtime.capacity`).
+**Prerequisite (casehubio/qhorus#429):** `ChannelSummaryService.triggerUpdate()` internally calls `channelService.findById()` which uses tenant-scoped `JpaChannelStore.find()`. This fails in `@ObservesAsync` context. Update `triggerUpdate()` to use `CrossTenantChannelStore.findById()` for the channel lookup. Also make `countMessagesSince()` public (currently package-private, inaccessible from `io.casehub.qhorus.runtime.capacity`).
 
 ```
 1. For each unique channelId in obligations:
@@ -274,8 +273,9 @@ public class RedistributionDelegate {
           continue
       if (routingOutcome == null):
           continue
-      if (routingOutcome.resolvedTarget().equals(actorId)):
-          LOG.debugf("Self-delegation prevented for %s", commitment.correlationId())
+      if (decision.excludeActors().contains(routingOutcome.resolvedTarget())):
+          LOG.debugf("Excluded actor prevented for %s: %s",
+                     commitment.correlationId(), routingOutcome.resolvedTarget())
           continue
 
    c. // Dispatch HANDOFF with pre-resolved target
@@ -290,7 +290,7 @@ public class RedistributionDelegate {
 5. Return RedistributionResult(successCount, redistributable.size())
 ```
 
-**Self-delegation guard rationale:** The executor pre-checks routing via `RoutingBridge.resolve()` before dispatching. If the only available target is the overloaded actor itself, the commitment is skipped and counted as a routing failure. This guard is necessary until Batch 2 ships the eidos `OVERLOADED` probe, which will systemically exclude overloaded agents from selection. The `excludeActors` field from `RedistributionDecision.Redistribute` is consumed here — the executor checks `routingOutcome.resolvedTarget()` against the source actor (which is always the sole member of `excludeActors`).
+**Self-delegation guard rationale:** The executor pre-checks routing via `RoutingBridge.resolve()` before dispatching. If the resolved target is in `decision.excludeActors()`, the commitment is skipped and counted as a routing failure. This guard is necessary until Batch 2 ships the eidos `OVERLOADED` probe, which will systemically exclude overloaded agents from selection. The `excludeActors` field from `RedistributionDecision.Redistribute` is consumed directly — the default policy sets `excludeActors = Set.of(context.actorId())`, but custom policies can exclude additional actors (e.g. recently-overloaded agents from the same pool).
 
 **Pre-resolved target:** The dispatch uses `withTarget(resolvedTarget)` to set the agent ID directly. Since the target no longer starts with `role:`, `MessageService.dispatch()` skips re-routing — no double routing. The HANDOFF triggers `commitmentService.delegate(correlationId, resolvedTarget)` which creates the child commitment on the resolved agent.
 
@@ -485,7 +485,7 @@ sweep (60s) → detect → fire event → executor acts → effect → sweep →
 | Guard | Prevents | Mechanism |
 |-------|----------|-----------|
 | Compression freshness | Wasteful LLM calls on repeat sweeps | `summaryService.countMessagesSince()` before `triggerUpdate()` |
-| Self-delegation | Overloaded actor selected as own HANDOFF target | Pre-routing via `routingBridge.resolve()`, check `resolvedTarget != actorId` |
+| Self-delegation | Excluded actor selected as HANDOFF target | Pre-routing via `routingBridge.resolve()`, check `decision.excludeActors().contains(resolvedTarget)` |
 | Routing failure escalation | Infinite stuck loop when no targets available | Boolean flag: zero successes + Redistribute → Escalate |
 | Grace period cooldown | Oscillation (redistribute → new work → redistribute) | `findLatestDelegatedByObligor()` + `resolvedAt` comparison |
 
@@ -494,13 +494,14 @@ sweep (60s) → detect → fire event → executor acts → effect → sweep →
 | Mode | Class | Resolution |
 |------|-------|------------|
 | Concurrent sweeps, same actor | WASTEFUL | Commitment state machine prevents double HANDOFF |
-| Self-delegation (target = source) | PREVENTED | Pre-routing guard checks resolvedTarget vs actorId |
+| Self-delegation (target in excludeActors) | PREVENTED | Pre-routing guard checks `decision.excludeActors().contains(resolvedTarget)` |
 | HANDOFF cascades overload target | HARMLESS | CIRCULAR_DELEGATION watchdog catches cycles |
 | Threshold oscillation | WASTEFUL | Freshness guard makes repeated compress a no-op |
 | Stale context_window_pct | WASTEFUL | Moves work that didn't need moving, no corruption |
 | fireAsync out-of-order delivery | HARMLESS | Executor queries live state, event is just a trigger |
 | Executor crash mid-HANDOFF | HARMLESS | Next sweep continues from current state |
 | Target goes offline after HANDOFF | HARMLESS | Commitment expiry handles it |
+| ACL-restricted channel blocks HANDOFF | GRACEFUL | `AllowedWritersPolicy` rejects `system:redistribution` sender; caught by redistribute loop, commitment skipped. Channels with `role:system` in `allowedWriters` are redistributable |
 
 ---
 
@@ -554,7 +555,7 @@ All tests are CDI-free plain JUnit — dual-constructor pattern (GE-20260602-c4a
 5. **inReplyTo resolution**: HANDOFF dispatch carries the original COMMAND/QUERY message ID as `inReplyTo`
 6. **Self-delegation guard**: routing resolves overloaded actor as target → commitment skipped, not dispatched
 7. **Cross-tenant channel access**: delegate uses `CrossTenantChannelStore.findById()`, not `ChannelService` — no `CurrentPrincipal` dependency
-8. **Allowed-writers ACL**: `system:redistribution` sender against channel with allowed_writers ACL → HANDOFF not blocked (system senders bypass ACL per `AllowedWritersPolicy.isAllowedWriter()` — sender contains `:`)
+8. **Allowed-writers ACL**: `system:redistribution` sender against channel with restrictive allowed_writers ACL (no `role:system`) → HANDOFF dispatch throws `IllegalStateException` → caught by redistribute loop → commitment skipped, counted as routing failure
 9. **Redistribution chain depth > 1**: redistributed commitment's child has `capabilityTag` and `tenancyId` → second-hop redistribution succeeds
 
 ### Commitment.capabilityTag tests
