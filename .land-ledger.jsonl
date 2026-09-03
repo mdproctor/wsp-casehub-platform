@@ -1,0 +1,2 @@
+{"event":"promote","branch":"issue-271-principal-identity-model","files":[],"timestamp":"2026-09-03T09:25:37.208366+00:00"}
+{"event":"land","repo":"platform","branch":"issue-271-principal-identity-model","base_branch":"main","landed_sha":"1e6c19d9df9caf69be5d8129958f08f7d4f714ba","push_target":"upstream","mirrored":true,"stamped":true,"timestamp":"2026-09-03T09:44:24.482504+00:00"}
