@@ -98,3 +98,27 @@
 **Sources:** `MessageLedgerEntryRepository.findLatestContextPressure()` (qhorus), `WatchdogEvaluationService.evaluateContextPressure()` (qhorus)
 **Exploration:** quick
 **Status:** captured
+
+## D9: Module placement — executor in runtime, event in api
+
+**Choice:** `ContextPressureCapacitySource` and `QhorusRedistributionExecutor` in qhorus-runtime (`io.casehub.qhorus.runtime.capacity`). `RedistributionExecutedEvent` in qhorus-api (`io.casehub.qhorus.api.capacity`).
+**Alternatives:**
+- Executor in a separate qhorus module (e.g., `capacity/`) — unnecessary isolation for a single class with runtime-internal dependencies.
+- Event in runtime — prevents external modules (notification-bridge) from observing without depending on runtime.
+**Rationale:** Executor depends on runtime-internal classes (`RoutingBridge`, `ChannelSummaryService`, `CommitmentService`, `MessageLedgerEntryRepository`). Event in api follows the existing pattern (`CommitmentDeclinedEvent`, `CommitmentExpiredEvent` in qhorus-api).
+**Trade-offs:** None significant.
+**Sources:** `CommitmentDeclinedEvent` (qhorus-api), `RoutingBridge` (qhorus-runtime)
+**Exploration:** quick
+**Status:** captured
+
+## D10: Capability tag on Commitment for redistribution target resolution
+
+**Choice:** Add `capabilityTag` (String, nullable) to the `Commitment` record. Populated at commitment creation when the dispatch was role-routed (`role:X` target). Null for directly-addressed commitments. The executor reads this directly — null means "skip, don't redistribute explicitly-addressed work."
+**Alternatives:**
+- Read from ledger (`MessageLedgerEntry.routingOriginalTarget`) — reconstructs data from audit history that should have been captured at creation time. Indirect lookup, design smell. Additional query per commitment during redistribution.
+**Rationale:** The commitment data model is incomplete without the capability context. It already has who (requester/obligor), where (channelId), what type (messageType) — `capabilityTag` adds "for what capability." Pre-release, schema change cost is zero. Also enables obligation analytics and routing diagnostics beyond redistribution.
+**Trade-offs:** One more field on Commitment record, entity, store implementations, and migration. Pre-release — cost is zero.
+**Depends on:** D7 (executor needs capability to resolve HANDOFF targets)
+**Sources:** `Commitment.java` (qhorus-api), `RoutingBridge.resolve()` (qhorus-runtime), `MessageLedgerEntry.routingOriginalTarget` (qhorus-runtime)
+**Exploration:** quick
+**Status:** captured
