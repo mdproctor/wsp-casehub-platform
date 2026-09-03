@@ -86,3 +86,15 @@
 **Sources:** `ChannelSummaryService.triggerUpdate()` (qhorus), `CommitmentService.delegate()` (qhorus), `RoutingBridge.resolve()` (qhorus), GE-20260605-373190 (@ObservesAsync + @RequestScoped), GE-20260512-6887c9 (@ObservesAsync + @Transactional), GE-20260517-e10a0f (HANDOFF commitment gotcha), GE-20260602-6941d6 (separate @Transactional delegate)
 **Exploration:** deep-analysis
 **Status:** captured
+
+## D8: Cross-channel global query for ContextPressureCapacitySource
+
+**Choice:** New `findLatestContextPressureGlobal()` method on `MessageLedgerEntryRepository` — single SQL query across all channels and tenants, returns latest `contextWindowPct` per actorId. `ContextPressureCapacitySource` injects this directly.
+**Alternatives:**
+- Iterate all channels via `crossTenantChannelStore.listAll()` + existing per-channel `findLatestContextPressure()` — reuses existing code but O(channels) queries, N+1 pattern, inefficient at scale.
+**Rationale:** Capacity signals are tenant-agnostic (D4). A single `GROUP BY actorId` query is both simpler and more efficient. The watchdog's per-channel iteration is legacy design — the signal source should not copy it.
+**Trade-offs:** New repository method to maintain. Acceptable — it's a single JPQL query.
+**Depends on:** D4 (tenant-agnostic signals)
+**Sources:** `MessageLedgerEntryRepository.findLatestContextPressure()` (qhorus), `WatchdogEvaluationService.evaluateContextPressure()` (qhorus)
+**Exploration:** quick
+**Status:** captured
