@@ -17,5 +17,5 @@ flyway-next-v: none
     - [x] Task 1: ActorType prefix and fromPrefix
     - [x] Task 2: Identity sealed interface and PrincipalId
     - [x] Task 3: Complete ActorId and ParticipantId
-  - [ ] Batch 2: Documentation
-    - [ ] Task 4: Consumer guide and glossary updates
+  - [x] Batch 2: Documentation
+    - [x] Task 4: Consumer guide and glossary updates
