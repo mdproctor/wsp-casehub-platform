@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-271-principal-identity-model
-state: scaffolded
+state: active
 project-sha: 8d9df53f55b08ca64700beef237c94bdd182cbeb
 date: 2026-09-03
 issue-repo: casehubio/platform
@@ -13,9 +13,9 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#271 — Issue #271 ← active
-  - [ ] Batch 1: Foundation
-    - [ ] Task 1: ActorType prefix and fromPrefix
-    - [ ] Task 2: Identity sealed interface and PrincipalId
-    - [ ] Task 3: Complete ActorId and ParticipantId
+  - [x] Batch 1: Foundation
+    - [x] Task 1: ActorType prefix and fromPrefix
+    - [x] Task 2: Identity sealed interface and PrincipalId
+    - [x] Task 3: Complete ActorId and ParticipantId
   - [ ] Batch 2: Documentation
     - [ ] Task 4: Consumer guide and glossary updates
