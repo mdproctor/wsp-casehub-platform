@@ -70,3 +70,27 @@
 **Sources:** ActorType.java, user direction
 **Exploration:** quick
 **Status:** captured
+
+## D7: Package placement — existing identity package
+
+**Choice:** Place PrincipalId, ActorId, ParticipantId, Identity in `io.casehub.platform.api.identity` alongside CurrentPrincipal and ActorType.
+**Alternatives:**
+- New sub-package `io.casehub.platform.api.identity.model` — separates value types from CDI SPIs, but the package isn't overcrowded
+**Rationale:** The package already has the right name and contains all identity-related types. Three records + one sealed interface is a modest addition.
+**Trade-offs:** None significant.
+**Depends on:** D4
+**Sources:** Existing package structure
+**Exploration:** quick
+**Status:** captured
+
+## D8: Serialized names use target naming from day one
+
+**Choice:** Any new serialized form (YAML keys, JSON fields, config properties) introduced by this issue uses `principalType` — the target name — not `actorType`. The Java enum stays as `ActorType` (D6) but Jackson/serialization annotations map to `principalType`. Also add Javadoc on `ActorType` noting the planned rename (#272).
+**Alternatives:**
+- Use `actorType` in serialization, rename later — serialized names are harder to change than Java names, creates a breaking change for consumers
+**Rationale:** Serialized forms appear in YAML files, config, API responses. Renaming those is a breaking change. Java class renames are mechanical (IntelliJ refactor). Get the external-facing name right from the start.
+**Trade-offs:** Mild naming mismatch between Java enum name (`ActorType`) and serialized field name (`principalType`) until #272 lands.
+**Depends on:** D6
+**Sources:** User direction
+**Exploration:** quick
+**Status:** captured
