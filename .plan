@@ -13,3 +13,8 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#269 — Issue #269 ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: Add extendsModule to YamlModuleHeader
+    - [ ] Task 2: Implement resolveExtensions with tests
+  - [ ] Batch 2: Jackson
+    - [ ] Task 3: Add YamlModuleHeaderMixin and integration test
