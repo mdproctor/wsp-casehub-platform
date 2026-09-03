@@ -122,3 +122,15 @@
 **Sources:** `Commitment.java` (qhorus-api), `RoutingBridge.resolve()` (qhorus-runtime), `MessageLedgerEntry.routingOriginalTarget` (qhorus-runtime)
 **Exploration:** quick
 **Status:** captured
+
+## D11: Executor CDI design — delegate pattern for @ObservesAsync
+
+**Choice:** `@ApplicationScoped` executor with `@ObservesAsync` handler. Delegates transactional work (commitment queries, HANDOFF dispatch) to a separate `@ApplicationScoped @Transactional` delegate bean. Uses `CrossTenantCommitmentStore` for obligation queries. No `CurrentPrincipal` injection — HANDOFF dispatch sets `tenancyId` explicitly from the commitment's own `tenancyId` field.
+**Alternatives:**
+- Single class with `@ObservesAsync` + `@Transactional` — unreliable per GE-20260512-6887c9.
+- Inject `CurrentPrincipal` with `ContextNotActiveException` catch — fragile, unnecessary when commitment already carries `tenancyId`.
+**Rationale:** Direct application of existing qhorus patterns. `WatchdogEvaluationService` uses the same approach: `QhorusSystemCurrentPrincipal` + `CrossTenant*Store` for background operations.
+**Trade-offs:** Two classes instead of one. Acceptable — the pattern is established and the separation is clean.
+**Sources:** GE-20260605-373190 (@ObservesAsync + @RequestScoped), GE-20260512-6887c9 (@ObservesAsync + @Transactional), GE-20260602-6941d6 (separate @Transactional delegate), `WatchdogEvaluationService` (qhorus-runtime)
+**Exploration:** quick
+**Status:** captured
