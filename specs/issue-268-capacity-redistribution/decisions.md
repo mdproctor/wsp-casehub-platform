@@ -76,7 +76,7 @@
 
 ## D7: Stateless fire-and-forget executor with sweep-based re-evaluation
 
-**Choice:** The redistribution executor uses fire-and-forget compression (option 1) with sweep-based re-evaluation. The executor is stateless across sweeps — all state lives in the commitment store (obligations), capacity view (pressure), and ledger (signal freshness). Two guards ensure eventual consistency: (1) compression freshness guard (`countMessagesSince()` before `triggerUpdate()`) prevents wasteful LLM calls, (2) routing failure escalation (if policy says Redistribute and zero HANDOFFs succeed, fire Escalate) prevents infinite stuck loops. The executor must respect the `gracePeriod` field on `Redistribute` decisions — after a redistribution action for an actor, skip subsequent redistribution for that actor until the grace period expires. Derive last-redistribution timestamp from the commitment store's latest DELEGATED commitment for the actor. `Duration.ZERO` (immediate threshold ≥ 0.95) disables the cooldown. This also serves as the oscillation prevention mechanism.
+**Choice:** The redistribution executor uses fire-and-forget compression (option 1) with sweep-based re-evaluation. The executor is stateless across sweeps — all state lives in the commitment store (obligations), capacity view (pressure), and ledger (signal freshness). Two guards ensure eventual consistency: (1) compression freshness guard (`countMessagesSince()` before `triggerUpdate()`) prevents wasteful LLM calls, (2) routing failure escalation (if policy says Redistribute and zero HANDOFFs succeed, fire Escalate) prevents infinite stuck loops. The executor must respect the `gracePeriod` field on `Redistribute` decisions — after a redistribution action for an actor, skip subsequent redistribution for that actor until the grace period expires. Derive last-redistribution timestamp via `CrossTenantCommitmentStore.findLatestDelegatedByObligor(actorId)`, which returns the most recently delegated commitment for the actor; use `resolvedAt` as the redistribution timestamp. `Duration.ZERO` (immediate threshold ≥ 0.95) disables the cooldown. This also serves as the oscillation prevention mechanism.
 **Alternatives:**
 - Synchronous wait (option 2) — executor blocks during LLM-driven compression, re-evaluates, then HANDOFFs. Clean sequential flow but holds a managed `@ObservesAsync` executor thread for seconds to minutes per channel. Shared thread pool — one slow redistribution delays all other async CDI event processing.
 - Two-phase event (option 3) — executor fires `CompressionRequestedEvent`, re-evaluates on `CompressionCompletedEvent`. Non-blocking with precise timing, but requires cross-event state correlation, two new CDI event types, and timeout handling. The sweep cycle already provides this coordination for free.
@@ -126,7 +126,7 @@
 
 ## D11: Executor CDI design — delegate pattern for @ObservesAsync
 
-**Choice:** `@ApplicationScoped` executor with `@ObservesAsync` handler. Delegates transactional work (commitment queries, HANDOFF dispatch) to a separate `@ApplicationScoped @Transactional` delegate bean. Uses `CrossTenantCommitmentStore` for obligation queries — requires new `findOpenByObligor(String obligor)` method (cross-tenant equivalent of the existing `CommitmentReader` default method). No `CurrentPrincipal` injection — HANDOFF dispatch sets `tenancyId` explicitly from the commitment's own `tenancyId` field.
+**Choice:** `@ApplicationScoped` executor with `@ObservesAsync` handler. Delegates transactional work (commitment queries, HANDOFF dispatch) to a separate `@ApplicationScoped @Transactional` delegate bean. Uses `CrossTenantCommitmentStore` for obligation queries — requires two new methods: (1) `findOpenByObligor(String obligor)` — cross-tenant equivalent of the existing `CommitmentReader` default method, returns active (OPEN/ACKNOWLEDGED) commitments; (2) `findLatestDelegatedByObligor(String obligor): Optional<Commitment>` — returns the most recently delegated commitment for the actor, ordered by `resolvedAt` DESC, used by D7's grace period mechanism to derive the last-redistribution timestamp. No `CurrentPrincipal` injection — HANDOFF dispatch sets `tenancyId` explicitly from the commitment's own `tenancyId` field.
 **Alternatives:**
 - Single class with `@ObservesAsync` + `@Transactional` — unreliable per GE-20260512-6887c9.
 - Inject `CurrentPrincipal` with `ContextNotActiveException` catch — fragile, unnecessary when commitment already carries `tenancyId`.
@@ -134,7 +134,7 @@
 **Trade-offs:** Two classes instead of one. Acceptable — the pattern is established and the separation is clean.
 **Sources:** GE-20260605-373190 (@ObservesAsync + @RequestScoped), GE-20260512-6887c9 (@ObservesAsync + @Transactional), GE-20260602-6941d6 (separate @Transactional delegate), `WatchdogEvaluationService` (qhorus-runtime)
 **Exploration:** quick
-**Status:** revised (R1-07: CrossTenantCommitmentStore.findOpenByObligor API addition specified)
+**Status:** revised (R1-07: findOpenByObligor; R2-02: findLatestDelegatedByObligor for grace period mechanism)
 
 ## D12: Event throttling strategy for CapacityPressureMonitor
 
