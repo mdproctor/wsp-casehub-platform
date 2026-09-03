@@ -1,1 +1,1 @@
-# Design Journal — issue-271-principal-identity-model
+# Design Journal — issue-269-module-extension-extends
