@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-268-capacity-signal-spi
-state: scaffolded
+state: active
 project-sha: 56022c152ede4bb4e0607b98a8d065e38c731c42
 date: 2026-09-04
 issue-repo: casehubio/platform
@@ -13,8 +13,8 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#268 — Issue #268 ← active
-  - [ ] Batch 1: Signal+Policy
-    - [ ] Task 1: CapacitySignal record and SPIs
-    - [ ] Task 2: Policy model and CDI event
-  - [ ] Batch 2: Runtime
-    - [ ] Task 3: Aggregating view and default policy and monitor
+  - [x] Batch 1: Signal+Policy
+    - [x] Task 1: CapacitySignal record and SPIs
+    - [x] Task 2: Policy model and CDI event
+  - [x] Batch 2: Runtime
+    - [x] Task 3: Aggregating view and default policy and monitor
