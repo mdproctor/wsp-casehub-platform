@@ -75,6 +75,7 @@ the unread count — there is no notification payload to push.
 | `jakarta.ws.rs.core.Context` import | No JAX-RS context injection |
 | `jakarta.ws.rs.GET` / `Produces` / `Path` imports | No JAX-RS endpoint |
 | `ObjectMapper` injection | Serialization delegated to `EventBroadcaster.broadcast(topic, T)` |
+| `CurrentPrincipal` injection | Only used in `stream()` endpoint — observers get userId/tenancyId from event payloads |
 
 ## Additions
 
