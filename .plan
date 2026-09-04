@@ -13,3 +13,8 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#268 — Issue #268 ← active
+  - [ ] Batch 1: Signal+Policy
+    - [ ] Task 1: CapacitySignal record and SPIs
+    - [ ] Task 2: Policy model and CDI event
+  - [ ] Batch 2: Runtime
+    - [ ] Task 3: Aggregating view and default policy and monitor
