@@ -1,0 +1,31 @@
+<svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    text { font-family: system-ui, sans-serif; font-size: 13px; fill: #333; }
+    .label { font-weight: bold; font-size: 14px; }
+    .metric { font-size: 11px; fill: #666; font-style: italic; }
+    .box { fill: #f5f5f5; stroke: #999; stroke-width: 1.5; rx: 6; }
+    .agent { fill: #fff3e0; stroke: #e65100; stroke-width: 2; rx: 8; }
+    .wall { stroke: #d32f2f; stroke-width: 2; stroke-dasharray: 6,4; }
+  </style>
+  <rect class="box" x="20" y="30" width="180" height="80"/>
+  <text class="label" x="110" y="55" text-anchor="middle">Qhorus</text>
+  <text class="metric" x="110" y="75" text-anchor="middle">context_window_pct: 92</text>
+  <text class="metric" x="110" y="90" text-anchor="middle">fires alert, can't act</text>
+
+  <rect class="box" x="260" y="30" width="180" height="80"/>
+  <text class="label" x="350" y="55" text-anchor="middle">Engine</text>
+  <text class="metric" x="350" y="75" text-anchor="middle">tasks: 8/10</text>
+  <text class="metric" x="350" y="90" text-anchor="middle">blocks new, can't move</text>
+
+  <rect class="box" x="500" y="30" width="180" height="80"/>
+  <text class="label" x="590" y="55" text-anchor="middle">Agent Gate</text>
+  <text class="metric" x="590" y="75" text-anchor="middle">sessions: 5/5</text>
+  <text class="metric" x="590" y="90" text-anchor="middle">throws, can't shed</text>
+
+  <rect class="agent" x="260" y="140" width="180" height="40"/>
+  <text class="label" x="350" y="165" text-anchor="middle">Agent (overloaded)</text>
+
+  <line class="wall" x1="110" y1="110" x2="110" y2="140"/>
+  <line class="wall" x1="350" y1="110" x2="350" y2="140"/>
+  <line class="wall" x1="590" y1="110" x2="590" y2="140"/>
+</svg>
