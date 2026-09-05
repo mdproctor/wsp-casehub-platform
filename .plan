@@ -13,3 +13,7 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#275 — Issue #275 ← active
+  - [ ] Batch 1: Migration
+    - [ ] Task 1: Add dependency and rename class
+    - [ ] Task 2: Write tests and rewrite implementation
+    - [ ] Task 3: Remove scheduler dependency and verify build
