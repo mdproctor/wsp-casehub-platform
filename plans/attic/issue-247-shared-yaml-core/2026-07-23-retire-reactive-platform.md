@@ -539,7 +539,7 @@ git -C /Users/mdproctor/claude/casehub/worktrees/30/platform commit -m "feat(#38
 
 **Interfaces:**
 - Consumes: `NotificationStore` (blocking SPI), `CurrentPrincipal`
-- Produces: `NotificationResource` returns plain types + `@RunOnVirtualThread`. `NotificationSseResource` uses blocking store for unread counts.
+- Produces: `NotificationResource` returns plain types + `@RunOnVirtualThread`. `NotificationPushService` uses blocking store for unread counts.
 
 - [ ] **Step 1: Rewrite NotificationResource**
 

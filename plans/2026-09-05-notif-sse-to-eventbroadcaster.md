@@ -11,7 +11,7 @@
 
 **Goal:** Replace SSE push with WebSocket push via EventBroadcaster in the notifications module.
 
-**Architecture:** Rename `NotificationSseResource` → `NotificationPushService`, strip all SSE
+**Architecture:** Rename `NotificationPushService` → `NotificationPushService`, strip all SSE
 connection management, inject `EventBroadcaster` from `casehub-pages-push`, and call
 `broadcast(topic, payload)` from the existing CDI event observers. Topic scheme:
 `notifications:{userId}:new`, `notifications:{userId}:updated`, `notifications:{userId}:unread-count`.
@@ -34,7 +34,7 @@ connection management, inject `EventBroadcaster` from `casehub-pages-push`, and 
 **Files:**
 - Modify: `pom.xml` (root — add managed dependency)
 - Modify: `notifications/pom.xml`
-- Rename: `NotificationSseResource` → `NotificationPushService` (use `ide_refactor_rename`)
+- Rename: `NotificationPushService` → `NotificationPushService` (use `ide_refactor_rename`)
 
 **Interfaces:**
 - Produces: `NotificationPushService` class at `notifications/src/main/java/io/casehub/platform/notification/rest/NotificationPushService.java`

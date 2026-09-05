@@ -13,7 +13,7 @@
 
 **Choice:** Rename to `NotificationPushService`, keep `@ApplicationScoped`, remove `@Path` — no longer a JAX-RS resource
 **Alternatives:**
-- Keep class name `NotificationSseResource` — avoids rename churn but leaves misleading name referencing a removed transport
+- Keep class name `NotificationPushService` — avoids rename churn but leaves misleading name referencing a removed transport
 - Rename to `NotificationPushObserver` — emphasises the CDI observer role but "observer" is a CDI concept that could confuse with `@Observes` annotation semantics
 **Rationale:** "PushService" accurately describes the role (bridges CDI events to push delivery), follows the reference naming pattern (SocTrustPushService, SocIncidentPushService), and "Service" is the established suffix for `@ApplicationScoped` beans that do work.
 **Trade-offs:** Rename touches references in docs and plans (consumer-guide.md, notification-store plan). IntelliJ refactoring handles code references; doc references are stale descriptions of the old pattern and should be updated.

@@ -6,7 +6,7 @@
 
 ## Summary
 
-Replace the SSE-based push mechanism in `NotificationSseResource` with
+Replace the SSE-based push mechanism in `NotificationPushService` with
 `EventBroadcaster` from `casehub-pages-push`. The frontend has migrated
 from SSEManager to EventStreamController/PushMixin (blocks-ui#153,
 casehub-pages#409), which expects events on the WebSocket push channel.
@@ -19,7 +19,7 @@ transport changes from server-managed SSE connections to
 
 ### Before
 
-`NotificationSseResource` is a `@Path("/notifications/stream")`
+`NotificationPushService` is a `@Path("/notifications/stream")`
 JAX-RS endpoint that:
 
 1. Accepts SSE connections via `GET /notifications/stream`
@@ -99,7 +99,7 @@ already serves this.
 
 ## Testing
 
-No SSE test exists for `NotificationSseResource` today. The new
+No SSE test exists for `NotificationPushService` today. The new
 `NotificationPushService` is testable by:
 
 1. Injecting a mock `EventBroadcaster` (or using `@InjectMock` in a
