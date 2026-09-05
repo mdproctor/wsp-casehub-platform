@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-275-notif-sse-to-eventbroadcaster
-state: scaffolded
+state: active
 project-sha: a3996330a5b772a988090807fdefdd17cf402d6a
 date: 2026-09-05
 issue-repo: casehubio/platform
