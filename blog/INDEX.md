@@ -6,3 +6,4 @@
 | [2026-08-31-mdp01-when-the-review-is-right.md](2026-08-31-mdp01-when-the-review-is-right.md) | 2026-08-31 | Decision review revised two design convictions — withModuleScope and throwing validate — both times making the design simpler |
 | [2026-09-03-mdp01-inheritance-without-the-inheritance.md](2026-09-03-mdp01-inheritance-without-the-inheritance.md) | 2026-09-03 | Module extension via extends keyword — where the field lives, why shallow merge, why single-level |
 | [2026-09-04-mdp01-pressure-as-a-shared-vocabulary.md](2026-09-04-mdp01-pressure-as-a-shared-vocabulary.md) | 2026-09-04 | Capacity signal SPI — shared vocabulary for actor pressure, scheduling boundary, volatile swap fix |
+| [2026-09-05-mdp01-the-167-line-delete.md](2026-09-05-mdp01-the-167-line-delete.md) | 2026-09-05 | SSE-to-EventBroadcaster migration: 232 lines of connection tracking collapsed to 65 lines of CDI bridge, plus a Mockito overload resolution gotcha |
