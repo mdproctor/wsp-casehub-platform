@@ -1,1 +1,1 @@
-/Users/mdproctor/claude/casehub/platform/CLAUDE.md
+proj/CLAUDE.md

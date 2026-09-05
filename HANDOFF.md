@@ -1,62 +1,46 @@
-# HANDOFF — Slot 30: Retire Reactive Tiers (#384)
+# HANDOFF — casehub-platform
 
-**Issue:** casehubio/parent#384
-**Slot:** `/Users/mdproctor/claude/casehub/worktrees/30/`
-**Branch:** `issue-384-retire-reactive` (all repos)
-**Cookbook:** `engine/docs/guides/virtual-thread-migration.md`
+## Last Session
 
-## What's Done
+Implemented qhorus#428 — `ContextPressureCapacitySource` + `QhorusRedistributionExecutor`. Five commits to qhorus: Commitment.capabilityTag schema extension, CrossTenantCommitmentStore + ledger query extensions, signal source, executor + delegate, and a bug fix (escalation guard checking redistributable count not total obligations). Updated platform CLAUDE.md with `.capacity` package entries and added Capacity Signal section to contributor-guide.md. Blog entry written: "Feedback Loops That Converge" with inline SVG diagrams. Garden entry captured: GE-20260905-5296aa (stateless sweep-based eventual consistency technique).
 
-| Repo | Status | Notes |
-|------|--------|-------|
-| **platform** | Merged | casehubio/platform#194 |
-| **ras** | Merged | casehubio/casehub-ras#54 |
-| **connectors** | Clean | Zero reactive code |
-| **claudony** | Clean | Zero reactive code |
-| **openclaw** | Clean | Zero reactive code |
-| **blocks** | Clean | Zero reactive code |
-| **ledger** | Committed | 40 files, 2329 lines deleted |
-| **eidos** | Committed | 50 files, 2245 lines deleted. Also fixed SettingsScope.root() (platform #193 API change) |
-| **qhorus** | Committed | 103 files, 9574 lines deleted. Dashboard service rewritten to blocking. Pre-existing connector-backend SRCFG00050 test failure (unrelated) |
-| **ops** | PR open | casehubio/casehub-ops#63 — different issue (#10,#21), not #384 |
-| **desiredstate** | PR open | casehubio/casehub-desiredstate#88 — CI failing: SettingsScope.root() API change |
-| **iot** | PR open | casehubio/iot#70 — CI failing: Worker.Builder.function() type mismatch |
+## Immediate Next Step — RESUME WORK-END
 
-## What's Left — Neocortex
+Work-end is in progress (`state: closing:promoted`). The close sequence completed code review, branch audits, sweeps, doc sync, artifact promotion, trajectory, and blog publishing. **Stuck at the rebase step** — platform branch has 8 conflicts rebasing 9 commits against main. Qhorus branch also needs rebasing against qhorus main.
 
-**Architecture difference:** Neocortex is reactive-primary. Unlike every other repo where blocking owns the logic and reactive wraps it, neocortex's reactive implementations ARE the real code (Qdrant gRPC, Mem0 REST, Graphiti REST). Blocking classes are thin `.await().indefinitely()` wrappers.
+**Resume instructions:**
 
-**The cookbook doesn't apply.** Cannot "delete reactive, keep blocking." Must convert reactive → blocking in-place.
+1. Run `work end` — it will detect the interrupted close and offer to resume
+2. The rebase step needs manual conflict resolution:
+   - Platform: `git -C /Users/mdproctor/claude/casehub/slots/171/platform rebase main` — resolve 8 conflicts across the capacity commits
+   - Qhorus: `git -C /Users/mdproctor/claude/casehub/slots/171/qhorus rebase main` — untested, conflicts unknown
+3. **Merge ordering dependency:** Platform must be merged and artifacts published FIRST. Qhorus depends on `casehub-platform-api:0.2-SNAPSHOT` which contains the capacity SPI types. Without platform on main, qhorus CI will fail to resolve the capacity classes.
+4. After rebase: squash → land (platform first, then qhorus) → close issues → verify
 
-### Conversion plan (3 categories)
+**`.close-progress` state:** All review and sweep steps done. Promote done. Trajectory done. Rebase is the current gate.
 
-**Category 1 — Straight deletion (~36 files):**
-Reactive SPI interfaces (10), bridges (6), InMemory reactive wrappers (2), parity tests (~18). Same mechanical pattern as other repos.
+## Cross-Module
 
-**Category 2 — Backend conversion (3 backends, ~1hr each):**
-- **Qdrant:** `ReactiveQdrantCbrCaseMemoryStore` → `QdrantCbrCaseMemoryStore`. Convert `QdrantFutures.toUni(future)` → `future.get()`. Delete thin blocking wrapper.
-- **Mem0:** `ReactiveMem0CaseMemoryStore` → `Mem0CaseMemoryStore`. Create blocking `Mem0Client` interface (drop `Uni<>` from return types). Delete thin blocking wrapper.
-- **Graphiti:** Same pattern as Mem0 — `ReactiveGraphitiClient` → blocking `GraphitiClient`.
+- casehubio/eidos#151 — load-aware selection (Batch 2). Depends on platform#268 (done). Not blocking qhorus#428.
+- Engine `ActorStateAccumulatorImpl.capacity()` override — needs an issue filed before branch merge.
+- casehubio/qhorus#429 — prerequisite for compress path: `ChannelSummaryService.triggerUpdate()` must use `CrossTenantChannelStore`. `countMessagesSince()` was made public in this session but the cross-tenant channel lookup is still needed.
+- Qhorus CLAUDE.md has uncommitted path normalization changes (harmless, from another session).
+- `blog/assets/` directory in workspace is untracked (SVG files extracted during blog writing — can be deleted, went with inline SVGs).
 
-**Category 3 — Decorator chain (4 decorators):**
-ReactiveTemporalDecay, ReactiveOutcomeWeighting, ReactiveScopeDecay, ReactiveTrendEnrichment. Check if blocking decorators exist — if yes, just delete reactive. If not, convert.
+## Garden Entries Consulted
 
-### Execution order
-1. Category 1 first (mechanical deletion)
-2. Category 2 backend-by-backend (Qdrant → Mem0 → Graphiti)
-3. Category 3 last
-4. POM cleanup (11 mutiny deps already identified)
-5. Build and verify
+GE-20260605-373190 (@ObservesAsync + @RequestScoped), GE-20260512-6887c9 (@ObservesAsync + @Transactional), GE-20260517-e10a0f (HANDOFF commitment gotcha), GE-20260512-0fe012 (fireAsync transaction timing), GE-20260627-f3476f (scope-safe CurrentPrincipal), GE-20260602-6941d6 (separate @Transactional delegate), GE-20260517-5de55b (dispatch auto-opens commitment)
 
-**Garden entry:** GE-20260724-115ce0 documents the gotcha.
+## Garden Entries Captured
 
-## Open PRs Needing Attention
+GE-20260905-5296aa — stateless sweep-based eventual consistency technique (pushed to garden)
 
-- **desiredstate #88** and **iot #70** — CI failing from upstream API changes (SettingsScope, WorkerFunction), not from #384 work. Need rebase onto latest main.
-- **Engine #381** — delivered locally, PR still open. Once merged, CI for all downstream repos will pass.
+## References
 
-## Artifacts
-
-- **Blog:** `2026-07-24-mdp01-twelve-out-of-thirteen.md` (workspace)
-- **Garden:** GE-20260724-115ce0 (neocortex reactive-primary gotcha), GE-20260724-c35265 (IntelliJ safe_delete line shift)
-- **Protocol:** `sse-endpoint-no-virtual-thread` (prior session, unchanged)
+- Spec (platform): `specs/issue-268-capacity-redistribution/2026-09-02-capacity-signal-spi-design.md`
+- Spec (qhorus): `specs/issue-268-capacity-redistribution/2026-09-03-qhorus-capacity-redistribution-design.md`
+- Decisions: `specs/issue-268-capacity-redistribution/decisions.md` (D1–D12)
+- Plan: `plans/2026-09-03-qhorus-capacity-redistribution.md`
+- Blog: `blog/2026-09-03-mdp01-feedback-loops-that-converge.md`
+- Blog (prior): `blog/2026-09-02-mdp01-shared-vocabulary-for-overload.md`
+- Cross-platform spec: `wsp-casehub-qhorus/specs/cross-platform-capacity-redistribution/`
