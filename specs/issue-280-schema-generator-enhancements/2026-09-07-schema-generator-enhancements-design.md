@@ -203,7 +203,7 @@ Merge best-of-both into yaml-codegen's `MappingConfig`. No new module — enhanc
 ```java
 public record MappingConfig(
     List<String> globalAnnotations,
-    List<String> skipPatterns,           // NEW — glob patterns
+    List<String> skipPatterns,           // NEW — prefix-star patterns
     Map<String, String> imports,         // NEW — type name → FQN
     Map<String, String> deserializers,   // NEW — deserializer name → FQN
     Map<String, TypeMapping> types) {
@@ -292,13 +292,18 @@ public class DriftDetectionRule implements EnforcerRule {
 
     @Override
     public void execute(EnforcerRuleHelper helper) throws EnforcerRuleException {
+        Log log = helper.getLog();
         Set<String> generated = scanGeneratedTypes(generatedSourcesDir);
         Set<String> handWritten = scanHandWrittenTypes(sourceRoot, targetPackage);
-        Set<String> allowed = loadAllowList(allowListFile);
+        AllowList allowList = loadAllowList(allowListFile);
+
+        for (String entry : allowList.unjustified()) {
+            log.warn("Allow-list entry '" + entry + "' has no justification comment");
+        }
 
         Set<String> drift = new TreeSet<>(handWritten);
         drift.removeAll(generated);
-        drift.removeAll(allowed);
+        drift.removeAll(allowList.entries());
 
         if (!drift.isEmpty()) {
             throw new EnforcerRuleException(
@@ -319,6 +324,7 @@ public class DriftDetectionRule implements EnforcerRule {
 **Scanning mechanism:**
 - `scanGeneratedTypes(generatedSourcesDir)`: lists `.java` files recursively under the directory, extracts simple class names from filenames (filtering `package-info.java`).
 - `scanHandWrittenTypes(sourceRoot, targetPackage)`: resolves `targetPackage` to a directory path (`sourceRoot/<package as path>/`), lists `.java` files in that directory, extracts simple class names. This directly identifies hand-written source files — generated sources live under `target/generated-sources/`, not under `src/main/java/`.
+- `loadAllowList(allowListFile)`: returns an `AllowList` record containing `entries()` (the set of allowed type names) and `unjustified()` (entries that lack a preceding `#` comment line). The parser treats any line starting with `#` as a justification comment for the next non-empty, non-comment line. `helper.getLog().warn(...)` emits warnings for unjustified entries — a nudge, not a failure.
 
 ### Configuration (consumer pom.xml)
 
@@ -376,11 +382,11 @@ drift-detection/
 
 ### Test strategy
 
-1. No drift — generated and compiled sets match → no exception
+1. No drift — generated and hand-written sets match → no exception
 2. Drift detected — hand-written class not in generated or allow-list → exception with class name
 3. Allow-list works — hand-written class in allow-list → no exception
 4. Allow-list justification — entries without preceding comment → warning (not failure)
-5. Empty generated dir — all compiled types flagged unless allow-listed
+5. Empty generated dir — all hand-written types flagged unless allow-listed
 6. Missing allow-list file — treated as empty (no exceptions allowed)
 
 ### Files changed
