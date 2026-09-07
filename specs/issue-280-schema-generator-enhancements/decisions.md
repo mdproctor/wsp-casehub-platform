@@ -22,3 +22,14 @@
 **Sources:** platform yaml-codegen MappingConfig.java (globalAnnotations, per-field skip, jsonProperty bidirectional lookup), engine RecordMapping.java (skipPatterns, imports, deserializers, body, defaultValue, recordName), platform TypeGraph.java (required, description, additionalProperties), engine SchemaType.java (simpler model)
 **Exploration:** deep-analysis
 **Status:** captured
+
+## D3: Drift detection plugin placement
+
+**Choice:** New module `drift-detection/` as separate Maven plugin
+**Alternatives:**
+- Second goal in yaml-codegen plugin — couples two independent concerns; blocks/neocortex may use drift detection without yaml-codegen
+**Rationale:** Drift detection is orthogonal to code generation. The issue explicitly requires "generic applicability" — usable for any codegen pipeline (yaml-codegen, APT generators, graphql-generator). Separate artifact (`casehub-platform-drift-detection`) with `maven-plugin` packaging. No dependency on yaml-codegen. Scans compiled classes vs a generated-sources directory.
+**Trade-offs:** One more module in platform's build. Consumers add a second plugin declaration. Acceptable given the generality requirement.
+**Sources:** issue #281 (design section, generic applicability), yaml-codegen YamlCodegenMojo.java (existing plugin pattern)
+**Exploration:** quick
+**Status:** captured
