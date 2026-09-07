@@ -66,14 +66,9 @@ public class ShorthandModule implements Module {
     }
 }
 
-@FunctionalInterface
 public interface ShorthandDefinition {
     ObjectNode scalarSchema(SchemaGeneratorConfig config);
-
-    default ObjectNode objectSchema(SchemaGeneratorConfig config) {
-        throw new UnsupportedOperationException(
-            "objectSchema must be provided");
-    }
+    ObjectNode objectSchema(SchemaGeneratorConfig config);
 
     static ShorthandDefinition of(
             Function<SchemaGeneratorConfig, ObjectNode> scalar,
