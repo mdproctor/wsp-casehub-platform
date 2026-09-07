@@ -33,3 +33,15 @@
 **Sources:** issue #281 (design section, generic applicability), yaml-codegen YamlCodegenMojo.java (existing plugin pattern)
 **Exploration:** quick
 **Status:** captured
+
+## D4: ShorthandModule — neocortex migration scope
+
+**Choice:** Follow-up issue on neocortex — same pattern as SealedHierarchyModule (#279)
+**Depends on:** D1 (generic ShorthandModule must be published before consumers adopt)
+**Alternatives:**
+- Cross-repo branch touching both platform and neocortex — couples the release, platform publishes first in build order
+**Rationale:** Matches precedent set by #279 D3 (SealedHierarchyModule). Platform publishes first, consumers adopt independently. Cleaner scope — this branch promotes the module, separate issues handle migration.
+**Trade-offs:** Neocortex temporarily has two copies of the module until migration completes.
+**Sources:** issue-279 decisions.md D3, build order (platform publishes before neocortex)
+**Exploration:** quick
+**Status:** captured
