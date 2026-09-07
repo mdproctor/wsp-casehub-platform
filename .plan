@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-280-schema-generator-enhancements
-state: scaffolded
+state: active
 project-sha: a370d5cc82e6430a8bf0ef3358dfe2af47be4cd5
 date: 2026-09-07
 issue-repo: casehubio/platform
@@ -13,10 +13,10 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#280 — Issue #280 ← active
-  - [ ] Batch 1: ShorthandModule
-    - [ ] Task 1: ShorthandDefinition and ShorthandModule
-  - [ ] Batch 2: yaml-codegen
-    - [ ] Task 2: Expand MappingConfig
-    - [ ] Task 3: RecordEmitter enhancements
-  - [ ] Batch 3: Drift detection
-    - [ ] Task 4: DriftDetectionRule enforcer rule
+  - [x] Batch 1: ShorthandModule
+    - [x] Task 1: ShorthandDefinition and ShorthandModule
+  - [x] Batch 2: yaml-codegen
+    - [x] Task 2: Expand MappingConfig
+    - [x] Task 3: RecordEmitter enhancements
+  - [x] Batch 3: Drift detection
+    - [x] Task 4: DriftDetectionRule enforcer rule
