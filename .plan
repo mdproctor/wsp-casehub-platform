@@ -1,0 +1,54 @@
+# Work Plan — issue-469-dual-framework-core-extraction
+
+## State
+branch: issue-469-dual-framework-core-extraction
+state: active
+epic: casehubio/parent#469
+issue-repo: casehubio/parent
+covers: casehubio/platform#276,casehubio/engine#1049,casehubio/work#394,casehubio/qhorus#432,casehubio/ledger#206,casehubio/eidos#169,casehubio/neocortex#279,casehubio/blocks#240,casehubio/connectors#99
+Current: casehubio/platform#276 — Extract framework-neutral core from platform modules
+date: 2026-09-07
+
+## Queue
+- [ ] casehubio/parent#469 — dual-framework support — extract framework-neutral core, add Spring Boot adapters (epic)
+  ### Batch 1 — Foundation (M) ← current
+  - [ ] casehubio/platform#276 — Extract framework-neutral core from platform modules [platform] ← active
+    - [ ] Batch 1: Infrastructure
+      - [ ] Task 1: Spring BOM + spring-testing scaffold
+    - [ ] Batch 2: Reference Extraction
+      - [ ] Task 2: platform-view-core extraction
+      - [ ] Task 3: platform-view Quarkus CDI producers
+      - [ ] Task 4: platform-view-spring auto-config
+    - [ ] Batch 3: Platform Defaults
+      - [ ] Task 5: platform-core NoOp extraction
+      - [ ] Task 6: platform Quarkus @DefaultBean wiring
+      - [ ] Task 7: platform-spring auto-config
+    - [ ] Batch 4: Leaf Services
+      - [ ] Task 8: expression-core extraction
+      - [ ] Task 9: identity-core extraction
+      - [ ] Task 10: governance-core extraction
+    - [ ] Batch 5: Agent Stack
+      - [ ] Task 11: agent backends extraction
+      - [ ] Task 12: agent-router-core extraction
+      - [ ] Task 13: agent-gate-core extraction
+    - [ ] Batch 6: Notification Pipeline
+      - [ ] Task 14: notification stores extraction
+      - [ ] Task 15: notification-dispatch-core extraction
+    - [ ] Batch 7: Data Infrastructure
+      - [ ] Task 16: datasource + endpoints + memory extraction
+      - [ ] Task 17: acl + callback + scim extraction
+    - [ ] Batch 8: Category C
+      - [ ] Task 18: subscriptions framework modules
+      - [ ] Task 19: streams framework modules
+      - [ ] Task 20: mcp framework modules
+  ### Batch 2 — Core runtime (XL+L) — rebase-merge Batch 1 to main first
+  - [ ] casehubio/engine#1049 — Extract framework-neutral core from engine runtime [engine]
+  - [ ] casehubio/work#394 — Extract framework-neutral core from work engine [work]
+  ### Batch 3 — Supporting services (S+M+M+M) — rebase-merge Batch 2 to main first
+  - [ ] casehubio/ledger#206 — Extract framework-neutral core from ledger [ledger]
+  - [ ] casehubio/eidos#169 — Extract framework-neutral core from eidos [eidos]
+  - [ ] casehubio/neocortex#279 — Extract framework-neutral core from neocortex [neocortex]
+  - [ ] casehubio/qhorus#432 — Extract framework-neutral core from qhorus messaging [qhorus]
+  ### Batch 4 — Adapters and bridges (M+S) — rebase-merge Batch 3 to main first
+  - [ ] casehubio/blocks#240 — Extract framework-neutral core from blocks [blocks]
+  - [ ] casehubio/connectors#99 — Extract framework-neutral core from connectors [connectors]
