@@ -9,3 +9,16 @@
 **Sources:** neocortex ShorthandModule.java (hardcoded 3 types), engine SchemaPostProcessor (hand-built oneOf methods), PlatformSchemaGenerator.java (module pattern), SealedHierarchyModule (parameterized module precedent)
 **Exploration:** quick
 **Status:** captured
+
+## D2: yaml-codegen consolidation strategy
+
+**Choice:** Merge best-of-both into yaml-codegen's MappingConfig
+**Alternatives:**
+- Enhance yaml-codegen only with engine's missing features (assumes platform's format is superior — it isn't, both have complementary strengths)
+- Start fresh with a clean data model — gold-plating risk, both formats are production-tested
+- Support both mapping formats with auto-detection — adds complexity for no lasting benefit
+**Rationale:** Side-by-side comparison showed neither format is more powerful. Platform has better schema parsing (TypeGraph with required/description/additionalProperties), dedicated JavaTypeResolver, per-field skip, globalAnnotations, jsonProperty bidirectional lookup. Engine has better code generation flexibility (body injection, defaultValue per field, ExtraField with defaults, recordName), and global configuration (skipPatterns, imports map, deserializers map). Merging preserves all working behavior. No existing consumers break — new features are additive/optional.
+**Trade-offs:** Engine's yaml-record-mappings.yaml files need translating to the expanded MappingConfig format. One-time migration cost per consuming repo.
+**Sources:** platform yaml-codegen MappingConfig.java (globalAnnotations, per-field skip, jsonProperty bidirectional lookup), engine RecordMapping.java (skipPatterns, imports, deserializers, body, defaultValue, recordName), platform TypeGraph.java (required, description, additionalProperties), engine SchemaType.java (simpler model)
+**Exploration:** deep-analysis
+**Status:** captured
