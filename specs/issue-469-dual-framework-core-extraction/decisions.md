@@ -125,3 +125,69 @@
 **Sources:** D5 (CDI pattern mappings), D6 (testing strategy)
 **Exploration:** implicit decision surfaced by reviewer
 **Status:** captured
+
+## D8: Spring auto-configuration generation
+
+**Choice:** Generate Spring auto-configuration from Quarkus CDI wiring — Quarkus is the source of truth. A `spring-generator` Maven plugin scans the Quarkus module's Jandex index at build time and generates the Spring @AutoConfiguration class, registered via META-INF/spring/...AutoConfiguration.imports. Manual coding for the ~20% the generator can't handle (event observers, decorators, CDI qualifiers). Drift verification fails the build when Quarkus and Spring diverge.
+**Alternatives:**
+- Hand-code all Spring auto-configurations — 47+ modules to maintain in parallel. Any @Produces change in Quarkus requires a matching @Bean change in Spring. Drift is inevitable.
+- Generate both Quarkus and Spring from core annotations (@PlatformBean) — adds an annotation layer to the zero-dep core, growing the vocabulary for edge cases (qualifiers, events, scheduling). Unnecessary abstraction.
+- Convention-based generation from core constructors — fragile; utility classes misidentified as beans; exclusion mechanism is annotations by another name.
+**Auto-generated mappings (~80%+):**
+
+| Quarkus (input — Jandex scan) | Spring (output — generated source) |
+|---|---|
+| `@Produces @ApplicationScoped` method | `@Bean` method |
+| `@Produces @DefaultBean` method | `@Bean @ConditionalOnMissingBean` method |
+| `@Produces @Alternative @Priority(N)` | `@Bean @Primary` + `@AutoConfigureOrder(N)` |
+| `@ConfigProperty(name = "x")` parameter | `@Value("${x}")` parameter |
+| Return type + constructor params | Same return type + same params |
+| Class-level @AutoConfiguration scaffolding | Generated per module |
+| META-INF/spring/AutoConfiguration.imports | Generated registration file |
+
+**Manual coding required (~20%):**
+
+| Pattern | Why manual | Drift-detected? |
+|---|---|---|
+| `@Observes`/`@ObservesAsync` → `@EventListener` | Async semantics differ; delegate pattern needs human review | Yes — verifier flags unmatched observers |
+| `@Scheduled` with Quarkus duration syntax | Quarkus uses "60s", Spring uses fixedRate=60000 or cron | Yes — verifier flags unmatched @Scheduled |
+| `@Decorator` → `@Bean @Primary` wrapping | Complex delegation pattern; AOP alternative | Yes — verifier flags decorator beans |
+| CDI qualifiers (@DIDMethod, @CloudEventType) | Spring @Qualifier or conditional logic | Yes — verifier flags qualified producers |
+| `Instance<T>` collection | Spring ObjectProvider<T> iteration differs | Yes — verifier flags Instance parameters |
+
+**Drift verification (fail-fast):**
+
+The generator includes a `verify` Mojo that runs in each -spring module's `verify` phase:
+1. Scans Quarkus module Jandex for all @Produces methods
+2. Scans Spring module classes for all @Bean methods
+3. Compares return types: every Quarkus @Produces must have a matching Spring @Bean
+4. Reports gaps (Quarkus bean with no Spring equivalent) and extras
+5. **Fails the build** on any gap — forces developers to either add a manual @Bean or update the generator
+
+Manual beans coexist alongside generated beans in a separate hand-written configuration class. The verifier treats them equally — it only cares that every Quarkus bean has a Spring counterpart.
+
+**Module:** `spring-generator/` — Maven plugin (same pattern as `yaml-codegen/`). Plugged into each -spring module's build:
+```xml
+<plugin>
+    <groupId>io.casehub</groupId>
+    <artifactId>casehub-platform-spring-generator</artifactId>
+    <executions>
+        <execution>
+            <goals><goal>generate</goal></goals>
+            <configuration>
+                <quarkusModule>${project.basedir}/../module</quarkusModule>
+            </configuration>
+        </execution>
+        <execution>
+            <goals><goal>verify</goal></goals>
+            <phase>verify</phase>
+        </execution>
+    </executions>
+</plugin>
+```
+**Rationale:** Follows the existing graphql-generator/callback-generator pattern — Jandex scan → source generation. Developers write CDI wiring once (which they already know). The 80%+ auto-generation eliminates the primary maintenance burden. The drift verifier catches the remaining 20% — a Quarkus change without a Spring update fails CI immediately, not silently.
+**Trade-offs:** The generator is a ~2-3 day upfront investment. Complex CDI patterns need manual Spring equivalents — but drift verification ensures they're never forgotten.
+**Sources:** graphql-generator/ (precedent), callback-generator/ (precedent), D5 (CDI pattern mappings)
+**Exploration:** deep-analysis
+**Depends on:** D2 (module structure), D5 (CDI pattern mappings), D7 (Spring Boot 3.x)
+**Status:** captured

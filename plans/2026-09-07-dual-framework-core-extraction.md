@@ -213,6 +213,85 @@ and SpringTestConfig — parallel to casehub-platform-testing for Quarkus.
 Refs casehubio/platform#276"
 ```
 
+### Task 2: Create spring-generator Maven plugin
+
+**Files:**
+- Create: `spring-generator/pom.xml` (maven-plugin packaging)
+- Create: `spring-generator/src/main/java/io/casehub/platform/spring/generator/SpringGeneratorMojo.java`
+- Create: `spring-generator/src/main/java/io/casehub/platform/spring/generator/SpringVerifyMojo.java`
+- Create: `spring-generator/src/main/java/io/casehub/platform/spring/generator/JandexProducerScanner.java`
+- Create: `spring-generator/src/main/java/io/casehub/platform/spring/generator/AutoConfigurationWriter.java`
+- Test: `spring-generator/src/test/java/io/casehub/platform/spring/generator/JandexProducerScannerTest.java`
+- Test: `spring-generator/src/test/java/io/casehub/platform/spring/generator/AutoConfigurationWriterTest.java`
+
+**Interfaces:**
+- Consumes: Jandex `IndexReader` for scanning Quarkus module indexes
+- Produces: Generated `@AutoConfiguration` Java source + `AutoConfiguration.imports` registration
+
+The generator has two Mojos:
+
+**`generate` goal (generate-sources phase):**
+1. Read Quarkus module's Jandex index (target/classes/META-INF/jandex.idx)
+2. Find all classes with `@Produces` methods
+3. For each `@Produces` method, extract: return type, parameter types, annotations (@DefaultBean, @Alternative, @Priority)
+4. Generate an `@AutoConfiguration` class with corresponding `@Bean` methods
+5. Apply D5 mapping: @DefaultBean → @ConditionalOnMissingBean, @Alternative @Priority → @Primary, @ConfigProperty → @Value
+6. Write generated source to `target/generated-sources/spring-generator/`
+7. Write `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
+
+**`verify` goal (verify phase):**
+1. Scan Quarkus module Jandex for all @Produces return types
+2. Scan Spring module classes for all @Bean return types
+3. Report gaps (Quarkus bean missing from Spring) and extras
+4. **Fail build** on any gap
+
+This follows the existing `yaml-codegen/` and `graphql-generator/` patterns.
+The generator is the first task because all subsequent -spring modules use it.
+
+- [ ] **Step 1: Write failing test for JandexProducerScanner**
+
+Test that the scanner can read a Jandex index and extract @Produces method metadata (return type, parameters, CDI annotations).
+
+- [ ] **Step 2: Implement JandexProducerScanner**
+
+Reads a Jandex `Index`, finds `@Produces`-annotated methods, returns a list of `ProducerDescriptor` records containing: className, methodName, returnType, parameterTypes, isDefaultBean, isAlternative, priority, configProperties.
+
+- [ ] **Step 3: Write failing test for AutoConfigurationWriter**
+
+Test that the writer generates correct Spring @AutoConfiguration source from ProducerDescriptors.
+
+- [ ] **Step 4: Implement AutoConfigurationWriter**
+
+Takes a list of `ProducerDescriptor`, generates a Java source file with:
+- `@AutoConfiguration` + `@ConditionalOnClass(returnType)` class annotation
+- `@Bean` method per producer
+- `@ConditionalOnMissingBean` when isDefaultBean=true
+- `@Primary` when isAlternative=true
+- `@Value("${name}")` for configProperty parameters
+- Writes `AutoConfiguration.imports` registration file
+
+- [ ] **Step 5: Wire SpringGeneratorMojo and SpringVerifyMojo**
+
+Standard Maven plugin Mojo wiring. `generate` reads configuration (quarkusModule path), runs scanner + writer. `verify` runs scanner + comparison.
+
+- [ ] **Step 6: Run all generator tests**
+
+Run: `mvn --batch-mode test -pl spring-generator`
+Expected: All tests PASS
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add spring-generator/ pom.xml
+git commit -m "feat(#276): create spring-generator Maven plugin
+
+Jandex-based generator that produces Spring @AutoConfiguration from Quarkus
+CDI @Produces methods. Verify goal fails the build when Quarkus and Spring
+bean sets diverge. Follows graphql-generator/callback-generator pattern.
+
+Refs casehubio/platform#276"
+```
+
 ---
 
 ## Batch 2: Platform-View Reference Extraction
@@ -494,19 +573,22 @@ name, same bean types, same behavior.
 Refs casehubio/platform#276"
 ```
 
-### Task 3: Create platform-view-spring auto-configuration
+### Task 3: Create platform-view-spring using the generator (first generated module)
+
+This is the first module to use the spring-generator. It validates both the
+generator AND the view extraction end-to-end.
 
 **Files:**
-- Create: `platform-view-spring/pom.xml`
-- Create: `platform-view-spring/src/main/java/io/casehub/platform/view/spring/ViewAutoConfiguration.java`
-- Create: `platform-view-spring/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
+- Create: `platform-view-spring/pom.xml` (with spring-generator plugin)
+- Generated: `platform-view-spring/target/generated-sources/spring-generator/io/casehub/platform/view/spring/ViewAutoConfiguration.java`
+- Generated: `platform-view-spring/target/generated-sources/spring-generator/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
 - Test: `platform-view-spring/src/test/java/io/casehub/platform/view/spring/ViewAutoConfigurationTest.java`
 
 **Interfaces:**
-- Consumes: `SubjectViewEvaluator`, `SubjectViewOrchestrator` from platform-view-core
-- Produces: Spring-managed beans for both classes
+- Consumes: `SubjectViewEvaluator`, `SubjectViewOrchestrator` from platform-view-core (via generated @Bean methods)
+- Produces: Spring-managed beans for both classes (auto-generated from Quarkus @Produces)
 
-- [ ] **Step 1: Create platform-view-spring/pom.xml**
+- [ ] **Step 1: Create platform-view-spring/pom.xml with generator plugin**
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -525,7 +607,7 @@ Refs casehubio/platform#276"
     <packaging>jar</packaging>
     <name>CaseHub Platform :: Subject View Spring</name>
     <description>Spring Boot auto-configuration for platform-view.
-        Produces view beans from platform-view-core POJOs.</description>
+        Generated from Quarkus CDI wiring via spring-generator.</description>
 
     <dependencies>
         <dependency>
@@ -551,20 +633,52 @@ Refs casehubio/platform#276"
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>io.casehub</groupId>
+                <artifactId>casehub-platform-spring-generator</artifactId>
+                <version>${project.version}</version>
+                <executions>
+                    <execution>
+                        <id>generate</id>
+                        <goals><goal>generate</goal></goals>
+                        <configuration>
+                            <quarkusModule>${project.basedir}/../platform-view</quarkusModule>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>verify-drift</id>
+                        <goals><goal>verify</goal></goals>
+                        <phase>verify</phase>
+                        <configuration>
+                            <quarkusModule>${project.basedir}/../platform-view</quarkusModule>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>
 ```
 
 Add `<module>platform-view-spring</module>` to parent pom.xml.
 
-- [ ] **Step 2: Write failing test for Spring auto-configuration**
+- [ ] **Step 2: Run the generator to produce the auto-configuration**
+
+Run: `mvn --batch-mode generate-sources -pl platform-view-spring`
+Expected: Generated ViewAutoConfiguration.java appears in `target/generated-sources/spring-generator/`
+
+Verify the generated source contains `@Bean` methods for `SubjectViewEvaluator` and `SubjectViewOrchestrator`, with `@ConditionalOnMissingBean` (because the Quarkus @Produces do not use @DefaultBean — they're plain @ApplicationScoped producers).
+
+- [ ] **Step 3: Write test for the generated auto-configuration**
 
 ```java
 package io.casehub.platform.view.spring;
 
 import io.casehub.platform.view.SubjectViewEvaluator;
-import io.casehub.platform.view.SubjectViewOrchestrator;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
@@ -584,77 +698,25 @@ class ViewAutoConfigurationTest {
 }
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [ ] **Step 4: Run tests + drift verification**
 
-Run: `mvn --batch-mode test -pl platform-view-spring -Dtest=ViewAutoConfigurationTest`
-Expected: Compilation failure — ViewAutoConfiguration not found
+Run: `mvn --batch-mode verify -pl platform-view-spring`
+Expected: Tests PASS, drift verification PASS (all Quarkus @Produces have matching Spring @Bean)
 
-- [ ] **Step 4: Implement ViewAutoConfiguration**
-
-```java
-package io.casehub.platform.view.spring;
-
-import io.casehub.platform.api.preferences.PreferenceProvider;
-import io.casehub.platform.api.view.SubjectViewStore;
-import io.casehub.platform.api.view.ViewMembershipTracker;
-import io.casehub.platform.view.SubjectViewEvaluator;
-import io.casehub.platform.view.SubjectViewOrchestrator;
-import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.context.annotation.Bean;
-
-@AutoConfiguration
-@ConditionalOnClass(SubjectViewEvaluator.class)
-public class ViewAutoConfiguration {
-
-    @Bean
-    @ConditionalOnMissingBean
-    public SubjectViewEvaluator subjectViewEvaluator() {
-        return new SubjectViewEvaluator();
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
-    public SubjectViewOrchestrator subjectViewOrchestrator(
-            SubjectViewEvaluator evaluator,
-            SubjectViewStore viewStore,
-            ViewMembershipTracker tracker,
-            PreferenceProvider preferenceProvider) {
-        return new SubjectViewOrchestrator(evaluator, viewStore, tracker, preferenceProvider);
-    }
-}
-```
-
-- [ ] **Step 5: Register auto-configuration**
-
-Create file:
-`platform-view-spring/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
-
-Contents:
-```
-io.casehub.platform.view.spring.ViewAutoConfiguration
-```
-
-- [ ] **Step 6: Run tests to verify they pass**
-
-Run: `mvn --batch-mode test -pl platform-view-spring`
-Expected: Tests PASS (note: the orchestrator test may need mock SPI beans in context — add @MockBean or use test doubles)
-
-- [ ] **Step 7: Verify full build of all view modules**
+- [ ] **Step 5: Verify full build of all view modules**
 
 Run: `mvn --batch-mode install -pl platform-view-core,platform-view,platform-view-spring`
 Expected: BUILD SUCCESS
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add platform-view-spring/ pom.xml
-git commit -m "feat(#276): add platform-view-spring auto-configuration
+git commit -m "feat(#276): add platform-view-spring — first generated auto-configuration
 
-Spring Boot auto-configuration for platform-view. Produces SubjectViewEvaluator
-and SubjectViewOrchestrator beans from core POJOs. @ConditionalOnMissingBean
-allows consumer overrides — equivalent to CDI @DefaultBean displacement.
+Spring Boot auto-configuration for platform-view, generated from Quarkus CDI
+wiring via spring-generator. Drift verification enabled — build fails if
+Quarkus adds @Produces without a matching Spring @Bean.
 
 Refs casehubio/platform#276"
 ```

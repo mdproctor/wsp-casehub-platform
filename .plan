@@ -14,33 +14,7 @@ date: 2026-09-07
   ### Batch 1 — Foundation (M) ← current
   - [ ] casehubio/platform#276 — Extract framework-neutral core from platform modules [platform] ← active
     - [ ] Batch 1: Infrastructure
-      - [ ] Task 1: Spring BOM + spring-testing scaffold
-    - [ ] Batch 2: Reference Extraction
-      - [ ] Task 2: platform-view-core extraction
-      - [ ] Task 3: platform-view Quarkus CDI producers
-      - [ ] Task 4: platform-view-spring auto-config
-    - [ ] Batch 3: Platform Defaults
-      - [ ] Task 5: platform-core NoOp extraction
-      - [ ] Task 6: platform Quarkus @DefaultBean wiring
-      - [ ] Task 7: platform-spring auto-config
-    - [ ] Batch 4: Leaf Services
-      - [ ] Task 8: expression-core extraction
-      - [ ] Task 9: identity-core extraction
-      - [ ] Task 10: governance-core extraction
-    - [ ] Batch 5: Agent Stack
-      - [ ] Task 11: agent backends extraction
-      - [ ] Task 12: agent-router-core extraction
-      - [ ] Task 13: agent-gate-core extraction
-    - [ ] Batch 6: Notification Pipeline
-      - [ ] Task 14: notification stores extraction
-      - [ ] Task 15: notification-dispatch-core extraction
-    - [ ] Batch 7: Data Infrastructure
-      - [ ] Task 16: datasource + endpoints + memory extraction
-      - [ ] Task 17: acl + callback + scim extraction
-    - [ ] Batch 8: Category C
-      - [ ] Task 18: subscriptions framework modules
-      - [ ] Task 19: streams framework modules
-      - [ ] Task 20: mcp framework modules
+      - [ ] Task 1: spring-generator Maven plugin
   ### Batch 2 — Core runtime (XL+L) — rebase-merge Batch 1 to main first
   - [ ] casehubio/engine#1049 — Extract framework-neutral core from engine runtime [engine]
   - [ ] casehubio/work#394 — Extract framework-neutral core from work engine [work]

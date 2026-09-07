@@ -342,6 +342,39 @@ For each Category A module:
 8. **Move tests** — pure logic tests to core, framework-specific tests stay
 9. **Verify** — `mvn install` passes, existing Quarkus tests green
 
+## Spring Auto-Configuration Generation
+
+Spring auto-configuration classes are generated from Quarkus CDI wiring —
+Quarkus is the source of truth. A `spring-generator` Maven plugin scans the
+Quarkus module's Jandex index at build time and generates the corresponding
+Spring `@AutoConfiguration` class.
+
+### Generated vs Manual
+
+**Auto-generated (~80%+):** `@Produces` → `@Bean`, `@DefaultBean` →
+`@ConditionalOnMissingBean`, `@Alternative @Priority` → `@Primary`,
+`@ConfigProperty` → `@Value`, plus the `AutoConfiguration.imports` registration.
+
+**Manual (~20%):** Event observers (`@Observes` → `@EventListener`), schedulers
+(syntax differs), decorators, CDI qualifiers, `Instance<T>` collection. These
+are hand-coded in a separate configuration class within the -spring module.
+
+### Drift Verification
+
+The generator includes a `verify` goal that runs in each -spring module's
+`verify` phase. It compares every `@Produces` return type in the Quarkus
+module against `@Bean` return types in the Spring module. Any gap — a Quarkus
+bean with no Spring counterpart — **fails the build**.
+
+Manual beans coexist alongside generated beans. The verifier treats them
+equally — it only checks that every Quarkus bean has a Spring match.
+
+### Module
+
+`spring-generator/` — Maven plugin, same architecture as `yaml-codegen/`
+and following the Jandex-scan pattern of `graphql-generator/` and
+`callback-generator/`.
+
 ## Scope and Constraints
 
 - **platform-api stays unchanged** — zero-dep pure Java, already framework-neutral
