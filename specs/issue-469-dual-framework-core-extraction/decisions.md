@@ -7,12 +7,12 @@
 - Pattern + platform-view only — proves the pattern but doesn't address the root (@DefaultBean coupling in platform/)
 - Pattern + platform-view + platform/ defaults — middle ground, proves the hardest pattern but leaves other modules untouched
 - Threshold-based extraction (only modules with ≥ N CDI-coupled beans) — risks inconsistent codebase; the threshold is arbitrary
-**Classification criteria:** A module qualifies for core extraction ("A" category) when it has ≥1 CDI-coupled bean whose business logic is separable from its CDI entry points (observers, scheduled methods, producers). Already-neutral modules (zero CDI, zero JPA) need no extraction — they are already cores. Persistence modules (-jpa, -mongodb) remain Tier 3 — their entities and wiring are inherently framework-specific. In-memory modules (-inmem) are thin CDI wiring and do not warrant separate core extraction.
+**Classification criteria:** A module qualifies for core extraction ("A" category) when it has ≥1 CDI-coupled bean whose business logic is separable from its CDI entry points (observers, scheduled methods, producers). Already-neutral modules (zero CDI, zero JPA) need no extraction — they are already cores. Persistence modules (-jpa, -mongodb) remain Tier 3 — their entities and wiring are inherently framework-specific. In-memory modules (-inmem) are thin CDI wiring and do not warrant separate core extraction. CDI @Decorator modules qualify for A classification when the decorator pattern (delegate wrapping) is expressible via constructor injection — the business logic (e.g. rate limiting, gating) is separable from the CDI decorator mechanism.
 **Rationale:** Pre-release platform where breaking changes cost nothing. Finding the roots means addressing the full coupling surface, not just one leaf module. The pattern must be proven comprehensively — partial extraction creates an inconsistent codebase where some modules are framework-neutral and others aren't.
 **Trade-offs:** Scale increases from M to XL. Mechanical work is high but each module follows the same extraction pattern.
 **Sources:** casehubio/parent#469 (epic), casehubio/platform#276 (issue), contributor-guide.md (three-layer model)
 **Exploration:** quick
-**Status:** revised — reconciled D1 scope with D3's A/C classification; added classification criteria; excluded already-neutral and persistence modules
+**Status:** revised — reconciled D1 scope with D3's A/C classification; added classification criteria; excluded already-neutral and persistence modules; added @Decorator classification rule
 
 ## D2: Module structure
 
@@ -36,14 +36,14 @@
 - Platform EventBus abstraction in platform-api — unnecessary abstraction: the platform has standardised on fireAsync(), and Consumer<T> callbacks are simpler and more testable than any EventBus
 - Core is pure I/O for ALL modules (no C) — forces extraction of modules whose purpose IS framework integration (subscriptions, streams, mcp), creating nearly-empty cores
 **Category assignments:**
-- **A (core extraction):** view, identity, governance, stores, notification-dispatch, expression, platform/ defaults
-- **C (framework-specific with shared utility):** subscriptions (5x @ObservesAsync + alpha network CDI integration), streams-* (connector-specific framework binding), mcp (GraphQL model scanning + CDI startup)
+- **A (core extraction):** view, identity, governance, stores, notification-dispatch, expression, agent-gate, platform/ defaults
+- **C (framework-specific with shared utility):** subscriptions (4x @ObservesAsync + 1x @Observes StartupEvent + alpha network CDI integration + CDI event firing), streams-* (connector-specific framework binding), mcp (GraphQL model scanning + CDI startup)
 **Rationale:** Consumer<T> callbacks are simpler and more testable than any EventBus abstraction — they require no framework at all. notification-dispatch was reclassified from C to A: its CDI coupling (2 async observers + 2 scheduled jobs) is structurally identical to other A modules, and its business logic (target resolution, suppression evaluation, channel routing, delivery retry, digest flushing) is cleanly separable from the 4 CDI entry points. The previous rationale based on the sync/async semantic gap between CDI and Spring events was overstated — the platform uses fireAsync() uniformly (only 1 synchronous fire() call exists in GraphQLModelScanner across the entire codebase). The stronger argument for callbacks over an EventBus is simplicity.
 **Trade-offs:** Two categories of modules with different extraction strategies adds cognitive load. The "C" modules still need dual implementations for the orchestration layer.
 **Sources:** GE-20260605-373190, GE-20260531-e1ce47, GE-20260423-daef97, GE-20260517-a6d608, GE-20260515-99cf39
 **Exploration:** deep-analysis
 **Depends on:** D2 (module structure)
-**Status:** revised — notification-dispatch reclassified from C to A based on CDI coupling analysis; rationale corrected from sync/async gap to simplicity
+**Status:** revised — notification-dispatch reclassified from C to A; agent-gate added to A list; subscriptions observer count corrected to 4x @ObservesAsync + 1x @Observes StartupEvent; rationale corrected from sync/async gap to simplicity
 
 ## D4: Consumer dependency management
 
@@ -68,8 +68,9 @@
 | CDI Pattern | Core Module | Quarkus Module | Spring Module |
 |---|---|---|---|
 | @DefaultBean no-op | Plain POJO (in core) | @Produces @DefaultBean | @Bean @ConditionalOnMissingBean |
-| @ApplicationScoped service | Constructor-injected POJO | @Produces @ApplicationScoped | @Bean |
-| @Alternative @Priority(N) | Plain POJO | @Produces @Alternative @Priority(N) | Activation: @ConditionalOnProperty or @Profile; preference: @Primary or @Order (see detail below) |
+| @ApplicationScoped service | Constructor-injected POJO | @Produces @ApplicationScoped | @Bean via @AutoConfiguration |
+| @Alternative @Priority(N) | Plain POJO | @Produces @Alternative @Priority(N) | @AutoConfiguration + @ConditionalOnClass for activation; @Primary for preference (see detail below) |
+| @Decorator @Priority(N) | POJO with delegate constructor param | @Decorator @Delegate @Any | @Bean @Primary wrapping the delegate (see detail below) |
 | @Inject Instance<T> | Constructor param: List<T> or Optional<T> | Collected from Instance<T> | Collected from ObjectProvider<T> |
 | @Observes / @ObservesAsync | Method called by framework adapter | CDI observer delegates to core | @EventListener delegates to core |
 | @Scheduled | Method called by framework adapter | @Scheduled delegates to core | @Scheduled delegates to core |
@@ -77,11 +78,20 @@
 | PanacheEntityBase (in -jpa modules) | Stays in persistence module as standard JPA @Entity | Can extend with PanacheEntityBase | Spring Data JPA repository |
 | Event.fire() / fireAsync() | Consumer<T> callback | CDI Event<T> provided at construction | ApplicationEventPublisher provided at construction |
 
-**@Alternative @Priority mapping detail:** CDI's three-tier priority ladder (@DefaultBean → @ApplicationScoped → @Alternative @Priority(1..N)) has no single Spring equivalent. @DefaultBean maps cleanly to @ConditionalOnMissingBean. @ApplicationScoped maps to @Bean. But @Alternative @Priority(N) requires a combination of activation mechanism (@ConditionalOnProperty or @Profile) and preference mechanism (@Primary or @Order). The numeric priority ladder used in tests (@Priority(200) for FixedCurrentPrincipal) maps to Spring @TestConfiguration with explicit overrides. Full mapping design will be detailed during implementation.
-**Trade-offs:** The @Alternative @Priority mapping is the most complex — it requires per-use-case decisions during implementation rather than a single mechanical rule.
+**@Alternative @Priority mapping — Spring activation principle:** Spring -spring modules use Spring Boot auto-configuration for classpath-activated bean registration — analogous to CDI's classpath scanning. Each -spring module ships an @AutoConfiguration class registered via META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports. The CDI three-tier priority ladder maps as follows:
+
+| CDI Tier | CDI Mechanism | Spring Mechanism |
+|---|---|---|
+| @DefaultBean (fallback) | Yields to any bean | @Bean @ConditionalOnMissingBean in base auto-config |
+| @ApplicationScoped (production default) | Classpath-presence activation | @AutoConfiguration + @ConditionalOnClass in module auto-config |
+| @Alternative @Priority(1..N) (opt-in override) | Classpath-presence + numeric priority | @AutoConfiguration ordering via @AutoConfigureBefore/@AutoConfigureAfter + @Primary |
+| @Alternative @Priority(200) (test override) | Test classpath + highest priority | @TestConfiguration with explicit @Bean overrides |
+
+**@Decorator mapping detail:** CDI's @Decorator provides automatic delegate binding via @Delegate @Inject. The core POJO expresses the same pattern via constructor injection: takes a delegate instance, wraps it. The Quarkus module uses @Decorator for automatic delegate binding. The Spring module uses @Bean @Primary that takes the original bean as a constructor parameter and wraps it — or Spring AOP @Around advice for cross-cutting concerns. Example: GatedAgentProvider's core is a POJO wrapping an AgentProvider delegate with admission strategies; CDI's @Decorator provides the delegate automatically; Spring provides it via @Bean method parameter injection.
+**Trade-offs:** The @Alternative @Priority mapping is the most complex — @AutoConfiguration ordering is less granular than CDI's numeric priorities. The @Decorator mapping requires one @Bean method per decorator in Spring vs automatic binding in CDI.
 **Sources:** PP-20260518-platform-spi-contract, PP-20260514-engine-spi-noops-defaultbean, alternative-extension-patterns.md
 **Exploration:** quick
-**Status:** revised — @Alternative @Priority mapping corrected; PanacheEntityBase row clarified to show entities stay in persistence modules
+**Status:** revised — @Alternative @Priority mapping corrected with Spring auto-configuration activation principle; @Decorator mapping row added; PanacheEntityBase row clarified to show entities stay in persistence modules
 
 ## D6: Testing strategy
 
@@ -98,5 +108,20 @@
 - **CI:** Both Quarkus and Spring test suites run in CI. Spring modules added to the Maven reactor.
 **Trade-offs:** Spring wiring modules need a parallel test infrastructure (spring-testing module). This is one-time setup — the fixtures are thin wiring around the same NoOp POJOs already in the core.
 **Sources:** PP-20260512-module-tiers (testing guidance), existing testing/ module pattern
+**Exploration:** implicit decision surfaced by reviewer
+**Depends on:** D7 (Spring framework choice)
+**Status:** captured
+
+## D7: Spring framework choice
+
+**Choice:** Spring Boot 3.x — auto-configuration for classpath-activated bean registration, opinionated dependency management, Jakarta EE namespace compatibility with Quarkus 3.x
+**Alternatives:**
+- Plain Spring Framework (no Boot) — requires explicit @Import on every consumer; no auto-configuration; loses the CDI-analogous classpath activation model. More configuration friction, no architectural benefit.
+- Spring Boot 2.x — javax namespace, incompatible with Quarkus 3.x's Jakarta migration. Not viable.
+**Rationale:** Spring Boot auto-configuration is the Spring-side equivalent of CDI's classpath-scanning bean discovery. Each -spring module ships an @AutoConfiguration class that registers beans when the module is on the classpath — the same "drop the jar on the classpath and it activates" model that CDI provides. Spring Boot 3.x uses the Jakarta namespace (jakarta.inject, jakarta.persistence), ensuring the core module's Jakarta annotations are compatible with both Quarkus and Spring consumers. Plain Spring Framework would require every consumer to explicitly @Import every module's configuration — the same friction as manual CDI bean.xml registration.
+**BOM integration:** casehub-parent BOM imports spring-boot-dependencies as a managed BOM (<scope>import</scope> in <dependencyManagement>). This ensures consistent Spring Boot versions across all -spring modules without requiring each module to specify versions. The Spring Boot version is managed in one place (casehub-parent).
+**Test dependency:** spring-boot-starter-test is test-scoped in each -spring module's pom.xml. The spring-testing module aggregates platform-specific test fixtures (@TestConfiguration overrides for NoOp POJOs) but does not re-export the test framework itself.
+**Trade-offs:** Spring Boot brings opinionated auto-configuration that may conflict with Quarkus in mixed-classpath scenarios — but this is prevented by the module separation (a consumer uses either -quarkus or -spring modules, never both).
+**Sources:** D5 (CDI pattern mappings), D6 (testing strategy)
 **Exploration:** implicit decision surfaced by reviewer
 **Status:** captured
