@@ -115,6 +115,18 @@ var gen = new PlatformSchemaGenerator(
 
 Opt-in via `PlatformSchemaGenerator`'s `Module... customModules` varargs. Not auto-included in the default set. Matches SealedHierarchyModule pattern.
 
+### Module ordering
+
+All three custom definition modules (`EnumInliningModule`, `SealedHierarchyModule`, `ShorthandModule`) register via `builder.forTypesInGeneral().withCustomDefinitionProvider()`. victools evaluates providers in registration order — **first non-null return wins**; remaining providers are not consulted for that type.
+
+Registration order in `PlatformSchemaGenerator`:
+1. `EnumInliningModule` (built-in, always first)
+2. Custom modules in `Module... customModules` varargs order
+
+**Type set invariant:** Each module returns `null` for types outside its domain — `EnumInliningModule` only intercepts `Enum.class` subtypes, `SealedHierarchyModule` only intercepts sealed types, `ShorthandModule` only intercepts types present in its explicit definition map. These type sets are naturally disjoint (Java enums cannot be sealed; shorthand types are explicitly registered by class). The consumer is responsible for not registering the same type in multiple modules.
+
+**DefinitionType choice:** `ShorthandModule` uses `CustomDefinition.DefinitionType.STANDARD` (the default from `new CustomDefinition(schema)`). This follows standard victools behaviour — shorthand types are placed in `$defs` with `$ref` when referenced multiple times or when `DEFINITIONS_FOR_ALL_OBJECTS` is enabled (which `PlatformSchemaGenerator` enables). `EnumInliningModule` uses `INLINE` because enum schemas are small and should be expanded at each use site. `SealedHierarchyModule` uses `STANDARD` as its `oneOf` schemas contain `$ref` entries to subtypes.
+
 ### Test strategy
 
 Local test types in the test package — no dependency on neocortex or engine types.
@@ -131,7 +143,7 @@ Test cases:
 3. Object form matches caller-provided schema
 4. Non-shorthand types not intercepted
 5. Multiple shorthand types in one module
-6. Interaction with SealedHierarchyModule (no conflict)
+6. Interaction with SealedHierarchyModule — both modules co-registered on the same `PlatformSchemaGenerator` with non-overlapping type sets: a sealed type NOT in the shorthand map, and a shorthand type that is NOT sealed. Verifies each module handles its own types correctly when both are active
 
 ### Files changed
 
@@ -144,10 +156,12 @@ Test cases:
 ### Migration scope
 
 Follow-up issues (not this branch):
-- casehubio/neocortex: migrate from local `ShorthandModule` to shared, delete local copy
-- casehubio/engine: migrate hand-built `SchemaPostProcessor` methods to shared `ShorthandModule`
+- casehubio/neocortex#290: migrate from local `ShorthandModule` to shared, delete local copy
+- casehubio/engine#1067: migrate hand-built `SchemaPostProcessor` methods to shared `ShorthandModule`
 
-Migrating consumers must produce schema-equivalent output (D5). Engine's `SchemaDriftTest` verifies equivalence.
+**Architectural note on engine migration:** Engine's `SchemaPostProcessor` (1661 lines) operates on already-generated JSON schemas — it's post-processing. It builds shorthand schemas as raw JSON (`buildCloudEventTrigger()`, `buildAdaptation()`, etc.) and patches them into `$defs` of the finished schema. `ShorthandModule` intercepts during schema generation via victools' `Module` interface — a fundamentally different mechanism. The engine migration requires: (1) identifying shorthand-pattern methods in `SchemaPostProcessor`, (2) creating `ShorthandDefinition` registrations, (3) verifying schema equivalence between early interception and late patching, (4) removing migrated methods while keeping non-shorthand post-processing intact. Engine's `SchemaDriftTest` (compares committed schema YAML against generator output) will catch regressions.
+
+Migrating consumers must produce schema-equivalent output. Engine's `SchemaDriftTest` verifies equivalence.
 
 ---
 
@@ -171,7 +185,7 @@ Merge best-of-both into yaml-codegen's `MappingConfig`. No new module — enhanc
 | `TypeMapping.body` | None | Add `body` field for arbitrary Java code injection |
 | `FieldOverride.defaultValue` | None (only null-guards collections) | Add `defaultValue` to `MappingConfig.FieldMapping` |
 | `ExtraField(name, type, defaultValue)` | `additionalFields` (no defaults) | Add `defaultValue` to additional fields |
-| `RecordMapping.skipPatterns` | Per-field `skip` only | Add global `skipPatterns` list with glob matching |
+| `RecordMapping.skipPatterns` | Per-field `skip` only | Add global `skipPatterns` list with prefix-star matching (exact match or trailing `*` wildcard) |
 | `RecordMapping.imports` | Per-field FQN in `type` | Add global `imports` map (short name to FQN) |
 | `RecordMapping.deserializers` | Per-field FQN in `deserializer` | Add global `deserializers` map (name to FQN) |
 
@@ -217,7 +231,7 @@ public record MappingConfig(
 
 - Compact constructor: generate null-guard for any field with `defaultValue` (not just collections)
 - Body injection: append `TypeMapping.body` inside record body after compact constructor
-- Skip patterns: apply global `skipPatterns` glob matching before per-field processing
+- Skip patterns: apply global `skipPatterns` before per-field processing. Matching: exact match (`pattern.equals(fieldName)`) or trailing `*` wildcard (`pattern.endsWith("*")` → prefix match via `fieldName.startsWith(prefix)`). Matches engine's `RecordEmitter.shouldSkip()` semantics
 - Import resolution: check global `imports` and `deserializers` maps when resolving FQNs
 - Record name: use `TypeMapping.recordName` when present, falling back to schema name + prefix
 
@@ -226,7 +240,7 @@ public record MappingConfig(
 Extend existing `RecordEmitterTest` with:
 1. `body` injection produces valid Java
 2. `defaultValue` generates compact constructor null-guard
-3. `skipPatterns` glob matching works (exact, prefix-`*`)
+3. `skipPatterns` prefix-star matching works (exact, prefix-`*`)
 4. Global `imports` map resolves short names to FQNs
 5. Global `deserializers` map resolves deserializer FQNs
 6. `recordName` overrides schema type name
@@ -264,22 +278,25 @@ Maven Enforcer custom rule in a new `drift-detection/` module. The enforcer plug
 
 ### API
 
+Targets Maven Enforcer 3.x (stable). The rule implements `EnforcerRule` from `enforcer-api:3.5.0`.
+
 ```java
 package io.casehub.platform.drift;
 
 public class DriftDetectionRule implements EnforcerRule {
 
     private String generatedSourcesDir;
+    private String sourceRoot;    // default: ${project.basedir}/src/main/java
     private String targetPackage;
     private String allowListFile;
 
     @Override
-    public void execute() throws EnforcerRuleException {
+    public void execute(EnforcerRuleHelper helper) throws EnforcerRuleException {
         Set<String> generated = scanGeneratedTypes(generatedSourcesDir);
-        Set<String> compiled = scanCompiledTypes(targetPackage);
+        Set<String> handWritten = scanHandWrittenTypes(sourceRoot, targetPackage);
         Set<String> allowed = loadAllowList(allowListFile);
 
-        Set<String> drift = new TreeSet<>(compiled);
+        Set<String> drift = new TreeSet<>(handWritten);
         drift.removeAll(generated);
         drift.removeAll(allowed);
 
@@ -292,8 +309,16 @@ public class DriftDetectionRule implements EnforcerRule {
                 + allowListFile + " with a justification comment.");
         }
     }
+
+    @Override public boolean isCacheable() { return false; }
+    @Override public boolean isResultValid(EnforcerRule cachedRule) { return false; }
+    @Override public String getCacheId() { return null; }
 }
 ```
+
+**Scanning mechanism:**
+- `scanGeneratedTypes(generatedSourcesDir)`: lists `.java` files recursively under the directory, extracts simple class names from filenames (filtering `package-info.java`).
+- `scanHandWrittenTypes(sourceRoot, targetPackage)`: resolves `targetPackage` to a directory path (`sourceRoot/<package as path>/`), lists `.java` files in that directory, extracts simple class names. This directly identifies hand-written source files — generated sources live under `target/generated-sources/`, not under `src/main/java/`.
 
 ### Configuration (consumer pom.xml)
 
@@ -317,6 +342,7 @@ public class DriftDetectionRule implements EnforcerRule {
                 <rules>
                     <driftDetectionRule>
                         <generatedSourcesDir>${project.build.directory}/generated-sources/yaml-codegen</generatedSourcesDir>
+                        <sourceRoot>${project.basedir}/src/main/java</sourceRoot>
                         <targetPackage>io.casehub.api.model.converter.yaml</targetPackage>
                         <allowListFile>src/main/resources/hand-written-exceptions.txt</allowListFile>
                     </driftDetectionRule>
@@ -345,7 +371,7 @@ drift-detection/
     DriftDetectionRule.java          — EnforcerRule implementation
   src/test/java/io/casehub/platform/drift/
     DriftDetectionRuleTest.java      — unit tests with mock directories
-  pom.xml                           — regular JAR, depends on maven-enforcer-api
+  pom.xml                           — regular JAR, depends on enforcer-api:3.5.0 (provided scope)
 ```
 
 ### Test strategy
@@ -361,7 +387,7 @@ drift-detection/
 
 | File | Action |
 |------|--------|
-| `drift-detection/pom.xml` | New — regular JAR, maven-enforcer-api dependency |
+| `drift-detection/pom.xml` | New — regular JAR, `enforcer-api:3.5.0` provided-scope dependency |
 | `drift-detection/src/main/java/io/casehub/platform/drift/DriftDetectionRule.java` | New |
 | `drift-detection/src/test/java/io/casehub/platform/drift/DriftDetectionRuleTest.java` | New |
 | `pom.xml` (root) | Modified — add `drift-detection` module |
@@ -374,10 +400,10 @@ This branch does platform-side work only. Consumer migration is separate:
 
 | Issue | Repo | Dependency |
 |-------|------|------------|
-| TBD | casehubio/neocortex | Migrate ShorthandModule to shared (depends on Part 1) |
-| TBD | casehubio/engine | Migrate SchemaPostProcessor shorthand methods to shared (depends on Part 1) |
-| TBD | casehubio/engine | Migrate codegen/ to yaml-codegen plugin (depends on Part 2) |
-| TBD | casehubio/engine | Add drift-detection enforcer rule (depends on Part 3) |
+| casehubio/neocortex#290 | casehubio/neocortex | Migrate ShorthandModule to shared (depends on Part 1) |
+| casehubio/engine#1067 | casehubio/engine | Migrate SchemaPostProcessor shorthand methods to shared (depends on Part 1) |
+| casehubio/engine#1068 | casehubio/engine | Migrate codegen/ to yaml-codegen plugin (depends on Part 2) |
+| casehubio/engine#1069 | casehubio/engine | Add drift-detection enforcer rule (depends on Part 3) |
 
 All downstream: engine epic casehubio/engine#1058.
 
