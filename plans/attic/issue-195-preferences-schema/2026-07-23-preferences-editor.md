@@ -229,8 +229,8 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(#193): add Prefe
 - Modify: `platform/src/main/java/io/casehub/platform/mock/MockPreferenceProvider.java`
 - Modify: `platform/src/test/java/io/casehub/platform/mock/MockBeansTest.java`
 - Modify: `config/src/main/java/io/casehub/platform/config/ConfigFilePreferenceProvider.java`
-- Modify: `config/src/test/java/io/casehub/platform/config/ConfigFilePreferenceProviderTest.java`
-- Modify: `config/src/test/java/io/casehub/platform/config/ChainingTest.java`
+- Modify: `../../../../config/src/test/java/io/casehub/platform/config/ConfigFilePreferenceProviderTest.java`
+- Modify: `../../../../config/src/test/java/io/casehub/platform/config/ChainingTest.java`
 
 **Interfaces:**
 - Consumes: `PreferenceStore` (from Task 1)

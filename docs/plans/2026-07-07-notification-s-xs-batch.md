@@ -255,7 +255,7 @@ InMemorySuppressionStore eviction, JPA server-side filtering, InMemoryDigestBuff
 
 **Files:**
 - Modify: `notification-settings-inmem/src/main/java/io/casehub/platform/notification/settings/inmem/InMemorySuppressionStore.java`
-- Modify: `notification-settings-inmem/src/test/java/io/casehub/platform/notification/settings/inmem/InMemorySuppressionStoreTest.java`
+- Modify: `../../../notification-settings-inmem-core/src/test/java/io/casehub/platform/notification/settings/inmem/InMemorySuppressionStoreTest.java`
 - Modify: `notification-settings-jpa/src/main/java/io/casehub/platform/notification/settings/jpa/JpaSuppressionStore.java`
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/InMemoryDigestBuffer.java`
 - Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/InMemoryDigestBufferTest.java`
@@ -452,7 +452,7 @@ Thread `Instant now` through `evaluate()` and `evaluateUserLevel()`. Remove mute
 
 **Files:**
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/SuppressionEvaluator.java`
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/SuppressionEvaluatorTest.java`
+- Modify: `../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/SuppressionEvaluatorTest.java`
 
 **Interfaces:**
 - Consumes: Store-authoritative expiry from Task 2
@@ -599,7 +599,7 @@ Add `ConcurrentHashMap<Class<?>, ConcurrentHashMap<String, Optional<MethodHandle
 
 **Files:**
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/TemplateResolver.java`
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/TemplateResolverTest.java`
+- Modify: `../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/TemplateResolverTest.java`
 
 **Interfaces:**
 - Consumes: nothing new
@@ -679,9 +679,9 @@ Add `QuietHoursAction` parameter to `ChannelRouter.route()`, implement quiet hou
 
 **Files:**
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/ChannelRouter.java`
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/ChannelRouterTest.java`
+- Modify: `../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/ChannelRouterTest.java`
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/NotificationDispatcher.java`
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/NotificationDispatcherTest.java`
+- Modify: `../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/NotificationDispatcherTest.java`
 
 **Interfaces:**
 - Consumes: `NotificationSeverity.isAtLeast()`, `QuietHoursAction` enum from Task 1
@@ -801,7 +801,7 @@ Thread `Instant now` through `processKey`, add quiet hours deferred key tracking
 
 **Files:**
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/DigestFlushScheduler.java`
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/DigestFlushSchedulerTest.java`
+- Modify: `../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/DigestFlushSchedulerTest.java`
 
 **Interfaces:**
 - Consumes: `SuppressionEvaluator.evaluateUserLevel(Optional, QuietHours, Instant)` from Task 3, `DigestSummary(... DigestGroupBy)` from Task 1
@@ -1035,7 +1035,7 @@ New SPI, `@DefaultBean` no-op, TargetResolver integration with `ENTITY_WATCHERS`
 **Files:**
 - Create: `platform/src/main/java/io/casehub/platform/subscription/NoOpEntityWatcherProvider.java`
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/TargetResolver.java`
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/TargetResolverTest.java`
+- Modify: `../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/TargetResolverTest.java`
 
 **Interfaces:**
 - Consumes: `EntityWatcherProvider` SPI, `TargetType.ENTITY_WATCHERS` from Task 1

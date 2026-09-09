@@ -40,9 +40,9 @@
 - Modify: `platform-api/src/test/java/io/casehub/platform/api/acl/AccessControlProviderContractTest.java`
 - Modify: `testing/src/test/java/io/casehub/platform/testing/InMemoryGroupMembershipProviderTest.java`
 - Modify: `scim/src/test/java/io/casehub/platform/scim/ScimGroupMembershipProviderTest.java`
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/TargetResolverTest.java`
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/NotificationDispatcherTest.java`
-- Modify: `acl-inmem/src/test/java/io/casehub/platform/acl/inmem/InMemoryAccessControlProviderTest.java`
+- Modify: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/TargetResolverTest.java`
+- Modify: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/NotificationDispatcherTest.java`
+- Modify: `../../../../acl-inmem-core/src/test/java/io/casehub/platform/acl/inmem/InMemoryAccessControlProviderTest.java`
 - Modify: `platform/src/test/java/io/casehub/platform/mock/MockBeansTest.java`
 
 **Interfaces:**
@@ -241,7 +241,7 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
 - Modify: `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/JpaAccessControlProvider.java`
 - Modify: `acl-inmem/src/main/java/io/casehub/platform/acl/inmem/InMemoryAccessControlProvider.java`
 - Modify: `platform-api/src/test/java/io/casehub/platform/api/acl/AccessControlProviderContractTest.java`
-- Modify: `acl-inmem/src/test/java/io/casehub/platform/acl/inmem/InMemoryAccessControlProviderTest.java`
+- Modify: `../../../../acl-inmem-core/src/test/java/io/casehub/platform/acl/inmem/InMemoryAccessControlProviderTest.java`
 - Modify: `acl-jpa/src/test/java/io/casehub/platform/acl/jpa/JpaAccessControlProviderTest.java`
 
 **Interfaces:**
@@ -466,9 +466,9 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/EngagementCallbackResource.java`
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/InAppEngagementBridge.java`
 - Modify: `delivery-tracking-jpa/src/test/java/io/casehub/platform/delivery/tracking/jpa/JpaDeliveryAttemptStoreTest.java`
-- Modify: `delivery-tracking-inmem/src/test/java/io/casehub/platform/delivery/tracking/inmem/InMemoryDeliveryAttemptStoreTest.java`
+- Modify: `../../../../delivery-tracking-inmem-core/src/test/java/io/casehub/platform/delivery/tracking/inmem/InMemoryDeliveryAttemptStoreTest.java`
 - Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/EngagementCallbackResourceTest.java`
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/InAppEngagementBridgeTest.java`
+- Modify: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/InAppEngagementBridgeTest.java`
 
 **Interfaces:**
 - Produces: `DeliveryAttemptStore.findById(String id, String tenancyId)`, `findBySource(..., String tenancyId)`, `findEngagementsByAttemptId(String, String)`, `findEngagementsBySource(String, DeliverySourceType, String)`

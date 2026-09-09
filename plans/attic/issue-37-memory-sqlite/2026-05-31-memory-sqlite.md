@@ -18,7 +18,7 @@
 |---|---|---|
 | **CREATE** | `testing/src/main/java/io/casehub/platform/testing/memory/CaseMemoryStoreContractTest.java` | Abstract JUnit5 base — all adapter-agnostic contract tests |
 | **MODIFY** | `testing/pom.xml` | Change `junit-jupiter` to `compile` scope so contract base compiles |
-| **MODIFY** | `memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java` | Extend contract base; remove duplicated test methods |
+| **MODIFY** | `../../../../memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java` | Extend contract base; remove duplicated test methods |
 | **MODIFY** | `memory-jpa/src/test/java/io/casehub/platform/memory/jpa/JpaMemoryStoreTest.java` | Extend contract base; remove duplicated test methods; keep JPA-specific ones |
 | **MODIFY** | `pom.xml` (root) | Add `memory-sqlite` module; add `sqlite-jdbc` + `HikariCP` to `dependencyManagement` |
 | **CREATE** | `memory-sqlite/pom.xml` | Module POM — deps, jandex plugin, no `quarkus:build` goal |
@@ -352,7 +352,7 @@ Expected: `BUILD SUCCESS`
 ## Task 2: Refactor InMemoryMemoryStoreTest to extend the contract base
 
 **Files:**
-- Modify: `memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java`
+- Modify: `../../../../memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java`
 
 - [ ] **Step 1: Rewrite InMemoryMemoryStoreTest**
 

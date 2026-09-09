@@ -32,7 +32,7 @@
 **Created:**
 - `platform-api/src/main/java/io/casehub/platform/api/endpoints/EndpointRegistered.java`
 - `platform-api/src/test/java/io/casehub/platform/api/endpoints/EndpointRegisteredTest.java`
-- `endpoints-memory/src/test/java/io/casehub/platform/endpoints/memory/InMemoryEndpointRegistryEventTest.java`
+- `../../../../endpoints-memory/src/test/java/io/casehub/platform/endpoints/memory/InMemoryEndpointRegistryEventTest.java`
 - `streams-kafka/pom.xml`
 - `streams-kafka/src/main/java/io/casehub/platform/streams/kafka/KafkaStreamProcessor.java`
 - `streams-kafka/src/test/java/io/casehub/platform/streams/kafka/KafkaStreamProcessorTest.java`
@@ -297,7 +297,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(platform#98): ad
 **Files:**
 - Modify: `endpoints-memory/pom.xml`
 - Modify: `endpoints-memory/src/main/java/io/casehub/platform/endpoints/memory/InMemoryEndpointRegistry.java`
-- Create: `endpoints-memory/src/test/java/io/casehub/platform/endpoints/memory/InMemoryEndpointRegistryEventTest.java`
+- Create: `../../../../endpoints-memory/src/test/java/io/casehub/platform/endpoints/memory/InMemoryEndpointRegistryEventTest.java`
 
 **Background:** `InMemoryEndpointRegistry` currently has no constructor and no CDI injection. All 14 existing unit tests use `new InMemoryEndpointRegistry()` directly (plain JUnit5, no CDI). Adding CDI field injection would NPE on all 14 tests. Use constructor injection with a package-private no-arg constructor for CDI proxy subclass + unit tests.
 
@@ -338,7 +338,7 @@ And add `quarkus-junit5` test dep inside `<dependencies>`:
 
 - [ ] **Step 3.2: Write the failing @QuarkusTest**
 
-Create `endpoints-memory/src/test/java/io/casehub/platform/endpoints/memory/InMemoryEndpointRegistryEventTest.java`:
+Create `../../../../endpoints-memory/src/test/java/io/casehub/platform/endpoints/memory/InMemoryEndpointRegistryEventTest.java`:
 
 ```java
 package io.casehub.platform.endpoints.memory;

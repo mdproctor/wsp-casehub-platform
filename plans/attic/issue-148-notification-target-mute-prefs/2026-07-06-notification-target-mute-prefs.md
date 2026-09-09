@@ -118,7 +118,7 @@ Update subscription store implementations and REST layer for userId→ownerId, t
 - Modify: `subscriptions-jpa/src/main/java/io/casehub/platform/subscription/jpa/JpaReactiveSubscriptionStore.java`
 - Create: `subscriptions-jpa/src/main/resources/db/subscription/migration/V2__subscription_targets.sql`
 - Modify: `subscriptions/src/main/java/io/casehub/platform/subscription/rest/SubscriptionResource.java`
-- Modify: `subscriptions-inmem/src/test/java/io/casehub/platform/subscription/inmem/InMemorySubscriptionStoreTest.java`
+- Modify: `../../../../subscriptions-inmem-core/src/test/java/io/casehub/platform/subscription/inmem/InMemorySubscriptionStoreTest.java`
 - Modify: `subscriptions/src/test/java/io/casehub/platform/subscription/engine/SubscriptionEngineTest.java`
 
 **Interfaces:**
@@ -196,8 +196,8 @@ New `notification-settings-inmem/` module. InMemoryNotificationPreferenceStore +
 - Create: `notification-settings-inmem/pom.xml`
 - Create: `notification-settings-inmem/src/main/java/io/casehub/platform/notification/settings/inmem/InMemoryNotificationPreferenceStore.java`
 - Create: `notification-settings-inmem/src/main/java/io/casehub/platform/notification/settings/inmem/InMemorySuppressionStore.java`
-- Create: `notification-settings-inmem/src/test/java/io/casehub/platform/notification/settings/inmem/InMemoryNotificationPreferenceStoreTest.java`
-- Create: `notification-settings-inmem/src/test/java/io/casehub/platform/notification/settings/inmem/InMemorySuppressionStoreTest.java`
+- Create: `../../../../notification-settings-inmem-core/src/test/java/io/casehub/platform/notification/settings/inmem/InMemoryNotificationPreferenceStoreTest.java`
+- Create: `../../../../notification-settings-inmem-core/src/test/java/io/casehub/platform/notification/settings/inmem/InMemorySuppressionStoreTest.java`
 - Modify: `pom.xml` (add module)
 
 **Interfaces:**
@@ -259,10 +259,10 @@ New `notification-dispatch/` module. The core of this branch — TargetResolver,
 - Create: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/InAppNotificationDeliverer.java`
 - Create: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/InMemoryDeliveryChannelRegistry.java`
 - Move: `subscriptions/src/main/java/.../engine/TemplateResolver.java` → `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/TemplateResolver.java`
-- Create: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/TargetResolverTest.java`
-- Create: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/SuppressionEvaluatorTest.java`
-- Create: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/ChannelRouterTest.java`
-- Create: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/NotificationDispatcherTest.java`
+- Create: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/TargetResolverTest.java`
+- Create: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/SuppressionEvaluatorTest.java`
+- Create: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/ChannelRouterTest.java`
+- Create: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/NotificationDispatcherTest.java`
 - Move: `subscriptions/src/test/java/.../engine/TemplateResolverTest.java` → `notification-dispatch/src/test/java/.../dispatch/TemplateResolverTest.java`
 - Modify: `pom.xml` (add module)
 

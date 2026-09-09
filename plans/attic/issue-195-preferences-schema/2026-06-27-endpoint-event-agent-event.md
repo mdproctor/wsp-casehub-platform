@@ -21,7 +21,7 @@
 
 **Files:**
 - Modify: `endpoints-memory/pom.xml` — add mockito-core test dependency
-- Create: `endpoints-memory/src/test/java/io/casehub/platform/endpoints/memory/InMemoryEndpointRegistryFireEventTest.java`
+- Create: `../../../../endpoints-memory-core/src/test/java/io/casehub/platform/endpoints/memory/InMemoryEndpointRegistryFireEventTest.java`
 
 **Interfaces:**
 - Consumes: `InMemoryEndpointRegistry(Event<EndpointRegistered>)` public constructor at line 56
@@ -43,7 +43,7 @@ No `<version>` — managed by parent POM.
 
 - [ ] **Step 2: Write the test class**
 
-Create `endpoints-memory/src/test/java/io/casehub/platform/endpoints/memory/InMemoryEndpointRegistryFireEventTest.java`:
+Create `../../../../endpoints-memory-core/src/test/java/io/casehub/platform/endpoints/memory/InMemoryEndpointRegistryFireEventTest.java`:
 
 ```java
 package io.casehub.platform.endpoints.memory;
@@ -460,8 +460,8 @@ git commit -m "feat(platform#118): extend AgentEvent sealed interface — Thinki
 **Files:**
 - Modify: `agent-langchain4j/src/main/java/io/casehub/platform/agent/langchain4j/AgentProviderChatModel.java:100-121`
 - Modify: `agent-langchain4j/src/main/java/io/casehub/platform/agent/langchain4j/AgentSessionChatModel.java:79-100`
-- Modify: `agent-langchain4j/src/test/java/io/casehub/platform/agent/langchain4j/AgentProviderChatModelTest.java`
-- Modify: `agent-langchain4j/src/test/java/io/casehub/platform/agent/langchain4j/AgentSessionChatModelTest.java`
+- Modify: `../../../../agent-langchain4j-core/src/test/java/io/casehub/platform/agent/langchain4j/AgentProviderChatModelTest.java`
+- Modify: `../../../../agent-langchain4j-core/src/test/java/io/casehub/platform/agent/langchain4j/AgentSessionChatModelTest.java`
 
 **Interfaces:**
 - Consumes: `AgentEvent.ThinkingDelta`, `AgentEvent.ToolCallDelta`, `AgentEvent.ToolCallComplete`, `AgentEvent.ToolResult` from Task 2
