@@ -8,7 +8,7 @@ Designed and began implementing dual-framework core extraction (casehubio/parent
 
 **Branch:** `issue-469-dual-framework-core-extraction`
 **Plan state:** active
-**Batch progress:** Batches 1-4 complete. Batch 5 (Agent Stack) next.
+**Batch progress:** Batches 1-5 complete. Batch 6 in progress (stores done, dispatch in progress).
 
 ## The Extraction Pattern
 
@@ -84,9 +84,9 @@ module-spring/   ← NEW: Spring Boot auto-config (80%+ auto-generated from Quar
 
 Pattern matches BootUI (github.com/jdubois/boot-ui) — real-world dual Quarkus/Spring project. Same three-tier split, same native-events approach, same SPI pattern. Also validated by hexagonal architecture projects (SvenWoltmann, dustinsand, fuinorg).
 
-## What's Been Built (Batches 1-2)
+## What's Been Built (Batches 1-6)
 
-### New Modules Created
+### New Core Modules Created
 
 | Module | Purpose | Tests |
 |--------|---------|-------|
@@ -94,11 +94,25 @@ Pattern matches BootUI (github.com/jdubois/boot-ui) — real-world dual Quarkus/
 | spring-generator/ | Maven plugin: Jandex scan → @AutoConfiguration + drift verification | 7 |
 | platform-view-core/ | SubjectViewEvaluator + SubjectViewOrchestrator POJOs | 31 |
 | platform-view-spring/ | Generated @AutoConfiguration (2 beans, drift verified) | 3 |
-| platform-core/ | 32 NoOp POJOs for all platform-api SPIs | compile ✅ |
+| platform-core/ | 32+ NoOp POJOs for all platform-api SPIs | compile ✅ |
 | platform-spring/ | Generated @AutoConfiguration (32 beans, 30 generated + 2 manual) | drift ✅ |
 | governance-core/ | PolicyEnforcer + DefaultPolicyEnforcer + exceptions | compile ✅ |
 | expression-core/ | DefaultExpressionEngineRegistry + MVEL/JQ/JEXL engines | compile ✅ |
 | identity-core/ | 15 POJOs: DID resolvers, VC validator, SCIM lookup, composites | 78 ✅ |
+| agent-runtime-core/ | SubprocessRuntime POJO | ✅ |
+| agent-claude-core/ | ClaudeAgentProvider + client + session | ✅ |
+| agent-openai-core/ | OpenAiAgentBackend POJO | ✅ |
+| agent-codex-core/ | CodexAgentBackend POJO | ✅ |
+| agent-gemini-core/ | GeminiAgentBackend POJO | ✅ |
+| agent-gemini-cli-core/ | GeminiCliAgentBackend POJO | ✅ |
+| agent-router-core/ | RoutingAgentProvider POJO | ✅ |
+| agent-gate-core/ | Strategies + SessionRegistry + SessionLeakReaper POJOs | 61 ✅ |
+| agent-langchain4j-core/ | ChatModelAgentProvider + AgentProviderChatModel POJOs | ✅ |
+| notifications-inmem-core/ | InMemoryNotificationStore — Event→Consumer | 34 ✅ |
+| notification-settings-inmem-core/ | Preference + Suppression stores | ✅ |
+| delivery-tracking-inmem-core/ | InMemoryDeliveryAttemptStore | 17 ✅ |
+| digest-inmem-core/ | InMemoryDigestBuffer | ✅ |
+| delivery-channel-inmem-core/ | InMemoryDeliveryChannelRegistry | ✅ |
 
 ### Modified Modules
 
@@ -111,9 +125,12 @@ Pattern matches BootUI (github.com/jdubois/boot-ui) — real-world dual Quarkus/
 | expression/ | 5 files to core, ExpressionBeans @Produces, depends on core |
 | identity/ | 15 files to core, IdentityBeans @Produces (CDI qualifiers preserved), depends on core |
 
-### Commit History (11 commits)
+### Commit History (15 commits)
 
 ```
+b2bdc9b2 feat(#276): extract notification in-memory store cores — 5 modules as POJOs
+aa70f2ad feat(#276): extract agent-router-core, agent-gate-core, agent-langchain4j-core as POJOs
+1011cae6 feat(#276): extract agent backend cores — runtime, claude, openai, codex, gemini, gemini-cli as POJOs
 5c2ffe9c feat(#276): extract identity-core — DID resolvers, VC validation, SCIM lookup as POJOs
 29d43f9a feat(#276): extract expression-core — MVEL, JQ, JEXL engines as POJOs
 6f062efe feat(#276): extract governance-core — PolicyEnforcer + retry logic as POJO
@@ -127,11 +144,11 @@ f52e10a0 feat(#276): create spring-generator Maven plugin
 2e3bdee4 feat(#276): add Spring Boot BOM and spring-testing scaffold
 ```
 
-**Total: 124+ tests green across 12 new modules. Zero consumer breakage.**
+**Total: 250+ tests green across 24 new core modules. Zero consumer breakage.**
 
 ## Immediate Next Step
 
-**Batch 5: Agent Stack** — 6 agent backends (claude, openai, codex, gemini, gemini-cli, langchain4j) + router + gate + runtime. Each backend follows the same pattern: remove @ApplicationScoped, convert to constructor injection, @Produces in existing module. Special patterns: agent-router uses Instance<AgentBackend> → core takes List<AgentBackend>. agent-gate uses @Decorator → core wraps delegate via constructor. agent-langchain4j has @DefaultBean @Priority(10) ChatModel.
+**Batch 6 dispatch extraction** in progress (notification-dispatch-core). Then Batch 7 (data infrastructure — datasource, endpoints, memory, acl, callback stores). Batch 7 survey done: 5 extractable stores, 4 partial extractions (logic to core, REST stays), 3 no-extraction (acl-admin, acl-worker, scim are framework-coupled).
 
 **IntelliJ workspace note:** The slot at `/Users/mdproctor/claude/casehub/slots/181/platform` was opened as a workspace module. Use `project_path=/Users/mdproctor/claude/casehub/slots/181/platform` for `ide_create_file` calls. The main repo at `/Users/mdproctor/claude/casehub/platform` is a DIFFERENT directory on `main` branch — do not write to it.
 
@@ -141,8 +158,8 @@ f52e10a0 feat(#276): create spring-generator Maven plugin
 |-------|---------|----------------|
 | ~~3~~ | ~~Platform defaults (NoOp POJOs)~~ | ~~M~~ DONE |
 | ~~4~~ | ~~Leaf services (expression, identity, governance)~~ | ~~M~~ DONE |
-| 5 | Agent stack (6 backends + router + gate + langchain4j) | L |
-| 6 | Notification pipeline (stores + dispatch) | L |
+| ~~5~~ | ~~Agent stack (9 backend + router + gate + langchain4j)~~ | ~~L~~ DONE |
+| 6 | Notification pipeline (stores DONE, dispatch in progress) | L |
 | 7 | Data infrastructure (datasource, endpoints, memory, acl, callback, scim) | L |
 | 8 | Category C modules (subscriptions, streams, mcp) | L |
 
