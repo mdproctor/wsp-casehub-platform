@@ -8,7 +8,7 @@ Designed and began implementing dual-framework core extraction (casehubio/parent
 
 **Branch:** `issue-469-dual-framework-core-extraction`
 **Plan state:** active
-**Batch progress:** Batches 1-3 complete. Batch 4 in progress (governance + expression done, identity next).
+**Batch progress:** Batches 1-4 complete. Batch 5 (Agent Stack) next.
 
 ## The Extraction Pattern
 
@@ -98,6 +98,7 @@ Pattern matches BootUI (github.com/jdubois/boot-ui) — real-world dual Quarkus/
 | platform-spring/ | Generated @AutoConfiguration (32 beans, 30 generated + 2 manual) | drift ✅ |
 | governance-core/ | PolicyEnforcer + DefaultPolicyEnforcer + exceptions | compile ✅ |
 | expression-core/ | DefaultExpressionEngineRegistry + MVEL/JQ/JEXL engines | compile ✅ |
+| identity-core/ | 15 POJOs: DID resolvers, VC validator, SCIM lookup, composites | 78 ✅ |
 
 ### Modified Modules
 
@@ -108,10 +109,12 @@ Pattern matches BootUI (github.com/jdubois/boot-ui) — real-world dual Quarkus/
 | platform/ | 32 NoOps deleted, DefaultBeans @Produces, depends on core |
 | governance/ | 6 files to core, GovernanceBeans @Produces, depends on core |
 | expression/ | 5 files to core, ExpressionBeans @Produces, depends on core |
+| identity/ | 15 files to core, IdentityBeans @Produces (CDI qualifiers preserved), depends on core |
 
-### Commit History (10 commits)
+### Commit History (11 commits)
 
 ```
+5c2ffe9c feat(#276): extract identity-core — DID resolvers, VC validation, SCIM lookup as POJOs
 29d43f9a feat(#276): extract expression-core — MVEL, JQ, JEXL engines as POJOs
 6f062efe feat(#276): extract governance-core — PolicyEnforcer + retry logic as POJO
 c500c083 feat(#276): add platform-spring — generated auto-config for 32 default beans
@@ -124,11 +127,11 @@ f52e10a0 feat(#276): create spring-generator Maven plugin
 2e3bdee4 feat(#276): add Spring Boot BOM and spring-testing scaffold
 ```
 
-**Total: 46+ tests green across 11 new modules. Zero consumer breakage.**
+**Total: 124+ tests green across 12 new modules. Zero consumer breakage.**
 
 ## Immediate Next Step
 
-**Identity extraction** (Batch 4 remaining). 18 files with CDI qualifiers (@DIDMethod, @ActorDIDSource) — the most complex extraction pattern. CompositeDIDResolver uses Instance<DIDResolver> with @DIDMethod qualifier → core takes List<DIDResolver> sorted by priority. ScimDIDResolver/ScimActorDIDProvider use SCIM REST client — may stay in identity/ (framework-coupled). Pure Java utilities (Base58, Multibase, MulticodecKeyType, CdiPriorityUtils) move directly to core.
+**Batch 5: Agent Stack** — 6 agent backends (claude, openai, codex, gemini, gemini-cli, langchain4j) + router + gate + runtime. Each backend follows the same pattern: remove @ApplicationScoped, convert to constructor injection, @Produces in existing module. Special patterns: agent-router uses Instance<AgentBackend> → core takes List<AgentBackend>. agent-gate uses @Decorator → core wraps delegate via constructor. agent-langchain4j has @DefaultBean @Priority(10) ChatModel.
 
 **IntelliJ workspace note:** The slot at `/Users/mdproctor/claude/casehub/slots/181/platform` was opened as a workspace module. Use `project_path=/Users/mdproctor/claude/casehub/slots/181/platform` for `ide_create_file` calls. The main repo at `/Users/mdproctor/claude/casehub/platform` is a DIFFERENT directory on `main` branch — do not write to it.
 
@@ -136,8 +139,8 @@ f52e10a0 feat(#276): create spring-generator Maven plugin
 
 | Batch | Content | Estimated Scale |
 |-------|---------|----------------|
-| 3 | Platform defaults (NoOp POJOs) | M |
-| 4 | Leaf services (expression, identity, governance) | M |
+| ~~3~~ | ~~Platform defaults (NoOp POJOs)~~ | ~~M~~ DONE |
+| ~~4~~ | ~~Leaf services (expression, identity, governance)~~ | ~~M~~ DONE |
 | 5 | Agent stack (6 backends + router + gate + langchain4j) | L |
 | 6 | Notification pipeline (stores + dispatch) | L |
 | 7 | Data infrastructure (datasource, endpoints, memory, acl, callback, scim) | L |
