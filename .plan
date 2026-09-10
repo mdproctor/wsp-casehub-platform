@@ -2,13 +2,14 @@
 
 ## State
 branch: issue-469-dual-framework-core-extraction
-state: active
+state: closing:promoted
 epic: casehubio/parent#469
 issue-repo: casehubio/parent
 covers: casehubio/platform#276,casehubio/engine#1049,casehubio/work#394,casehubio/qhorus#432,casehubio/ledger#206,casehubio/eidos#169,casehubio/neocortex#279,casehubio/blocks#240,casehubio/connectors#99
 Current: casehubio/platform#276 — Extract framework-neutral core from platform modules
 date: 2026-09-07
 
+evidence-era: true
 ## Queue
 - [ ] casehubio/parent#469 — dual-framework support — extract framework-neutral core, add Spring Boot adapters (epic)
   ### Batch 1 — Foundation (M) ← current
