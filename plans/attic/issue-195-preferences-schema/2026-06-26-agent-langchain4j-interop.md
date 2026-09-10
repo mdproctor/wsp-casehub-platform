@@ -243,7 +243,7 @@ This is the first code task for #105. Creates the module, POM, and the AgentProv
 - Create: `agent-langchain4j/pom.xml`
 - Create: `agent-langchain4j/src/main/java/io/casehub/platform/agent/langchain4j/AgentLangchain4jProperties.java`
 - Create: `agent-langchain4j/src/main/java/io/casehub/platform/agent/langchain4j/AgentProviderChatModel.java`
-- Create: `agent-langchain4j/src/test/java/io/casehub/platform/agent/langchain4j/AgentProviderChatModelTest.java`
+- Create: `../../../../agent-langchain4j-core/src/test/java/io/casehub/platform/agent/langchain4j/AgentProviderChatModelTest.java`
 - Modify: `pom.xml` (parent) — add module, remove agent-claude-langchain4j
 
 **Interfaces:**
@@ -363,7 +363,7 @@ public interface AgentLangchain4jProperties {
 
 - [ ] **Step 3: Write failing tests for AgentProviderChatModel**
 
-Create `agent-langchain4j/src/test/java/io/casehub/platform/agent/langchain4j/AgentProviderChatModelTest.java`. This is a large test class — adapted from `ClaudeAgentChatModelTest` but with key differences:
+Create `../../../../agent-langchain4j-core/src/test/java/io/casehub/platform/agent/langchain4j/AgentProviderChatModelTest.java`. This is a large test class — adapted from `ClaudeAgentChatModelTest` but with key differences:
 
 1. Uses `invoke()` not `openSession()` for single-shot
 2. Returns `ModelProvider.OTHER` not `ANTHROPIC`
@@ -792,7 +792,7 @@ Refs casehubio/platform#105
 
 **Files:**
 - Create: `agent-langchain4j/src/main/java/io/casehub/platform/agent/langchain4j/ChatModelAgentSession.java`
-- Create: `agent-langchain4j/src/test/java/io/casehub/platform/agent/langchain4j/ChatModelAgentSessionTest.java`
+- Create: `../../../../agent-langchain4j-core/src/test/java/io/casehub/platform/agent/langchain4j/ChatModelAgentSessionTest.java`
 
 **Interfaces:**
 - Consumes: `ChatModel` (LangChain4j), `AgentSessionInit`, `AgentLangchain4jProperties`

@@ -210,10 +210,10 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(#223): register 
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/InAppEngagementBridge.java`
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/EngagementCallbackResource.java`
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/DeliveryRetryProcessor.java`
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/EngagementRecorderTest.java`
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/InAppEngagementBridgeTest.java`
+- Modify: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/EngagementRecorderTest.java`
+- Modify: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/InAppEngagementBridgeTest.java`
 - Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/EngagementCallbackResourceTest.java`
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/DeliveryRetryProcessorTest.java`
+- Modify: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/DeliveryRetryProcessorTest.java`
 
 **Interfaces:**
 - Consumes: `PlatformPreferenceKeys.ENGAGEMENT_ENABLED`, `PlatformPreferenceKeys.DELIVERY_RETRY_MAX_RETRIES` from Task 1

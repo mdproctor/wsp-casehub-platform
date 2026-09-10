@@ -137,7 +137,7 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `acl-inmem/src/main/java/io/casehub/platform/acl/inmem/InMemoryAccessControlProvider.java`
-- Modify: `acl-inmem/src/test/java/io/casehub/platform/acl/inmem/InMemoryAccessControlProviderTest.java`
+- Modify: `../../../../acl-inmem-core/src/test/java/io/casehub/platform/acl/inmem/InMemoryAccessControlProviderTest.java`
 
 **Interfaces:**
 - Consumes: Blocking `AccessControlProvider` from Task 1

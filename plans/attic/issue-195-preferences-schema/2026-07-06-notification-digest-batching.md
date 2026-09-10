@@ -498,8 +498,8 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(platform#144): d
 **Files:**
 - Create: `platform/src/main/java/io/casehub/platform/delivery/NoOpDigestBuffer.java`
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/InAppNotificationDeliverer.java` (constructor arg)
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/ChannelRouterTest.java` (all `DeliveryChannelDescriptor` and `ChannelPreference` constructors)
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/NotificationDispatcherTest.java` (all `DeliveryChannelDescriptor` constructors)
+- Modify: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/ChannelRouterTest.java` (all `DeliveryChannelDescriptor` and `ChannelPreference` constructors)
+- Modify: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/NotificationDispatcherTest.java` (all `DeliveryChannelDescriptor` constructors)
 - Modify: `notification-settings-inmem/src/main/java/io/casehub/platform/notification/settings/inmem/InMemoryNotificationPreferenceStore.java` (no change needed — stores ChannelPreference as-is)
 - Modify: `notifications/src/main/java/io/casehub/platform/notification/rest/NotificationPreferenceResource.java` (no structural change — Jackson handles serialization)
 
@@ -567,7 +567,7 @@ channelRegistry.register(
 
 - [ ] **Step 3: Fix ChannelRouterTest — all constructor call sites**
 
-In `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/ChannelRouterTest.java`:
+In `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/ChannelRouterTest.java`:
 
 All `DeliveryChannelDescriptor` constructors: add `null` as sixth arg.
 All `ChannelPreference` constructors: add `null` as third arg.
@@ -604,7 +604,7 @@ var userPrefs = Map.of(
 
 - [ ] **Step 4: Fix NotificationDispatcherTest — all constructor call sites**
 
-In `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/NotificationDispatcherTest.java`:
+In `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/NotificationDispatcherTest.java`:
 
 All `DeliveryChannelDescriptor` constructors: add `null` as sixth arg.
 
@@ -653,7 +653,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "refactor(platform#144
 
 **Files:**
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/SuppressionEvaluator.java`
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/SuppressionEvaluatorTest.java`
+- Modify: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/SuppressionEvaluatorTest.java`
 
 **Interfaces:**
 - Consumes: `SuppressionResult(boolean, boolean, boolean)` from platform-api
@@ -748,7 +748,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(platform#144): S
 **Files:**
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/ResolvedChannel.java`
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/ChannelRouter.java`
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/ChannelRouterTest.java`
+- Modify: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/ChannelRouterTest.java`
 
 **Interfaces:**
 - Consumes: `ChannelPreference.digestSchedule()`, `DeliveryChannelDescriptor.defaultDigestSchedule()` from Task 1
@@ -1139,7 +1139,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(platform#144): I
 
 **Files:**
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/NotificationDispatcher.java`
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/NotificationDispatcherTest.java`
+- Modify: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/NotificationDispatcherTest.java`
 
 **Interfaces:**
 - Consumes: `DigestBuffer.add(DigestBufferKey, NotificationInput)` from Task 5, `ResolvedChannel.digested()` from Task 4
@@ -1325,7 +1325,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(platform#144): N
 
 **Files:**
 - Create: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/DigestFlushScheduler.java`
-- Create: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/DigestFlushSchedulerTest.java`
+- Create: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/DigestFlushSchedulerTest.java`
 - Modify: `notification-dispatch/pom.xml` (add `quarkus-scheduler` dependency)
 
 **Interfaces:**
@@ -1345,7 +1345,7 @@ Add to `notification-dispatch/pom.xml` in `<dependencies>`:
 
 - [ ] **Step 2: Write scheduler tests**
 
-Create `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/DigestFlushSchedulerTest.java`:
+Create `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/DigestFlushSchedulerTest.java`:
 
 ```java
 package io.casehub.platform.notification.dispatch;

@@ -48,9 +48,9 @@ Flyway, AssertJ, JUnit 5
 - Modify: `delivery-tracking-inmem/src/main/java/io/casehub/platform/delivery/tracking/inmem/InMemoryDeliveryAttemptStore.java:62` — claimRetryable constructor
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/DeliveryTracker.java` — 5 constructor calls
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/DeliveryRetryProcessor.java` — 3 constructor calls
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/DeliveryTrackerTest.java` — no direct constructor calls (uses tracker methods)
-- Modify: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/DeliveryRetryProcessorTest.java` — 4 constructor calls in helpers
-- Modify: `delivery-tracking-inmem/src/test/java/io/casehub/platform/delivery/tracking/inmem/InMemoryDeliveryAttemptStoreTest.java` — 4 constructor calls in helpers
+- Modify: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/DeliveryTrackerTest.java` — no direct constructor calls (uses tracker methods)
+- Modify: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/DeliveryRetryProcessorTest.java` — 4 constructor calls in helpers
+- Modify: `../../../../delivery-tracking-inmem-core/src/test/java/io/casehub/platform/delivery/tracking/inmem/InMemoryDeliveryAttemptStoreTest.java` — 4 constructor calls in helpers
 - Modify: `delivery-tracking-jpa/src/test/java/io/casehub/platform/delivery/tracking/jpa/JpaDeliveryAttemptStoreTest.java` — 2 constructor calls in helpers
 
 **Interfaces:**
@@ -613,7 +613,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(#170): engagemen
 
 **Files:**
 - Modify: `delivery-tracking-inmem/src/main/java/io/casehub/platform/delivery/tracking/inmem/InMemoryDeliveryAttemptStore.java`
-- Modify: `delivery-tracking-inmem/src/test/java/io/casehub/platform/delivery/tracking/inmem/InMemoryDeliveryAttemptStoreTest.java`
+- Modify: `../../../../delivery-tracking-inmem-core/src/test/java/io/casehub/platform/delivery/tracking/inmem/InMemoryDeliveryAttemptStoreTest.java`
 
 **Interfaces:**
 - Consumes: `EngagementEvent` record, `EngagementType` enum, `DeliveryAttemptStore.recordEngagement/findEngagementsByAttemptId/findEngagementsByNotificationId`
@@ -1023,7 +1023,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(#170): JPA engag
 
 **Files:**
 - Create: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/EngagementRecorder.java`
-- Create: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/EngagementRecorderTest.java`
+- Create: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/EngagementRecorderTest.java`
 
 **Interfaces:**
 - Consumes: `DeliveryAttempt`, `DeliveryAttemptStore.recordEngagement()`, `EngagementEvent`, `EngagementType`, `EngagementRecorded`, `UUIDv7`
@@ -1565,7 +1565,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(#170): Engagemen
 
 **Files:**
 - Create: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/InAppEngagementBridge.java`
-- Create: `notification-dispatch/src/test/java/io/casehub/platform/notification/dispatch/InAppEngagementBridgeTest.java`
+- Create: `../../../../notification-dispatch-core/src/test/java/io/casehub/platform/notification/dispatch/InAppEngagementBridgeTest.java`
 
 **Interfaces:**
 - Consumes: `EngagementRecorder.record()`, `DeliveryAttemptStore.findByNotificationId()`, `NotificationStatusChanged`, `NotificationStatus`, `DeliveryChannels.IN_APP`

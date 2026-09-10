@@ -23,7 +23,7 @@
 | `platform-api/src/test/java/io/casehub/platform/api/memory/MemoryQueryTest.java` | Replace — new API |
 | `platform-api/src/main/java/io/casehub/platform/api/memory/CaseMemoryStore.java` | Modify — Javadoc only |
 | `memory-inmem/src/main/java/io/casehub/platform/memory/inmem/InMemoryMemoryStore.java` | Modify — entityIds fan-out, MemoryOrder ignored |
-| `memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java` | Modify — new API + contract tests |
+| `../../../../memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java` | Modify — new API + contract tests |
 | `memory-jpa/src/main/java/io/casehub/platform/memory/jpa/JpaMemoryStore.java` | Modify — IN clause, MemoryOrder routing |
 | `memory-jpa/src/test/java/io/casehub/platform/memory/jpa/JpaMemoryStoreTest.java` | Modify — new API + contract tests |
 
@@ -611,7 +611,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "docs(memory-api): emi
 
 **Files:**
 - Modify: `memory-inmem/src/main/java/io/casehub/platform/memory/inmem/InMemoryMemoryStore.java`
-- Modify: `memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java`
+- Modify: `../../../../memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java`
 
 - [ ] **Step 1: Replace `InMemoryMemoryStoreTest.java`**
 

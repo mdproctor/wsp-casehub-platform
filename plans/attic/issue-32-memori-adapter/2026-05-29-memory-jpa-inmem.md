@@ -31,7 +31,7 @@
 - `memory-inmem/pom.xml`
 - `memory-inmem/src/main/java/io/casehub/platform/memory/inmem/BucketKey.java`
 - `memory-inmem/src/main/java/io/casehub/platform/memory/inmem/InMemoryMemoryStore.java`
-- `memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java`
+- `../../../../memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java`
 - `memory-jpa/pom.xml`
 - `memory-jpa/src/main/java/io/casehub/platform/memory/jpa/MemoryJpaConfig.java`
 - `memory-jpa/src/main/java/io/casehub/platform/memory/jpa/MemoryEntry.java`
@@ -587,7 +587,7 @@ Expected: `BUILD SUCCESS` — the root pom is valid. The new modules don't exist
 - Create: `memory-inmem/pom.xml`
 - Create: `memory-inmem/src/main/java/io/casehub/platform/memory/inmem/BucketKey.java`
 - Create: `memory-inmem/src/main/java/io/casehub/platform/memory/inmem/InMemoryMemoryStore.java`
-- Create: `memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java`
+- Create: `../../../../memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java`
 
 - [ ] **Step 1: Create memory-inmem/pom.xml**
 
@@ -817,7 +817,7 @@ Expected: 1 test passes.
 ## Task 6: InMemoryMemoryStore — complete contract tests
 
 **Files:**
-- Modify: `memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java`
+- Modify: `../../../../memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java`
 
 - [ ] **Step 1: Write all remaining failing tests**
 

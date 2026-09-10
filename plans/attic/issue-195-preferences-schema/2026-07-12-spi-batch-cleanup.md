@@ -416,7 +416,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(platform#139): M
 - Modify: `datasource-inmem/src/main/java/io/casehub/platform/datasource/memory/InMemoryDataSourceRegistry.java` — add `update()`
 - Modify: `platform/src/main/java/io/casehub/platform/datasource/DataSourceRouter.java` — observe DataSourceUpdated
 - Create: `platform-api/src/test/java/io/casehub/platform/api/datasource/DataSourceUpdatedTest.java`
-- Modify: `datasource-inmem/src/test/java/io/casehub/platform/datasource/memory/InMemoryDataSourceRegistryTest.java` — add update tests
+- Modify: `../../../../datasource-inmem-core/src/test/java/io/casehub/platform/datasource/memory/InMemoryDataSourceRegistryTest.java` — add update tests
 - Modify: `platform/src/test/java/io/casehub/platform/datasource/NoOpDataSourceRegistryTest.java` — add update test
 
 **Interfaces:**
@@ -986,7 +986,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "refactor(platform#169
 **Files:**
 - Create: `notifications/src/main/java/io/casehub/platform/notification/rest/PreferenceValidator.java`
 - Modify: `notifications/src/main/java/io/casehub/platform/notification/rest/NotificationPreferenceResource.java` — inject and call validator
-- Create: `notifications/src/test/java/io/casehub/platform/notification/rest/PreferenceValidatorTest.java`
+- Create: `../../../../notifications-core/src/test/java/io/casehub/platform/notification/PreferenceValidatorTest.java`
 
 **Interfaces:**
 - Consumes: `DeliveryChannelRegistry`, `NotificationPreferenceUpdate`, `NotificationPreferences`
@@ -1030,7 +1030,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(platform#164): v
 
 **Files:**
 - Modify: `digest-inmem/src/main/java/io/casehub/platform/delivery/digest/inmem/InMemoryDigestBuffer.java` — add userIndex
-- Modify: `digest-inmem/src/test/java/io/casehub/platform/delivery/digest/inmem/InMemoryDigestBufferTest.java` — add index tests
+- Modify: `../../../../digest-inmem-core/src/test/java/io/casehub/platform/delivery/digest/inmem/InMemoryDigestBufferTest.java` — add index tests
 
 **Interfaces:**
 - Consumes: `DigestBuffer` (SPI), `DigestBufferKey`
@@ -1126,7 +1126,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "perf(platform#165): s
 - Modify: `digest-jpa/src/main/java/io/casehub/platform/delivery/digest/jpa/JpaDigestBuffer.java` — add retentionPurge()
 - Modify: `digest-inmem/src/main/java/io/casehub/platform/delivery/digest/inmem/InMemoryDigestBuffer.java` — add TTL eviction
 - Modify: `digest-jpa/src/test/java/io/casehub/platform/delivery/digest/jpa/JpaDigestBufferTest.java` — add retention test
-- Modify: `digest-inmem/src/test/java/io/casehub/platform/delivery/digest/inmem/InMemoryDigestBufferTest.java` — add TTL test
+- Modify: `../../../../digest-inmem-core/src/test/java/io/casehub/platform/delivery/digest/inmem/InMemoryDigestBufferTest.java` — add TTL test
 
 **Interfaces:**
 - Consumes: `DigestBuffer` (SPI), `DigestBufferKey`

@@ -24,7 +24,7 @@
 
 **Files:**
 - Create: `agent-langchain4j/src/main/java/io/casehub/platform/agent/langchain4j/AgentEventBridge.java`
-- Create: `agent-langchain4j/src/test/java/io/casehub/platform/agent/langchain4j/AgentEventBridgeTest.java`
+- Create: `../../../../agent-langchain4j-core/src/test/java/io/casehub/platform/agent/langchain4j/AgentEventBridgeTest.java`
 
 **Interfaces:**
 - Consumes: `AgentEvent` (sealed interface from `agent-api`), `StreamingChatModel`, `StreamingChatResponseHandler`, `PartialThinking`, `PartialToolCall`, `CompleteToolCall`, `PartialResponse`, `PartialResponseContext`, `PartialThinkingContext`, `PartialToolCallContext`, `StreamingHandle` (all from `dev.langchain4j`)
@@ -363,7 +363,7 @@ git commit -m "feat(platform#120): AgentEventBridge.stream() — handler→Agent
 
 **Files:**
 - Modify: `agent-langchain4j/src/main/java/io/casehub/platform/agent/langchain4j/AgentEventBridge.java`
-- Modify: `agent-langchain4j/src/test/java/io/casehub/platform/agent/langchain4j/AgentEventBridgeTest.java`
+- Modify: `../../../../agent-langchain4j-core/src/test/java/io/casehub/platform/agent/langchain4j/AgentEventBridgeTest.java`
 
 **Interfaces:**
 - Consumes: `AgentEvent` (sealed), `StreamingChatResponseHandler`, `AiMessage.builder()`, `FinishReason`, `ToolExecutionRequest`, `PartialThinking`, `PartialToolCall`, `CompleteToolCall`
@@ -755,7 +755,7 @@ git commit -m "feat(platform#120): ChatModelAgentProvider streaming detection an
 
 **Files:**
 - Modify: `agent-langchain4j/src/main/java/io/casehub/platform/agent/langchain4j/ChatModelAgentSession.java`
-- Modify: `agent-langchain4j/src/test/java/io/casehub/platform/agent/langchain4j/ChatModelAgentSessionTest.java`
+- Modify: `../../../../agent-langchain4j-core/src/test/java/io/casehub/platform/agent/langchain4j/ChatModelAgentSessionTest.java`
 
 **Interfaces:**
 - Consumes: `AgentEventBridge.stream(StreamingChatModel, ChatRequest)` from Task 1

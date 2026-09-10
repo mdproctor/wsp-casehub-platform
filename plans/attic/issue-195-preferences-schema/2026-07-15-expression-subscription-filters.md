@@ -257,7 +257,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(#151): replace C
 
 **Files:**
 - Modify: `subscriptions-inmem/src/main/java/io/casehub/platform/subscription/inmem/InMemorySubscriptionStore.java`
-- Modify: `subscriptions-inmem/src/test/java/io/casehub/platform/subscription/inmem/InMemorySubscriptionStoreTest.java`
+- Modify: `../../../../subscriptions-inmem-core/src/test/java/io/casehub/platform/subscription/inmem/InMemorySubscriptionStoreTest.java`
 - Modify: `platform/src/main/java/io/casehub/platform/subscription/NoOpSubscriptionStore.java`
 - Modify: `subscriptions-jpa/src/main/java/io/casehub/platform/subscription/jpa/SubscriptionEntity.java`
 - Modify: `subscriptions-jpa/src/main/resources/db/subscription/migration/V1__subscription.sql`

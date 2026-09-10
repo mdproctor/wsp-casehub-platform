@@ -180,7 +180,7 @@ git -C ~/claude/casehub/parent commit -m "chore(bom): add casehub-platform-confi
 ### Task 2: YamlPreferenceLoader — TDD
 
 **Files:**
-- Create: `config/src/test/java/io/casehub/platform/config/YamlPreferenceLoaderTest.java`
+- Create: `../../../../config-core/src/test/java/io/casehub/platform/config/YamlPreferenceLoaderTest.java`
 - Create: `config/src/test/resources/loader-test.yaml`
 - Create: `config/src/main/java/io/casehub/platform/config/YamlPreferenceLoader.java`
 
@@ -200,7 +200,7 @@ entries:
 
 - [ ] **Step 2: Write the failing test**
 
-Create `config/src/test/java/io/casehub/platform/config/YamlPreferenceLoaderTest.java`:
+Create `../../../../config-core/src/test/java/io/casehub/platform/config/YamlPreferenceLoaderTest.java`:
 
 ```java
 package io.casehub.platform.config;
@@ -353,7 +353,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(config): impleme
 - Create: `config/src/test/resources/application.properties`
 - Create: `config/src/test/resources/test-prefs-a.yaml`
 - Create: `config/src/test/resources/test-prefs-b.yaml`
-- Create: `config/src/test/java/io/casehub/platform/config/ConfigFilePreferenceProviderTest.java`
+- Create: `../../../../config/src/test/java/io/casehub/platform/config/ConfigFilePreferenceProviderTest.java`
 - Create: `config/src/main/java/io/casehub/platform/config/ConfigFilePreferenceProvider.java`
 
 - [ ] **Step 1: Create test YAML files**
@@ -387,7 +387,7 @@ casehub.platform.config.files=classpath:test-prefs-a.yaml
 
 - [ ] **Step 2: Write the failing @QuarkusTest**
 
-Create `config/src/test/java/io/casehub/platform/config/ConfigFilePreferenceProviderTest.java`:
+Create `../../../../config/src/test/java/io/casehub/platform/config/ConfigFilePreferenceProviderTest.java`:
 
 ```java
 package io.casehub.platform.config;
@@ -629,7 +629,7 @@ Add to `ConfigFilePreferenceProviderTest.java` — a second test class that uses
 
 Since Quarkus `@QuarkusTest` uses one config per test class, add an interpolation unit test to `ConfigFilePreferenceProvider` instead:
 
-Add to `config/src/test/java/io/casehub/platform/config/ConfigFilePreferenceProviderTest.java`:
+Add to `../../../../config/src/test/java/io/casehub/platform/config/ConfigFilePreferenceProviderTest.java`:
 
 ```java
     @Test

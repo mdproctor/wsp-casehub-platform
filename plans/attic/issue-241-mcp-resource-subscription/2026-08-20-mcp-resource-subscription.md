@@ -539,7 +539,7 @@ Refs #241"
 - Create: `mcp/src/main/java/io/casehub/platform/mcp/DomainContentFormatter.java`
 - Create: `mcp/src/main/java/io/casehub/platform/mcp/DomainResourceRegistrar.java`
 - Modify: `mcp/src/main/java/io/casehub/platform/mcp/CaseHubMcpTools.java` — delegate to `DomainContentFormatter`
-- Test: `mcp/src/test/java/io/casehub/platform/mcp/DomainContentFormatterTest.java`
+- Test: `../../../../mcp-core/src/test/java/io/casehub/platform/mcp/DomainContentFormatterTest.java`
 - Test: `mcp/src/test/java/io/casehub/platform/mcp/DomainResourceRegistrarTest.java`
 
 **Interfaces:**

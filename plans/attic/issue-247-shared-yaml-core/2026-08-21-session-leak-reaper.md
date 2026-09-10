@@ -30,7 +30,7 @@
 ### Task 1: SessionRegistry — session tracking bean
 
 **Files:**
-- Create: `agent-gate/src/test/java/io/casehub/platform/agent/gate/SessionRegistryTest.java`
+- Create: `../../../../agent-gate-core/src/test/java/io/casehub/platform/agent/gate/SessionRegistryTest.java`
 - Create: `agent-gate/src/main/java/io/casehub/platform/agent/gate/SessionRegistry.java`
 
 **Interfaces:**
@@ -231,8 +231,8 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(#242): add Sessi
 **Files:**
 - Modify: `agent-gate/src/main/java/io/casehub/platform/agent/gate/GatedAgentSession.java`
 - Modify: `agent-gate/src/main/java/io/casehub/platform/agent/gate/GatedAgentProvider.java`
-- Modify: `agent-gate/src/test/java/io/casehub/platform/agent/gate/GatedAgentSessionTest.java`
-- Modify: `agent-gate/src/test/java/io/casehub/platform/agent/gate/GatedAgentProviderTest.java`
+- Modify: `../../../../agent-gate-core/src/test/java/io/casehub/platform/agent/gate/GatedAgentSessionTest.java`
+- Modify: `../../../../agent-gate/src/test/java/io/casehub/platform/agent/gate/GatedAgentProviderTest.java`
 
 **Interfaces:**
 - Consumes: `SessionRegistry.register(GatedAgentSession) → long`, `SessionRegistry.deregister(long)`
@@ -473,7 +473,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(#242): idempoten
 
 **Files:**
 - Modify: `agent-gate/src/main/java/io/casehub/platform/agent/gate/AgentGateProperties.java`
-- Create: `agent-gate/src/test/java/io/casehub/platform/agent/gate/SessionLeakReaperTest.java`
+- Create: `../../../../agent-gate-core/src/test/java/io/casehub/platform/agent/gate/SessionLeakReaperTest.java`
 - Create: `agent-gate/src/main/java/io/casehub/platform/agent/gate/SessionLeakReaper.java`
 - Modify: `agent-gate/src/test/resources/application.properties`
 - Modify: `agent-gate/pom.xml`

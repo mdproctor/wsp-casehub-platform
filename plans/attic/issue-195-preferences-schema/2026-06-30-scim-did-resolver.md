@@ -217,7 +217,7 @@ JwtVCValidator passes null actorId for issuer DID resolution.
 
 **Files:**
 - Create: `identity/src/main/java/io/casehub/platform/identity/CompositeDIDResolver.java`
-- Create: `identity/src/test/java/io/casehub/platform/identity/CompositeDIDResolverTest.java`
+- Create: `../../../../identity-core/src/test/java/io/casehub/platform/identity/CompositeDIDResolverTest.java`
 
 **Interfaces:**
 - Consumes: `DIDResolver.resolve(String actorId, String did)` from Task 1
@@ -733,7 +733,7 @@ refactor(platform#85): ScimAgentLookup — shared SCIM client for DID provider a
 
 **Files:**
 - Create: `identity/src/main/java/io/casehub/platform/identity/ScimDIDResolver.java`
-- Create: `identity/src/test/java/io/casehub/platform/identity/ScimDIDResolverTest.java`
+- Create: `../../../../identity-core/src/test/java/io/casehub/platform/identity/ScimDIDResolverTest.java`
 
 **Interfaces:**
 - Consumes: `ScimAgentLookup.get(String actorId) → Optional<ScimAgentResource>` from Task 3

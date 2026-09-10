@@ -32,7 +32,7 @@
 | `agent-claude/src/main/java/io/casehub/platform/agent/claude/ClaudeAgentProperties.java` | Create | `@ConfigMapping` for binary path, timeout, max sessions |
 | `agent-claude/src/main/java/io/casehub/platform/agent/claude/ClaudeAgentClient.java` | Create | Core: @Startup bean, three constructors, @PostConstruct, run(), buildEventStream(), @PreDestroy |
 | `agent-claude/src/main/java/io/casehub/platform/agent/claude/ClaudeAgentProvider.java` | Create | `@ApplicationScoped` SPI implementation |
-| `agent-claude/src/test/java/io/casehub/platform/agent/claude/ClaudeAgentClientTest.java` | Create | Infra tests: semaphore, timeout, termination handlers |
+| `../../../../agent-claude-core/src/test/java/io/casehub/platform/agent/claude/ClaudeAgentClientTest.java` | Create | Infra tests: semaphore, timeout, termination handlers |
 | `agent-claude/src/test/java/io/casehub/platform/agent/claude/ClaudeAgentClientIT.java` | Create | Gated integration test (`CLAUDE_AGENT_TESTS_ENABLED`) |
 
 ---
@@ -644,7 +644,7 @@ Expected: `BUILD SUCCESS`
 
 **Files:**
 - Create: `agent-claude/src/main/java/io/casehub/platform/agent/claude/ClaudeAgentClient.java`
-- Create: `agent-claude/src/test/java/io/casehub/platform/agent/claude/ClaudeAgentClientTest.java`
+- Create: `../../../../agent-claude-core/src/test/java/io/casehub/platform/agent/claude/ClaudeAgentClientTest.java`
 
 - [ ] **Write the failing tests first**
 

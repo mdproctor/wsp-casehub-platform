@@ -35,7 +35,7 @@
 | `platform/src/test/java/io/casehub/platform/memory/BlockingToReactiveBridgeThreadingTest.java` | Update import + 7th threading test | #90, #99 |
 | `platform/src/test/java/io/casehub/platform/memory/NoOpCaseMemoryStoreTest.java` | Update import + 2 new tests | #90, #99 |
 | `memory-inmem/src/main/java/io/casehub/platform/memory/inmem/InMemoryMemoryStore.java` | Add `eraseEntityAcrossTenants` + `CROSS_TENANT_ERASE` capability | #99 |
-| `memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java` | eraseEntityAcrossTenants tests | #99 |
+| `../../../../memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java` | eraseEntityAcrossTenants tests | #99 |
 | `memory-jpa/src/main/java/io/casehub/platform/memory/jpa/JpaMemoryStore.java` | Add `eraseEntityAcrossTenants` + `CROSS_TENANT_ERASE` capability | #99 |
 | `memory-jpa/src/test/java/io/casehub/platform/memory/jpa/JpaMemoryStoreTest.java` | eraseEntityAcrossTenants tests | #99 |
 | `memory-sqlite/src/main/java/io/casehub/platform/memory/sqlite/SqliteMemoryStore.java` | Add `eraseEntityAcrossTenants` + `CROSS_TENANT_ERASE` capability | #99 |
@@ -805,7 +805,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(platform#99): No
 
 **Files:**
 - Modify: `memory-inmem/src/main/java/io/casehub/platform/memory/inmem/InMemoryMemoryStore.java`
-- Modify: `memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java`
+- Modify: `../../../../memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java`
 
 - [ ] **Step 1: Write failing tests**
 
