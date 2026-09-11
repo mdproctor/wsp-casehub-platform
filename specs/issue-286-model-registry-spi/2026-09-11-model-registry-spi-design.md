@@ -713,6 +713,7 @@ Priority 0 — lowest. Any live API source (priority > 0) overrides seed entries
 
 | File | Action |
 |------|--------|
+| `agent-router/pom.xml` | Modified — add `casehub-platform-api` compile dependency |
 | `agent-router/src/main/java/io/casehub/platform/agent/router/RoutingAgentProvider.java` | Modified — three-step resolution |
 | `agent-router/src/test/java/io/casehub/platform/agent/router/RoutingAgentProviderTest.java` | Modified — registry resolution tests |
 
