@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-286-model-registry-spi
-state: scaffolded
+state: active
 project-sha: f997493fa47bfc8c63cfd86853bc989ee8a26ab9
 date: 2026-09-11
 issue-repo: casehubio/platform
@@ -16,9 +16,9 @@ flyway-next-v: none
   - [x] Batch 1: SPIs
     - [x] Task 1: Enums and ModelDescriptor
     - [x] Task 2: ModelRegistry and ModelQuery
-  - [ ] Batch 2: Registry
-    - [ ] Task 3: InMemoryModelRegistry and Refresher
-    - [ ] Task 4: SeedCatalogModelSource
-  - [ ] Batch 3: Integration
-    - [ ] Task 5: DomainModelRegistry rename
-    - [ ] Task 6: RoutingAgentProvider resolution
+  - [x] Batch 2: Registry
+    - [x] Task 3: InMemoryModelRegistry and Refresher
+    - [x] Task 4: SeedCatalogModelSource
+  - [x] Batch 3: Integration
+    - [x] Task 5: DomainModelRegistry rename
+    - [x] Task 6: RoutingAgentProvider resolution
