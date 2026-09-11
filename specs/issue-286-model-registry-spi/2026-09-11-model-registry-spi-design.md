@@ -235,11 +235,35 @@ public class InMemoryModelRegistry implements ModelRegistry {
 }
 ```
 
+**`replaceSource` — atomic per-source replacement:**
+
+```java
+public record CatalogDelta(
+    Set<String> addedIds,
+    Set<String> removedIds,
+    Set<String> updatedIds
+) {
+    public boolean hasChanges() {
+        return !addedIds.isEmpty() || !removedIds.isEmpty() || !updatedIds.isEmpty();
+    }
+}
+
+public CatalogDelta replaceSource(String sourceId, int priority, List<ModelDescriptor> models) {
+    // 1. Compute delta: diff new models against current source entries
+    // 2. Replace source's entry map atomically
+    // 3. Update source priority ordering if new source
+    // 4. Rebuild resolved view
+    // 5. Return delta
+}
+```
+
+Atomicity: the source's entry map is replaced as a single `ConcurrentHashMap.put` — no partial states visible to `resolveById`/`query` readers. The resolved view rebuild is a volatile write of a new immutable `Map`, so readers see either the old or new view, never an intermediate state. The delta is computed by comparing the new model set against the previous entries for this source: added = IDs in new but not old, removed = IDs in old but not new, updated = IDs in both where the descriptor differs.
+
 **Storage:** `ConcurrentHashMap<sourceId, ConcurrentHashMap<modelId, ModelDescriptor>>`. Per-source maps enable atomic replacement per source without affecting others.
 
 **Priority resolution:** Sources ordered by `ModelSource.priority()` (descending). When two sources provide the same model ID, the higher-priority source wins. The resolved view is a flattened `Map<String, ModelDescriptor>` rebuilt after each source refresh — O(1) lookups for `resolveById`.
 
-**Query implementation:** Filters the resolved view by matching each non-null `ModelQuery` predicate. `maxCostTier` matches descriptors where `descriptor.costTier() != null && descriptor.costTier().rank() <= maxCostTier.rank()` — descriptors with null `costTier` are excluded from cost-constrained queries. `requiredCapabilities` checks `descriptor.capabilities().containsAll(required)`. `authMethod` matches descriptors with `descriptor.authMethod().equals(query.authMethod())`.
+**Query implementation:** Filters the resolved view by matching each non-null `ModelQuery` predicate. `maxCostTier` matches descriptors where `descriptor.costTier() != null && descriptor.costTier().rank() <= maxCostTier.rank()` — descriptors with null `costTier` are excluded from cost-constrained queries. `requiredCapabilities` checks `descriptor.capabilities().containsAll(required)`. `authMethod` matches descriptors where `descriptor.authMethod() != null && descriptor.authMethod().equals(query.authMethod())` — descriptors with null `authMethod` are excluded from `authMethod`-constrained queries, included when query `authMethod` is null.
 
 ### ModelRegistryRefresher
 
@@ -639,6 +663,7 @@ Priority 0 — lowest. Any live API source (priority > 0) overrides seed entries
 6. `InMemoryModelRegistry.resolveById` — returns descriptor for known ID, empty for unknown
 7. `InMemoryModelRegistry.query` — filters by vendor, family, tier, capabilities, locality, maxCostTier, authMethod
 8. `InMemoryModelRegistry.query` — null costTier on descriptor excluded from maxCostTier-constrained queries
+8a. `InMemoryModelRegistry.query` — null authMethod on descriptor excluded from authMethod-constrained queries, included when query authMethod is null
 9. `InMemoryModelRegistry` with zero sources — resolveById returns empty, query returns empty, all returns empty
 10. `InMemoryModelRegistry.replaceSource` — atomic per-source replacement, doesn't affect other sources
 11. Priority resolution — higher-priority source wins for same model ID
