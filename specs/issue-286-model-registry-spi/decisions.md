@@ -21,3 +21,15 @@
 **Sources:** epic #285 queryable dimensions table, AgentBackend.key() (backendKey foreign key), eidos AgentDescriptor.modelFamily (downstream consumer of id field)
 **Exploration:** quick
 **Status:** captured
+
+## D3: ModelRegistry SPI — query contract
+
+**Choice:** Predicate-based query with ModelQuery record
+**Alternatives:**
+- Fluent filter chain (registry.models().vendor("x").list()) — ergonomic but requires custom builder/stream type, more API surface
+- Single all() method, callers filter — minimal SPI but every caller reimplements filtering, no standard query semantics
+**Rationale:** ModelQuery record is simple, serializable (works over REST/MCP), and keeps filtering logic in the registry implementation. resolveById is the fast-path integration with RoutingAgentProvider. query() returns all matching descriptors. Builder provides ergonomic construction without custom stream types.
+**Trade-offs:** ModelQuery record must evolve when new dimensions are added — acceptable pre-release. Post-release, new nullable fields with null=any semantics are backward compatible.
+**Sources:** RoutingAgentProvider.resolve() (resolveById integration point), epic #285 MCP tools (ModelQuery serializable for REST/MCP)
+**Exploration:** quick
+**Status:** captured
