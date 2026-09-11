@@ -8,7 +8,7 @@
 
 Queryable LLM model registry — the foundation of epic #285. Three deliverables:
 
-1. **SPIs in platform-api** — `ModelDescriptor` (normalized model metadata with typed dimensions), `ModelRegistry` (query by dimensions, resolve by ID), `ModelSource` (pull-based refresh), `ModelQuery` (predicate record), enums (`ModelTier`, `ModelCapability`, `ModelLocality`, `CostTier`), `ModelCatalogChangedEvent` (CDI event on catalog change)
+1. **SPIs in platform-api** — `ModelDescriptor` (normalized model metadata with typed dimensions), `ModelRegistry` (query by dimensions, resolve by ID), `ModelSource` (pull-based refresh), `ModelQuery` (predicate record), enums (`ModelTier`, `ModelLocality`, `CostTier`), `ModelCapabilities` (string constants), `ModelCatalogChangedEvent` (CDI event on catalog change)
 2. **Implementation in platform** — `InMemoryModelRegistry` (per-source maps with priority-resolved view), `ModelRegistryRefresher` (@Scheduled periodic refresh), `RoutingAgentProvider` integration (three-step model reference resolution), `DomainModelRegistry` rename (MCP naming collision)
 3. **Seed catalog (#287)** — committed YAML with known models from major vendors, `SeedCatalogModelSource` implementation
 
@@ -46,27 +46,35 @@ public enum ModelTier {
     EMBEDDING    // text-embedding-3, embedding models
 }
 
-public enum ModelCapability {
-    TEXT,
-    VISION,
-    TOOL_USE,
-    CODE,
-    REASONING
-}
-
 public enum ModelLocality {
     CLOUD,
     LOCAL
 }
 
 public enum CostTier {
-    FREE,
-    LOW,
-    MEDIUM,
-    HIGH,
-    PREMIUM
+    FREE(0), LOW(1), MEDIUM(2), HIGH(3), PREMIUM(4);
+
+    private final int rank;
+    CostTier(int rank) { this.rank = rank; }
+    public int rank() { return rank; }
 }
 ```
+
+### ModelCapabilities (string constants)
+
+```java
+public final class ModelCapabilities {
+    public static final String TEXT = "text";
+    public static final String VISION = "vision";
+    public static final String TOOL_USE = "tool-use";
+    public static final String CODE = "code";
+    public static final String REASONING = "reasoning";
+
+    private ModelCapabilities() {}
+}
+```
+
+Capabilities use `Set<String>` with well-known constants rather than a fixed enum. New capabilities (audio, structured output, computer use, image generation, batch, realtime) emerge on a months-to-weeks cadence — a fixed enum in `platform-api` would create version pressure across the entire ecosystem. String constants provide IDE discoverability and type-safe references for well-known values while allowing `ModelSource` implementations to declare new capabilities without a `platform-api` release. This follows the `EndpointPropertyKeys` pattern established in the endpoint registry.
 
 ### ModelDescriptor
 
@@ -78,11 +86,12 @@ public record ModelDescriptor(
     String family,                      // "claude", "gpt-4", "gemini", "llama"
     String displayName,                 // "Claude Sonnet 5"
     ModelTier tier,                     // FLAGSHIP, STANDARD, FAST, EMBEDDING
-    Set<ModelCapability> capabilities,  // TEXT, VISION, TOOL_USE, CODE, REASONING
+    Set<String> capabilities,           // ModelCapabilities.TEXT, .VISION, .TOOL_USE, etc.
     int contextWindow,                  // 200000
     int maxOutput,                      // 16384
     ModelLocality locality,             // CLOUD, LOCAL
-    CostTier costTier,                  // FREE, LOW, MEDIUM, HIGH, PREMIUM
+    CostTier costTier,                  // nullable — null = unknown cost, excluded from maxCostTier queries
+    String authMethod,                  // "api-key", "vertex", "bedrock", "local"
     Map<String, String> properties      // extensible vendor-specific metadata
 ) {
     public ModelDescriptor {
@@ -90,11 +99,16 @@ public record ModelDescriptor(
         Objects.requireNonNull(backendKey, "backendKey");
         Objects.requireNonNull(vendor, "vendor");
         Objects.requireNonNull(family, "family");
+        Objects.requireNonNull(displayName, "displayName");
+        Objects.requireNonNull(tier, "tier");
+        Objects.requireNonNull(locality, "locality");
         capabilities = capabilities != null ? Set.copyOf(capabilities) : Set.of();
         properties = properties != null ? Map.copyOf(properties) : Map.of();
     }
 }
 ```
+
+**Null semantics:** `costTier` and `authMethod` are nullable. A null `costTier` means unknown cost — excluded from `maxCostTier`-constrained queries but included in unconstrained queries (`maxCostTier = null`). A null `authMethod` means unspecified access method.
 
 **`family`** groups models by product lineage, distinct from `vendor`:
 - Anthropic: vendor=`"anthropic"`, family=`"claude"` (Haiku, Sonnet, Opus)
@@ -111,9 +125,10 @@ public record ModelQuery(
     String vendor,                          // null = any
     String family,                          // null = any
     ModelTier tier,                         // null = any
-    Set<ModelCapability> requiredCapabilities,  // empty = any
+    Set<String> requiredCapabilities,       // empty = any
     ModelLocality locality,                 // null = any
-    CostTier maxCostTier                   // null = any
+    CostTier maxCostTier,                   // null = any
+    String authMethod                       // null = any
 ) {
     public ModelQuery {
         requiredCapabilities = requiredCapabilities != null
@@ -121,7 +136,7 @@ public record ModelQuery(
     }
 
     public static ModelQuery all() {
-        return new ModelQuery(null, null, null, Set.of(), null, null);
+        return new ModelQuery(null, null, null, Set.of(), null, null, null);
     }
 
     public static Builder builder() { return new Builder(); }
@@ -130,20 +145,23 @@ public record ModelQuery(
         private String vendor;
         private String family;
         private ModelTier tier;
-        private Set<ModelCapability> requiredCapabilities = Set.of();
+        private Set<String> requiredCapabilities = Set.of();
         private ModelLocality locality;
         private CostTier maxCostTier;
+        private String authMethod;
 
         public Builder vendor(String vendor) { this.vendor = vendor; return this; }
         public Builder family(String family) { this.family = family; return this; }
         public Builder tier(ModelTier tier) { this.tier = tier; return this; }
-        public Builder requiredCapabilities(Set<ModelCapability> caps) {
+        public Builder requiredCapabilities(Set<String> caps) {
             this.requiredCapabilities = caps; return this;
         }
         public Builder locality(ModelLocality locality) { this.locality = locality; return this; }
         public Builder maxCostTier(CostTier maxCostTier) { this.maxCostTier = maxCostTier; return this; }
+        public Builder authMethod(String authMethod) { this.authMethod = authMethod; return this; }
         public ModelQuery build() {
-            return new ModelQuery(vendor, family, tier, requiredCapabilities, locality, maxCostTier);
+            return new ModelQuery(vendor, family, tier, requiredCapabilities,
+                locality, maxCostTier, authMethod);
         }
     }
 }
@@ -178,37 +196,27 @@ public interface ModelSource {
 ```java
 public record ModelCatalogChangedEvent(
     String sourceId,
-    int added,
-    int removed,
-    int updated
-) {}
-```
-
-Fired as a CDI event when a source refresh results in actual catalog changes. Follows platform's event-on-mutation pattern (`EndpointRegistered`, `DataSourceUpdated`).
-
----
-
-## Part 2: Implementation in platform (#286)
-
-### NoOpModelRegistry (@DefaultBean)
-
-```java
-@DefaultBean
-@ApplicationScoped
-public class NoOpModelRegistry implements ModelRegistry {
-    @Override public Optional<ModelDescriptor> resolveById(String modelId) {
-        return Optional.empty();
+    Set<String> addedIds,
+    Set<String> removedIds,
+    Set<String> updatedIds
+) {
+    public ModelCatalogChangedEvent {
+        addedIds = addedIds != null ? Set.copyOf(addedIds) : Set.of();
+        removedIds = removedIds != null ? Set.copyOf(removedIds) : Set.of();
+        updatedIds = updatedIds != null ? Set.copyOf(updatedIds) : Set.of();
     }
-    @Override public List<ModelDescriptor> query(ModelQuery query) {
-        return List.of();
-    }
-    @Override public List<ModelDescriptor> all() {
-        return List.of();
+
+    public boolean hasChanges() {
+        return !addedIds.isEmpty() || !removedIds.isEmpty() || !updatedIds.isEmpty();
     }
 }
 ```
 
-Passthrough when no sources are on the classpath.
+Fired as a CDI event when a source refresh results in actual catalog changes. Carries the IDs of changed models to enable targeted cache invalidation without full-catalog diffing. Counts are trivially derived from set sizes. Follows platform's event-on-mutation pattern (`EndpointRegistered`, `DataSourceUpdated`).
+
+---
+
+## Part 2: Implementation in platform (#286)
 
 ### InMemoryModelRegistry
 
@@ -231,7 +239,7 @@ public class InMemoryModelRegistry implements ModelRegistry {
 
 **Priority resolution:** Sources ordered by `ModelSource.priority()` (descending). When two sources provide the same model ID, the higher-priority source wins. The resolved view is a flattened `Map<String, ModelDescriptor>` rebuilt after each source refresh — O(1) lookups for `resolveById`.
 
-**Query implementation:** Filters the resolved view by matching each non-null `ModelQuery` predicate. `maxCostTier` matches descriptors with `costTier.ordinal() <= maxCostTier.ordinal()`. `requiredCapabilities` checks `descriptor.capabilities().containsAll(required)`.
+**Query implementation:** Filters the resolved view by matching each non-null `ModelQuery` predicate. `maxCostTier` matches descriptors where `descriptor.costTier() != null && descriptor.costTier().rank() <= maxCostTier.rank()` — descriptors with null `costTier` are excluded from cost-constrained queries. `requiredCapabilities` checks `descriptor.capabilities().containsAll(required)`. `authMethod` matches descriptors with `descriptor.authMethod().equals(query.authMethod())`.
 
 ### ModelRegistryRefresher
 
@@ -255,7 +263,7 @@ public class ModelRegistryRefresher {
                 var delta = registry.replaceSource(source.sourceId(), source.priority(), models);
                 if (delta.hasChanges()) {
                     catalogChanged.fire(new ModelCatalogChangedEvent(
-                        source.sourceId(), delta.added(), delta.removed(), delta.updated()));
+                        source.sourceId(), delta.addedIds(), delta.removedIds(), delta.updatedIds()));
                 }
             } catch (Exception e) {
                 LOG.warnf("Model source '%s' refresh failed: %s", source.sourceId(), e.getMessage());
@@ -269,19 +277,21 @@ Error-isolated per source — one source failing doesn't block others. `ModelCat
 
 ### RoutingAgentProvider changes
 
-The `resolve(String model)` method gains a three-step resolution contract:
+The `resolve(String model)` method gains a three-step resolution contract with config rewriting. Resolution returns both the backend and the rewritten model string:
 
 ```java
-private AgentBackend resolve(String model, AgentSessionConfig config) {
+private record ResolvedRoute(AgentBackend backend, String apiModelId) {}
+
+private ResolvedRoute resolve(String model) {
     if (model == null) {
         if (defaultBackend == null) {
             throw new IllegalStateException(
                 "No default backend configured — set casehub.platform.agent.default-backend");
         }
-        return defaultBackend;
+        return new ResolvedRoute(defaultBackend, null);
     }
 
-    // Step 1: Registry path
+    // Step 1: Registry path — model ID from descriptor, backend from backendKey
     Optional<ModelDescriptor> descriptor = modelRegistry.resolveById(model);
     if (descriptor.isPresent()) {
         AgentBackend backend = backends.get(descriptor.get().backendKey());
@@ -290,12 +300,12 @@ private AgentBackend resolve(String model, AgentSessionConfig config) {
                 "ModelRegistry resolved '" + model + "' to backend '" +
                 descriptor.get().backendKey() + "', but no backend with that key is available");
         }
-        return backend;
+        return new ResolvedRoute(backend, descriptor.get().id());
     }
 
-    // Step 2: Key-based path
+    // Step 2: Key-based path — model nulled so backend uses its configured default
     AgentBackend backend = backends.get(model);
-    if (backend != null) return backend;
+    if (backend != null) return new ResolvedRoute(backend, null);
 
     // Step 3: Fail-fast
     throw new IllegalArgumentException("No model or backend for: " + model +
@@ -303,13 +313,46 @@ private AgentBackend resolve(String model, AgentSessionConfig config) {
 }
 ```
 
-Config rewriting: when registry resolves, the original `AgentSessionConfig` is rebuilt with the model-specific API identifier from the descriptor (backends receive the specific model ID, not the routing reference). When key-based path matches, `model` is set to `null` so backends use their configured default.
+Callers construct rewritten configs with the resolved model:
 
-`ModelRegistry` injected via CDI — when no `InMemoryModelRegistry` is on the classpath, the `@DefaultBean NoOpModelRegistry` returns empty and the router falls back to key-based dispatch (current behavior preserved).
+```java
+@Override
+public Multi<AgentEvent> invoke(AgentSessionConfig config) {
+    var route = resolve(config.model());
+    var rewritten = new AgentSessionConfig(
+        config.systemPrompt(), config.userPrompt(), config.mcpServers(),
+        config.timeout(), config.correlationId(), route.apiModelId());
+    return route.backend().invoke(rewritten);
+}
+
+@Override
+public AgentSession openSession(AgentSessionInit init) {
+    var route = resolve(init.model());
+    var rewritten = new AgentSessionInit(
+        init.systemPrompt(), init.mcpServers(),
+        init.timeout(), init.correlationId(), route.apiModelId());
+    return route.backend().openSession(rewritten);
+}
+```
+
+Config rewriting eliminates semantic overloading: backends always receive either a model-specific API identifier (e.g., `"claude-sonnet-5"` from the registry) or `null` (backend uses its configured default). The key-based path nulls the model so backends that previously read `config.model()` as both routing key and API identifier now correctly fall through to their configured default.
+
+`ModelRegistry` injected via CDI. `InMemoryModelRegistry` is always on the classpath (it's in `platform/`). With no `ModelSource` beans, it returns empty and the router falls through to key-based dispatch (current behavior preserved).
 
 ### DomainModelRegistry rename
 
-The existing `io.casehub.platform.mcp.ModelRegistry` (consumed by `DomainResourceRegistrar` for MCP domain-index resources) is renamed to `DomainModelRegistry` to resolve the naming collision. One consumer update + one test update.
+The existing `io.casehub.platform.mcp.ModelRegistry` (a registry of `DomainModel` objects for MCP domain-index resources) is renamed to `DomainModelRegistry` to resolve the naming collision. Five production consumers and one test reference the class:
+
+| File | Usage |
+|------|-------|
+| `DomainResourceRegistrar.java` | `ModelRegistry modelRegistry` field |
+| `CaseHubMcpTools.java` | `ModelRegistry registry` field |
+| `ReflectiveOperationDispatcher.java` | `ModelRegistry registry` field |
+| `GraphQLModelScanner.java` | `ModelRegistry registry` field |
+| `DynamicToolRegistrar.java` | `ModelRegistry registry` field |
+| `GraphQLModelScannerTest.java` | `ModelRegistry registry` field |
+
+All updates are mechanical — rename the type reference in each injection site.
 
 ---
 
@@ -321,18 +364,72 @@ The existing `io.casehub.platform.mcp.ModelRegistry` (consumed by `DomainResourc
 
 ```yaml
 models:
-  # --- Anthropic ---
+  # --- Anthropic (Claude 5 family) ---
+  - id: claude-opus-5
+    backendKey: claude
+    vendor: anthropic
+    family: claude
+    displayName: Claude Opus 5
+    tier: FLAGSHIP
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 200000
+    maxOutput: 32768
+    locality: CLOUD
+    costTier: PREMIUM
+    authMethod: api-key
+
+  - id: claude-sonnet-5
+    backendKey: claude
+    vendor: anthropic
+    family: claude
+    displayName: Claude Sonnet 5
+    tier: STANDARD
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 200000
+    maxOutput: 16384
+    locality: CLOUD
+    costTier: HIGH
+    authMethod: api-key
+
+  - id: claude-fable-5-1
+    backendKey: claude
+    vendor: anthropic
+    family: claude
+    displayName: Claude Fable 5.1
+    tier: STANDARD
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 200000
+    maxOutput: 16384
+    locality: CLOUD
+    costTier: MEDIUM
+    authMethod: api-key
+
+  # --- Anthropic (Claude 4 family) ---
+  - id: claude-opus-4-6
+    backendKey: claude
+    vendor: anthropic
+    family: claude
+    displayName: Claude Opus 4.6
+    tier: FLAGSHIP
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 200000
+    maxOutput: 32768
+    locality: CLOUD
+    costTier: PREMIUM
+    authMethod: api-key
+
   - id: claude-opus-4
     backendKey: claude
     vendor: anthropic
     family: claude
     displayName: Claude Opus 4
     tier: FLAGSHIP
-    capabilities: [TEXT, VISION, TOOL_USE, CODE, REASONING]
+    capabilities: [text, vision, tool-use, code, reasoning]
     contextWindow: 200000
     maxOutput: 32768
     locality: CLOUD
     costTier: PREMIUM
+    authMethod: api-key
 
   - id: claude-sonnet-4
     backendKey: claude
@@ -340,11 +437,12 @@ models:
     family: claude
     displayName: Claude Sonnet 4
     tier: STANDARD
-    capabilities: [TEXT, VISION, TOOL_USE, CODE, REASONING]
+    capabilities: [text, vision, tool-use, code, reasoning]
     contextWindow: 200000
     maxOutput: 16384
     locality: CLOUD
     costTier: HIGH
+    authMethod: api-key
 
   - id: claude-haiku-4-5
     backendKey: claude
@@ -352,11 +450,12 @@ models:
     family: claude
     displayName: Claude Haiku 4.5
     tier: FAST
-    capabilities: [TEXT, VISION, TOOL_USE, CODE]
+    capabilities: [text, vision, tool-use, code]
     contextWindow: 200000
     maxOutput: 8192
     locality: CLOUD
     costTier: LOW
+    authMethod: api-key
 
   # --- OpenAI ---
   - id: gpt-4.1
@@ -365,11 +464,12 @@ models:
     family: gpt-4
     displayName: GPT-4.1
     tier: STANDARD
-    capabilities: [TEXT, VISION, TOOL_USE, CODE, REASONING]
+    capabilities: [text, vision, tool-use, code, reasoning]
     contextWindow: 1048576
     maxOutput: 32768
     locality: CLOUD
     costTier: MEDIUM
+    authMethod: api-key
 
   - id: o3
     backendKey: openai
@@ -377,11 +477,25 @@ models:
     family: o3
     displayName: o3
     tier: FLAGSHIP
-    capabilities: [TEXT, TOOL_USE, CODE, REASONING]
+    capabilities: [text, tool-use, code, reasoning]
     contextWindow: 200000
     maxOutput: 100000
     locality: CLOUD
     costTier: PREMIUM
+    authMethod: api-key
+
+  - id: o4-mini
+    backendKey: openai
+    vendor: openai
+    family: o4
+    displayName: o4-mini
+    tier: FAST
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 200000
+    maxOutput: 100000
+    locality: CLOUD
+    costTier: LOW
+    authMethod: api-key
 
   - id: gpt-4o-mini
     backendKey: openai
@@ -389,11 +503,12 @@ models:
     family: gpt-4
     displayName: GPT-4o mini
     tier: FAST
-    capabilities: [TEXT, VISION, TOOL_USE, CODE]
+    capabilities: [text, vision, tool-use, code]
     contextWindow: 128000
     maxOutput: 16384
     locality: CLOUD
     costTier: LOW
+    authMethod: api-key
 
   # --- Google ---
   - id: gemini-2.5-pro
@@ -402,11 +517,12 @@ models:
     family: gemini
     displayName: Gemini 2.5 Pro
     tier: STANDARD
-    capabilities: [TEXT, VISION, TOOL_USE, CODE, REASONING]
+    capabilities: [text, vision, tool-use, code, reasoning]
     contextWindow: 1048576
     maxOutput: 65536
     locality: CLOUD
     costTier: MEDIUM
+    authMethod: api-key
 
   - id: gemini-2.5-flash
     backendKey: gemini
@@ -414,11 +530,12 @@ models:
     family: gemini
     displayName: Gemini 2.5 Flash
     tier: FAST
-    capabilities: [TEXT, VISION, TOOL_USE, CODE]
+    capabilities: [text, vision, tool-use, code]
     contextWindow: 1048576
     maxOutput: 65536
     locality: CLOUD
     costTier: LOW
+    authMethod: api-key
 
   # --- Meta (local) ---
   - id: llama-4-scout
@@ -427,11 +544,12 @@ models:
     family: llama
     displayName: Llama 4 Scout
     tier: STANDARD
-    capabilities: [TEXT, VISION, TOOL_USE, CODE]
+    capabilities: [text, vision, tool-use, code]
     contextWindow: 131072
     maxOutput: 16384
     locality: LOCAL
     costTier: FREE
+    authMethod: local
 
   - id: llama-4-maverick
     backendKey: ollama
@@ -439,11 +557,39 @@ models:
     family: llama
     displayName: Llama 4 Maverick
     tier: FLAGSHIP
-    capabilities: [TEXT, VISION, TOOL_USE, CODE, REASONING]
+    capabilities: [text, vision, tool-use, code, reasoning]
     contextWindow: 131072
     maxOutput: 16384
     locality: LOCAL
     costTier: FREE
+    authMethod: local
+
+  # --- Mistral ---
+  - id: mistral-large
+    backendKey: mistral
+    vendor: mistral
+    family: mistral
+    displayName: Mistral Large
+    tier: FLAGSHIP
+    capabilities: [text, vision, tool-use, code, reasoning]
+    contextWindow: 131072
+    maxOutput: 16384
+    locality: CLOUD
+    costTier: MEDIUM
+    authMethod: api-key
+
+  - id: codestral
+    backendKey: mistral
+    vendor: mistral
+    family: codestral
+    displayName: Codestral
+    tier: STANDARD
+    capabilities: [text, tool-use, code]
+    contextWindow: 262144
+    maxOutput: 16384
+    locality: CLOUD
+    costTier: LOW
+    authMethod: api-key
 ```
 
 ### SeedCatalogModelSource
@@ -482,27 +628,30 @@ Priority 0 — lowest. Any live API source (priority > 0) overrides seed entries
 
 ### Part 1 — SPI types (platform-api)
 
-1. `ModelDescriptor` — defensive copies on capabilities and properties, null validation on required fields
+1. `ModelDescriptor` — defensive copies on capabilities and properties, null validation on required fields (`id`, `backendKey`, `vendor`, `family`, `displayName`, `tier`, `locality`), nullable `costTier` and `authMethod`
 2. `ModelQuery.all()` — matches everything
-3. `ModelQuery.builder()` — each dimension filter works independently
-4. `ModelCatalogChangedEvent` — record construction
+3. `ModelQuery.builder()` — each dimension filter works independently, including `authMethod`
+4. `ModelCatalogChangedEvent` — record construction, `hasChanges()` logic, defensive copies on ID sets
+5. `CostTier.rank()` — explicit rank values survive enum reordering
 
 ### Part 2 — Implementation (platform)
 
-5. `NoOpModelRegistry` — resolveById returns empty, query returns empty, all returns empty
 6. `InMemoryModelRegistry.resolveById` — returns descriptor for known ID, empty for unknown
-7. `InMemoryModelRegistry.query` — filters by vendor, family, tier, capabilities, locality, maxCostTier
-8. `InMemoryModelRegistry.replaceSource` — atomic per-source replacement, doesn't affect other sources
-9. Priority resolution — higher-priority source wins for same model ID
-10. Priority shadowing — removing higher-priority entry exposes lower-priority
-11. `ModelRegistryRefresher` — calls refresh on all sources, fires event on change, error-isolated
-12. `RoutingAgentProvider` — registry path resolves model ID to backend, key-based fallback, fail-fast for unknown
+7. `InMemoryModelRegistry.query` — filters by vendor, family, tier, capabilities, locality, maxCostTier, authMethod
+8. `InMemoryModelRegistry.query` — null costTier on descriptor excluded from maxCostTier-constrained queries
+9. `InMemoryModelRegistry` with zero sources — resolveById returns empty, query returns empty, all returns empty
+10. `InMemoryModelRegistry.replaceSource` — atomic per-source replacement, doesn't affect other sources
+11. Priority resolution — higher-priority source wins for same model ID
+12. Priority shadowing — removing higher-priority entry exposes lower-priority
+13. `ModelRegistryRefresher` — calls refresh on all sources, fires event with correct IDs on change, error-isolated
+14. `RoutingAgentProvider` — registry path resolves model ID to backend with config rewriting, key-based fallback nulls model, fail-fast for unknown
+15. `RoutingAgentProvider` — both `invoke()` and `openSession()` paths produce rewritten configs
 
 ### Part 3 — Seed catalog (platform)
 
-13. `SeedCatalogModelSource.refresh()` — parses YAML, returns descriptors with correct fields
-14. Seed catalog YAML — all entries parse without error, no duplicate IDs
-15. Integration — seed entries resolve via `InMemoryModelRegistry.resolveById`
+16. `SeedCatalogModelSource.refresh()` — parses YAML, returns descriptors with correct fields including `authMethod`
+17. Seed catalog YAML — all entries parse without error, no duplicate IDs
+18. Integration — seed entries resolve via `InMemoryModelRegistry.resolveById`
 
 ---
 
@@ -514,7 +663,7 @@ Priority 0 — lowest. Any live API source (priority > 0) overrides seed entries
 |------|--------|
 | `platform-api/src/main/java/io/casehub/platform/api/model/ModelDescriptor.java` | New |
 | `platform-api/src/main/java/io/casehub/platform/api/model/ModelTier.java` | New |
-| `platform-api/src/main/java/io/casehub/platform/api/model/ModelCapability.java` | New |
+| `platform-api/src/main/java/io/casehub/platform/api/model/ModelCapabilities.java` | New |
 | `platform-api/src/main/java/io/casehub/platform/api/model/ModelLocality.java` | New |
 | `platform-api/src/main/java/io/casehub/platform/api/model/CostTier.java` | New |
 | `platform-api/src/main/java/io/casehub/platform/api/model/ModelRegistry.java` | New |
@@ -528,12 +677,10 @@ Priority 0 — lowest. Any live API source (priority > 0) overrides seed entries
 
 | File | Action |
 |------|--------|
-| `platform/src/main/java/io/casehub/platform/model/NoOpModelRegistry.java` | New |
 | `platform/src/main/java/io/casehub/platform/model/InMemoryModelRegistry.java` | New |
 | `platform/src/main/java/io/casehub/platform/model/ModelRegistryRefresher.java` | New |
 | `platform/src/main/java/io/casehub/platform/model/SeedCatalogModelSource.java` | New |
 | `platform/src/main/resources/models/seed-catalog.yaml` | New |
-| `platform/src/test/java/io/casehub/platform/model/NoOpModelRegistryTest.java` | New |
 | `platform/src/test/java/io/casehub/platform/model/InMemoryModelRegistryTest.java` | New |
 | `platform/src/test/java/io/casehub/platform/model/SeedCatalogModelSourceTest.java` | New |
 
@@ -550,6 +697,17 @@ Priority 0 — lowest. Any live API source (priority > 0) overrides seed entries
 |------|--------|
 | `mcp/src/main/java/io/casehub/platform/mcp/ModelRegistry.java` → `DomainModelRegistry.java` | Rename |
 | `mcp/src/main/java/io/casehub/platform/mcp/DomainResourceRegistrar.java` | Modified — update reference |
+| `mcp/src/main/java/io/casehub/platform/mcp/CaseHubMcpTools.java` | Modified — update reference |
+| `mcp/src/main/java/io/casehub/platform/mcp/ReflectiveOperationDispatcher.java` | Modified — update reference |
+| `mcp/src/main/java/io/casehub/platform/mcp/GraphQLModelScanner.java` | Modified — update reference |
+| `mcp/src/main/java/io/casehub/platform/mcp/DynamicToolRegistrar.java` | Modified — update reference |
+| `mcp/src/test/java/io/casehub/platform/mcp/GraphQLModelScannerTest.java` | Modified — update reference |
+
+### Part 2 — architectural documentation
+
+| File | Action |
+|------|--------|
+| `ARC42STORIES.MD` | Modified — §1 core capabilities, §5 building block view, §9 chapter index |
 
 ---
 
@@ -571,7 +729,7 @@ Priority 0 — lowest. Any live API source (priority > 0) overrides seed entries
 - `io.casehub.platform.agent.AgentSessionConfig` — `model` field semantics
 - `io.casehub.platform.agent.router.RoutingAgentProvider` — current resolve() method, integration point
 - `io.casehub.platform.mcp.ModelRegistry` — existing class to rename (DomainModelRegistry)
-- `io.casehub.platform.mcp.DomainResourceRegistrar` — sole consumer of existing ModelRegistry
+- `io.casehub.platform.mcp.DomainResourceRegistrar` — one of five production consumers of existing ModelRegistry
 - casehubio/platform#285 — LLM model registry epic (layer model, boundary rules)
 - casehubio/eidos AgentDescriptor — modelFamily/modelVersion fields (Layer 3 → Layer 2 binding, D6)
 - Anthropic `/v1/models` API — cloud model listing reference
