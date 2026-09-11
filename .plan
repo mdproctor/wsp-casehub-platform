@@ -13,3 +13,12 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#286 — Issue #286 ← active
+  - [ ] Batch 1: SPIs
+    - [ ] Task 1: Enums and ModelDescriptor
+    - [ ] Task 2: ModelRegistry and ModelQuery
+  - [ ] Batch 2: Registry
+    - [ ] Task 3: InMemoryModelRegistry and Refresher
+    - [ ] Task 4: SeedCatalogModelSource
+  - [ ] Batch 3: Integration
+    - [ ] Task 5: DomainModelRegistry rename
+    - [ ] Task 6: RoutingAgentProvider resolution
