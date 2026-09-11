@@ -33,3 +33,15 @@
 **Sources:** RoutingAgentProvider.resolve() (resolveById integration point), epic #285 MCP tools (ModelQuery serializable for REST/MCP)
 **Exploration:** quick
 **Status:** captured
+
+## D4: ModelSource SPI — refresh contract
+
+**Choice:** Pull-based refresh with lastRefreshed hint for incremental efficiency
+**Alternatives:**
+- Push-based registration (sources call registry.register/deregister) — sources must track lifecycle, handle restarts. More complex for no benefit — vendor APIs are pull-based
+- Delta-based refresh (return added/removed/updated) — over-engineering for a catalog of tens to low hundreds of models. Full replacement is cheap and eliminates stale-entry bugs
+**Rationale:** Simple pull-based contract: registry calls refresh() on each source periodically, passing the timestamp of the last successful refresh. Sources that support incremental APIs can use the hint; sources that don't ignore it and return the full catalog. Registry replaces that source's entries atomically. Error-isolated per source. The contract: `refresh(Instant lastRefreshed)` returns the complete current catalog from this source's perspective. The hint is advisory — sources always MAY return the full list.
+**Trade-offs:** Full replacement per source means re-transmitting unchanged entries on every refresh. Acceptable: catalog is small, refresh is infrequent (minutes to hours), and full replacement eliminates stale-entry tracking bugs.
+**Sources:** Anthropic /v1/models API, OpenAI /v1/models API, Ollama /api/tags API (all return full lists)
+**Exploration:** quick
+**Status:** captured
