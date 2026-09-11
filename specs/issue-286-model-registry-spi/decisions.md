@@ -45,3 +45,15 @@
 **Sources:** Anthropic /v1/models API, OpenAI /v1/models API, Ollama /api/tags API (all return full lists)
 **Exploration:** quick
 **Status:** captured
+
+## D5: Registry implementation placement
+
+**Choice:** In-memory ConcurrentHashMap registry in `platform/`, no-op @DefaultBean in `platform/`
+**Depends on:** D3 (ModelRegistry SPI shape)
+**Alternatives:**
+- New `model-registry/` module — the registry is a thin cache with a scheduled refresher, doesn't warrant its own module
+**Rationale:** ConcurrentHashMap keyed by model ID, atomic replacement per source via ModelRegistryRefresher. @Startup initial refresh, @Scheduled periodic refresh. Error-isolated per source. No persistence — registry is a cache, sources are the truth. Seed catalog (#287) on the same branch provides the initial data. Follows platform's established pattern: SPI in platform-api, @ApplicationScoped impl in platform.
+**Trade-offs:** Lost on restart — repopulated from seed catalog immediately, live sources within first refresh cycle. No persistence needed for a cache.
+**Sources:** platform NoOpCaseMemoryStore pattern, DataSourceRouter @ApplicationScoped pattern
+**Exploration:** quick
+**Status:** captured
