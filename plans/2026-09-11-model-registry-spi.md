@@ -11,7 +11,7 @@
 
 **Goal:** Build the queryable LLM model registry — SPIs, in-memory implementation, seed catalog, and RoutingAgentProvider integration.
 
-**Architecture:** Layer 2 (Model Selection) in epic #285. SPIs in `platform-api/` (zero-dep), implementation in `platform/` (InMemoryModelRegistry + SeedCatalogModelSource), integration in `agent-router/` (three-step resolution with config rewriting), and MCP rename (`ModelRegistry` → `DomainModelRegistry`).
+**Architecture:** Layer 2 (Model Selection) in epic #285. SPIs in `platform-api/` (zero-dep), implementation in `platform/` (InMemoryModelRegistry + SeedCatalogModelSource), integration in `agent-router/` (three-step resolution with config rewriting), and MCP rename (`DomainModelRegistry` → `DomainModelRegistry`).
 
 **Tech Stack:** Pure Java (SPIs), Quarkus CDI (registry impl), Jackson YAML (seed catalog), JUnit 5, AssertJ
 
@@ -22,7 +22,7 @@
 - New impl package: `io.casehub.platform.model`
 - Capabilities use `Set<String>` with constants (not enum) — new capabilities emerge on weeks cadence
 - `costTier` and `authMethod` are nullable on `ModelDescriptor`
-- `ModelRegistry` injected as `@ApplicationScoped` — always on classpath, returns empty with no sources
+- `DomainModelRegistry` injected as `@ApplicationScoped` — always on classpath, returns empty with no sources
 - Existing `io.casehub.platform.mcp.ModelRegistry` renamed to `DomainModelRegistry` via `ide_refactor_rename`
 - RoutingAgentProvider: fail-fast for unknown model (no silent langchain4j fallback for non-null refs)
 
@@ -240,7 +240,7 @@ Refs #286"
 
 **Interfaces:**
 - Consumes: `ModelDescriptor`, `ModelTier`, `ModelLocality`, `CostTier` from Task 1
-- Produces: `ModelRegistry` (SPI: `resolveById(String)`, `query(ModelQuery)`, `all()`), `ModelSource` (SPI: `sourceId()`, `priority()`, `refresh()`), `ModelQuery` (record with builder), `ModelCatalogChangedEvent` (CDI event record)
+- Produces: `DomainModelRegistry` (SPI: `resolveById(String)`, `query(ModelQuery)`, `all()`), `ModelSource` (SPI: `sourceId()`, `priority()`, `refresh()`), `ModelQuery` (record with builder), `ModelCatalogChangedEvent` (CDI event record)
 
 - [ ] **Step 1: Write failing tests**
 
@@ -457,7 +457,7 @@ Refs #286"
 - Test: `platform/src/test/java/io/casehub/platform/model/InMemoryModelRegistryTest.java`
 
 **Interfaces:**
-- Consumes: `ModelRegistry`, `ModelSource`, `ModelDescriptor`, `ModelQuery`, `ModelCatalogChangedEvent` from Tasks 1-2
+- Consumes: `DomainModelRegistry`, `ModelSource`, `ModelDescriptor`, `ModelQuery`, `ModelCatalogChangedEvent` from Tasks 1-2
 - Produces: `InMemoryModelRegistry` (@ApplicationScoped, `replaceSource(sourceId, priority, models)` → `CatalogDelta`), `ModelRegistryRefresher` (@Startup + @Scheduled)
 
 - [ ] **Step 1: Write failing tests**
@@ -1094,7 +1094,7 @@ Refs #286"
 - Modify: `agent-router/src/test/java/io/casehub/platform/agent/router/RoutingAgentProviderTest.java`
 
 **Interfaces:**
-- Consumes: `ModelRegistry` (SPI from Task 2), `InMemoryModelRegistry` (impl from Task 3)
+- Consumes: `DomainModelRegistry` (SPI from Task 2), `InMemoryModelRegistry` (impl from Task 3)
 - Produces: Modified `RoutingAgentProvider` with three-step resolution: registry → key → fail-fast. Config rewriting so backends receive model-specific API ID or null.
 
 - [ ] **Step 1: Write failing tests**
@@ -1186,7 +1186,7 @@ Add to `agent-router/pom.xml` dependencies:
 
 Use `ide_edit_member` to update `RoutingAgentProvider`:
 
-1. Add `ModelRegistry` field and new test constructor accepting it
+1. Add `DomainModelRegistry` field and new test constructor accepting it
 2. Replace `resolve(String model)` with three-step resolution returning `ResolvedRoute`
 3. Update `invoke()` and `openSession()` to use config rewriting
 
@@ -1262,7 +1262,7 @@ public AgentSession openSession(AgentSessionInit init) {
 }
 ```
 
-Update CDI constructor to inject `ModelRegistry`:
+Update CDI constructor to inject `DomainModelRegistry`:
 ```java
 @Inject
 public RoutingAgentProvider(@Any Instance<AgentBackend> backends,

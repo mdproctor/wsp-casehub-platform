@@ -6,7 +6,7 @@ Executed Batch 2 of the model registry plan: InMemoryModelRegistry (per-source C
 
 ## Immediate Next Step
 
-Batch 3 (Tasks 5-6): rename MCP `ModelRegistry` to `DomainModelRegistry` via `ide_refactor_rename`, then wire three-step resolution into RoutingAgentProvider with config rewriting.
+Batch 3 (Tasks 5-6): rename MCP `DomainModelRegistry` to `DomainModelRegistry` via `ide_refactor_rename`, then wire three-step resolution into RoutingAgentProvider with config rewriting.
 
 ## References
 

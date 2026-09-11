@@ -8,7 +8,7 @@
 
 Queryable LLM model registry — the foundation of epic #285. Three deliverables:
 
-1. **SPIs in platform-api** — `ModelDescriptor` (normalized model metadata with typed dimensions), `ModelRegistry` (query by dimensions, resolve by ID), `ModelSource` (pull-based refresh), `ModelQuery` (predicate record), enums (`ModelTier`, `ModelLocality`, `CostTier`), `ModelCapabilities` (string constants), `ModelCatalogChangedEvent` (CDI event on catalog change)
+1. **SPIs in platform-api** — `ModelDescriptor` (normalized model metadata with typed dimensions), `DomainModelRegistry` (query by dimensions, resolve by ID), `ModelSource` (pull-based refresh), `ModelQuery` (predicate record), enums (`ModelTier`, `ModelLocality`, `CostTier`), `ModelCapabilities` (string constants), `ModelCatalogChangedEvent` (CDI event on catalog change)
 2. **Implementation in platform** — `InMemoryModelRegistry` (per-source maps with priority-resolved view), `ModelRegistryRefresher` (@Scheduled periodic refresh), `RoutingAgentProvider` integration (three-step model reference resolution), `DomainModelRegistry` rename (MCP naming collision)
 3. **Seed catalog (#287)** — committed YAML with known models from major vendors, `SeedCatalogModelSource` implementation
 
@@ -361,7 +361,7 @@ public AgentSession openSession(AgentSessionInit init) {
 
 Config rewriting eliminates semantic overloading: backends always receive either a model-specific API identifier (e.g., `"claude-sonnet-5"` from the registry) or `null` (backend uses its configured default). The key-based path nulls the model so backends that previously read `config.model()` as both routing key and API identifier now correctly fall through to their configured default.
 
-`ModelRegistry` injected via CDI. `InMemoryModelRegistry` is always on the classpath (it's in `platform/`). With no `ModelSource` beans, it returns empty and the router falls through to key-based dispatch (current behavior preserved).
+`DomainModelRegistry` injected via CDI. `InMemoryModelRegistry` is always on the classpath (it's in `platform/`). With no `ModelSource` beans, it returns empty and the router falls through to key-based dispatch (current behavior preserved).
 
 ### DomainModelRegistry rename
 

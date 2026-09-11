@@ -112,7 +112,7 @@ The handler type is `McpResourceHandler` — a functional interface: `McpResourc
 
 These are categorically different:
 1. `EndpointDescriptor` has no handler concept — it stores connection metadata, not behavior
-2. Resource handlers execute code (e.g., query `ModelRegistry` for domain data) — they can't be reduced to a URL
+2. Resource handlers execute code (e.g., query `DomainModelRegistry` for domain data) — they can't be reduced to a URL
 3. `EndpointRegistry` is keyed by `(Path, tenancyId)` — resources are keyed by URI/name
 4. The issue's intent is correct (programmatic data-driven registration, not `@Resource` annotations) but `EndpointRegistry` is the wrong mechanism for in-process content contribution
 

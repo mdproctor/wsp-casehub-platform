@@ -543,7 +543,7 @@ Refs #241"
 - Test: `mcp/src/test/java/io/casehub/platform/mcp/DomainResourceRegistrarTest.java`
 
 **Interfaces:**
-- Consumes: `McpResourceRegistry` (from Task 3), `ModelRegistry`, `ModelScanComplete`, `DomainModel`, `OperationDescriptor`, `EventDescriptor`, `ParameterDescriptor`
+- Consumes: `McpResourceRegistry` (from Task 3), `DomainModelRegistry`, `ModelScanComplete`, `DomainModel`, `OperationDescriptor`, `EventDescriptor`, `ParameterDescriptor`
 - Produces: `DomainContentFormatter` (package-private, static methods: `formatIndex(List<DomainModel>)`, `formatDomain(DomainModel)`), `DomainResourceRegistrar @ApplicationScoped` (observes `ModelScanComplete`, registers `casehub://domain-index` and `casehub://domains/{domain}`)
 
 - [ ] **Step 1: Write DomainContentFormatter test**
