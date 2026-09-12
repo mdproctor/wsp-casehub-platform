@@ -514,8 +514,9 @@ public class LlmConfigService implements LlmConfigApi {
 **Authorization enforcement points:**
 1. **Writes** (`configure`, `unconfigure`): `@RolesAllowed(PlatformRoles.ADMIN)` on service methods. `PlatformRoles.ADMIN = "platform-admin"` — the platform constant used across the codebase (e.g., `AclResource`, `CallbackRegistrationResource`). Quarkus SecurityInterceptor enforces via `CurrentPrincipal.roles()`.
 2. **Reads** (`vendors`, `configured`): No role restriction. Any authenticated user can list vendors and see configured providers.
-3. **Tenant ID extraction**: Always from `CurrentPrincipal.tenancyId()` — never from user input. This is a platform invariant documented on `CurrentPrincipal`: "must never be sourced from user-supplied input."
-4. **Generated endpoints**: The `GraphQLResolverProcessor` does not generate `@RolesAllowed` annotations — authorization is enforced at the service layer. The generated REST/GraphQL endpoints delegate directly to `LlmConfigService`, where the security interceptor fires.
+3. **Validate** (`validate`): No role restriction — any authenticated user can test credentials before requesting admin configuration. The server makes HTTP calls only to hardcoded vendor API endpoints (§Implementations), not caller-controlled URLs. (R3-02)
+4. **Tenant ID extraction**: Always from `CurrentPrincipal.tenancyId()` — never from user input. This is a platform invariant documented on `CurrentPrincipal`: "must never be sourced from user-supplied input."
+5. **Generated endpoints**: The `GraphQLResolverProcessor` does not generate `@RolesAllowed` annotations — authorization is enforced at the service layer. The generated REST/GraphQL endpoints delegate directly to `LlmConfigService`, where the security interceptor fires.
 
 **Distinction from `ConfiguredModelSourceManager`:** The manager does NOT inject `CurrentPrincipal` because it runs at `@Startup` and `@Scheduled` — no request context exists. All manager methods take explicit `tenancyId` parameters. `LlmConfigService` bridges the gap: it extracts `tenancyId` from `CurrentPrincipal` and passes it to the manager.
 
@@ -600,6 +601,7 @@ Provider index (`PLATFORM_TENANT_ID` scope, for startup enumeration):
 |------|--------|
 | `pom.xml` (root) | Modified — add `llm-config` to modules list |
 | `platform/...InMemoryModelRegistry.java` | Modified — implements MutableModelRegistry |
+| `platform/...SeedCatalogModelSource.java` | Modified — add `apiModelId` parameter (= `id` for seed catalog models) (R3-01) |
 | `platform/.../credentials/NoOpLlmCredentialStore.java` | New — `@DefaultBean` no-op impl (R2-03) |
 | `agent-router/...RoutingAgentProvider.java` | Modified — use `descriptor.apiModelId()` instead of `descriptor.id()` (R1-01) |
 | `graphql-generator/` | Modified — REST generation PoC (already committed) |
