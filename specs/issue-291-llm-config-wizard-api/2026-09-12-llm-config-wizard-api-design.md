@@ -6,7 +6,9 @@
 
 ## Summary
 
-Headless REST/GraphQL/MCP API for guided LLM provider configuration. An admin configures which LLM providers are available system-wide; users can add personal providers at user scope. The wizard validates credentials against the vendor's live API, persists the configuration, and auto-registers a `ModelSource` that feeds the `ModelRegistry`.
+Headless REST/GraphQL/MCP API for guided LLM provider configuration. An admin configures which LLM providers are available at tenant scope. The wizard validates credentials against the vendor's live API, persists the configuration, and auto-registers a `ModelSource` that feeds the `ModelRegistry`.
+
+User-scope personal providers are deferred to a follow-up (see §Downstream) — the source lifecycle, model ID format, and refresh scaling require separate design work (R2-01, R2-02).
 
 Three API surfaces (REST, GraphQL, MCP) are generated from a single `@McpDomain` SPI interface — no hand-written endpoints.
 
@@ -149,7 +151,7 @@ public record ConfigureResult(
 ) {}
 ```
 
-`credentialRef` is no longer caller-supplied — the wizard generates it internally from vendorKey + tenancyId + scope hash. This prevents callers from accidentally colliding with non-LLM credential refs.
+`credentialRef` is no longer caller-supplied — the wizard generates it internally from `{vendorKey}-{tenancyId}` (see §Credential Ref Generation). This prevents callers from accidentally colliding with non-LLM credential refs.
 
 ### ProviderConfig (for `configured()` response)
 
@@ -248,20 +250,22 @@ public interface LlmCredentialStore {
 - Separate from `CredentialResolver` — `CredentialResolver` is for outbound endpoint credentials. LLM credentials are a distinct concern with different lifecycle (user-managed, validated, revocable).
 - **SPI in `platform-api`** (R1-11) — follows the standard platform pattern for replaceable implementations. The Vault-backed production implementation can live in a separate module (e.g., `llm-credentials-vault/`) without coupling secrets infrastructure to `llm-config`. This avoids a future SPI promotion migration.
 
-**Pre-release implementation:** `InMemoryLlmCredentialStore` in `llm-config` (`@ApplicationScoped`, `ConcurrentHashMap`, lost on restart). Persistence added when needed (file-backed, JPA, or Vault integration in a separate module).
+**`@DefaultBean` no-op (R2-03):** `NoOpLlmCredentialStore` (`@DefaultBean @ApplicationScoped`) in `platform/` — returns empty maps, no-op store/delete. Follows the universal platform pattern (48 `@DefaultBean` implementations in `platform/`). Prevents `UnsatisfiedResolutionException` when `llm-config` is not on the classpath.
+
+**Pre-release implementation:** `InMemoryLlmCredentialStore` in `llm-config` (`@ApplicationScoped`, `ConcurrentHashMap`, lost on restart). Displaces the `@DefaultBean` no-op via standard CDI priority. Persistence added when needed (file-backed, JPA, or Vault integration in a separate module).
 
 **For restart durability (pre-release):** `PreferenceStore` stores a `llm.credentials.{ref}.exists=true` marker (no secret values). On startup, if the marker exists but the in-memory store is empty, the wizard reports the provider as "credentials expired — reconfigure." This is acceptable for pre-release: credentials are re-entered after restart. Production deployments use Vault-backed storage.
 
 ### Credential Ref Generation (R1-06)
 
-The `credentialRef` is generated internally — never caller-supplied. The formula includes the full scope path to ensure isolation:
+The `credentialRef` is generated internally — never caller-supplied. Formula:
 
-| Scope | Formula | Example |
-|-------|---------|---------|
-| Tenant root | `{vendorKey}-{tenancyId}` | `anthropic-tenant-42` |
-| User scope | `{vendorKey}-{tenancyId}-{actorId}` | `anthropic-tenant-42-user-7` |
+```
+{vendorKey}-{tenancyId}
+Example: anthropic-tenant-42
+```
 
-Two users in the same tenant configuring the same vendor produce distinct credential refs. The `actorId` suffix guarantees user-scope isolation within a tenant.
+One credential ref per `(vendorKey, tenancyId)` pair. When user-scope lands, the formula extends to `{vendorKey}-{tenancyId}-{actorId}` to guarantee per-user isolation.
 
 ### CredentialResolver integration (R1-04 — decorator, not alternative)
 
@@ -362,7 +366,7 @@ Error-isolated per source. Follows the same pattern as `ModelRegistryRefresher` 
 
 **Rate limiting consideration:** Each configured source's `refresh()` makes a live HTTP call to the vendor API. With N tenants × M vendors, the refresh cycle makes N×M API calls per interval. For pre-release scale (single-digit tenants), this is acceptable. At scale, implement staggered refresh (jitter) and configurable per-vendor rate limits.
 
-### ConfiguredModelSource (revised)
+### ConfiguredModelSource (revised, R2-04)
 
 ```java
 class ConfiguredModelSource implements ModelSource {
@@ -385,15 +389,33 @@ class ConfiguredModelSource implements ModelSource {
         }
         var result = client.listModels(creds);
         if (result.valid()) {
-            lastKnownModels = result.models();
+            lastKnownModels = toTenantScoped(result.models());
             return lastKnownModels;
         }
         return lastKnownModels != null ? lastKnownModels : List.of();
     }
+
+    /**
+     * Transforms VendorClient-produced descriptors into tenant-scoped registry entries.
+     * VendorClient returns descriptors with apiModelId as the vendor-facing identifier
+     * (e.g., "claude-sonnet-5"). This method sets:
+     *   id = "{vendorKey}:{tenancyId}:{apiModelId}" — the tenant-scoped registry key
+     *   apiModelId = unchanged — the vendor-facing identifier for RoutingAgentProvider
+     */
+    private List<ModelDescriptor> toTenantScoped(List<ModelDescriptor> vendorModels) {
+        return vendorModels.stream()
+            .map(d -> new ModelDescriptor(
+                vendorKey + ":" + tenancyId + ":" + d.apiModelId(),  // tenant-scoped registry key
+                d.apiModelId(),       // vendor-facing identifier (unchanged)
+                d.backendKey(), d.vendor(), d.family(), d.displayName(),
+                d.tier(), d.capabilities(), d.contextWindow(), d.maxOutput(),
+                d.locality(), d.costTier(), d.authMethod(), d.properties()))
+            .toList();
+    }
 }
 ```
 
-Tenant ID is stored at construction time, not resolved from request context.
+Tenant ID is stored at construction time, not resolved from request context. The `toTenantScoped()` method is the critical bridge between VendorClient output (plain model IDs) and the registry's tenant-scoped partitioning scheme (§Tenant Isolation).
 
 ## Vendor Clients (R1-05, R1-12 — shared abstraction for #288)
 
@@ -447,20 +469,21 @@ CDI-discovered via `@Any Instance<VendorClient>`. `vendors()` derives the list d
 
 **No Mistral backend (R1-08):** `MistralClient` is not included in this branch — no `MistralAgentBackend` exists in the platform. Added when a Mistral backend module is created.
 
-## Scope Model — Tenant + User (simplified)
+## Scope Model — Tenant Only (R2-01, R2-02)
 
-Provider configurations are scoped via PreferenceStore:
+Provider configurations are scoped via PreferenceStore at tenant root scope only:
 
 | Scope | Who writes | What's stored |
 |-------|-----------|---------------|
-| Tenant root (`/`) | Admin (`@RolesAllowed(ADMIN)`) | Provider config metadata |
-| User scope (`/users/{actorId}`) | The user themselves | Provider config metadata |
+| Tenant root (`/`) | Admin (`@RolesAllowed(PlatformRoles.ADMIN)`) | Provider config metadata |
 
-Credentials are scoped by `(tenancyId, credentialRef)` in `LlmCredentialStore` — separate from PreferenceStore. The `credentialRef` includes the full scope path to prevent collisions (see §Credential Ref Generation).
+Credentials are scoped by `(tenancyId, credentialRef)` in `LlmCredentialStore` — separate from PreferenceStore.
 
-The `ConfiguredModelSourceManager` creates separate `ConfiguredModelSource` instances per `(vendorKey, tenancyId)` tuple. Model IDs are tenant-prefixed for isolation (see §Tenant Isolation).
+The `ConfiguredModelSourceManager` creates one `ConfiguredModelSource` per `(vendorKey, tenancyId)` tuple. Each source has a single `credentialRef` mapping to the admin-configured credential. Model IDs are tenant-prefixed for isolation (see §Tenant Isolation).
 
-### Authorization Flow (R1-09)
+**User-scope deferred (R2-01, R2-02):** User-scope personal providers require per-`(vendorKey, tenancyId, actorId)` source isolation, user-scoped model IDs (a fourth segment in the ID format), and N×M×U refresh scaling. These concerns need separate design — the tenant-scope source lifecycle doesn't extend to user scope without significant rework. Tracked in §Downstream.
+
+### Authorization Flow (R1-09, R2-01, R2-05)
 
 `LlmConfigService` injects `CurrentPrincipal` for request-scoped authorization. This is safe in an `@ApplicationScoped` bean — CDI client proxies delegate to the correct contextual instance per request (see `CurrentPrincipal` Javadoc).
 
@@ -472,28 +495,27 @@ public class LlmConfigService implements LlmConfigApi {
     @Inject ConfiguredModelSourceManager sourceManager;
     // ... other injections
 
-    @RolesAllowed("ADMIN")
+    @RolesAllowed(PlatformRoles.ADMIN)
     @Override
     public ConfigureResult configure(ConfigureRequest request) {
         String tenancyId = principal.tenancyId();
         // ... tenant-scope write
     }
 
+    @RolesAllowed(PlatformRoles.ADMIN)
     @Override
-    public ConfigureResult configureUserScope(ConfigureRequest request) {
+    public void unconfigure(String providerId) {
         String tenancyId = principal.tenancyId();
-        String actorId = principal.actorId();
-        // writes to /users/{actorId} scope — no admin role required
+        // ... tenant-scope delete
     }
 }
 ```
 
 **Authorization enforcement points:**
-1. **Tenant-scope writes** (`configure`, `unconfigure`): `@RolesAllowed("ADMIN")` on service methods. Quarkus SecurityInterceptor enforces via `CurrentPrincipal.roles()`.
-2. **User-scope writes** (`configureUserScope`): No role check — any authenticated user can write to their own scope. The scope path includes `principal.actorId()`, enforcing that the caller can only write to their own user scope.
-3. **Reads** (`vendors`, `configured`): No role restriction. Any authenticated user can list vendors and see configured providers.
-4. **Tenant ID extraction**: Always from `CurrentPrincipal.tenancyId()` — never from user input. This is a platform invariant documented on `CurrentPrincipal`: "must never be sourced from user-supplied input."
-5. **Generated endpoints**: The `GraphQLResolverProcessor` does not generate `@RolesAllowed` annotations — authorization is enforced at the service layer. The generated REST/GraphQL endpoints delegate directly to `LlmConfigService`, where the security interceptor fires.
+1. **Writes** (`configure`, `unconfigure`): `@RolesAllowed(PlatformRoles.ADMIN)` on service methods. `PlatformRoles.ADMIN = "platform-admin"` — the platform constant used across the codebase (e.g., `AclResource`, `CallbackRegistrationResource`). Quarkus SecurityInterceptor enforces via `CurrentPrincipal.roles()`.
+2. **Reads** (`vendors`, `configured`): No role restriction. Any authenticated user can list vendors and see configured providers.
+3. **Tenant ID extraction**: Always from `CurrentPrincipal.tenancyId()` — never from user input. This is a platform invariant documented on `CurrentPrincipal`: "must never be sourced from user-supplied input."
+4. **Generated endpoints**: The `GraphQLResolverProcessor` does not generate `@RolesAllowed` annotations — authorization is enforced at the service layer. The generated REST/GraphQL endpoints delegate directly to `LlmConfigService`, where the security interceptor fires.
 
 **Distinction from `ConfiguredModelSourceManager`:** The manager does NOT inject `CurrentPrincipal` because it runs at `@Startup` and `@Scheduled` — no request context exists. All manager methods take explicit `tenancyId` parameters. `LlmConfigService` bridges the gap: it extracts `tenancyId` from `CurrentPrincipal` and passes it to the manager.
 
@@ -521,11 +543,12 @@ Provider index (`PLATFORM_TENANT_ID` scope, for startup enumeration):
 3. **Tenant isolation is partitioning, not authorization:** Tenant-prefixed model IDs prevent accidental cross-tenant use but don't enforce it cryptographically. Post-release: add tenant-aware query overloads to `ModelRegistry` SPI (R1-01).
 4. **Credentials lost on restart (pre-release):** `InMemoryLlmCredentialStore` is volatile. Providers show as "credentials expired" after restart and require reconfiguration. Production: Vault-backed store.
 5. **Per-tenant credential dispatch for invocation (R1-02):** Configured credentials are used for model discovery and refresh only. Model invocation uses platform-level backend credentials. Per-tenant credential dispatch requires extending `AgentBackend` SPI — tracked as a follow-up (see §Downstream).
+6. **User-scope personal providers deferred (R2-01, R2-02):** Only tenant-scope admin configuration in this branch. User-scope requires per-user source lifecycle, user-scoped model IDs, and O(N×M×U) refresh scaling — tracked in §Downstream.
 
 ## Test Strategy
 
 1. `LlmConfigApi` — SPI contract: `vendors()` returns CDI-derived catalog, `configure`/`unconfigure` lifecycle
-2. `LlmConfigService` — tenant isolation: admin configures at tenant scope, user at user scope, cross-tenant blocked
+2. `LlmConfigService` — tenant isolation: admin configures at tenant scope, cross-tenant blocked, non-admin blocked
 3. `LlmConfigService.configure()` — re-validates internally before persisting (R1-14)
 4. `VendorClient` — per-vendor: mock HTTP responses, verify `ModelDescriptor` construction (backendKey, vendor, family, locality, tier, capabilities)
 5. `ConfiguredModelSourceManager` — startup: provider index → reconstruct sources; runtime: configure/unconfigure lifecycle
@@ -577,6 +600,7 @@ Provider index (`PLATFORM_TENANT_ID` scope, for startup enumeration):
 |------|--------|
 | `pom.xml` (root) | Modified — add `llm-config` to modules list |
 | `platform/...InMemoryModelRegistry.java` | Modified — implements MutableModelRegistry |
+| `platform/.../credentials/NoOpLlmCredentialStore.java` | New — `@DefaultBean` no-op impl (R2-03) |
 | `agent-router/...RoutingAgentProvider.java` | Modified — use `descriptor.apiModelId()` instead of `descriptor.id()` (R1-01) |
 | `graphql-generator/` | Modified — REST generation PoC (already committed) |
 
@@ -588,6 +612,7 @@ Provider index (`PLATFORM_TENANT_ID` scope, for startup enumeration):
 | #290 | platform | Multi-instance backend — extends wizard to support N configs per vendor |
 | #295 | platform | Unified API generation — productionise REST generator PoC |
 | TBD | platform | Per-tenant credential dispatch — extend `AgentBackend` SPI for credential-aware invocation (R1-02) |
+| TBD | platform | User-scope personal providers — per-user source lifecycle, user-scoped model IDs, refresh scaling (R2-01, R2-02) |
 
 ## Review History
 
@@ -606,6 +631,7 @@ Provider index (`PLATFORM_TENANT_ID` scope, for startup enumeration):
 - `io.casehub.platform.api.credentials.LlmCredentialStore` — LLM credential storage SPI (new, in platform-api)
 - `io.casehub.platform.api.identity.TenancyConstants` — `PLATFORM_TENANT_ID` for cross-tenant indexes
 - `io.casehub.platform.api.identity.CurrentPrincipal` — request-scoped identity (injected into LlmConfigService)
+- `io.casehub.platform.api.identity.PlatformRoles` — `ADMIN = "platform-admin"` role constant
 - `io.casehub.platform.api.preferences.PreferenceStore` — scope-aware config persistence SPI
 - `io.casehub.platform.graphql.generator.GraphQLResolverProcessor` — APT for GraphQL + REST generation
 - `io.casehub.platform.api.mcp.McpDomain` — domain annotation for MCP + generation
