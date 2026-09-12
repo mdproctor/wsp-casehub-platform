@@ -184,7 +184,7 @@ public class ConfiguredModelSourceManager {
 
     @Inject PreferenceStore preferenceStore;
     @Inject CurrentPrincipal principal;
-    @Inject InMemoryModelRegistry registry;  // package-internal, not SPI
+    @Inject InMemoryModelRegistry registry;  // internal — replaceSource() is not on the ModelRegistry SPI
     @Inject VendorValidatorRegistry validators;
     @Inject Event<ModelCatalogChangedEvent> catalogChanged;
 
