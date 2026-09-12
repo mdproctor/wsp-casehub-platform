@@ -13,3 +13,12 @@ flyway-next-v: unknown
 
 ## Queue
 - [ ] casehubio/platform#291 — Issue #291 ← active
+  - [ ] Batch 1: SPI Foundation
+    - [ ] Task 1: ModelDescriptor apiModelId + MutableModelRegistry + routing fix
+    - [ ] Task 2: LlmCredentialStore SPI + @DefaultBean no-op
+  - [ ] Batch 2: llm-config Core
+    - [ ] Task 3: Module scaffold + DTOs + SPI interfaces
+    - [ ] Task 4: InMemoryLlmCredentialStore + ConfiguredModelSource + Manager
+  - [ ] Batch 3: Vendor + Service
+    - [ ] Task 5: Vendor client implementations
+    - [ ] Task 6: LlmConfigService + integration tests
