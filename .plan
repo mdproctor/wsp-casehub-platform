@@ -12,13 +12,4 @@ design-section-hashes: 4d2cc5ab:## §1 Introduction and Goals|4f6b26ef:## §2 Co
 flyway-next-v: unknown
 
 ## Queue
-- [ ] casehubio/platform#291 — Issue #291 ← active
-  - [x] Batch 1: SPI Foundation
-    - [x] Task 1: ModelDescriptor apiModelId + MutableModelRegistry + routing fix
-    - [x] Task 2: LlmCredentialStore SPI + @DefaultBean no-op
-  - [x] Batch 2: llm-config Core
-    - [x] Task 3: Module scaffold + DTOs + SPI interfaces
-    - [x] Task 4: InMemoryLlmCredentialStore + ConfiguredModelSource + Manager
-  - [x] Batch 3: Vendor + Service
-    - [x] Task 5: Vendor client implementations
-    - [x] Task 6: LlmConfigService + integration tests
+- [x] casehubio/platform#291 — Issue #291
