@@ -305,7 +305,7 @@ EOF
 
 - [ ] **Step 1: Move AccessCheckResponse to platform-api**
 
-Use `ide_move_file` to move `acl-admin/src/main/java/io/casehub/platform/acl/admin/AccessCheckResponse.java` → `platform-api/src/main/java/io/casehub/platform/api/acl/AccessCheckResponse.java`.
+Use `ide_move_file` to move `../../platform-api/src/main/java/io/casehub/platform/api/acl/AccessCheckResponse.java` → `platform-api/src/main/java/io/casehub/platform/api/acl/AccessCheckResponse.java`.
 
 Update the package declaration to `io.casehub.platform.api.acl`.
 
