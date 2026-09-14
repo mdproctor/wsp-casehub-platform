@@ -9,3 +9,4 @@
 | [2026-09-05-mdp01-the-167-line-delete.md](2026-09-05-mdp01-the-167-line-delete.md) | 2026-09-05 | SSE-to-EventBroadcaster migration: 232 lines of connection tracking collapsed to 65 lines of CDI bridge, plus a Mockito overload resolution gotcha |
 | [2026-09-11-mp01-model-registry-spi.md](2026-09-11-mp01-model-registry-spi.md) | 2026-09-11 | Model registry SPI — normalised LLM catalog with three-step resolution in RoutingAgentProvider |
 | [2026-09-14-mdp01-one-interface-three-surfaces.md](2026-09-14-mdp01-one-interface-three-surfaces.md) | 2026-09-14 | Productionised graphql-generator REST output. @RestMethod as transport-agnostic annotation. APT can't scan own Jandex index. Four endpoints migrated. |
+| [2026-09-14-mdp02-zero-hand-written-rest.md](2026-09-14-mdp02-zero-hand-written-rest.md) | 2026-09-14 | Migrated all hand-written REST endpoints to generated @McpDomain approach — @RestPath, Jandex type detection, 28 endpoints across 5 resources |
