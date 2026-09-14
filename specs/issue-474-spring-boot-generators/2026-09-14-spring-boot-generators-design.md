@@ -188,9 +188,11 @@ Generated classes inject the `@McpDomain` SPI interface and delegate method call
 
 | Quarkus MCP Server | Spring MCP SDK |
 |-------------------|----------------|
-| `@Tool` method | `@Tool` method (Spring AI MCP) or `ToolCallback` registration |
-| `@ToolArg` parameter | `@ToolParam` or schema-based parameter |
-| Tool description | Tool description annotation attribute |
+| `@Tool` method | Spring AI `@Tool` method (mirrors source annotation pattern) |
+| `@ToolArg` parameter | Spring AI method parameter (name/description from annotation) |
+| Tool description (annotation attribute) | `@Tool(description = "...")` attribute |
+
+The Spring AI MCP SDK's `@Tool` annotation provides the closest 1:1 mapping to Quarkus MCP Server's `@Tool`. Both use method-level annotations with description attributes. The generator produces `@Configuration` classes that register `@Tool`-annotated methods as Spring AI tool beans.
 
 **Verify goal:** Every `@Tool`-annotated method in the Quarkus Jandex must have a Spring MCP SDK equivalent.
 
