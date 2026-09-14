@@ -6,7 +6,7 @@
 
 ## Summary
 
-The `casehub-platform-graphql-generator` annotation processor cannot be used in consumer modules (discovered when wiring it in casehubio/ledger#207). Four bugs were reported — root cause analysis reveals they share a common failure chain: the APT generates code for all platform-api domains instead of just the consumer's domains, and the generated GraphQL resolvers import classes not on the consumer's classpath.
+The `casehub-platform-graphql-generator` annotation processor cannot be used in consumer modules (discovered when wiring it in casehubio/ledger#207). Four bugs were reported — all four are symptoms of a common failure: the APT generates code for all platform-api domains instead of just the consumer's domains, and the generated GraphQL resolvers import classes not on the consumer's classpath.
 
 This spec fixes the root causes and adds RoundEnvironment scanning so consumers can define SPIs in the same module as the generated code.
 
@@ -20,19 +20,12 @@ The issue reports four bugs:
 
 Static analysis of the current code shows that `toPascalCase()` (lines 590-603) correctly handles hyphens and slashes — the test at line 88 proves `toPascalCase("delivery-channels") = "DeliveryChannels"`. **Bugs 1-2 as described cannot occur with the current `toPascalCase` implementation.** The flag check (`!"false".equals(...)`) and filter check (`allowedDomains.contains(entry.getKey())`) are also logically correct.
 
-The real failure chain when a consumer (Java 26) wires the APT:
-
-```
-@SupportedSourceVersion(RELEASE_21) on Java 26
-  → javac warning / potential option handling quirk in compiler plugin
-    → APT options not received or silently defaulted
-      → generateGraphQL defaults to true (bug 3)
-      → domainFilter is null → all domains pass (bug 4)
-        → GraphQL resolvers generated for ALL 11 platform-api domains
-          → Generated code imports @Query, @Description, @GraphQLApi
-            → GraphQL API not on consumer's REST-only classpath
-              → compilation errors (bugs 1-2 symptoms)
-```
+**Hypothesis** (not proven — diagnostic logging in D4 will make the actual cause visible): the most likely failure chain when a consumer (Java 26) wires the APT is that APT options are not received by the processor — either due to Maven compiler plugin configuration, the `@SupportedSourceVersion(RELEASE_21)` annotation emitting warnings that confuse the build, or a Quarkus-specific annotation processing quirk. When options are absent:
+- `generateGraphQL` defaults to `true` → GraphQL resolvers generated (bug 3)
+- `domainFilter` is `null` → all domains pass the filter (bug 4)
+- GraphQL resolvers for all 11 platform-api domains are generated
+- Generated code imports `@Query`, `@Description`, `@GraphQLApi` — not on the consumer's REST-only classpath
+- Compilation fails with errors the reporter attributed to illegal class names (bugs 1-2)
 
 Additionally, consumer SPIs defined in the current compilation unit are invisible — the APT only reads Jandex indexes from dependency JARs, not the source being compiled.
 
@@ -56,11 +49,15 @@ public class GraphQLResolverProcessor extends AbstractProcessor {
     }
 ```
 
-Remove the annotation, add the method override. The processor uses no version-specific language features — it should work on any Java version.
+Remove the annotation, add the method override. The processor uses no version-specific language features — it should work on any Java version. This is best practice regardless of whether the source version annotation is the root cause.
+
+**Also apply to `CallbackDecoratorProcessor`** in the `callback-generator` module, which has the identical `@SupportedSourceVersion(SourceVersion.RELEASE_21)` annotation.
 
 ### 2. Refactor OperationInfo to ResolvedOperation (D2)
 
 The current `OperationInfo` holds Jandex `MethodInfo` and `ClassInfo` directly. Code generation methods (`generateMethod`, `generateRestMethod`, `collectTypeImports`) reach into Jandex types at generation time. This tight coupling makes it impossible to add RoundEnvironment scanning without duplicating all code gen.
+
+**Why not reuse `DomainDescriptor` from graphql-spring-generator?** `DomainDescriptor` uses JavaPoet `TypeName` for type representation because the spring generators use JavaPoet for code generation. The graphql-generator APT uses `PrintWriter` string concatenation and cannot add a JavaPoet dependency (APTs should minimize dependencies to avoid classpath conflicts). `ResolvedOperation` uses plain strings for the same data.
 
 **New records** (inner classes of `GraphQLResolverProcessor`):
 
@@ -96,9 +93,22 @@ record ResolvedParam(
 - `generateRestMethod(PrintWriter out, ResolvedOperation op)` → reads `param.isPathParam()`, `param.isSimpleType()` — no `findParameterAnnotation()` calls
 - `collectTypeImports(List<ResolvedOperation> ops)` → unions `op.typeImports()` — no `addTypeImport(Type)` needed
 
-The existing `typeToJava(Type)` and `addTypeImport(Set, Type)` methods move into the Jandex scanning path — called during `scanAnnotatedInterfaces` to populate the `ResolvedOperation` fields. The `DomainOperations` class changes to hold `List<ResolvedOperation>` instead of `List<OperationInfo>`.
+The existing `typeToJava(Type)` and `addTypeImport(Set, Type)` methods move into the Jandex scanning path — called during `scanAnnotatedInterfaces` to populate the `ResolvedOperation` fields. The `DomainOperations` class changes to hold `List<ResolvedOperation>` instead of `List<OperationInfo>`, and gains a `Source source` field (`enum Source { JANDEX, ROUND_ENV }`) for diagnostic logging.
 
 ### 3. RoundEnvironment scanning (D3)
+
+**Null-index guard change:** The current `process()` method returns early when no Jandex index is found (line 66-68: `if (index == null) return false`). This must be relaxed — a null Jandex index is fine when RoundEnvironment scanning finds domains:
+
+```java
+IndexView index = loadCombinedIndex(); // may be null — that's fine
+this.jandexIndex = index;
+
+Map<String, DomainOperations> jandexDomains =
+    index != null ? scanAnnotatedInterfaces(index) : new HashMap<>();
+Map<String, DomainOperations> roundEnvDomains = scanRoundEnvironment(roundEnv);
+```
+
+The downstream uses of `this.jandexIndex` (in `isSimpleType` calls) already handle null — `isSimpleType(fqcn, null)` falls back to the static list.
 
 **New method:**
 
@@ -106,20 +116,23 @@ The existing `typeToJava(Type)` and `addTypeImport(Set, Type)` methods move into
 private Map<String, DomainOperations> scanRoundEnvironment(RoundEnvironment roundEnv) {
     Map<String, DomainOperations> domains = new HashMap<>();
 
-    for (Element element : roundEnv.getElementsAnnotatedWith(McpDomainAnnotation())) {
+    for (Element element : roundEnv.getElementsAnnotatedWith(McpDomain.class)) {
         if (element.getKind() != ElementKind.INTERFACE) continue;
         TypeElement typeElement = (TypeElement) element;
 
         String domain = extractMcpDomainValue(typeElement);
-        DomainOperations ops = domains.computeIfAbsent(domain, DomainOperations::new);
+        DomainOperations ops = domains.computeIfAbsent(domain,
+            d -> new DomainOperations(d, Source.ROUND_ENV));
 
         for (Element enclosed : typeElement.getEnclosedElements()) {
             if (enclosed.getKind() != ElementKind.METHOD) continue;
             ExecutableElement method = (ExecutableElement) enclosed;
 
-            // Check for @PlatformQuery / @PlatformMutation
-            AnnotationMirror queryAnn = findAnnotation(method, PLATFORM_QUERY_FQCN);
-            AnnotationMirror mutAnn = findAnnotation(method, PLATFORM_MUTATION_FQCN);
+            // Check for @PlatformQuery / @PlatformMutation via AnnotationMirror lookup
+            AnnotationMirror queryAnn = findAnnotationMirror(method,
+                "io.casehub.platform.api.mcp.PlatformQuery");
+            AnnotationMirror mutAnn = findAnnotationMirror(method,
+                "io.casehub.platform.api.mcp.PlatformMutation");
 
             if (queryAnn != null || mutAnn != null) {
                 ops.operations.add(resolveFromTypeMirror(method, typeElement, ...));
@@ -130,6 +143,8 @@ private Map<String, DomainOperations> scanRoundEnvironment(RoundEnvironment roun
 }
 ```
 
+**`McpDomain.class` in `getElementsAnnotatedWith`:** This works because `casehub-platform-api` is a compile dependency of the generator — the annotation class is on the processor classpath.
+
 **Type conversion:** `typeMirrorToJava(TypeMirror)` parallels the existing `typeToJava(Type)`:
 - `TypeKind.VOID` → `"void"`
 - `TypeKind.DECLARED` → simple name for code, qualified name for imports
@@ -137,17 +152,71 @@ private Map<String, DomainOperations> scanRoundEnvironment(RoundEnvironment roun
 - `TypeKind.ARRAY` → recurse + `"[]"`
 - Primitives → lowercase name
 
-**Merging:** In `process()`, scan both sources and merge:
-```java
-Map<String, DomainOperations> jandexDomains = scanAnnotatedInterfaces(index);
-Map<String, DomainOperations> roundEnvDomains = scanRoundEnvironment(roundEnv);
+**`isSimpleType` for TypeMirror types:** For types discovered via RoundEnvironment, add a TypeMirror-based check alongside the static list and Jandex fallback:
 
-// Merge — RoundEnv wins on conflict (source code is more authoritative than index)
-Map<String, DomainOperations> allDomains = new HashMap<>(jandexDomains);
-allDomains.putAll(roundEnvDomains);
+```java
+private boolean isSimpleTypeMirror(TypeMirror type) {
+    if (type.getKind() == TypeKind.DECLARED) {
+        Element element = ((DeclaredType) type).asElement();
+        if (element.getKind() == ElementKind.ENUM) return true;
+        // Check for static fromString(String) or valueOf(String) methods
+        for (Element enclosed : element.getEnclosedElements()) {
+            if (enclosed.getKind() == ElementKind.METHOD) {
+                ExecutableElement method = (ExecutableElement) enclosed;
+                if (method.getModifiers().contains(Modifier.STATIC)
+                    && method.getParameters().size() == 1
+                    && method.getParameters().get(0).asType().toString().equals("java.lang.String")) {
+                    if (method.getSimpleName().contentEquals("fromString")
+                        || method.getSimpleName().contentEquals("valueOf")) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
 ```
 
-**`isSimpleType` limitation:** For types discovered via RoundEnvironment (not in the Jandex index), `isSimpleType(fqcn, index)` falls back to the static list. Consumer-defined enums used as query parameters on GET/DELETE methods will be misclassified as complex types. The consumer can add `@PathParam` as a workaround. TypeMirror-based enum detection (`typeElement.getKind() == ElementKind.ENUM`) is a straightforward follow-up but out of scope for this fix.
+This handles consumer-defined enums and types with `fromString`/`valueOf`. Called during `resolveFromTypeMirror()` to populate `ResolvedParam.isSimpleType`. Without this, POST/PUT/PATCH methods accepting both an enum query parameter and a DTO body parameter would see the enum misclassified as a second complex parameter, triggering a confusing error ("method has 2 complex parameters").
+
+**Merging:** In `process()`, scan both sources and merge. Per #296 spec D7, Jandex takes precedence on conflict — this prevents double-generation when a dependency JAR contains a previously compiled version of the same SPI:
+
+```java
+// Merge — Jandex wins on conflict (prevents double-generation from
+// stale JAR + edited source). In practice conflicts are rare:
+// consumer SPIs are typically only in RoundEnv, platform SPIs only in Jandex.
+Map<String, DomainOperations> allDomains = new HashMap<>(roundEnvDomains);
+allDomains.putAll(jandexDomains);  // Jandex overwrites on conflict
+```
+
+**Hand-written skip detection:** The existing `scanHandWrittenGraphQLMethods()` and `scanHandWrittenRestMethods()` only scan the Jandex index. If a consumer defines a hand-written `@GraphQLApi` resolver or `@Path` resource in the same module (the scenario D3 enables), the skip detection won't find them. Add RoundEnvironment scanning to both skip detection methods:
+
+```java
+// In scanHandWrittenGraphQLMethods — after Jandex scan:
+for (Element element : roundEnv.getElementsAnnotatedWith(GraphQLApi.class)) {
+    if (element.getKind() != ElementKind.CLASS) continue;
+    TypeElement typeElement = (TypeElement) element;
+    AnnotationMirror mcpDomain = findAnnotationMirror(typeElement,
+        "io.casehub.platform.api.mcp.McpDomain");
+    if (mcpDomain == null) continue;
+    String domain = extractAnnotationValue(mcpDomain);
+    for (Element enclosed : typeElement.getEnclosedElements()) {
+        if (enclosed.getKind() != ElementKind.METHOD) continue;
+        ExecutableElement method = (ExecutableElement) enclosed;
+        if (hasAnnotationMirror(method, "org.eclipse.microprofile.graphql.Query")
+            || hasAnnotationMirror(method, "org.eclipse.microprofile.graphql.Mutation")) {
+            methods.add(domain + ":" + method.getSimpleName().toString());
+        }
+    }
+}
+```
+
+Similar pattern for `scanHandWrittenRestMethods` — scan for `@Path`-annotated classes with `@McpDomain` and JAX-RS verb annotations.
+
+**Note:** The `GraphQLApi.class` reference in `getElementsAnnotatedWith` only works if the GraphQL API is on the processor classpath. If it isn't (REST-only consumer), the RoundEnv scan for hand-written GraphQL methods silently finds nothing — which is correct (no GraphQL resolvers to skip). Use the string-based `findAnnotationMirror` approach instead of `.class` to handle the case where the annotation class isn't loadable.
+
+**Multi-round limitation:** The existing `processed` flag ensures the processor runs at most once per compilation. If another annotation processor generates `@McpDomain` interfaces in a prior round, this processor would miss them. This is an existing limitation, not introduced by this spec. Multi-round support is not needed for current use cases (no APT generates SPI interfaces).
 
 ### 4. Diagnostic logging (D4)
 
@@ -235,6 +304,7 @@ The `compile-testing` dependency (already in pom.xml) enables integration tests 
 - `toPascalCase` edge cases: empty, single char, multiple consecutive hyphens, leading/trailing hyphens, `/` mixed with `-`
 - `ResolvedOperation` and `ResolvedParam` construction from mock data
 - `isSimpleType` with various type categories
+- `isSimpleTypeMirror` with enums, fromString types, complex types
 
 **Integration tests (via compile-testing):**
 - Compile an `@McpDomain` interface → verify generated resolver/resource source
@@ -244,28 +314,33 @@ The `compile-testing` dependency (already in pom.xml) enables integration tests 
 - Interface with hyphenated domain name → verify valid class name
 - Interface in current compilation (RoundEnvironment path) → verify discovered and generated
 - Interface in Jandex index (dependency path) → verify discovered and generated
-- Both Jandex and RoundEnvironment with same domain → verify RoundEnvironment wins
+- Both Jandex and RoundEnvironment with same domain → verify Jandex wins
+- Hand-written `@GraphQLApi` resolver in same compilation → verify methods skipped
+- Consumer enum used as POST parameter → verify classified as simple type via TypeMirror
 
 ## File Changes
 
 | File | Change |
 |------|--------|
-| `graphql-generator/src/main/java/.../GraphQLResolverProcessor.java` | All changes: source version, ResolvedOperation record, RoundEnv scanning, diagnostic logging, class name validation |
+| `graphql-generator/src/main/java/.../GraphQLResolverProcessor.java` | Source version, ResolvedOperation record, RoundEnv scanning (including skip detection), diagnostic logging, class name validation, isSimpleTypeMirror |
 | `graphql-generator/src/test/java/.../GraphQLResolverProcessorTest.java` | New unit tests for edge cases, new integration tests via compile-testing |
+| `callback-generator/src/main/java/.../CallbackDecoratorProcessor.java` | Fix `@SupportedSourceVersion` to `latestSupported()` (same pattern as D1) |
 
 ## Out of Scope
 
-- TypeMirror-based `isSimpleType` for consumer enums — follow-up enhancement
 - Stale generated file cleanup — a build lifecycle concern, not an APT concern; consumers should use `mvn clean` when changing APT flags
 - Changes to other generators (rest-spring-generator, graphql-spring-generator, mcp-spring-generator) — they are Maven plugins, not APTs; different lifecycle
 - Changes to the `domainFilter` value format — `,` separator is standard and works correctly
+- Scanner consolidation between `ResolvedOperation` and `DomainDescriptor` — different type representations (strings vs JavaPoet TypeName) for different code gen strategies (PrintWriter vs JavaPoet). Consolidation would require choosing one type system, which is a larger architectural decision.
 
 ## References
 
 - GraphQLResolverProcessor.java lines 36-694 — full processor source
 - graphql-spring-generator/DomainDescriptor.java — established pattern for scan/gen decoupling
 - graphql-spring-generator/McpDomainScanner.java — Jandex scanning abstraction
-- casehubio/platform#296 spec — "SPI discovery via RoundEnvironment" planned feature
+- casehubio/platform#296 spec D7 — RoundEnvironment scanning design + merge precedence (Jandex wins)
+- casehubio/platform#296 spec D2 — isSimpleType via Jandex
 - casehubio/platform#295 spec — unified API generation decisions
 - casehubio/ledger#207 — consumer wiring attempt that discovered these bugs
 - javac AbstractProcessor.getSupportedSourceVersion() javadoc
+- callback-generator/CallbackDecoratorProcessor.java line 33 — same @SupportedSourceVersion issue
