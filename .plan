@@ -13,9 +13,9 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#295 — Issue #295 ← active
-  - [ ] Batch 1: Foundation
-    - [ ] Task 1: Annotations+utilities
-  - [ ] Batch 2: Generator
-    - [ ] Task 2: Skip detection+verb mapping+params+response
-  - [ ] Batch 3: Migration
-    - [ ] Task 3: Channels+digest+callbacks+preferences
+  - [x] Batch 1: Foundation
+    - [x] Task 1: Annotations+utilities
+  - [x] Batch 2: Generator
+    - [x] Task 2: Skip detection+verb mapping+params+response
+  - [x] Batch 3: Migration
+    - [x] Task 3: Channels+digest+callbacks+preferences
