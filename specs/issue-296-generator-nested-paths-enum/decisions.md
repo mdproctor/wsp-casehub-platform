@@ -21,3 +21,15 @@
 **Sources:** GraphQLResolverProcessor.isSimpleType() line 610 (current static check), AclResource line 60 (`@QueryParam("action") AclAction action`), NotificationResource line 39 (`@QueryParam("status") NotificationStatus status`)
 **Exploration:** quick
 **Status:** captured
+
+## D3: Notification + Suppression domain split — separate domains with distinct prefixes
+
+**Choice:** Two separate `@McpDomain` SPIs: `@McpDomain("notifications")` for inbox CRUD (list, unreadCount, markRead, dismiss, markAllRead) and `@McpDomain("notification-suppression")` for suppression rules (addMute, listMutes, removeMute, activateSnooze, getSnooze, cancelSnooze). Each generates its own REST resource at its own path prefix (`/api/notifications`, `/api/notification-suppression`).
+**Alternatives:**
+- Single `@McpDomain("notifications")` combining all 11 methods — mixes inbox management and suppression in one SPI, large interface, undifferentiated MCP domain
+- Separate domains but use @RestPath to keep shared `/notifications/` prefix — domain base path never used, every method overrides it, confusing
+**Rationale:** Clean separation of concerns. Inbox CRUD and suppression rules have different authorization profiles and different consumers. MCP discovery benefits from focused domains — an LLM can request suppression operations without wading through inbox methods. Pre-release, no external consumers — path change is acceptable.
+**Trade-offs:** Path prefix changes from `/notifications/mute` to `/api/notification-suppression/mute`. Acceptable for pre-release. Internal tests updated during migration.
+**Sources:** NotificationResource (5 endpoints, /notifications prefix), SuppressionResource (6 endpoints, /notifications prefix, different injected SPI — SuppressionStore vs NotificationStore)
+**Exploration:** quick
+**Status:** captured
