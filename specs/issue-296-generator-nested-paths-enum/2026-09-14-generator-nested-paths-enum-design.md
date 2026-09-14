@@ -10,7 +10,8 @@ Two changes to the `graphql-generator` APT (#296) followed by migrating the rema
 
 Generator enhancements:
 1. **`@RestPath` annotation** — custom path segments on SPI methods, enabling nested REST paths (`/grants/batch`, `/mute/{id}`)
-2. **Enum detection via Jandex** — `isSimpleType()` uses `IndexView` to classify enums as `@QueryParam` instead of request body
+2. **Simple type detection via Jandex** — `isSimpleType()` uses `IndexView` to classify enums and JAX-RS-convertible types (with `fromString`/`valueOf`) as `@QueryParam` instead of request body. This is a correctness enhancement for future-proofing — no batch 2 endpoint is blocked by this gap, since enum parameters only appear on GET/DELETE methods where all non-`@PathParam` params are already classified as `@QueryParam`.
+3. **SPI discovery via RoundEnvironment** — the APT is enhanced to also scan the current compilation unit via APT's TypeMirror API, enabling SPI interfaces to live in the same module as the generated code.
 
 Batch 2 migration: AclResource, PreferenceResource, PreferenceSchemaResource, NotificationResource, SuppressionResource — completing full platform coverage. Zero hand-written REST resources remain after this work (PreferenceSchemaResource stays hand-written for ETag support but is annotated for skip detection).
 
@@ -94,8 +95,21 @@ static boolean isSimpleType(String fqcn, IndexView index) {
         ClassInfo ci = index.getClassByName(fqcn);
         if (ci != null) {
             if (ci.isEnum()) return true;
-            if (hasStaticMethod(ci, "fromString", String.class)) return true;
-            if (!ci.isEnum() && hasStaticMethod(ci, "valueOf", String.class)) return true;
+            if (hasStaticStringMethod(ci, "fromString")) return true;
+            if (!ci.isEnum() && hasStaticStringMethod(ci, "valueOf")) return true;
+        }
+    }
+    return false;
+}
+
+private static boolean hasStaticStringMethod(ClassInfo ci, String methodName) {
+    DotName stringType = DotName.createSimple("java.lang.String");
+    for (MethodInfo m : ci.methods()) {
+        if (m.name().equals(methodName)
+                && java.lang.reflect.Modifier.isStatic(m.flags())
+                && m.parameterTypes().size() == 1
+                && m.parameterTypes().get(0).name().equals(stringType)) {
+            return true;
         }
     }
     return false;
@@ -111,6 +125,19 @@ The `IndexView` is threaded from `process()` → `generateRestResourceSource()` 
 
 `index.getClassByName()` is O(1) in Jandex (hash lookup). Method scanning is O(n) per class but negligible for any real-world type.
 
+### SPI Discovery — APT Enhancement (D7)
+
+The current APT discovers `@McpDomain` SPI interfaces exclusively via Jandex indexes loaded from dependency JARs (`META-INF/jandex.idx` on the classpath). This works for SPIs in separate API modules (e.g., `CallbackApi` in `callback-api/`, which is a dependency of `callback/`). However, batch 2 SPIs live in the same module as the APT configuration (e.g., `AclApi` in `acl-admin/`). These classes are not yet compiled into a JAR with a Jandex index when the APT runs during the `compile` phase — the jandex-maven-plugin runs at `process-classes`, after compilation.
+
+**Fix:** Enhance `scanAnnotatedInterfaces()` to use a dual-scan approach:
+
+1. **Jandex scan (existing)** — discovers SPIs from dependency JARs. Handles cross-module SPIs like `CallbackApi`.
+2. **APT TypeMirror scan (new)** — discovers SPIs being compiled in the current module. Uses `roundEnv.getElementsAnnotatedWith()` or `processingEnv.getElementUtils()` to find `@McpDomain`-annotated interfaces in the current compilation unit. Converts TypeMirror/Element API data into the same `DomainOperations`/`OperationInfo` structures used by Jandex.
+
+The TypeMirror scan runs after the Jandex scan. If both find the same domain (same `@McpDomain` value), the Jandex result takes precedence — this prevents double-generation when a dependency JAR contains a previously compiled version of the same SPI.
+
+This enhancement is a prerequisite for batch 2 migration. Without it, SPIs in `acl-admin/`, `preferences-editor/`, and `notifications/` would be invisible to the APT.
+
 ## Issue #297 — Batch 2 Migration
 
 ### Migration Pattern (established in #295)
@@ -124,7 +151,7 @@ The `IndexView` is threaded from `process()` → `generateRestResourceSource()` 
 
 **Module:** `acl-admin/`
 **Domain:** `@McpDomain("acl")`
-**Endpoints:** 13
+**Endpoints:** 12
 
 The `AclApi` SPI interface uses `@RestPath` for nested path segments:
 
@@ -146,8 +173,7 @@ public interface AclApi {
     void revoke(String actorId, ResourceId resourceId, AclAction action);
 
     @PlatformMutation("Revoke grants in batch")
-    @RestMethod(HttpMethod.DELETE)
-    @RestPath("grants/batch")
+    @RestPath("grants/revoke-batch")
     void revokeBatch(List<AclEntryInput> inputs);
 
     @PlatformMutation("Revoke all grants for an actor on a resource")
@@ -170,8 +196,7 @@ public interface AclApi {
     void removeDeny(String actorId, ResourceId resourceId, AclAction action);
 
     @PlatformMutation("Remove deny entries in batch")
-    @RestMethod(HttpMethod.DELETE)
-    @RestPath("denies/batch")
+    @RestPath("denies/revoke-batch")
     void removeDenyBatch(List<AclEntryInput> inputs);
 
     // --- Parents ---
@@ -190,11 +215,13 @@ public interface AclApi {
 }
 ```
 
+**Batch DELETE→POST verb change:** The original `AclResource` uses `@DELETE` with request body for `revokeBatch` and `removeDenyBatch`. HTTP DELETE with a request body is non-standard (RFC 9110 §9.3.5: "a client SHOULD NOT generate content in a DELETE request"). The generator only classifies POST/PUT/PATCH as body-accepting verbs — DELETE parameters would be misclassified as `@QueryParam`. These two methods are changed to POST with distinct `@RestPath` values (`grants/revoke-batch`, `denies/revoke-batch`). Verb change is acceptable for pre-release.
+
 **AclService** (`@ApplicationScoped implements AclApi`):
 - Mutation methods: `@RolesAllowed(PlatformRoles.ADMIN)`, delegates to `AccessControlProvider`
 - `AclEntryInput→AclEntryRequest` mapping in service (private helper)
 - Query methods: imperative `requireAdminOrSelf(actorId)` guard, throws `ForbiddenException`
-- Input validation (null checks on required params) in service — returns 400 via `BadRequestException`
+- Input validation (null checks on required params) in service — returns 400 via `BadRequestException`; validation runs after `@RolesAllowed` CDI interceptor (authorization before validation)
 - Injects: `AccessControlProvider`, `CurrentPrincipal`
 
 **Note on `AclAction` and `ResourceId` as query params:** With D2 (enum detection), `AclAction` is correctly classified as simple. `ResourceId` has `fromString(String)` — JAX-RS uses this for automatic `@QueryParam` conversion. No `ParamConverter` needed.
@@ -209,6 +236,7 @@ public interface AclApi {
 @McpDomain("preferences")
 public interface PreferenceApi {
     @PlatformMutation("Set a preference value")
+    @RestMethod(HttpMethod.PUT)
     void set(String scope, PreferenceInput input);
 
     @PlatformMutation("Delete a single preference")
@@ -241,20 +269,22 @@ public interface PreferenceApi {
 **Module:** `preferences-editor/`
 **Domain:** `@McpDomain("preference-schemas")`
 
-The ETag conditional GET pattern requires `@Context Request` — a JAX-RS runtime concept that doesn't belong in an SPI interface. The hand-written resource gets `@McpDomain("preference-schemas")` added, enabling:
-- REST skip detection (generator skips its methods)
-- MCP discovery via `GraphQLModelScanner` (runtime scan finds the domain)
-- GraphQL generation via a separate `PreferenceSchemaApi` SPI interface (query-only, no ETag):
+The ETag conditional GET pattern requires `@Context Request` — a JAX-RS runtime concept that doesn't belong in an SPI interface. This endpoint uses a three-part approach:
 
-```java
-@McpDomain("preference-schemas")
-public interface PreferenceSchemaApi {
-    @PlatformQuery("List preference schema descriptors")
-    List<PreferenceSchemaDescriptor> schema(String namespace);
-}
-```
+1. **`PreferenceSchemaApi`** — SPI interface for GraphQL/MCP generation only:
+   ```java
+   @McpDomain("preference-schemas")
+   public interface PreferenceSchemaApi {
+       @PlatformQuery("List preference schema descriptors")
+       List<PreferenceSchemaDescriptor> schema(String namespace);
+   }
+   ```
 
-The `PreferenceSchemaResource` implements this SPI (for GraphQL/MCP generation) and also has the hand-written `@GET` method with ETag support. The generator skips the REST method because it detects the hand-written `@Path` + `@McpDomain` + `@GET` combination.
+2. **`PreferenceSchemaService`** (`@ApplicationScoped implements PreferenceSchemaApi`) — handles the GraphQL/MCP path. Returns `List<PreferenceSchemaDescriptor>` without ETag. Delegates to `PreferenceSchemaRegistry.discover()` with namespace filtering — same logic as the hand-written resource minus ETag.
+
+3. **`PreferenceSchemaResource`** — stays hand-written, unchanged. Gets `@McpDomain("preference-schemas")` added to its class-level annotations (alongside existing `@Path`). This enables REST skip detection: the generator sees `@Path` + `@McpDomain` + `@GET` and skips generating a REST method for `schema`. The hand-written resource does NOT implement `PreferenceSchemaApi` — their signatures differ (`Response` with `@Context Request` vs `List<PreferenceSchemaDescriptor>`). The hand-written REST endpoint and the generated GraphQL/MCP endpoints coexist independently.
+
+**Path note:** The hand-written resource stays at `/preferences/schema` (no `/api/` prefix). Generated GraphQL/MCP endpoints use the `preference-schemas` domain name. This path inconsistency is acceptable — the REST endpoint is hand-written specifically because it needs ETag support that the generator can't express.
 
 ### Endpoint 4: NotificationResource → NotificationApi (D3)
 
@@ -364,6 +394,8 @@ Extend `GraphQLResolverProcessorTest`:
 4. **@RestPath absent** — verify existing kebab-case derivation unchanged
 5. **Enum detection** — verify `isSimpleType("io.casehub.platform.api.acl.AclAction", index)` returns `true` when Jandex index contains the enum
 6. **Enum as @QueryParam** — verify enum parameters are classified as `@QueryParam`, not body
+7. **fromString detection** — verify `isSimpleType("io.casehub.platform.api.acl.ResourceId", index)` returns `true` when Jandex index contains the type with `fromString(String)`
+8. **RoundEnvironment discovery** — verify the APT finds `@McpDomain` interfaces from the current compilation unit (not just from Jandex dependency indexes)
 
 ### Migration Integration Tests (#297)
 
@@ -386,8 +418,8 @@ For each migrated endpoint:
 
 | File | Action |
 |------|--------|
-| `graphql-generator/.../GraphQLResolverProcessor.java` | Modified — @RestPath support, enum detection, IndexView threading |
-| `graphql-generator/.../GraphQLResolverProcessorTest.java` | Modified — new tests for @RestPath and enum detection |
+| `graphql-generator/.../GraphQLResolverProcessor.java` | Modified — @RestPath support, simple type detection (enum + fromString/valueOf), IndexView threading, dual-scan SPI discovery (Jandex + RoundEnvironment) |
+| `graphql-generator/.../GraphQLResolverProcessorTest.java` | Modified — new tests for @RestPath, simple type detection, and RoundEnvironment discovery |
 
 ### acl-admin (migration)
 
@@ -405,6 +437,7 @@ For each migrated endpoint:
 | `preferences-editor/.../PreferenceApi.java` | New — `@McpDomain("preferences")` SPI |
 | `preferences-editor/.../PreferenceService.java` | New — `@ApplicationScoped` impl with validation |
 | `preferences-editor/.../PreferenceSchemaApi.java` | New — `@McpDomain("preference-schemas")` SPI (GraphQL/MCP only) |
+| `preferences-editor/.../PreferenceSchemaService.java` | New — `@ApplicationScoped` impl (no ETag, delegates to registry) |
 | `preferences-editor/.../PreferenceResource.java` | Deleted |
 | `preferences-editor/.../PreferenceSchemaResource.java` | Modified — add `@McpDomain` for skip detection |
 | `preferences-editor/pom.xml` | Modified — add graphql-generator APT |
@@ -423,15 +456,21 @@ For each migrated endpoint:
 
 ## Known Limitations
 
-1. **PreferenceSchemaResource stays hand-written** — ETag conditional GET requires `@Context Request` which is a JAX-RS runtime concept. GraphQL/MCP generation works via separate `PreferenceSchemaApi` SPI.
+1. **PreferenceSchemaResource stays hand-written** — ETag conditional GET requires `@Context Request` which is a JAX-RS runtime concept. GraphQL/MCP generation works via separate `PreferenceSchemaApi` SPI. The hand-written REST endpoint stays at `/preferences/schema` (no `/api/` prefix), while generated GraphQL/MCP use the `preference-schemas` domain.
 2. **Response status changes** — `addMute`/`activateSnooze` return 200 (was 201), `removeMute`/`cancelSnooze` throw NotFoundException (was boolean→404). Acceptable for pre-release.
-3. **Path changes** — all generated endpoints use `/api/{domain}/...` prefix. Pre-release, no external consumers.
+3. **Path and verb changes** — all generated endpoints use `/api/{domain}/...` prefix. Pre-release, no external consumers. Specific changes:
+   - **Prefix addition:** `/acl/grants` → `/api/acl/grants`
+   - **Segment reordering:** `/notifications/{id}/read` → `/api/notifications/read/{id}` (action-first URL ordering — `@RestPath` + `@PathParam` always appends the path param after the rest path)
+   - **Domain regrouping:** `/notifications/mute` → `/api/notification-suppression/mute` (D3 domain split)
+   - **Path renaming:** `/preferences` (root DELETE) → `/api/preferences/delete`, `/preferences/by-namespace` → `/api/preferences/delete-namespace`
+   - **Verb changes:** `revokeBatch`/`removeDenyBatch` changed from DELETE to POST (DELETE with request body is non-standard HTTP); `set` explicitly annotated `@RestMethod(HttpMethod.PUT)` to preserve PUT verb
 4. **`fromString`/`valueOf` detection scope** — D2 detects enums, `fromString(String)`, and `valueOf(String)` via Jandex. Types with other JAX-RS conversion mechanisms (single-String constructors, `ParamConverter` implementations) are not detected — they would need to be added to the static `SIMPLE_TYPES` set manually or accepted as `String` in the SPI.
+5. **D2 is not a batch 2 blocker** — no batch 2 endpoint has an enum parameter on a body-accepting HTTP verb (POST/PUT/PATCH). Enum params only appear on GET and DELETE methods where all non-`@PathParam` params are already classified as `@QueryParam` regardless of `isSimpleType()`. D2 is a correctness enhancement for future-proofing, not a migration prerequisite.
 
 ## References
 
 - `GraphQLResolverProcessor.java` — existing APT (lines 366-452: generateRestMethod, lines 603-614: isSimpleType)
-- `AclResource.java` — 13 endpoints with nested paths (lines 42-171)
+- `AclResource.java` — 12 endpoints with nested paths (lines 42-171)
 - `NotificationResource.java` — 5 endpoints, PATCH verbs, Optional returns
 - `SuppressionResource.java` — 6 endpoints, boolean→404 patterns, 201 status
 - `PreferenceResource.java` — 5 endpoints, schema validation, scope parsing
