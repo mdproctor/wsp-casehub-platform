@@ -8,3 +8,4 @@
 | [2026-09-04-mdp01-pressure-as-a-shared-vocabulary.md](2026-09-04-mdp01-pressure-as-a-shared-vocabulary.md) | 2026-09-04 | Capacity signal SPI — shared vocabulary for actor pressure, scheduling boundary, volatile swap fix |
 | [2026-09-05-mdp01-the-167-line-delete.md](2026-09-05-mdp01-the-167-line-delete.md) | 2026-09-05 | SSE-to-EventBroadcaster migration: 232 lines of connection tracking collapsed to 65 lines of CDI bridge, plus a Mockito overload resolution gotcha |
 | [2026-09-11-mp01-model-registry-spi.md](2026-09-11-mp01-model-registry-spi.md) | 2026-09-11 | Model registry SPI — normalised LLM catalog with three-step resolution in RoutingAgentProvider |
+| [2026-09-14-mdp01-spring-generators-epic-shrank.md](2026-09-14-mdp01-spring-generators-epic-shrank.md) | 2026-09-14 | Codebase survey reduced 5 generators to 3 + Panache porting; design review caught dual-output and MCP scope issues; generator-common foundation built and validated |
