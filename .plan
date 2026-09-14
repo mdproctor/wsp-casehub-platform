@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-299-graphql-generator-apt-fixes
-state: scaffolded
+state: active
 project-sha: acad7168ee4ab24369e786c22479c337f600b324
 date: 2026-09-15
 issue-repo: casehubio/platform
@@ -13,3 +13,11 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#299 — Issue #299 ← active
+  - [ ] Batch 1: Refactor+SrcVersion
+    - [ ] Task 1: Fix @SupportedSourceVersion
+    - [ ] Task 2: Introduce ResolvedOperation records
+    - [ ] Task 3: Refactor scanAnnotatedInterfaces
+    - [ ] Task 4: Refactor code gen methods
+  - [ ] Batch 2: RoundEnv+Logging
+    - [ ] Task 5: Add RoundEnvironment scanning
+    - [ ] Task 6: Diagnostic logging + class name validation + tests
