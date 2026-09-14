@@ -13,10 +13,10 @@ flyway-next-v: unknown
 
 ## Queue
 - [ ] casehubio/parent#474 — Issue #474 ← active
-  - [ ] Batch 1: Foundation
-    - [ ] Task 1: generator-common module
-    - [ ] Task 2: AbstractVerifyMojo
-    - [ ] Task 3: Retrofit spring-generator
+  - [x] Batch 1: Foundation
+    - [x] Task 1: generator-common module
+    - [x] Task 2: AbstractVerifyMojo
+    - [x] Task 3: Retrofit spring-generator
   - [ ] Batch 2: REST Generator
     - [ ] Task 4: RestResourceScanner + RestControllerWriter
     - [ ] Task 5: Provider mapping
