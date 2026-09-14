@@ -126,6 +126,16 @@ Generated paths: `@Path("/method-name")` instead of `@Path("/methodName")`.
 
 Domain paths remain as declared in `@McpDomain("llm-config")` — the domain value is used verbatim in `@Path("/api/llm-config")`.
 
+### 4.1b Domain Name to Class Name — toPascalCase
+
+Kebab-case domain names (`"delivery-channels"`, `"notification-preferences"`) must be converted to valid Java identifiers for generated class names. Add `toPascalCase(String kebab)`: split on hyphens, capitalize each segment, join. Examples:
+
+- `"delivery-channels"` → `DeliveryChannels` → `GeneratedDeliveryChannelsResolver`
+- `"notification-preferences"` → `NotificationPreferences` → `GeneratedNotificationPreferencesResource`
+- `"digest"` → `Digest` (no change — no hyphens)
+
+The existing `capitalize()` is insufficient — it uppercases only the first character and produces invalid identifiers like `Delivery-channels`.
+
 ### 4.2 HTTP Verb Mapping (D1)
 
 The REST generator reads `@RestMethod` from the SPI method via Jandex. If present, use its `HttpMethod` value. If absent, fall back to the default: `@PlatformQuery` → `@GET`, `@PlatformMutation` → `@POST`.
@@ -156,6 +166,8 @@ Convention-based classification of each SPI method parameter:
 3. **Everything else** → `@QueryParam("paramName")`.
 
 **"Complex" type definition:** Any type that is NOT one of: `String`, a Java primitive, a primitive wrapper (`Integer`, `Long`, `Boolean`, etc.), an enum, a `java.time.*` type, or `java.util.UUID`.
+
+**@Valid on body parameters:** When a complex parameter is classified as a request body, the generator also adds `jakarta.validation.Valid` to the parameter. This ensures Jakarta Bean Validation annotations on request DTOs (`@NotNull`, `@Size`, etc.) are enforced at the REST layer.
 
 **Multiple complex params error (D2):** If a POST/PUT/PATCH method has more than one complex parameter (after excluding `@PathParam`-annotated params), the annotation processor emits a compile error:
 
@@ -251,7 +263,7 @@ These require the generator enhancements from this branch to be complete and val
 
 `@McpDomain` SPI interfaces for migration live in their respective modules (e.g., `CallbackApi` in `callback/`, `DeliveryChannelApi` in `notifications/`), not in `platform-api`. These are generation sources for REST/GraphQL/MCP endpoints, not cross-module contracts. The service implementations inject module-internal dependencies (`PreferenceValidator`, `CurrentPrincipal`) that don't belong in `platform-api`.
 
-This differs from `ModelRegistryApi` and `LlmConfigApi` which live in `platform-api` because they define cross-module query contracts.
+This differs from `ModelRegistryApi` (in `platform-api`) which defines a cross-module query contract. `LlmConfigApi` follows the same module-local pattern — it lives in `llm-config/`, not `platform-api`.
 
 ### Domain Naming Convention
 
@@ -263,6 +275,15 @@ This differs from `ModelRegistryApi` and `LlmConfigApi` which live in `platform-
 | `DeliveryChannelApi` | `"delivery-channels"` | `/api/delivery-channels` |
 | `DigestApi` | `"digest"` | `/api/digest` |
 | `NotificationPreferenceApi` | `"notification-preferences"` | `/api/notification-preferences` |
+
+## Path Changes (Pre-release)
+
+Generated endpoints use `/api/{domain}/{method-name}` paths. Hand-written endpoints use module-specific prefixes (`/casehub/callbacks`, `/notifications/channels`). Migration changes all URL paths. This is acceptable for pre-release — there are no external consumers. Internal callers (tests, `callback-client/`) are updated as part of each batch 1 migration.
+
+## Migration Behavioral Notes
+
+- **NotificationPreferenceResource.get()**: The current endpoint returns default preferences (empty map, `Instant.EPOCH`) when none exist — not 404. The `NotificationPreferenceApi.get()` SPI method must return `NotificationPreferences` (not `Optional`), with the default-if-absent logic in the service impl. This preserves current behavior.
+- **CallbackRegistrationResource.heartbeat()**: The current endpoint composes `findById()` + conditional 404 + `heartbeat()`. The `CallbackService.heartbeat()` impl absorbs this logic — throws `NotFoundException` when callback doesn't exist, which JAX-RS maps to 404.
 
 ## Known Limitations
 
