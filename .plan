@@ -12,12 +12,12 @@ design-section-hashes: 4d2cc5ab:## §1 Introduction and Goals|4f6b26ef:## §2 Co
 flyway-next-v: none
 
 ## Queue
-- [ ] casehubio/platform#296 — Issue #296 ← active
+- [x] casehubio/platform#296 — Issue #296 ← active
   - [x] Batch 1: Generator
     - [x] Task 1: @RestPath + simple types + tests
   - [x] Batch 2: ACL
     - [x] Task 2: AclApi SPI + AclService + tests
   - [x] Batch 3: Preferences
     - [x] Task 3: PreferenceApi + services + tests
-  - [ ] Batch 4: Notifications
-    - [ ] Task 4: NotificationApi + SuppressionApi + services + tests
+  - [x] Batch 4: Notifications
+    - [x] Task 4: NotificationApi + SuppressionApi + services + tests
