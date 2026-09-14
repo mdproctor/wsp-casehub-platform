@@ -58,3 +58,15 @@
 **Sources:** AclResource lines 44-171 (13 endpoints, mixed auth), AclResource line 173 (isAdminOrSelf guard), #295 decisions D7 (authorization model)
 **Exploration:** quick
 **Status:** captured
+
+## D6: Preference endpoint mapping — direct SPI, validation in service
+
+**Choice:** `@McpDomain("preferences")` with separate methods per operation. `scope` is a String `@QueryParam` — `parseScopePath()` moves into `PreferenceService`. Two DELETE operations disambiguated via `@RestPath`: `delete` (single, requires namespace+name) and `delete-namespace` (bulk). Schema validation (`PreferenceValidator.validate()`) and null-check validation move into the service impl. `PreferenceSchemaResource` stays hand-written (D4 — ETag conditional GET).
+**Depends on:** D1 (@RestPath for path disambiguation), D4 (ETag endpoint stays hand-written)
+**Alternatives:**
+- Single delete method with discriminator param — pushes dispatch logic into a conditional, unclear SPI contract
+**Rationale:** Each SPI method has one clear purpose. @RestPath disambiguation is exactly what D1 was designed for. Validation belongs in the service layer, not the endpoint layer — consistent with #295 pattern.
+**Trade-offs:** Two DELETE methods on the same domain produce different paths (`/api/preferences/delete` vs `/api/preferences/delete-namespace`). Previous paths were `/preferences` and `/preferences/by-namespace`. Path change acceptable for pre-release.
+**Sources:** PreferenceResource lines 37-95 (5 endpoints, validation, scope parsing), PreferenceSchemaResource lines 25-37 (ETag — stays hand-written per D4)
+**Exploration:** quick
+**Status:** captured
