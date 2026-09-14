@@ -17,14 +17,19 @@ flyway-next-v: unknown
     - [x] Task 1: generator-common module
     - [x] Task 2: AbstractVerifyMojo
     - [x] Task 3: Retrofit spring-generator
-  - [ ] Batch 2: REST Generator
-    - [ ] Task 4: RestResourceScanner + RestControllerWriter
-    - [ ] Task 5: Provider mapping
-  - [ ] Batch 3: GraphQL Generator
-    - [ ] Task 6: graphql-spring-generator dual output
-  - [ ] Batch 4: MCP Generator
-    - [ ] Task 7: mcp-spring-generator @Tool mapping
+  - [x] Batch 2: REST Generator
+    - [x] Task 4: RestResourceScanner + RestControllerWriter
+    - [x] Task 5: Provider mapping
+  - [x] Batch 3: GraphQL Generator
+    - [x] Task 6: graphql-spring-generator dual output
+  - [x] Batch 4: MCP Generator
+    - [x] Task 7: mcp-spring-generator @Tool mapping
   - [ ] Batch 5: Panache Porting
     - [ ] Task 8: Port ledger (2 files)
     - [ ] Task 9: Port work (21 files)
     - [ ] Task 10: Port qhorus (22 files)
+
+## Deferred
+- [ ] Port ledger (2 files) (XS / Low) [ledger] — Cross-repo refactoring — needs own branch in ledger repo. Independent of generators. File as casehubio/ledger issue.
+- [ ] Port work (21 files) (M / Med) [work] — Cross-repo refactoring — needs own branch in work repo. Independent of generators. File as casehubio/work issue.
+- [ ] Port qhorus (22 files) (M / Med) [qhorus] — Cross-repo refactoring — needs own branch in qhorus repo. Independent of generators. File as casehubio/qhorus issue.
