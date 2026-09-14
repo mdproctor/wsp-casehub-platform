@@ -1,0 +1,30 @@
+# Work Plan — issue-474-spring-boot-generators
+
+## State
+branch: issue-474-spring-boot-generators
+state: active
+project-sha: slot-creation
+date: 2026-09-14
+issue-repo: casehubio/parent
+covers: 474
+design-repo: project
+design-section-hashes: 
+flyway-next-v: unknown
+
+## Queue
+- [ ] casehubio/parent#474 — Issue #474 ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: generator-common module
+    - [ ] Task 2: AbstractVerifyMojo
+    - [ ] Task 3: Retrofit spring-generator
+  - [ ] Batch 2: REST Generator
+    - [ ] Task 4: RestResourceScanner + RestControllerWriter
+    - [ ] Task 5: Provider mapping
+  - [ ] Batch 3: GraphQL Generator
+    - [ ] Task 6: graphql-spring-generator dual output
+  - [ ] Batch 4: MCP Generator
+    - [ ] Task 7: mcp-spring-generator @Tool mapping
+  - [ ] Batch 5: Panache Porting
+    - [ ] Task 8: Port ledger (2 files)
+    - [ ] Task 9: Port work (21 files)
+    - [ ] Task 10: Port qhorus (22 files)
