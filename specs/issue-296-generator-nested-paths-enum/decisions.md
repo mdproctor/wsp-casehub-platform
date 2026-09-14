@@ -46,3 +46,15 @@
 **Sources:** SuppressionResource lines 51,106 (201 responses), SuppressionResource lines 85,138 (boolean→404), PreferenceSchemaResource lines 25-37 (ETag conditional GET)
 **Exploration:** quick
 **Status:** captured
+
+## D5: ACL authorization — service-layer with imperative guards
+
+**Choice:** Single `@McpDomain("acl")` with `AclService` impl. Mutation methods carry `@RolesAllowed(PlatformRoles.ADMIN)` on the service. Query methods (`check`, `accessible`) use imperative `requireAdminOrSelf(actorId)` guard that throws `ForbiddenException` — no `@RolesAllowed`. `AclEntryInput→AclEntryRequest` DTO mapping moves into the service. Generated endpoint is pure delegation.
+**Depends on:** D4 (authorization at service layer pattern from #295 D7)
+**Alternatives:**
+- Split into two domains (`acl-admin` mutations + `acl` queries) — over-engineered, splits a cohesive domain for an authorization concern
+**Rationale:** Follows established #295 pattern: CDI interceptors handle `@RolesAllowed`, imperative code handles fine-grained guards. One domain, one service, single MCP discoverable unit. The admin-or-self guard is a two-line method — doesn't warrant a separate domain.
+**Trade-offs:** Mixed authorization model in one service class (some methods annotated, others imperative). Acceptable — the pattern is clear and the alternative (domain split) is worse.
+**Sources:** AclResource lines 44-171 (13 endpoints, mixed auth), AclResource line 173 (isAdminOrSelf guard), #295 decisions D7 (authorization model)
+**Exploration:** quick
+**Status:** captured
