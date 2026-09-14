@@ -33,3 +33,16 @@
 **Sources:** NotificationResource (5 endpoints, /notifications prefix), SuppressionResource (6 endpoints, /notifications prefix, different injected SPI — SuppressionStore vs NotificationStore)
 **Exploration:** quick
 **Status:** captured
+
+## D4: Non-standard response patterns — reshape SPI, keep ETag hand-written
+
+**Choice:** Three strategies: (1) 201→200: service returns entity, generator wraps in `Response.ok()` — acceptable status change for pre-release. (2) boolean→void/Optional: service throws `NotFoundException` or returns `Optional` instead of boolean — generator's existing void→204 and Optional→404 paths handle it. (3) ETag conditional GET: keep `PreferenceSchemaResource` hand-written with `@McpDomain` + `@Path` annotations so the REST skip detection (D5 from #295) suppresses generation for its methods. A `PreferenceSchemaApi` SPI still exists for GraphQL + MCP generation.
+**Depends on:** D1 (#295, REST skip detection)
+**Alternatives:**
+- New `@RestStatus(201)` annotation + generator support — premature for two methods; still doesn't solve ETag case
+- Generator support for `@Context` injection — JAX-RS runtime concept that doesn't belong in SPI interfaces
+**Rationale:** Generator stays simple. Edge cases are handled at the SPI contract level (reshape return types) or by keeping the hand-written resource (ETag). No new annotations for minority patterns. If more endpoints need custom status codes in future, `@RestStatus` can be added then.
+**Trade-offs:** Two behavioral changes for pre-release: addMute/activateSnooze return 200 instead of 201, removeMute/cancelSnooze throw NotFoundException instead of returning 404 via boolean. Both are acceptable — no external consumers. PreferenceSchemaResource stays hand-written — one endpoint that doesn't benefit from generation.
+**Sources:** SuppressionResource lines 51,106 (201 responses), SuppressionResource lines 85,138 (boolean→404), PreferenceSchemaResource lines 25-37 (ETag conditional GET)
+**Exploration:** quick
+**Status:** captured
