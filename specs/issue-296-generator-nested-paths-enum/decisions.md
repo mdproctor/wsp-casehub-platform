@@ -10,15 +10,16 @@
 **Exploration:** quick
 **Status:** captured
 
-## D2: Enum detection — pass IndexView to isSimpleType
+## D2: Simple type detection — enums + fromString/valueOf via Jandex
 
-**Choice:** Add `IndexView` parameter to `isSimpleType(String fqcn, IndexView index)`. Static FQCN set check is the fast path; for unknown types, call `index.getClassByName(fqcn)` and check `classInfo.isEnum()`. Existing no-arg signature stays as a package-private test helper.
+**Choice:** Add `IndexView` parameter to `isSimpleType(String fqcn, IndexView index)`. Static FQCN set check is the fast path; for unknown types, call `index.getClassByName(fqcn)` and check: (1) `classInfo.isEnum()`, (2) has a static `fromString(String)` method, (3) has a static `valueOf(String)` non-enum method. Any match → simple type. Existing no-arg signature stays as a package-private test helper.
 **Depends on:** None
 **Alternatives:**
-- Build `Set<String> knownEnums` during scan phase, pass alongside IndexView — adds upfront scan of all indexed classes for no performance benefit since `getClassByName()` is O(1) in Jandex
-**Rationale:** Minimal change. Jandex hash lookup is O(1), so per-parameter lookup is effectively free. No need for a separate collection pass. Enums like `AclAction`, `NotificationStatus`, `MuteScope` will be correctly classified as `@QueryParam` instead of request body.
-**Trade-offs:** Requires `IndexView` to be threaded through to `generateRestMethod()`. This is already available at the processor level — just needs to be passed down.
-**Sources:** GraphQLResolverProcessor.isSimpleType() line 610 (current static check), AclResource line 60 (`@QueryParam("action") AclAction action`), NotificationResource line 39 (`@QueryParam("status") NotificationStatus status`)
+- Check only `isEnum()` — misses types like `ResourceId` that have `fromString(String)` for JAX-RS auto-conversion
+- Build `Set<String> knownEnums` during scan phase — adds upfront scan for no benefit
+**Rationale:** JAX-RS classifies types as `@QueryParam`-convertible if they have `valueOf(String)` or `fromString(String)`. Matching this in the generator prevents misclassifying JAX-RS-convertible types as request body params. Covers enums (`AclAction`, `NotificationStatus`) and value types (`ResourceId`).
+**Trade-offs:** Requires `IndexView` threading through to `generateRestMethod()`. Already available at processor level. Method scan on a class is O(n) but negligible for real-world classes.
+**Sources:** GraphQLResolverProcessor.isSimpleType() line 610 (current static check), AclResource line 60 (`@QueryParam("action") AclAction action`), ResourceId.fromString() line 36, JAX-RS spec §3.2 (parameter conversion rules)
 **Exploration:** quick
 **Status:** captured
 

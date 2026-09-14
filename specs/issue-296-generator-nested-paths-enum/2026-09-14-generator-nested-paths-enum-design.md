@@ -82,7 +82,7 @@ private static final DotName REST_PATH_ANN = DotName.createSimple("io.casehub.pl
 
 The `@RestPath` value is read in `scanAnnotatedInterfaces()` and stored on `OperationInfo` (new field: `String restPathOverride`).
 
-### Enum Detection via Jandex (D2)
+### Simple Type Detection via Jandex (D2)
 
 Change `isSimpleType(String fqcn)` to `isSimpleType(String fqcn, IndexView index)`:
 
@@ -92,15 +92,24 @@ static boolean isSimpleType(String fqcn, IndexView index) {
     if (fqcn.startsWith("java.time.")) return true;
     if (index != null) {
         ClassInfo ci = index.getClassByName(fqcn);
-        if (ci != null && ci.isEnum()) return true;
+        if (ci != null) {
+            if (ci.isEnum()) return true;
+            if (hasStaticMethod(ci, "fromString", String.class)) return true;
+            if (!ci.isEnum() && hasStaticMethod(ci, "valueOf", String.class)) return true;
+        }
     }
     return false;
 }
 ```
 
+Three Jandex checks for JAX-RS-convertible types:
+1. **`isEnum()`** — enums like `AclAction`, `NotificationStatus`, `MuteScope`
+2. **`fromString(String)`** — value types like `ResourceId` that implement JAX-RS parameter conversion
+3. **`valueOf(String)` (non-enum)** — types following the `valueOf` convention
+
 The `IndexView` is threaded from `process()` → `generateRestResourceSource()` → `generateRestMethod()`. The existing no-arg overload remains as a package-private test helper for static type checks.
 
-`index.getClassByName()` is O(1) in Jandex (hash lookup). Enums like `AclAction`, `NotificationStatus`, `MuteScope` will be correctly classified as `@QueryParam` parameters.
+`index.getClassByName()` is O(1) in Jandex (hash lookup). Method scanning is O(n) per class but negligible for any real-world type.
 
 ## Issue #297 — Batch 2 Migration
 
@@ -188,7 +197,7 @@ public interface AclApi {
 - Input validation (null checks on required params) in service — returns 400 via `BadRequestException`
 - Injects: `AccessControlProvider`, `CurrentPrincipal`
 
-**Note on `AclAction` and `ResourceId` as query params:** With D2 (enum detection), `AclAction` is correctly classified as simple. `ResourceId` is a record with `parse(String)` — JAX-RS handles it via `ParamConverter` or `fromString()`. If JAX-RS can't convert it, the service can accept `String resourceId` and parse internally.
+**Note on `AclAction` and `ResourceId` as query params:** With D2 (enum detection), `AclAction` is correctly classified as simple. `ResourceId` has `fromString(String)` — JAX-RS uses this for automatic `@QueryParam` conversion. No `ParamConverter` needed.
 
 ### Endpoint 2: PreferenceResource → PreferenceApi (D6)
 
@@ -417,7 +426,7 @@ For each migrated endpoint:
 1. **PreferenceSchemaResource stays hand-written** — ETag conditional GET requires `@Context Request` which is a JAX-RS runtime concept. GraphQL/MCP generation works via separate `PreferenceSchemaApi` SPI.
 2. **Response status changes** — `addMute`/`activateSnooze` return 200 (was 201), `removeMute`/`cancelSnooze` throw NotFoundException (was boolean→404). Acceptable for pre-release.
 3. **Path changes** — all generated endpoints use `/api/{domain}/...` prefix. Pre-release, no external consumers.
-4. **ResourceId as @QueryParam** — `ResourceId` is a record type used as query param in ACL endpoints. Requires JAX-RS `ParamConverter` or `fromString()` support. If problematic, accept as `String` and parse in service.
+4. **`fromString`/`valueOf` detection scope** — D2 detects enums, `fromString(String)`, and `valueOf(String)` via Jandex. Types with other JAX-RS conversion mechanisms (single-String constructors, `ParamConverter` implementations) are not detected — they would need to be added to the static `SIMPLE_TYPES` set manually or accepted as `String` in the SPI.
 
 ## References
 
