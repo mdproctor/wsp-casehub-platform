@@ -2,15 +2,38 @@
 
 ## Last Session
 
-Executed Batch 2 of the model registry plan: InMemoryModelRegistry (per-source ConcurrentHashMap, priority-resolved view, CatalogDelta return) and SeedCatalogModelSource (17 models from 5 vendors, classpath YAML, priority 0). Added jackson-databind + jackson-dataformat-yaml deps to platform/pom.xml. All 160 platform tests green.
+Completed #292 (MCP tools for model registry) — the final issue in the queue. Branch rebased onto main and pushed.
 
-## Immediate Next Step
+Key deliverables:
+- `ModelRegistryApi` interface in platform-api with `@McpDomain("models")` — 3 operations: `listModels`, `getModel`, `refreshRegistry`
+- `RefreshResult` record in platform-api — delta reporting for registry refresh
+- `ModelRegistryService` in platform — `@ApplicationScoped` implementation delegating to `ModelRegistry` + `ModelRegistryRefresher`
+- `ModelRegistryEnricher` in platform — enriches MCP catalog with model count and vendor list
+- `ModelRegistryRefresher.refreshAllWithResult()` — refactored to return aggregate `RefreshResult`
 
-Batch 3 (Tasks 5-6): rename MCP `DomainModelRegistry` to `DomainModelRegistry` via `ide_refactor_rename`, then wire three-step resolution into RoutingAgentProvider with config rewriting.
+APT generates `GeneratedModelsResolver` (GraphQL) and `GeneratedModelsResource` (REST at `/api/models/`) automatically.
+
+30 new tests, 183 total platform module tests pass.
+
+## Branch Status
+
+All 4 issues complete: #288 (cloud sources), #289 (local sources), #290 (multi-instance backend), #292 (MCP tools).
+
+Branch rebased onto main and force-pushed. Ready to merge.
+
+**Known issue:** `DefaultBeans.java` has a pre-existing compilation error from main (MockCurrentPrincipal/MockPreferenceProvider constructor signatures changed). Not introduced by this branch.
+
+## Queue
+
+Branch `issue-288-cloud-model-sources` — 4/4 issues done:
+- [x] #288 — cloud model sources
+- [x] #289 — local model sources
+- [x] #290 — multi-instance backend
+- [x] #292 — MCP tools for model registry
 
 ## References
 
-- Plan: `plans/2026-09-11-model-registry-spi.md`
-- Spec: `specs/issue-286-model-registry-spi/2026-09-11-model-registry-spi-design.md`
-- Decisions: `specs/issue-286-model-registry-spi/decisions.md`
-- Epic: casehubio/platform#285
+- Spec (#292): `specs/issue-288-cloud-model-sources/2026-09-14-mcp-model-registry-tools-design.md`
+- Decisions (#292): `specs/issue-288-cloud-model-sources/292-decisions.md`
+- Plan (#292): `plans/2026-09-14-mcp-model-registry-tools.md`
+- Epic #285: LLM model registry
