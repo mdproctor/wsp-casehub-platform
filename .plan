@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-296-generator-nested-paths-enum
-state: scaffolded
+state: active
 project-sha: 3c4cd0c6c4161fe7c214607f7498a9cd4aae17db
 date: 2026-09-14
 issue-repo: casehubio/platform
@@ -17,7 +17,7 @@ flyway-next-v: none
     - [x] Task 1: @RestPath + simple types + tests
   - [x] Batch 2: ACL
     - [x] Task 2: AclApi SPI + AclService + tests
-  - [ ] Batch 3: Preferences
-    - [ ] Task 3: PreferenceApi + services + tests
+  - [x] Batch 3: Preferences
+    - [x] Task 3: PreferenceApi + services + tests
   - [ ] Batch 4: Notifications
     - [ ] Task 4: NotificationApi + SuppressionApi + services + tests
