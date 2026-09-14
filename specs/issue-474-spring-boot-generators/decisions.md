@@ -34,3 +34,69 @@
 **Exploration:** quick
 **Depends on:** D1 (generator-common houses the shared JavaPoet infrastructure)
 **Status:** captured
+
+## D4: REST generator delegation model
+
+**Choice:** Generated @RestController methods delegate to core POJOs
+**Alternatives:**
+- Standalone replication — generated controllers contain full method signatures and delegate directly to injected SPIs/services. Doesn't depend on core extraction completeness but duplicates more logic.
+**Rationale:** The core extraction (#469) moved business logic out of JAX-RS resources into framework-neutral POJOs. The generated Spring controllers should be thin wrappers — annotation mapping only, with method bodies that call through to the core.
+**Trade-offs:** Depends on core extraction being complete for each consumer module. If a JAX-RS resource hasn't been core-extracted, the generator can't produce a working controller for it.
+**Sources:** platform-spring/PlatformDefaultsManualConfig.java (demonstrates the existing pattern of Spring beans wrapping core POJOs)
+**Exploration:** quick
+**Depends on:** D1, D2
+**Status:** captured
+
+## D5: MCP generator scope — single generator for both patterns
+
+**Choice:** Single mcp-spring-generator handles both @McpDomain+@PlatformQuery/@PlatformMutation (21 files) and @Tool from Quarkus MCP Server (11 files)
+**Alternatives:**
+- Separate generators — mcp-spring-generator for @McpDomain only, tool-spring-generator for @Tool. Cleaner separation but more moving parts.
+- @McpDomain only, port @Tool manually — only 11 @Tool files in connectors, small enough to hand-port. Reduces generator complexity.
+**Rationale:** Both produce the same output format (Spring MCP SDK tool registrations). The scanner has two modes but the writer is shared. One plugin is simpler for consumers than two.
+**Trade-offs:** Single generator is slightly more complex internally (two scan paths). If @Tool scanning has issues, it could block @McpDomain generation.
+**Sources:** connectors/mcp/ (8 @Tool files), consumer repo survey (@McpDomain: 21 files, @Tool: 11 files)
+**Exploration:** quick
+**Depends on:** D1, D2
+**Status:** captured
+
+## D6: Retrofit existing spring-generator
+
+**Choice:** Refactor spring-generator to extend generator-common base classes
+**Alternatives:**
+- Leave spring-generator as-is — only new generators use generator-common. Some duplication with spring-generator but zero risk to existing builds.
+**Rationale:** Validates the shared base against a working generator. Consistency across all 4 generators. One Jandex loading path, one verify framework. The retrofit also migrates spring-generator from StringBuilder to JavaPoet.
+**Trade-offs:** Risk of introducing regressions in an already-working generator. Mitigated by existing tests and the verify goal's drift detection.
+**Sources:** spring-generator/src/main/java/ (5 classes to retrofit), platform-spring/pom.xml (consumer that validates retrofit didn't break anything)
+**Exploration:** quick
+**Depends on:** D1, D3
+**Status:** captured
+
+## D7: REST mapping rules
+
+**Choice:** Full REST parity — generate @RestController endpoints + @Provider equivalents, with ResponseEntity return types
+**Mapping:**
+| JAX-RS | Spring MVC |
+|---|---|
+| `@Path("/foo")` | `@RestController @RequestMapping("/foo")` |
+| `@GET` / `@POST` / `@PUT` / `@DELETE` / `@PATCH` | `@GetMapping` / `@PostMapping` / `@PutMapping` / `@DeleteMapping` / `@PatchMapping` |
+| `@PathParam` | `@PathVariable` |
+| `@QueryParam` | `@RequestParam` |
+| `@HeaderParam` | `@RequestHeader` |
+| `@Consumes` / `@Produces` | `consumes` / `produces` attributes on mapping |
+| `@RunOnVirtualThread` (class-level) | Config property `spring.threads.virtual.enabled=true` (documented, not generated) |
+| `Response.ok(entity)` / `Response.noContent()` | `ResponseEntity.ok(entity)` / `ResponseEntity.noContent().build()` |
+| `ExceptionMapper<T>` | `@ControllerAdvice` + `@ExceptionHandler(T.class)` |
+| `ContainerRequestFilter` / `ContainerResponseFilter` | Spring `Filter` or `HandlerInterceptor` |
+| `ParamConverterProvider` | Spring `Converter<S,T>` + `@Configuration` registration |
+| `@Inject` constructor | Constructor injection (Spring default) |
+| `@Inject` field | Constructor injection (generator normalizes to constructor) |
+**Alternatives:**
+- Typed returns where possible — infer entity type from Response.ok(entity) calls. More type-safe but requires method body analysis, not just annotation scanning.
+- @Provider out of scope — only 3 files, hand-port. Simpler generator but incomplete parity.
+**Rationale:** Mechanical 1:1 mapping keeps the generator simple — it translates annotations and method signatures without analyzing method bodies. The core POJO has the business logic; the controller is a thin delegation layer. @Provider generation provides complete REST parity so Spring deployment works without manual intervention.
+**Trade-offs:** Generator must handle 3 @Provider patterns (ExceptionMapper, Filter, ParamConverter) in addition to @Path resources. @RunOnVirtualThread is documented as a config property rather than generated — consumer responsible for enabling virtual threads.
+**Sources:** Platform REST survey (12 resource classes, 3 @Provider classes, JAX-RS patterns inventory), GE-20260612-4f9a47 (class-level @Consumes edge case)
+**Exploration:** quick
+**Depends on:** D4 (delegation model)
+**Status:** captured
