@@ -15,8 +15,8 @@ flyway-next-v: none
 - [ ] casehubio/platform#296 — Issue #296 ← active
   - [x] Batch 1: Generator
     - [x] Task 1: @RestPath + simple types + tests
-  - [ ] Batch 2: ACL
-    - [ ] Task 2: AclApi SPI + AclService + tests
+  - [x] Batch 2: ACL
+    - [x] Task 2: AclApi SPI + AclService + tests
   - [ ] Batch 3: Preferences
     - [ ] Task 3: PreferenceApi + services + tests
   - [ ] Batch 4: Notifications
