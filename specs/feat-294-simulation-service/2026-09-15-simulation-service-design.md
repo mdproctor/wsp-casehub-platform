@@ -12,15 +12,37 @@ The service is interface-agnostic. It applies to any part of the system where a 
 
 ## Architecture
 
-### Two modes, one decorator
+### Two modes
 
-A single generated `@Decorator` per SPI handles both modes:
+The simulation framework provides two modes of operation per SPI:
 
-- **Simulation mode** — when no real impl is active (the delegate is a NoOp) and a simulation strategy is configured, the decorator resolves a response from the configured strategy instead of delegating to the NoOp.
-- **Capture mode** — when a real impl IS active and capture is enabled, the decorator records input/output pairs to a `SimulationCorpus` while passing through to the real implementation.
-- **Passthrough** — when neither simulation nor capture is configured, the decorator delegates transparently. Zero overhead in the common case.
+- **Simulation mode** — when a simulation strategy is configured for an SPI, responses are resolved from the configured strategy instead of delegating to the underlying implementation. This is configuration-driven: `casehub.simulation.<spi-name>.strategy=<strategy>` activates simulation regardless of whether the delegate is a NoOp or a real implementation.
+- **Capture mode** — when capture is enabled, the framework records input/output pairs to a `SimulationCorpus` while passing through to the real implementation.
+- **Passthrough** — when neither simulation nor capture is configured, the framework delegates transparently. Zero overhead in the common case.
 
-NoOp implementations remain untouched — zero-dependency, zero-logic, trivially constructable. The simulation decorator wraps them; it does not modify them.
+NoOp implementations remain untouched — zero-dependency, zero-logic, trivially constructable. The simulation framework wraps them; it does not modify them.
+
+### Two integration paths
+
+Not all SPIs are equal. The framework provides two integration paths depending on the SPI's existing architecture:
+
+**Path A — Generated `@Decorator`** (default for simple SPIs)
+
+For SPIs with direct CDI injection and simple request-response methods (PreferenceProvider, CaseMemoryStore, DataSourceRegistry, ExpressionEngine, etc.), the framework generates a `@Decorator` per `@SimulationEligible` SPI. The decorator intercepts calls, routes to simulation strategies when configured, and optionally captures invocations.
+
+**Path B — Backend integration** (for SPIs with existing routing layers)
+
+SPIs that already have multi-backend routing (like AgentProvider → RoutingAgentProvider → AgentBackend) integrate simulation as a backend implementation rather than a decorator. The simulation backend registers with the existing routing infrastructure and is dispatched to via the existing model/key resolution mechanism.
+
+| Criteria | Path A (Decorator) | Path B (Backend) |
+|----------|-------------------|-----------------|
+| SPI shape | Simple request-response | Routing layer with multiple backends |
+| Return types | Blocking / data types | Reactive streams, stateful sessions |
+| Integration | Generated @Decorator wrapping SPI | Implements backend interface, registered with router |
+| First target | CaseMemoryStore (#320) | AgentProvider (#315) |
+| Strategy contract | Same `SimulationStrategy<I, O>` | Same `SimulationStrategy<I, O>` |
+
+Both paths use the same `SimulationStrategy<I, O>` contract, `SimulationCorpus`, and configuration model. The difference is where the interception happens.
 
 ### Activation
 
@@ -44,11 +66,20 @@ casehub.simulation.preference-store.capture=true
 |--------|-----------|----------|------------|
 | `simulation-api` | jar (zero-dep) | SimulationStrategy, SimulationCorpus, InvocationRecord, KeyExtractor, DataRealism, @SimulationEligible | nothing |
 | `simulation-core` | jar | Strategy implementations: SequentialStrategy, KeyLookupStrategy, RandomStrategy, RecordedReplayStrategy | simulation-api |
-| `simulation-generator` | maven-plugin | SimulationDecoratorProcessor — generates @Decorator per @SimulationEligible SPI | simulation-api, generator-common |
+| `simulation-generator` | annotation-processor | SimulationDecoratorProcessor — generates @Decorator per @SimulationEligible SPI (extends AbstractProcessor, sibling to CallbackDecoratorProcessor) | simulation-api, generator-common |
 | `simulation-inmem` | jar (Jandex) | InMemorySimulationCorpus @Alternative @Priority(100) | simulation-api |
-| `simulation-fs` | jar (Jandex) | FilesystemSimulationCorpus @Alternative (YAML/JSON fixtures, captured corpora) | simulation-api |
+| `simulation-fs` | jar (Jandex) | FilesystemSimulationCorpus @ApplicationScoped (YAML/JSON fixtures, captured corpora) | simulation-api |
 
-Follows the established module naming convention (D2): dedicated `simulation-api` module, not embedded in `platform-api`. Simulation is opt-in — consumers add the modules they need.
+`simulation-api` includes a NoOp `@DefaultBean` SimulationCorpus (returns empty for all lookups, discards records). This follows the store pattern: the @DefaultBean is active when no corpus module is on the classpath, preventing `UnsatisfiedResolutionException`.
+
+CDI priority follows the persistence backend ladder (PP-20260522-0cfa30):
+- NoOp @DefaultBean (Tier 1b) — in `simulation-api`, active with no corpus module
+- Filesystem @ApplicationScoped (Tier 2, primary) — durable, file-backed corpus
+- InMemory @Alternative @Priority(100) (Tier 4) — ephemeral, wins in tests
+
+Filesystem and in-memory are mutually exclusive per deployment — do not co-deploy in production. InMemory wins when both are on the classpath (test safety net).
+
+Follows the established module naming convention (D2): dedicated `simulation-api` module, not embedded in `platform-api`. Simulation is opt-in — consumers add the modules they need. Note: `@SimulationEligible` lives in `simulation-api`, diverging from `@CallbackEligible` which lives in `platform-api`. This is intentional — callbacks are a universal platform concern, while simulation is opt-in. SPIs that want simulation add `simulation-api` as a dependency; those that don't are unaffected.
 
 ## Core contracts
 
@@ -94,7 +125,7 @@ public interface SimulationCorpus<I, O> {
 }
 ```
 
-Follows the store pattern (D5): NoOp @DefaultBean, InMemory @Alternative, filesystem @Alternative. Tenant-aware per D10 — captured data is scoped to the tenant context of the invocation.
+Follows the store pattern (D5) per CDI priority ladder (PP-20260522-0cfa30): NoOp @DefaultBean (Tier 1b, in simulation-api), Filesystem @ApplicationScoped (Tier 2, primary), InMemory @Alternative @Priority(100) (Tier 4, tests). Tenant-aware per D10 — captured data is scoped to the tenant context of the invocation.
 
 ### InvocationRecord
 
@@ -144,6 +175,37 @@ public @interface SimulationEligible {
 
 Placed on SPI interfaces to trigger decorator generation. The `name` defaults to kebab-case of the interface name (e.g. `AgentProvider` → `agent-provider`). Used as the config key: `casehub.simulation.<name>.strategy=...`.
 
+### SimulationRuntime
+
+```java
+package io.casehub.platform.simulation;
+
+@ApplicationScoped
+public class SimulationRuntime {
+    @Inject SimulationConfig config;
+    @Inject SimulationCorpus corpus;
+
+    public <I, O> Optional<SimulationStrategy<I, O>> strategyFor(String spiName) {
+        return config.strategyFor(spiName)
+            .map(strategyName -> createStrategy(spiName, strategyName));
+    }
+
+    public boolean captureEnabled(String spiName) {
+        return config.captureEnabled(spiName);
+    }
+
+    public <I, O> void capture(String spiName, String tenancyId, I input, O output) {
+        corpus.record(tenancyId, input, output);
+    }
+
+    public <I, O> void capture(String spiName, String tenancyId, String key, I input, O output) {
+        corpus.record(tenancyId, key, input, output);
+    }
+}
+```
+
+Non-generic `@ApplicationScoped` bean — avoids the CDI type erasure problem with `Instance<SimulationStrategy<I, O>>`. Generated decorators and backend implementations inject `SimulationRuntime` and resolve strategies by SPI name at runtime. Follows the `CallbackRegistry` pattern: a non-generic registry that resolves by SPI name, not by generic type parameters.
+
 ## Strategy implementations
 
 All in `simulation-core`, constructor-injected POJOs (no CDI annotations).
@@ -160,11 +222,18 @@ public class SequentialStrategy<I, O> implements SimulationStrategy<I, O> {
 
     public O resolve(I input) {
         int i = index.getAndIncrement();
+        if (exhaustionPolicy == ExhaustionPolicy.THROW && i >= corpus.size()) {
+            throw new SimulationExhaustedException(
+                "Corpus exhausted at index " + i + " (size: " + corpus.size() + ")");
+        }
         return corpus.lookupByIndex(i % corpus.size())
             .orElseThrow(() -> new SimulationExhaustedException(...));
     }
 
     public boolean canResolve(I input) {
+        if (exhaustionPolicy == ExhaustionPolicy.THROW) {
+            return index.get() < corpus.size();
+        }
         return corpus.size() > 0;
     }
 }
@@ -227,6 +296,7 @@ Replays captured corpus in recorded order.
 public class RecordedReplayStrategy<I, O> implements SimulationStrategy<I, O> {
     private final SimulationCorpus<I, O> corpus;
     private final KeyExtractor<I> keyExtractor;
+    private final AtomicInteger index = new AtomicInteger(0);
 
     public O resolve(I input) {
         String key = keyExtractor.extract(input);
@@ -272,9 +342,9 @@ public interface SimilarityScorer<I> {
 
 ### SimulationDecoratorProcessor
 
-Maven plugin (sibling to `callback-generator`). Scans Jandex indexes for `@SimulationEligible` interfaces and generates a `@Decorator` for each.
+Annotation processor (extends `AbstractProcessor`, sibling to `CallbackDecoratorProcessor`). Scans Jandex indexes for `@SimulationEligible` interfaces and generates a `@Decorator` for each. This is an annotation processor — not a Maven plugin — following the same mechanism as callback-generator. `generator-common` provides shared Jandex/JavaPoet utilities used by both.
 
-**Generated decorator template:**
+**Generated decorator template (Path A — direct SPIs only):**
 
 ```java
 @Decorator
@@ -282,30 +352,30 @@ Maven plugin (sibling to `callback-generator`). Scans Jandex indexes for `@Simul
 public class Simulated{SpiName} implements {SpiInterface} {
 
     @Inject @Delegate @Any {SpiInterface} delegate;
-    @Inject SimulationConfig config;
-    @Inject Instance<SimulationStrategy<{InputType}, {OutputType}>> strategies;
-    @Inject Instance<SimulationCorpus<{InputType}, {OutputType}>> corpuses;
+    @Inject SimulationRuntime simulation;
+    @Inject CurrentPrincipal currentPrincipal;
 
     @Override
     public {ReturnType} {method}({params}) {
         String spiName = "{spi-name}";
 
-        // Simulation mode: strategy configured and delegate is a NoOp
-        if (config.strategyFor(spiName).isPresent()) {
-            SimulationStrategy<...> strategy = resolveStrategy(spiName);
+        // Simulation mode: strategy configured
+        Optional<SimulationStrategy<{InputType}, {OutputType}>> strategy =
+            simulation.strategyFor(spiName);
+        if (strategy.isPresent()) {
             {InputType} input = new {InputType}({params});
-            if (strategy.canResolve(input)) {
-                return strategy.resolve(input);
+            if (strategy.get().canResolve(input)) {
+                return strategy.get().resolve(input);
             }
         }
 
         // Passthrough + optional capture
         {ReturnType} result = delegate.{method}({params});
 
-        if (config.captureEnabled(spiName)) {
-            SimulationCorpus<...> corpus = resolveCorpus(spiName);
+        if (simulation.captureEnabled(spiName)) {
+            String tenancyId = currentPrincipal.tenancyId();
             {InputType} input = new {InputType}({params});
-            corpus.record(tenancyId, input, result);
+            simulation.capture(spiName, tenancyId, input, result);
         }
 
         return result;
@@ -315,6 +385,8 @@ public class Simulated{SpiName} implements {SpiInterface} {
 }
 ```
 
+The generated input record `{InputType}` wraps the SPI method parameters directly — `new {InputType}({params})` maps one-to-one with the method signature. Domain-specific field selection for matching is the `KeyExtractor`'s responsibility, not the input record's.
+
 The generator handles:
 - All abstract methods implemented with delegation (avoiding the CDI @Decorator gotcha from GE-20260818-2589ee)
 - Lazy initialization pattern (no @PostConstruct — GE-20260806-93549d)
@@ -323,25 +395,12 @@ The generator handles:
 
 ### Per-SPI input/output types
 
-Each `@SimulationEligible` SPI needs typed input/output records. These live alongside the SPI (in the SPI's own module or in a simulation adapter module).
+Each simulation-eligible SPI needs typed input/output records. For Path A (decorator) SPIs, input records wrap the SPI method parameters directly — the generator produces `new {InputType}({params})`. For Path B (backend) SPIs, input/output types are defined by the backend implementation and may restructure parameters for optimal key extraction.
 
-**Example — AgentProvider:**
-
-```java
-public record AgentSimulationInput(
-    String systemPrompt,
-    String userPrompt,
-    String model,
-    Map<String, Object> config
-) {}
-
-// Output is Multi<AgentEvent> — the existing return type
-// KeyExtractor strips UUIDs/timestamps from prompts before hashing
-```
-
-**Example — CaseMemoryStore:**
+**Example — CaseMemoryStore (Path A — decorator):**
 
 ```java
+// Input wraps the method parameters directly
 public record MemorySimulationInput(
     String tenancyId,
     List<String> entityIds,
@@ -350,8 +409,34 @@ public record MemorySimulationInput(
     MemoryOrder order
 ) {}
 
-// Output is List<Memory>
+// Output is List<Memory> — a data type, stored directly in corpus
+// KeyExtractor selects domain + question for matching
 ```
+
+**Example — AgentProvider (Path B — backend):**
+
+```java
+// Input restructures AgentSessionConfig for key extraction
+public record AgentSimulationInput(
+    String systemPrompt,
+    String userPrompt,
+    String model
+) {}
+
+// Output is List<AgentEvent> — the MATERIALIZED form
+// The backend converts List<AgentEvent> → Multi<AgentEvent> via
+// Multi.createFrom().iterable(events)
+// KeyExtractor strips UUIDs/timestamps from prompts before hashing
+```
+
+### Reactive type handling
+
+Platform SPIs are predominantly blocking (per the "Blocking SPI + virtual threads" architectural pattern). For SPIs that return reactive types (`Multi<T>`, `Uni<T>`), the simulation output type is the **materialized data form** (e.g., `List<AgentEvent>` not `Multi<AgentEvent>`). The conversion between materialized and reactive forms is handled by the integration layer:
+
+- **Path A (decorator):** The decorator wraps the materialized output in the reactive type (e.g., `Multi.createFrom().iterable(list)`)
+- **Path B (backend):** The backend implementation handles conversion internally (e.g., `SimulatedAgentBackend.invoke()` returns `Multi.createFrom().iterable(corpus.lookup(key))`)
+
+This keeps the corpus and strategy contracts data-oriented — they store and return data structures, not reactive publishers.
 
 ## Corpus storage
 
@@ -361,7 +446,7 @@ public record MemorySimulationInput(
 
 ### FilesystemSimulationCorpus
 
-`@Alternative @Priority(200)`. Reads YAML/JSON fixture files at startup. Writes captured corpora to configurable directory. Hot-reload for scenario development.
+`@ApplicationScoped` (Tier 2, primary backend per CDI priority ladder). Reads YAML/JSON fixture files at startup. Writes captured corpora to configurable directory. Hot-reload for scenario development.
 
 **Fixture file format:**
 
@@ -397,7 +482,7 @@ Per D10, all corpus operations are tenant-scoped:
 - `record()` takes `tenancyId` — captured data tagged with tenant context
 - `listByTenant()` filters by tenant
 - Fixture files declare their tenant scope
-- The generated decorator reads `CurrentPrincipal.tenancyId()` for capture context
+- The generated decorator injects `CurrentPrincipal` and reads `currentPrincipal.tenancyId()` for capture context
 
 ## Configuration
 
@@ -445,16 +530,22 @@ A scheduled emitter (analogous to `DigestFlushScheduler`) invokes the strategy o
 ```java
 @ApplicationScoped
 public class SimulatedEventEmitter {
-    @Inject SimulationStrategy<EventTrigger, CloudEvent> strategy;
+    @Inject SimulationRuntime simulation;
     @Inject DataSourceRegistry dataSourceRegistry;
+    @Inject CurrentPrincipal currentPrincipal;
 
     @Scheduled(every = "{casehub.simulation.events.interval:10s}")
     void emit() {
-        EventTrigger trigger = new EventTrigger(...);
-        if (strategy.canResolve(trigger)) {
-            CloudEvent event = strategy.resolve(trigger);
-            dataSourceRegistry.resolve(path).ifPresent(ds -> ds.receive(event));
-        }
+        simulation.<EventTrigger, CloudEvent>strategyFor("event-emitter")
+            .ifPresent(strategy -> {
+                EventTrigger trigger = new EventTrigger(...);
+                if (strategy.canResolve(trigger)) {
+                    CloudEvent event = strategy.resolve(trigger);
+                    String tenancyId = currentPrincipal.tenancyId();
+                    dataSourceRegistry.resolveSource(path, tenancyId)
+                        .ifPresent(ds -> ds.add(event));
+                }
+            });
     }
 }
 ```
@@ -465,11 +556,13 @@ Per D9, three complementary systems:
 
 | System | Scope | Activation | Data model |
 |--------|-------|------------|------------|
-| **Demo SPI Convention** | Connector SPIs (ChatPlatform, CalendarPlatform) | `@IfBuildProfile("demo")` — compile-time | Pre-loaded datasets, bootstrap endpoints |
+| **Demo SPI Convention** | Connector SPIs (ChatPlatform, CalendarPlatform) | `@Alternative @Priority(300) @IfBuildProfile("demo")` — build-time (Quarkus augmentation) | Pre-loaded datasets, bootstrap endpoints |
 | **Scenario Engine** | Cross-service orchestration | Scenario YAML steps | Step-driven, multi-service |
 | **Simulation Service** | Platform SPIs (AgentProvider, CaseMemoryStore, etc.) | Config-driven — runtime | Corpus-backed, 5 strategy modes |
 
-The Scenario Engine can configure simulation strategies as part of scenario setup. The Demo Convention handles connector-level mock data. They do not overlap.
+The Demo Convention handles connector-level mock data. The Simulation Service handles platform SPIs. They do not overlap.
+
+**Scenario Engine integration** is deferred to Phase 4 (#322). The current boot-time configuration model (D11) does not support per-scenario strategy switching. Phase 4 will design a runtime-override mechanism (e.g., request-scoped strategy selection, scenario-aware config) to enable scenario steps to configure simulation strategies. The `SimulationStrategy<I, O>` contract and `SimulationRuntime` are designed to support this — the integration mechanism is what's deferred.
 
 ## Cross-repo interaction map
 
@@ -486,16 +579,30 @@ The Scenario Engine can configure simulation strategies as part of scenario setu
 | ModelRegistry | SPI | yes | — | — | — | yes | yes | — | yes | yes |
 | @RegisterRestClient | — | — | — | — | — | Mem0/Graphiti | — | 5 GitHub APIs | — | — |
 
+## Scope
+
+This spec covers **Phase 1 (Foundation)** and **Phase 2 (LLM first)** of epic #294. The following items are explicitly deferred to later phases:
+
+| Item | Phase | Issue | Notes |
+|------|-------|-------|-------|
+| REST client simulation | 3 | #319 | `@RegisterRestClient` proxy interception. Strategy contract supports this; integration mechanism differs (MicroProfile REST Client proxy, not CDI decorator). |
+| Generic @DefaultBean upgrade | 3 | #321 | Proposes `SimulationAwareDefaultBean` base class as an alternative to decorator wrapping for ~35 existing @DefaultBean no-ops. May complement or replace Path A for some SPIs — design decision deferred. |
+| Pages scenario integration | 4 | #322 | Requires runtime strategy switching — conflicts with current boot-time config (D11). Needs request-scoped override mechanism. |
+| NearestMatchStrategy | 2 | #317 | Constraint weighting, similarity scoring. Contract (`SimulationStrategy<I, O>`) supports it; implementation is the hard problem. |
+
+The strategy contract (`SimulationStrategy<I, O>`) and `SimulationRuntime` are designed to accommodate these deferred items without breaking changes.
+
 ## Implementation priority
 
-1. **Foundation:** `simulation-api` (contracts), `simulation-core` (strategies), `simulation-inmem` (in-memory corpus)
-2. **Generator:** `simulation-generator` (decorator processor)
-3. **First adapter:** `@SimulationEligible` on `AgentProvider` — highest-value target (blocks 326+, clinical 8 files, engine via blocks)
-4. **Second adapter:** `@SimulationEligible` on `CaseMemoryStore` — second most consumed (7 repos)
+1. **Foundation:** `simulation-api` (contracts + NoOp @DefaultBean corpus), `simulation-core` (strategies), `simulation-inmem` (in-memory corpus)
+2. **Generator:** `simulation-generator` (annotation processor for Path A decorators)
+3. **First adapter (Path B):** `SimulatedAgentBackend` implementing `AgentBackend` — highest-value target (blocks 326+, clinical 8 files, engine via blocks). Integrates with `RoutingAgentProvider` via `BackendInstanceRegistry`. (#315)
+4. **Second adapter (Path A):** `@SimulationEligible` on `CaseMemoryStore` — second most consumed (7 repos). First use of generated decorator path. (#320)
 5. **Corpus filesystem:** `simulation-fs` (YAML fixtures, captured corpora)
-6. **Event simulation:** `SimulatedEventEmitter` + DataSource integration
-7. **Nearest match:** NearestMatchStrategy implementation (deferred hard problem)
-8. **Consumer adoption:** clinical, devtown, aml, fsitrading fixture files and migration guides
+6. **Capture/replay:** Record real invocations to corpus, replay via RecordedReplayStrategy (#316)
+7. **Event simulation:** `SimulatedEventEmitter` + DataSource integration (#318)
+8. **Nearest match:** NearestMatchStrategy implementation (deferred hard problem — #317)
+9. **Consumer adoption:** clinical, devtown, aml, fsitrading fixture files and migration guides (#323)
 
 ## References
 
