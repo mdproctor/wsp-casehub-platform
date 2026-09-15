@@ -2,38 +2,26 @@
 
 ## Last Session
 
-Completed 3 issues from the follow-on queue: #479 (llm-config-core), #483 (Spring REST non-domain resources), and designed #480 (Pattern 2 qhorus migration). Queue advanced to position 3/6.
+Executed #480 (Pattern 2 qhorus migration) — all 4 tasks complete. 5 commits to qhorus repo. Queue still at position 3/6 (#480 active).
 
-**1. #479: llm-config-core extraction (XS/Low).**
+**#480: Pattern 2 migration qhorus (M/Med) — executed.**
 
-New module `llm-config-core` — extracted `LlmConfigApi` (@McpDomain interface) and 11 API records from `llm-config`. Wired as `quarkusModule` in `platform-spring` graphql-spring-generator. Now generates `LlmConfigGraphqlController` + `LlmConfigRestController`.
+Migrated qhorus from Pattern 1 (@McpDomain on resolver classes) to Pattern 2 (@McpDomain on SPI interfaces). 4 SPI interfaces created in `api/`, 4 implementation beans in `graphql/` and `compliance-report/`, graphql-generator APT wired, 7 old resolvers deleted, 41 dead DTOs deleted, 6 tests rewritten.
 
-**2. #483: Spring REST for non-domain @Path resources (M/Med).**
+Qhorus commits (on branch `issue-440-panache-purge`):
+1. `65b2bbe9` — SPI supporting types + compliance model move (23 files) to api/
+2. `2adcfb8c` — 4 SPI interfaces (ChannelsApi, MessagingApi, GovernanceApi, ComplianceApi)
+3. `d57d8efa` — 4 implementation beans
+4. `35474526` — APT wiring + resolver deletion + test updates
+5. `9580e56b` — Dead DTO cleanup (41 deleted, 2 kept for ChannelsSubscriptionResolver)
 
-6 JAX-RS resources that weren't covered by @McpDomain generators needed Spring equivalents. Core-extracted business logic to -core POJOs, wrote thin Spring @RestControllers in platform-spring.
-
-New modules created:
-- `callback-client-core` — `CallbackDispatcher` (reflection-based SPI dispatch)
-- `streams-webhook-core` — `WebhookReceiver` (CloudEvents, Consumer<CloudEvent> callback pattern)
-
-Core extractions into existing modules:
-- `EventTypeService` → subscriptions-core
-- `SubscriptionService` → subscriptions-core (8 methods with auth + expression validation)
-- `PreferenceSchemaService` → preferences-editor-core (ETag support via SchemaResult record)
-- `EngagementCallbackService` → notification-dispatch-core (Instance<> → Map<String, Handler>)
-
-Spring controllers in platform-spring (`io.casehub.platform.spring.rest`):
-- `EventTypeRestController`, `SubscriptionRestController`, `PreferenceSchemaRestController`
-- `EngagementCallbackRestController`, `CallbackDispatchRestController`, `WebhookRestController`
-- `RestControllersAutoConfiguration` — wires service beans with @ConditionalOnBean
-
-**3. #480: Pattern 2 qhorus migration — designed, not yet executed.**
-
-Spec and 5 decisions captured. 4 SPI interfaces (`ChannelsApi`, `MessagingApi`, `GovernanceApi`, `ComplianceApi`) to go in qhorus `api/` module. Compliance domain renamed from `qhorus` to `compliance`. 7 resolver classes deleted, 2 kept (Subscription + ModelEnricher). Next step: writing-plans → execution in the qhorus repo.
+**One incomplete item:** compliance-report tests (ComplianceQueryResolverTest, ComplianceMutationResolverTest) still reference deleted resolver classes. Blocked by pre-existing compilation errors in compliance-report from ledger dependency refactoring (TrustGateService, ComplianceReport, DecisionRecord missing from `io.casehub.ledger.runtime.service`). Fix pattern is identical to graphql test updates — replace resolver references with ComplianceService, update DTO types to domain types. Apply when the ledger dep compiles again.
 
 ## Immediate Next Step
 
-Write the implementation plan for #480 (Pattern 2 qhorus migration), then execute. This is cross-repo work — changes go to the qhorus repo at `/Users/mdproctor/claude/casehub/slots/192/qhorus`.
+The #480 execution is done for what can be verified. Either:
+- Advance to #481 (Pattern 2 neocortex) via `work next`
+- Or fix the compliance-report ledger dep first (pre-existing, not new from #480)
 
 ## Queue State
 
@@ -42,31 +30,29 @@ Write the implementation plan for #480 (Pattern 2 qhorus migration), then execut
 | 0 | parent#478 | L | High | Done |
 | 1 | parent#479 | XS | Low | Done |
 | 2 | parent#483 | M | Med | Done |
-| 3 | parent#480 | M | Med | Active — designed, plan next |
+| 3 | parent#480 | M | Med | Active — executed, compliance tests blocked |
 | 4 | parent#481 | S | Low | Pending — Pattern 2 neocortex |
 | 5 | parent#482 | S | Low | Pending — Wire graphql-spring-gen |
 
 ## Key Facts
 
-- Platform branch `issue-478-spring-deployment-completion` — 18 commits ahead of origin/main (10 from prior sessions + 8 this session).
-- 2 new -core modules this session: callback-client-core, streams-webhook-core.
-- llm-config-core also new this session.
-- engine#1095 (Pattern 2 migration) is NOT actually implemented in slot 192's engine checkout — the reference pattern comes from platform's own domains (acl, notifications, etc.).
-- Pre-existing test failures in `notifications` module (REST resource tests) — unrelated to this branch.
-- Consumer repo branches unchanged from prior session.
+- Platform branch `issue-478-spring-deployment-completion` — unchanged this session (all work in qhorus repo).
+- Qhorus branch `issue-440-panache-purge` — 5 new commits from this session.
+- APT generates 6 files for graphql/: GeneratedChannelsResolver, GeneratedMessagingResolver, GeneratedGovernanceResolver + 3 REST resources. Verified with `mvn compile`.
+- Compliance APT wired but cannot verify — pre-existing compilation errors block the entire compliance-report module.
+- `ChannelsSubscriptionResolver` and `ChannelsModelEnricher` stay hand-written (by design). MessageType + PresenceType DTOs kept for subscription support.
+- `ChannelQuery` name collision with `io.casehub.qhorus.api.store.query.ChannelQuery` — ChannelsService uses FQN for the SPI param type.
+- `PropertyViolation` was also moved to api/ (discovered during execution — it was referenced by `PropertyResult` which moved with the compliance models).
+- Plan file: `plans/2026-09-15-pattern2-qhorus-migration.md`
 
 ## Garden Entries Consulted
 
-GE-20260420-7d28fa, GE-0138, GE-20260914-248827, GE-20260910-fc414e (Consumer<T> callback pattern), GE-20260909-c81437 (module naming), GE-20260909-81809c (Jandex generator)
+None this session — Pattern 2 migration pattern was already well-established from prior sessions.
 
 ## References
 
-- `specs/spring-deployment-completion/2026-09-15-spring-deployment-completion-design.md`
-- `specs/spring-deployment-completion/decisions.md` (4 decisions)
-- `specs/issue-478-spring-deployment-completion/2026-09-15-spring-rest-non-domain-design.md`
-- `specs/issue-478-spring-deployment-completion/decisions.md` (4 decisions for #483)
 - `specs/issue-478-spring-deployment-completion/2026-09-15-pattern2-qhorus-design.md`
-- `specs/issue-478-spring-deployment-completion/pattern2-qhorus-decisions.md` (5 decisions for #480)
-- `plans/2026-09-15-spring-rest-non-domain.md` — implementation plan for #483
-- casehubio/parent#478, #479, #480, #483 — tracking issues
-- Memory: `project_pattern2_migration.md` — Pattern 2 migration tracking
+- `specs/issue-478-spring-deployment-completion/pattern2-qhorus-decisions.md` (5 decisions)
+- `plans/2026-09-15-pattern2-qhorus-migration.md` — implementation plan
+- casehubio/parent#478, #480 — tracking issues
+- Memory: `project_pattern2_migration.md`
