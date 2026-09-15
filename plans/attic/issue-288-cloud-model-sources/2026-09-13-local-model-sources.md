@@ -247,7 +247,7 @@ git commit -m "feat(#289): add OllamaModelSource + OllamaSourceStatus — priori
 ### Task 2: Extract AbstractOpenAiSdkBackend from OpenAiAgentBackend
 
 **Files:**
-- Create: `agent-openai/src/main/java/io/casehub/platform/agent/openai/AbstractOpenAiSdkBackend.java`
+- Create: `../../../../agent-openai-core/src/main/java/io/casehub/platform/agent/openai/AbstractOpenAiSdkBackend.java`
 - Modify: `agent-openai/src/main/java/io/casehub/platform/agent/openai/OpenAiAgentBackend.java`
 - Modify: `agent-openai/src/main/java/io/casehub/platform/agent/openai/OpenAiEventMapper.java` — change visibility from package-private to `public`
 - Test: `agent-openai/src/test/java/io/casehub/platform/agent/openai/OpenAiAgentBackendTest.java` (existing — must still pass)
