@@ -16,7 +16,7 @@ The service is interface-agnostic. It applies to any part of the system where a 
 
 The simulation framework provides two modes of operation per SPI:
 
-- **Simulation mode** — when a simulation strategy is configured for an SPI, responses are resolved from the configured strategy instead of delegating to the underlying implementation. This is configuration-driven: `casehub.simulation.<spi-name>.strategy=<strategy>` activates simulation regardless of whether the delegate is a NoOp or a real implementation.
+- **Simulation mode** — when a simulation strategy is configured for an SPI method, responses are resolved from the configured strategy instead of delegating to the underlying implementation. This is configuration-driven: `casehub.simulation.<spi-name>.<method-name>.strategy=<strategy>` activates simulation regardless of whether the delegate is a NoOp or a real implementation.
 - **Capture mode** — when capture is enabled, the framework records input/output pairs to a `SimulationCorpus` while passing through to the real implementation.
 - **Passthrough** — when neither simulation nor capture is configured, the framework delegates transparently. Zero overhead in the common case.
 
@@ -49,15 +49,19 @@ Both paths use the same `SimulationStrategy<I, O>` contract, `SimulationCorpus`,
 The `@SimulationEligible` annotation on an SPI interface triggers code generation of the `@Decorator`. Configuration at boot time controls behaviour:
 
 ```properties
-# Enable simulation with key-based lookup strategy
-casehub.simulation.agent-provider.strategy=key-lookup
+# Per-method strategy configuration (multi-method SPIs)
+casehub.simulation.case-memory-store.query.strategy=key-lookup
+casehub.simulation.case-memory-store.store.strategy=sequential
+# erase: no strategy → passthrough
 
-# Enable capture mode (record real invocations)
-casehub.simulation.agent-provider.capture=true
+# Enable capture mode per method
+casehub.simulation.case-memory-store.query.capture=true
 
-# Both can be active simultaneously on different SPIs
-casehub.simulation.case-memory-store.strategy=sequential
-casehub.simulation.preference-store.capture=true
+# AgentProvider uses Path B (backend), but config key structure is the same
+casehub.simulation.agent-provider.invoke.strategy=key-lookup
+
+# Single-method SPIs can use the method name directly
+casehub.simulation.preference-store.get.capture=true
 ```
 
 ### Module structure
@@ -113,17 +117,19 @@ Owned by strategies that need key-based matching (D7). Functional interface — 
 package io.casehub.platform.simulation;
 
 public interface SimulationCorpus<I, O> {
-    Optional<O> lookupByKey(String key);
-    Optional<O> lookupByIndex(int index);
-    List<InvocationRecord<I, O>> list();
-    List<InvocationRecord<I, O>> listByTenant(String tenancyId);
-    void record(String tenancyId, I input, O output);
-    void record(String tenancyId, String key, I input, O output);
-    void seed(List<InvocationRecord<I, O>> records);
-    void clear();
-    int size();
+    Optional<O> lookupByKey(String qualifiedName, String key);
+    Optional<O> lookupByIndex(String qualifiedName, int index);
+    List<InvocationRecord<I, O>> list(String qualifiedName);
+    List<InvocationRecord<I, O>> listByTenant(String qualifiedName, String tenancyId);
+    void record(String qualifiedName, String tenancyId, I input, O output);
+    void record(String qualifiedName, String tenancyId, String key, I input, O output);
+    void seed(String qualifiedName, List<InvocationRecord<I, O>> records);
+    void clear(String qualifiedName);
+    int size(String qualifiedName);
 }
 ```
+
+Every corpus method takes `qualifiedName` — the method-qualified key (e.g., `"case-memory-store.query"`) that partitions the data space. Without it, two SPIs using the same key (e.g., `"default"`) would collide. The composite key for data access is `(qualifiedName, tenancyId, key)`.
 
 Follows the store pattern (D5) per CDI priority ladder (PP-20260522-0cfa30): NoOp @DefaultBean (Tier 1b, in simulation-api), Filesystem @ApplicationScoped (Tier 2, primary), InMemory @Alternative @Priority(100) (Tier 4, tests). Tenant-aware per D10 — captured data is scoped to the tenant context of the invocation.
 
@@ -173,7 +179,7 @@ public @interface SimulationEligible {
 }
 ```
 
-Placed on SPI interfaces to trigger decorator generation. The `name` defaults to kebab-case of the interface name (e.g. `AgentProvider` → `agent-provider`). Used as the config key: `casehub.simulation.<name>.strategy=...`.
+Placed on SPI interfaces to trigger decorator generation. The `name` defaults to kebab-case of the interface name (e.g. `AgentProvider` → `agent-provider`). Used as the config key prefix: `casehub.simulation.<name>.<method>.strategy=...`.
 
 ### SimulationRuntime
 
@@ -185,26 +191,83 @@ public class SimulationRuntime {
     @Inject SimulationConfig config;
     @Inject SimulationCorpus corpus;
 
-    public <I, O> Optional<SimulationStrategy<I, O>> strategyFor(String spiName) {
-        return config.strategyFor(spiName)
-            .map(strategyName -> createStrategy(spiName, strategyName));
+    private final Map<String, KeyExtractor<?>> extractors = new ConcurrentHashMap<>();
+
+    // --- Registration API (called by SPI adapter modules at startup) ---
+
+    public <I> void registerExtractor(String qualifiedName, KeyExtractor<I> extractor) {
+        extractors.put(qualifiedName, extractor);
     }
 
-    public boolean captureEnabled(String spiName) {
-        return config.captureEnabled(spiName);
+    // --- Strategy resolution (called by decorators and backends) ---
+
+    public <I, O> Optional<SimulationStrategy<I, O>> strategyFor(String qualifiedName) {
+        return config.strategyFor(qualifiedName)
+            .map(strategyName -> createStrategy(qualifiedName, strategyName));
     }
 
-    public <I, O> void capture(String spiName, String tenancyId, I input, O output) {
-        corpus.record(tenancyId, input, output);
+    public boolean captureEnabled(String qualifiedName) {
+        return config.captureEnabled(qualifiedName);
     }
 
-    public <I, O> void capture(String spiName, String tenancyId, String key, I input, O output) {
-        corpus.record(tenancyId, key, input, output);
+    public <I, O> void capture(String qualifiedName, String tenancyId, I input, O output) {
+        corpus.record(qualifiedName, tenancyId, input, output);
+    }
+
+    public <I, O> void capture(String qualifiedName, String tenancyId, String key, I input, O output) {
+        corpus.record(qualifiedName, tenancyId, key, input, output);
+    }
+
+    // --- Strategy factory ---
+
+    @SuppressWarnings("unchecked")
+    private <I, O> SimulationStrategy<I, O> createStrategy(String qualifiedName, String strategyName) {
+        return switch (strategyName) {
+            case "sequential" -> new SequentialStrategy<>(corpus, qualifiedName,
+                config.exhaustionPolicy(qualifiedName).orElse(ExhaustionPolicy.WRAP));
+            case "key-lookup" -> {
+                KeyExtractor<I> extractor = requireExtractor(qualifiedName);
+                yield new KeyLookupStrategy<>(corpus, qualifiedName, extractor);
+            }
+            case "random" -> new RandomStrategy<>(corpus, qualifiedName, new Random());
+            case "recorded-replay" -> {
+                KeyExtractor<I> extractor = requireExtractor(qualifiedName);
+                yield new RecordedReplayStrategy<>(corpus, qualifiedName, extractor);
+            }
+            default -> throw new SimulationConfigException(
+                "Unknown strategy '" + strategyName + "' for " + qualifiedName);
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    private <I> KeyExtractor<I> requireExtractor(String qualifiedName) {
+        KeyExtractor<I> extractor = (KeyExtractor<I>) extractors.get(qualifiedName);
+        if (extractor == null) {
+            throw new SimulationConfigException(
+                "Strategy for " + qualifiedName + " requires a KeyExtractor, but none registered");
+        }
+        return extractor;
     }
 }
 ```
 
-Non-generic `@ApplicationScoped` bean — avoids the CDI type erasure problem with `Instance<SimulationStrategy<I, O>>`. Generated decorators and backend implementations inject `SimulationRuntime` and resolve strategies by SPI name at runtime. Follows the `CallbackRegistry` pattern: a non-generic registry that resolves by SPI name, not by generic type parameters.
+Non-generic `@ApplicationScoped` bean — avoids the CDI type erasure problem with `Instance<SimulationStrategy<I, O>>`. Generated decorators and backend implementations inject `SimulationRuntime` and resolve strategies by method-qualified name at runtime. Follows the `CallbackRegistry` pattern: a non-generic registry that resolves by name, not by generic type parameters.
+
+**Registration:** SPI adapter modules register their `KeyExtractor` instances at startup via CDI `@Observes StartupEvent`. The factory uses registered components to construct the configured strategy variant. Strategies that don't require a KeyExtractor (sequential, random) work without registration.
+
+```java
+// Example: CaseMemoryStore adapter registers extractors at startup
+@ApplicationScoped
+public class CaseMemoryStoreSimulationAdapter {
+    @Inject SimulationRuntime simulation;
+
+    void onStartup(@Observes StartupEvent event) {
+        simulation.registerExtractor("case-memory-store.query",
+            (QuerySimulationInput input) -> input.query().domain().name()
+                + ":" + input.query().question());
+    }
+}
+```
 
 ## Strategy implementations
 
@@ -217,24 +280,25 @@ Returns responses from a pre-defined list in order. Thread-safe atomic counter.
 ```java
 public class SequentialStrategy<I, O> implements SimulationStrategy<I, O> {
     private final SimulationCorpus<I, O> corpus;
+    private final String qualifiedName;
     private final AtomicInteger index = new AtomicInteger(0);
     private final ExhaustionPolicy exhaustionPolicy;
 
     public O resolve(I input) {
         int i = index.getAndIncrement();
-        if (exhaustionPolicy == ExhaustionPolicy.THROW && i >= corpus.size()) {
+        if (exhaustionPolicy == ExhaustionPolicy.THROW && i >= corpus.size(qualifiedName)) {
             throw new SimulationExhaustedException(
-                "Corpus exhausted at index " + i + " (size: " + corpus.size() + ")");
+                "Corpus exhausted at index " + i + " (size: " + corpus.size(qualifiedName) + ")");
         }
-        return corpus.lookupByIndex(i % corpus.size())
+        return corpus.lookupByIndex(qualifiedName, i % corpus.size(qualifiedName))
             .orElseThrow(() -> new SimulationExhaustedException(...));
     }
 
     public boolean canResolve(I input) {
         if (exhaustionPolicy == ExhaustionPolicy.THROW) {
-            return index.get() < corpus.size();
+            return index.get() < corpus.size(qualifiedName);
         }
-        return corpus.size() > 0;
+        return corpus.size(qualifiedName) > 0;
     }
 }
 
@@ -250,17 +314,18 @@ Invocation parameters → key → exact match in corpus.
 ```java
 public class KeyLookupStrategy<I, O> implements SimulationStrategy<I, O> {
     private final SimulationCorpus<I, O> corpus;
+    private final String qualifiedName;
     private final KeyExtractor<I> keyExtractor;
 
     public O resolve(I input) {
         String key = keyExtractor.extract(input);
-        return corpus.lookupByKey(key)
+        return corpus.lookupByKey(qualifiedName, key)
             .orElseThrow(() -> new SimulationKeyNotFoundException(key));
     }
 
     public boolean canResolve(I input) {
         String key = keyExtractor.extract(input);
-        return corpus.lookupByKey(key).isPresent();
+        return corpus.lookupByKey(qualifiedName, key).isPresent();
     }
 }
 ```
@@ -274,13 +339,14 @@ Samples from corpus or generates on demand.
 ```java
 public class RandomStrategy<I, O> implements SimulationStrategy<I, O> {
     private final SimulationCorpus<I, O> corpus;
+    private final String qualifiedName;
     private final Random random;
     private final Supplier<O> generator; // optional on-demand generation
 
     public O resolve(I input) {
         if (generator != null) return generator.get();
-        int i = random.nextInt(corpus.size());
-        return corpus.lookupByIndex(i)
+        int i = random.nextInt(corpus.size(qualifiedName));
+        return corpus.lookupByIndex(qualifiedName, i)
             .orElseThrow(() -> new SimulationExhaustedException(...));
     }
 }
@@ -295,15 +361,16 @@ Replays captured corpus in recorded order.
 ```java
 public class RecordedReplayStrategy<I, O> implements SimulationStrategy<I, O> {
     private final SimulationCorpus<I, O> corpus;
+    private final String qualifiedName;
     private final KeyExtractor<I> keyExtractor;
     private final AtomicInteger index = new AtomicInteger(0);
 
     public O resolve(I input) {
         String key = keyExtractor.extract(input);
-        return corpus.lookupByKey(key)
+        return corpus.lookupByKey(qualifiedName, key)
             .orElseGet(() -> {
                 // fallback to sequential if key not found
-                return corpus.lookupByIndex(index.getAndIncrement())
+                return corpus.lookupByIndex(qualifiedName, index.getAndIncrement())
                     .orElseThrow();
             });
     }
@@ -319,11 +386,12 @@ The hard problem — constraint weighting, similarity scoring. Designed but defe
 ```java
 public class NearestMatchStrategy<I, O> implements SimulationStrategy<I, O> {
     private final SimulationCorpus<I, O> corpus;
+    private final String qualifiedName;
     private final SimilarityScorer<I> scorer;
     private final double threshold;
 
     public O resolve(I input) {
-        return corpus.list().stream()
+        return corpus.list(qualifiedName).stream()
             .map(r -> new ScoredMatch<>(r, scorer.score(input, r.input())))
             .filter(m -> m.score() >= threshold)
             .max(Comparator.comparingDouble(ScoredMatch::score))
@@ -346,6 +414,8 @@ Annotation processor (extends `AbstractProcessor`, sibling to `CallbackDecorator
 
 **Generated decorator template (Path A — direct SPIs only):**
 
+The generator produces a **per-method** strategy resolution block for each abstract method on the SPI. Each method gets its own method-qualified name (`"{spi-name}.{method-name}"`), its own input/output type pair, and its own strategy lookup. This handles multi-method SPIs like CaseMemoryStore where `store()`, `query()`, and `erase()` have different I/O types.
+
 ```java
 @Decorator
 @Priority(Interceptor.Priority.APPLICATION + 200)
@@ -355,15 +425,17 @@ public class Simulated{SpiName} implements {SpiInterface} {
     @Inject SimulationRuntime simulation;
     @Inject CurrentPrincipal currentPrincipal;
 
+    // --- Per-method: generated for each abstract method ---
+
     @Override
     public {ReturnType} {method}({params}) {
-        String spiName = "{spi-name}";
+        String qualifiedName = "{spi-name}.{method-name}";
 
-        // Simulation mode: strategy configured
-        Optional<SimulationStrategy<{InputType}, {OutputType}>> strategy =
-            simulation.strategyFor(spiName);
+        // Simulation mode: strategy configured for this method
+        Optional<SimulationStrategy<{MethodInputType}, {MethodOutputType}>> strategy =
+            simulation.strategyFor(qualifiedName);
         if (strategy.isPresent()) {
-            {InputType} input = new {InputType}({params});
+            {MethodInputType} input = new {MethodInputType}({params});
             if (strategy.get().canResolve(input)) {
                 return strategy.get().resolve(input);
             }
@@ -372,10 +444,10 @@ public class Simulated{SpiName} implements {SpiInterface} {
         // Passthrough + optional capture
         {ReturnType} result = delegate.{method}({params});
 
-        if (simulation.captureEnabled(spiName)) {
+        if (simulation.captureEnabled(qualifiedName)) {
             String tenancyId = currentPrincipal.tenancyId();
-            {InputType} input = new {InputType}({params});
-            simulation.capture(spiName, tenancyId, input, result);
+            {MethodInputType} input = new {MethodInputType}({params});
+            simulation.capture(qualifiedName, tenancyId, input, result);
         }
 
         return result;
@@ -385,7 +457,7 @@ public class Simulated{SpiName} implements {SpiInterface} {
 }
 ```
 
-The generated input record `{InputType}` wraps the SPI method parameters directly — `new {InputType}({params})` maps one-to-one with the method signature. Domain-specific field selection for matching is the `KeyExtractor`'s responsibility, not the input record's.
+Each method gets its own input record type (`{MethodInputType}`) that wraps the method's parameters directly — `new {MethodInputType}({params})` maps one-to-one with the method signature. Domain-specific field selection for matching is the `KeyExtractor`'s responsibility, not the input record's.
 
 The generator handles:
 - All abstract methods implemented with delegation (avoiding the CDI @Decorator gotcha from GE-20260818-2589ee)
@@ -393,24 +465,34 @@ The generator handles:
 - Idempotency guard for double-application through bridges (GE-20260620-9d043b)
 - `@IfBuildProperty` gating for zero-overhead when simulation module is absent
 
-### Per-SPI input/output types
+### Per-method input/output types
 
-Each simulation-eligible SPI needs typed input/output records. For Path A (decorator) SPIs, input records wrap the SPI method parameters directly — the generator produces `new {InputType}({params})`. For Path B (backend) SPIs, input/output types are defined by the backend implementation and may restructure parameters for optimal key extraction.
+Each simulated method needs its own typed input/output record. For Path A (decorator) SPIs, input records wrap the method parameters directly — the generator produces `new {MethodInputType}({params})`. For Path B (backend) SPIs, input/output types are defined by the backend implementation and may restructure parameters for optimal key extraction.
 
-**Example — CaseMemoryStore (Path A — decorator):**
+**Example — CaseMemoryStore (Path A — decorator, multi-method SPI):**
+
+Each abstract method gets its own input record:
 
 ```java
-// Input wraps the method parameters directly
-public record MemorySimulationInput(
-    String tenancyId,
-    List<String> entityIds,
-    String domain,
-    String question,
-    MemoryOrder order
-) {}
+// query() — wraps the single method parameter directly
+public record QuerySimulationInput(MemoryQuery query) {}
+// Output: List<Memory>
+// KeyExtractor: input -> input.query().domain().name() + ":" + input.query().question()
 
-// Output is List<Memory> — a data type, stored directly in corpus
-// KeyExtractor selects domain + question for matching
+// store() — wraps the single method parameter directly
+public record StoreSimulationInput(MemoryInput input) {}
+// Output: String (the stored memory ID)
+
+// erase() — wraps the single method parameter directly
+public record EraseSimulationInput(EraseRequest request) {}
+// Output: int (erasure count)
+```
+
+Configuration per method:
+```properties
+casehub.simulation.case-memory-store.query.strategy=key-lookup
+casehub.simulation.case-memory-store.store.strategy=sequential
+# erase: no strategy → passthrough to delegate
 ```
 
 **Example — AgentProvider (Path B — backend):**
@@ -442,7 +524,7 @@ This keeps the corpus and strategy contracts data-oriented — they store and re
 
 ### InMemorySimulationCorpus
 
-`@Alternative @Priority(100)`. `ConcurrentHashMap` keyed by `(spiName, tenancyId, key)`. Thread-safe. Supports concurrent capture from async callers.
+`@Alternative @Priority(100)`. `ConcurrentHashMap` keyed by `(qualifiedName, tenancyId, key)`. Thread-safe. Supports concurrent capture from async callers.
 
 ### FilesystemSimulationCorpus
 
@@ -451,7 +533,7 @@ This keeps the corpus and strategy contracts data-oriented — they store and re
 **Fixture file format:**
 
 ```yaml
-spi: agent-provider
+qualifiedName: agent-provider.invoke
 tenancy: default
 records:
   - key: "clinical-triage-prompt-v2"
@@ -495,21 +577,33 @@ public interface SimulationConfig {
     Map<String, SpiSimulationConfig> spis();
 
     interface SpiSimulationConfig {
+        @WithParentName
+        Map<String, MethodSimulationConfig> methods();
+    }
+
+    interface MethodSimulationConfig {
         Optional<String> strategy();
         @WithDefault("false")
         boolean capture();
         Optional<String> corpusPath();
+        Optional<String> exhaustionPolicy();
     }
 }
 ```
 
-Usage in `application.properties`:
+Two-level map: `spis()` maps SPI names (e.g., `case-memory-store`), `methods()` maps method names (e.g., `query`). The method-qualified name `case-memory-store.query` is resolved by `SimulationRuntime.strategyFor()` and maps to `casehub.simulation.case-memory-store.query.strategy=...` in properties.
+
+Usage in `application.properties` — method-qualified keys:
 
 ```properties
-casehub.simulation.agent-provider.strategy=key-lookup
-casehub.simulation.agent-provider.corpus-path=classpath:simulation/agent-provider.yaml
-casehub.simulation.case-memory-store.strategy=sequential
-casehub.simulation.case-memory-store.capture=true
+# AgentProvider (Path B) — per-method
+casehub.simulation.agent-provider.invoke.strategy=key-lookup
+casehub.simulation.agent-provider.invoke.corpus-path=classpath:simulation/agent-provider.yaml
+
+# CaseMemoryStore (Path A) — per-method, different strategies
+casehub.simulation.case-memory-store.query.strategy=key-lookup
+casehub.simulation.case-memory-store.store.strategy=sequential
+casehub.simulation.case-memory-store.query.capture=true
 ```
 
 ## Event simulation
@@ -532,17 +626,17 @@ A scheduled emitter (analogous to `DigestFlushScheduler`) invokes the strategy o
 public class SimulatedEventEmitter {
     @Inject SimulationRuntime simulation;
     @Inject DataSourceRegistry dataSourceRegistry;
-    @Inject CurrentPrincipal currentPrincipal;
 
     @Scheduled(every = "{casehub.simulation.events.interval:10s}")
     void emit() {
-        simulation.<EventTrigger, CloudEvent>strategyFor("event-emitter")
+        simulation.<EventTrigger, CloudEvent>strategyFor("event-emitter.emit")
             .ifPresent(strategy -> {
                 EventTrigger trigger = new EventTrigger(...);
                 if (strategy.canResolve(trigger)) {
                     CloudEvent event = strategy.resolve(trigger);
-                    String tenancyId = currentPrincipal.tenancyId();
-                    dataSourceRegistry.resolveSource(path, tenancyId)
+                    // Tenant context from corpus/fixture data, not CurrentPrincipal
+                    // (@Scheduled runs outside request context — no CurrentPrincipal available)
+                    dataSourceRegistry.resolveSource(path, trigger.tenancyId())
                         .ifPresent(ds -> ds.add(event));
                 }
             });
