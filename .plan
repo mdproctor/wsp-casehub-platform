@@ -9,11 +9,11 @@ Current: casehubio/platform#312 — feat: simulation-api — core SPI, strategy 
 date: 2026-09-15
 
 ## Queue
-- [ ] casehubio/platform#312 — feat: simulation-api — core SPI, strategy contracts, corpus types ← active
-- [ ] casehubio/platform#313 — feat: simulation-core — standard strategy implementations
-- [ ] casehubio/platform#314 — feat: simulation corpus storage — in-memory and filesystem backends
-- [ ] casehubio/platform#315 — feat: AgentProvider simulation adapter — LLM response simulation
-- [ ] casehubio/platform#327 — docs:
+- [x] casehubio/platform#312 — feat: simulation-api — core SPI, strategy contracts, corpus types
+- [x] casehubio/platform#313 — feat: simulation-core — standard strategy implementations
+- [x] casehubio/platform#314 — feat: simulation corpus storage — in-memory and filesystem backends
+- [x] casehubio/platform#315 — feat: AgentProvider simulation adapter — LLM response simulation
+- [ ] casehubio/platform#327 — docs: ← active
 - [ ] casehubio/platform#325 — YAML-driven
 - [ ] casehubio/platform#320 — CaseMemoryStore
 - [ ] casehubio/platform#317 — nearest-match
