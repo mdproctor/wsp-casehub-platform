@@ -2,36 +2,46 @@
 
 ## Last Session
 
-Two major workstreams this session under casehubio/parent#478 (Spring deployment completion):
+Validated and completed Batches 1-2 of casehubio/parent#478 (Spring deployment completion).
 
-**1. Generator infrastructure improvements.** Extracted shared MCP domain scan model to generator-common — `McpDomainJandexScanner`, `ResolvedOperation`, `ResolvedParam`, `DomainScanResult`, `OperationType`, `GeneratorUtils`. This gives both APT and Maven plugin generators a single scan model. Then rewrote graphql-spring-generator for full annotation parity with the Quarkus graphql-generator: @PlatformStream→@SubscriptionMapping+SseEmitter, @RestName, @RestStatus, @PaginatedResponse, @RolesAllowed pass-through, @PathParam→@PathVariable with null→404, mutations→201, kebab-case paths, isSimpleType routing. 14 tests covering all features.
+**1. Batch 1 test validation.** Platform Panache purge was compilation-only from the prior session. Ran tests on all 5 purged -jpa modules. Found 5 test files in persistence-jpa and acl-jpa still using Panache API calls (deleteAll, persist, count, list, find). Ported all to EntityManager + JPQL. All 5 modules pass (persistence-jpa, acl-jpa, notification-settings-jpa, digest-jpa, platform-view-jpa). Batch 1 is now fully validated.
 
-**2. Platform Panache purge (Batch 1 complete).** Stripped `extends PanacheEntityBase` from 11 entity files across 6 -jpa modules. Ported all Panache API calls in 3 store files (JpaAccessControlProvider: 20+ calls including find/delete/count/findById/persist; JpaPreferenceStore: find/list/delete/persist; JpaMemoryStore: 2x persist). Removed `quarkus-hibernate-orm-panache` dependency from all 6 pom files, replaced with direct `quarkus-hibernate-orm`. All modules compile.
+**2. Batch 2 consumer Panache porting (complete).** Ported Panache out of all 3 consumer repos:
 
-Also pushed generator modules + new annotation commits to shared local platform repo (`/Users/mdproctor/claude/casehub/platform`) so other slots can access them.
+| Repo | Branch | Entities | Stores | Poms | Compilation |
+|------|--------|----------|--------|------|-------------|
+| ledger | n/a | 0 (already done prior session) | 0 | 0 | Clean |
+| work | `issue-401-panache-purge` | 21 stripped | 30+ ported | 9 updated | Clean (2 pre-existing: engine-adapter missing InboundWorkItemRequest, federation missing markCompensated) |
+| qhorus | `issue-440-panache-purge` | 18 stripped | 20 ported + 4 PanacheRepo classes deleted | 2 updated | All 27 modules clean |
+
+Work repo: 3 commits (entity strip, store port, pom cleanup).
+Qhorus repo: 8 commits (entity strip, store ports in batches, PanacheRepo removal, pom cleanup).
+
+Both repos have WIP commits that need squashing before merge.
 
 ## Immediate Next Step
 
-Continue with plan Batch 2: Consumer Panache porting — ledger (2 files), work (~21 files), qhorus (~22 files). Issues already filed: ledger#208, work#401, qhorus#440. Same porting pattern established in Batch 1.
+Batch 3: Create missing -spring modules (work-spring, ledger-spring, eidos-spring). These live in their respective repos — each needs a pom.xml with spring-generator plugin, parent pom module declaration, and `<quarkusModule>` pointing at the Quarkus runtime module. Follow existing pattern from platform-spring.
 
 ## Remaining Batches
 
 | Batch | What | Status |
 |-------|------|--------|
-| 1. Platform Panache Purge | 11 entities + 3 stores + 6 poms | Done |
-| 2. Consumer Panache Porting | ledger (2), work (21), qhorus (22) | Next |
-| 3. Missing -spring Modules | work, ledger, eidos | Pending |
+| 1. Platform Panache Purge | 11 entities + 3 stores + 6 poms | Done + tested |
+| 2. Consumer Panache Porting | ledger, work, qhorus | Done (WIP commits need squash) |
+| 3. Missing -spring Modules | work, ledger, eidos | Next |
 | 4. Generator Plugin Wiring | rest/graphql gen to 5 repos | Pending |
 | 5. mcp-spring Runtime | SpringModelScanner + registrar | Pending |
 | 6. callback-spring | @Decorator → @Bean @Primary | Pending |
-| 7. Blocks Push | 10 commits to origin/main | Pending |
+| 7. Blocks Push | 10 commits to origin/main | Pending (needs squash first) |
 
 ## Key Facts
 
-- Blocks repo has 10 unpushed core extraction commits on local main (rebased onto origin/main). Push needed.
-- Platform Panache tests NOT run yet — compilation verified only. Tests need running before considering Batch 1 truly validated.
-- graphql-generator APT processor NOT yet retrofitted to use shared types (works correctly, lower priority than Spring generators).
-- origin/main may have new commits from other sessions — rebase before continuing.
+- Work and qhorus branches have WIP commits. Squash before merging to main.
+- Work repo has 2 pre-existing compilation failures (engine-adapter, federation) unrelated to Panache — cross-repo interface evolution.
+- Blocks repo still has 10 unpushed core extraction commits on local main.
+- graphql-generator APT processor NOT yet retrofitted to use shared types (lower priority).
+- Platform branch `issue-478-spring-deployment-completion` has 2 commits ahead of origin/main.
 
 ## Garden Entries Consulted
 
@@ -43,3 +53,5 @@ GE-20260420-7d28fa, GE-0138, GE-20260914-248827
 - `specs/spring-deployment-completion/decisions.md` (4 decisions)
 - `plans/2026-09-15-spring-deployment-completion.md` (11 tasks, 7 batches)
 - casehubio/parent#478 — tracking issue
+- casehubio/work#401 — work Panache purge issue
+- casehubio/qhorus#440 — qhorus Panache purge issue
