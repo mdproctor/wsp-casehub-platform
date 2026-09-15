@@ -23,3 +23,6 @@ date: 2026-09-15
 - [ ] casehubio/platform#321 — DefaultBean
 - [ ] casehubio/platform#322 — pages
 - [ ] casehubio/platform#323 — consumer
+- [ ] casehubio/platform#328 — domain-specific
+- [ ] casehubio/platform#329 — strategy
+- [ ] casehubio/platform#330 — domain
