@@ -192,6 +192,7 @@ public class SimulationRuntime {
     @Inject SimulationCorpus corpus;
 
     private final Map<String, KeyExtractor<?>> extractors = new ConcurrentHashMap<>();
+    private final Map<String, SimulationStrategy<?, ?>> strategyCache = new ConcurrentHashMap<>();
 
     // --- Registration API (called by SPI adapter modules at startup) ---
 
@@ -201,9 +202,11 @@ public class SimulationRuntime {
 
     // --- Strategy resolution (called by decorators and backends) ---
 
+    @SuppressWarnings("unchecked")
     public <I, O> Optional<SimulationStrategy<I, O>> strategyFor(String qualifiedName) {
         return config.strategyFor(qualifiedName)
-            .map(strategyName -> createStrategy(qualifiedName, strategyName));
+            .map(strategyName -> (SimulationStrategy<I, O>) strategyCache.computeIfAbsent(
+                qualifiedName, qn -> createStrategy(qn, strategyName)));
     }
 
     public boolean captureEnabled(String qualifiedName) {
