@@ -1080,7 +1080,7 @@ git commit -m "feat(#290): add OpenAiDirectBackendFactory for credential-store-d
 - `platform-api/src/main/java/io/casehub/platform/api/model/ModelDescriptor.java` — current record
 - `platform-api/src/main/java/io/casehub/platform/api/credentials/LlmCredentialStore.java` — credential SPI
 - `agent-openai/src/main/java/io/casehub/platform/agent/openai/OpenAiAgentBackend.java` — OpenAI backend
-- `agent-openai/src/main/java/io/casehub/platform/agent/openai/AbstractOpenAiSdkBackend.java` — shared base class
+- `../../../../agent-openai-core/src/main/java/io/casehub/platform/agent/openai/AbstractOpenAiSdkBackend.java` — shared base class
 - GE-20260810-804c58 — CaseHub AgentProvider CDI tiering
 - GE-20260626-c21b02 — @DefaultBean suppressed by Instance<T> peer
 - GitHub #290 — multi-instance backend support
