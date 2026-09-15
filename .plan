@@ -13,8 +13,17 @@ date: 2026-09-15
 - [x] casehubio/platform#313 — feat: simulation-core — standard strategy implementations
 - [x] casehubio/platform#314 — feat: simulation corpus storage — in-memory and filesystem backends
 - [x] casehubio/platform#315 — feat: AgentProvider simulation adapter — LLM response simulation
-- [ ] casehubio/platform#327 — docs: ← active
-- [ ] casehubio/platform#325 — YAML-driven
+- [x] casehubio/platform#327 — docs:
+- [ ] casehubio/platform#325 — YAML-driven ← active
+  - [ ] Batch 1: Config binding
+    - [ ] Task 1: SmallRyeSimulationConfig + module scaffold
+  - [ ] Batch 2: Corpus + extractors
+    - [ ] Task 2: YamlCorpusLoader
+    - [ ] Task 3: DeclarativeExtractorFactory
+  - [ ] Batch 3: CDI wiring
+    - [ ] Task 4: SimulationConfigBeans + integration tests
+  - [ ] Batch 4: Docs
+    - [ ] Task 5: CLAUDE.md + guide updates
 - [ ] casehubio/platform#320 — CaseMemoryStore
 - [ ] casehubio/platform#317 — nearest-match
 - [ ] casehubio/platform#318 — event
