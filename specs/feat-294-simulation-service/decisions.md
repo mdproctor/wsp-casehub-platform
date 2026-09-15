@@ -12,6 +12,59 @@
 **Exploration:** quick
 **Status:** captured
 
+---
+
+# Phase 3 — #317 NearestMatchStrategy
+
+## D17: Generic SimilarityScorer<I> in simulation-api, not CBR reuse
+
+**Choice:** Define `SimilarityScorer<I>` as a `@FunctionalInterface` in simulation-api (`double score(I query, I candidate)`). NearestMatchStrategy takes this interface. No dependency on neocortex-memory-api's CBR infrastructure.
+**Alternatives:**
+- Direct CBR reuse — NearestMatchStrategy takes CbrSimilarityScorer + CbrFeatureSchema directly. Tight coupling, wrong dependency direction (simulation is platform, CBR is neocortex).
+- Shared similarity-core module — extract CBR's similarity primitives into a shared module. Clean but requires migration for marginal reuse.
+**Rationale:** CBR's `CbrSimilarityScorer` operates on `Map<String, FeatureValue>` with `CbrFeatureSchema` — domain-specific to case retrieval. Simulation operates on arbitrary SPI input types. Forcing inputs through CBR's type system is unnatural. The bridge to CBR is a consumer concern: implement `SimilarityScorer<I>` by converting to FeatureValue maps and delegating to CbrSimilarityScorer. This keeps simulation-core zero-dep on neocortex.
+**Trade-offs:** No shared similarity primitives — per-field scoring functions (exact, numeric range, Jaccard) are reimplemented in simulation-core's `RecordFieldScorer`. Acceptable because the implementations are trivial (1-3 lines each) and the abstraction levels differ.
+**Sources:** CbrSimilarityScorer.java (neocortex-memory-api), LocalSimilarityFunction.java, SimilaritySpec.java, KeyExtractor.java (simulation-api parallel)
+**Exploration:** quick (first-principles analysis confirmed spec's existing direction)
+**Status:** captured
+
+## D18: Programmatic builder + declarative config factory (both, not either/or)
+
+**Choice:** `RecordFieldScorer<I>` provides a programmatic builder API for power users. `DeclarativeScorerFactory` (in simulation-config-core) parses config strings into RecordFieldScorer instances — parallel to `DeclarativeExtractorFactory` for KeyExtractors. Both coexist.
+**Alternatives:**
+- Programmatic only — YAGNI the declarative path. But #329 (strategy configuration) and #330 (domain configuration) are planned; programmatic-only forces a retrofit.
+- Declarative only — all scorers from config. Loses type safety and complex scoring (custom lambdas, domain logic).
+**Rationale:** #325 established the `DeclarativeExtractorFactory` pattern — config strings → functional instances. NearestMatch follows the same trajectory. The programmatic API handles complex cases; the declarative factory handles common cases via config. #329/#330 extend the declarative layer without reworking NearestMatch.
+**Trade-offs:** Two paths to the same result (code vs config). Acceptable — same pattern as KeyExtractor.
+**Sources:** DeclarativeExtractorFactory.java (simulation-config-core), #329, #330
+**Depends on:** D16 (Jackson ObjectMapper.convertValue for field access — same mechanism reused)
+**Exploration:** quick (user correction on YAGNI call)
+**Status:** captured
+
+## D19: Threshold as config property, no-match throws SimulationNoMatchException
+
+**Choice:** Threshold is a config property (`casehub.simulation.<spi>.<method>.threshold=0.7`, default 0.0). When no corpus entry exceeds the threshold, `canResolve()` returns false (strategy declines, decorator falls through to delegate). When `resolve()` is called and no match exceeds threshold, throw `SimulationNoMatchException`.
+**Alternatives:**
+- Threshold on the scorer — couples scoring and matching decisions. Scorer should only score; the strategy decides what's "good enough."
+- Fall through silently — return null or empty. Violates the strategy contract (resolve must return a value or throw).
+**Rationale:** `canResolve()` + `resolve()` contract from `SimulationStrategy<I, O>` already handles this. The decorator checks `canResolve()` first — if false, it delegates to the real backend. Threshold on the strategy (not the scorer) keeps concerns separate.
+**Trade-offs:** Default threshold 0.0 means any match wins — may return poor matches. Acceptable for dev/test; production simulation configs should set explicit thresholds.
+**Sources:** SimulationStrategy.java (canResolve/resolve contract), SimulationDecoratorProcessor generated code
+**Exploration:** quick
+**Status:** captured
+
+## D20: O(n) corpus scan, no indexing
+
+**Choice:** NearestMatchStrategy scans all corpus entries for the qualified name, scores each, returns the best above threshold. No indexing, no pre-filtering.
+**Alternatives:**
+- Pre-index corpus entries by key dimensions — amortised lookup. But corpora are small (10-50 entries in test fixtures) and the scan runs in dev/test, not production hot paths.
+- Approximate nearest neighbor (ANN) — vector-based. Overkill for small corpora; introduces embedding dependency.
+**Rationale:** Issue #317 says "naive O(n) scan first, optimise later." Corpora are small. The SimilarityScorer is called per-entry — for 50 entries with a simple field scorer, this is sub-millisecond.
+**Trade-offs:** Doesn't scale to large corpora (1000+ entries). If needed, add optional indexing as a follow-on — the strategy contract doesn't change.
+**Sources:** Issue #317 ("Corpus indexing — efficient lookup in large corpora. Naive O(n) scan first, optimise later.")
+**Exploration:** quick
+**Status:** captured
+
 ## D2: SPI types live in a dedicated simulation-api module
 
 **Choice:** Simulation SPI types (SimulationStrategy, SimulationCorpus, InvocationRecord, etc.) live in a new `simulation-api` module, not in `platform-api`.
@@ -33,6 +86,59 @@
 **Rationale:** Clean, type-safe. Each SPI adapter defines its own input/output record types. The strategy contract doesn't know about specific SPIs. Per-SPI adapters are small and mechanical.
 **Trade-offs:** Requires an adapter per SPI. But that adapter is where the SPI-specific key extraction and response shaping lives anyway — it's not overhead, it's design.
 **Sources:** AgentProvider SPI shape, CaseMemoryStore SPI shape (different signatures prove the need for generic typing)
+**Exploration:** quick
+**Status:** captured
+
+---
+
+# Phase 3 — #317 NearestMatchStrategy
+
+## D17: Generic SimilarityScorer<I> in simulation-api, not CBR reuse
+
+**Choice:** Define `SimilarityScorer<I>` as a `@FunctionalInterface` in simulation-api (`double score(I query, I candidate)`). NearestMatchStrategy takes this interface. No dependency on neocortex-memory-api's CBR infrastructure.
+**Alternatives:**
+- Direct CBR reuse — NearestMatchStrategy takes CbrSimilarityScorer + CbrFeatureSchema directly. Tight coupling, wrong dependency direction (simulation is platform, CBR is neocortex).
+- Shared similarity-core module — extract CBR's similarity primitives into a shared module. Clean but requires migration for marginal reuse.
+**Rationale:** CBR's `CbrSimilarityScorer` operates on `Map<String, FeatureValue>` with `CbrFeatureSchema` — domain-specific to case retrieval. Simulation operates on arbitrary SPI input types. Forcing inputs through CBR's type system is unnatural. The bridge to CBR is a consumer concern: implement `SimilarityScorer<I>` by converting to FeatureValue maps and delegating to CbrSimilarityScorer. This keeps simulation-core zero-dep on neocortex.
+**Trade-offs:** No shared similarity primitives — per-field scoring functions (exact, numeric range, Jaccard) are reimplemented in simulation-core's `RecordFieldScorer`. Acceptable because the implementations are trivial (1-3 lines each) and the abstraction levels differ.
+**Sources:** CbrSimilarityScorer.java (neocortex-memory-api), LocalSimilarityFunction.java, SimilaritySpec.java, KeyExtractor.java (simulation-api parallel)
+**Exploration:** quick (first-principles analysis confirmed spec's existing direction)
+**Status:** captured
+
+## D18: Programmatic builder + declarative config factory (both, not either/or)
+
+**Choice:** `RecordFieldScorer<I>` provides a programmatic builder API for power users. `DeclarativeScorerFactory` (in simulation-config-core) parses config strings into RecordFieldScorer instances — parallel to `DeclarativeExtractorFactory` for KeyExtractors. Both coexist.
+**Alternatives:**
+- Programmatic only — YAGNI the declarative path. But #329 (strategy configuration) and #330 (domain configuration) are planned; programmatic-only forces a retrofit.
+- Declarative only — all scorers from config. Loses type safety and complex scoring (custom lambdas, domain logic).
+**Rationale:** #325 established the `DeclarativeExtractorFactory` pattern — config strings → functional instances. NearestMatch follows the same trajectory. The programmatic API handles complex cases; the declarative factory handles common cases via config. #329/#330 extend the declarative layer without reworking NearestMatch.
+**Trade-offs:** Two paths to the same result (code vs config). Acceptable — same pattern as KeyExtractor.
+**Sources:** DeclarativeExtractorFactory.java (simulation-config-core), #329, #330
+**Depends on:** D16 (Jackson ObjectMapper.convertValue for field access — same mechanism reused)
+**Exploration:** quick (user correction on YAGNI call)
+**Status:** captured
+
+## D19: Threshold as config property, no-match throws SimulationNoMatchException
+
+**Choice:** Threshold is a config property (`casehub.simulation.<spi>.<method>.threshold=0.7`, default 0.0). When no corpus entry exceeds the threshold, `canResolve()` returns false (strategy declines, decorator falls through to delegate). When `resolve()` is called and no match exceeds threshold, throw `SimulationNoMatchException`.
+**Alternatives:**
+- Threshold on the scorer — couples scoring and matching decisions. Scorer should only score; the strategy decides what's "good enough."
+- Fall through silently — return null or empty. Violates the strategy contract (resolve must return a value or throw).
+**Rationale:** `canResolve()` + `resolve()` contract from `SimulationStrategy<I, O>` already handles this. The decorator checks `canResolve()` first — if false, it delegates to the real backend. Threshold on the strategy (not the scorer) keeps concerns separate.
+**Trade-offs:** Default threshold 0.0 means any match wins — may return poor matches. Acceptable for dev/test; production simulation configs should set explicit thresholds.
+**Sources:** SimulationStrategy.java (canResolve/resolve contract), SimulationDecoratorProcessor generated code
+**Exploration:** quick
+**Status:** captured
+
+## D20: O(n) corpus scan, no indexing
+
+**Choice:** NearestMatchStrategy scans all corpus entries for the qualified name, scores each, returns the best above threshold. No indexing, no pre-filtering.
+**Alternatives:**
+- Pre-index corpus entries by key dimensions — amortised lookup. But corpora are small (10-50 entries in test fixtures) and the scan runs in dev/test, not production hot paths.
+- Approximate nearest neighbor (ANN) — vector-based. Overkill for small corpora; introduces embedding dependency.
+**Rationale:** Issue #317 says "naive O(n) scan first, optimise later." Corpora are small. The SimilarityScorer is called per-entry — for 50 entries with a simple field scorer, this is sub-millisecond.
+**Trade-offs:** Doesn't scale to large corpora (1000+ entries). If needed, add optional indexing as a follow-on — the strategy contract doesn't change.
+**Sources:** Issue #317 ("Corpus indexing — efficient lookup in large corpora. Naive O(n) scan first, optimise later.")
 **Exploration:** quick
 **Status:** captured
 
@@ -99,6 +205,59 @@
 **Rationale:** Events are just another output type. The simulation framework should not care whether it's responding to a request or generating an event. Unified infrastructure reduces surface area.
 **Trade-offs:** Event timing/scheduling needs to be handled outside the strategy (by whatever triggers the strategy). The strategy itself is stateless — it resolves one event per invocation.
 **Sources:** DataSourceRegistry SPI, CloudEvent patterns in engine/work/blocks
+**Exploration:** quick
+**Status:** captured
+
+---
+
+# Phase 3 — #317 NearestMatchStrategy
+
+## D17: Generic SimilarityScorer<I> in simulation-api, not CBR reuse
+
+**Choice:** Define `SimilarityScorer<I>` as a `@FunctionalInterface` in simulation-api (`double score(I query, I candidate)`). NearestMatchStrategy takes this interface. No dependency on neocortex-memory-api's CBR infrastructure.
+**Alternatives:**
+- Direct CBR reuse — NearestMatchStrategy takes CbrSimilarityScorer + CbrFeatureSchema directly. Tight coupling, wrong dependency direction (simulation is platform, CBR is neocortex).
+- Shared similarity-core module — extract CBR's similarity primitives into a shared module. Clean but requires migration for marginal reuse.
+**Rationale:** CBR's `CbrSimilarityScorer` operates on `Map<String, FeatureValue>` with `CbrFeatureSchema` — domain-specific to case retrieval. Simulation operates on arbitrary SPI input types. Forcing inputs through CBR's type system is unnatural. The bridge to CBR is a consumer concern: implement `SimilarityScorer<I>` by converting to FeatureValue maps and delegating to CbrSimilarityScorer. This keeps simulation-core zero-dep on neocortex.
+**Trade-offs:** No shared similarity primitives — per-field scoring functions (exact, numeric range, Jaccard) are reimplemented in simulation-core's `RecordFieldScorer`. Acceptable because the implementations are trivial (1-3 lines each) and the abstraction levels differ.
+**Sources:** CbrSimilarityScorer.java (neocortex-memory-api), LocalSimilarityFunction.java, SimilaritySpec.java, KeyExtractor.java (simulation-api parallel)
+**Exploration:** quick (first-principles analysis confirmed spec's existing direction)
+**Status:** captured
+
+## D18: Programmatic builder + declarative config factory (both, not either/or)
+
+**Choice:** `RecordFieldScorer<I>` provides a programmatic builder API for power users. `DeclarativeScorerFactory` (in simulation-config-core) parses config strings into RecordFieldScorer instances — parallel to `DeclarativeExtractorFactory` for KeyExtractors. Both coexist.
+**Alternatives:**
+- Programmatic only — YAGNI the declarative path. But #329 (strategy configuration) and #330 (domain configuration) are planned; programmatic-only forces a retrofit.
+- Declarative only — all scorers from config. Loses type safety and complex scoring (custom lambdas, domain logic).
+**Rationale:** #325 established the `DeclarativeExtractorFactory` pattern — config strings → functional instances. NearestMatch follows the same trajectory. The programmatic API handles complex cases; the declarative factory handles common cases via config. #329/#330 extend the declarative layer without reworking NearestMatch.
+**Trade-offs:** Two paths to the same result (code vs config). Acceptable — same pattern as KeyExtractor.
+**Sources:** DeclarativeExtractorFactory.java (simulation-config-core), #329, #330
+**Depends on:** D16 (Jackson ObjectMapper.convertValue for field access — same mechanism reused)
+**Exploration:** quick (user correction on YAGNI call)
+**Status:** captured
+
+## D19: Threshold as config property, no-match throws SimulationNoMatchException
+
+**Choice:** Threshold is a config property (`casehub.simulation.<spi>.<method>.threshold=0.7`, default 0.0). When no corpus entry exceeds the threshold, `canResolve()` returns false (strategy declines, decorator falls through to delegate). When `resolve()` is called and no match exceeds threshold, throw `SimulationNoMatchException`.
+**Alternatives:**
+- Threshold on the scorer — couples scoring and matching decisions. Scorer should only score; the strategy decides what's "good enough."
+- Fall through silently — return null or empty. Violates the strategy contract (resolve must return a value or throw).
+**Rationale:** `canResolve()` + `resolve()` contract from `SimulationStrategy<I, O>` already handles this. The decorator checks `canResolve()` first — if false, it delegates to the real backend. Threshold on the strategy (not the scorer) keeps concerns separate.
+**Trade-offs:** Default threshold 0.0 means any match wins — may return poor matches. Acceptable for dev/test; production simulation configs should set explicit thresholds.
+**Sources:** SimulationStrategy.java (canResolve/resolve contract), SimulationDecoratorProcessor generated code
+**Exploration:** quick
+**Status:** captured
+
+## D20: O(n) corpus scan, no indexing
+
+**Choice:** NearestMatchStrategy scans all corpus entries for the qualified name, scores each, returns the best above threshold. No indexing, no pre-filtering.
+**Alternatives:**
+- Pre-index corpus entries by key dimensions — amortised lookup. But corpora are small (10-50 entries in test fixtures) and the scan runs in dev/test, not production hot paths.
+- Approximate nearest neighbor (ANN) — vector-based. Overkill for small corpora; introduces embedding dependency.
+**Rationale:** Issue #317 says "naive O(n) scan first, optimise later." Corpora are small. The SimilarityScorer is called per-entry — for 50 entries with a simple field scorer, this is sub-millisecond.
+**Trade-offs:** Doesn't scale to large corpora (1000+ entries). If needed, add optional indexing as a follow-on — the strategy contract doesn't change.
+**Sources:** Issue #317 ("Corpus indexing — efficient lookup in large corpora. Naive O(n) scan first, optimise later.")
 **Exploration:** quick
 **Status:** captured
 
@@ -169,6 +328,59 @@
 **Exploration:** quick
 **Status:** captured
 
+---
+
+# Phase 3 — #317 NearestMatchStrategy
+
+## D17: Generic SimilarityScorer<I> in simulation-api, not CBR reuse
+
+**Choice:** Define `SimilarityScorer<I>` as a `@FunctionalInterface` in simulation-api (`double score(I query, I candidate)`). NearestMatchStrategy takes this interface. No dependency on neocortex-memory-api's CBR infrastructure.
+**Alternatives:**
+- Direct CBR reuse — NearestMatchStrategy takes CbrSimilarityScorer + CbrFeatureSchema directly. Tight coupling, wrong dependency direction (simulation is platform, CBR is neocortex).
+- Shared similarity-core module — extract CBR's similarity primitives into a shared module. Clean but requires migration for marginal reuse.
+**Rationale:** CBR's `CbrSimilarityScorer` operates on `Map<String, FeatureValue>` with `CbrFeatureSchema` — domain-specific to case retrieval. Simulation operates on arbitrary SPI input types. Forcing inputs through CBR's type system is unnatural. The bridge to CBR is a consumer concern: implement `SimilarityScorer<I>` by converting to FeatureValue maps and delegating to CbrSimilarityScorer. This keeps simulation-core zero-dep on neocortex.
+**Trade-offs:** No shared similarity primitives — per-field scoring functions (exact, numeric range, Jaccard) are reimplemented in simulation-core's `RecordFieldScorer`. Acceptable because the implementations are trivial (1-3 lines each) and the abstraction levels differ.
+**Sources:** CbrSimilarityScorer.java (neocortex-memory-api), LocalSimilarityFunction.java, SimilaritySpec.java, KeyExtractor.java (simulation-api parallel)
+**Exploration:** quick (first-principles analysis confirmed spec's existing direction)
+**Status:** captured
+
+## D18: Programmatic builder + declarative config factory (both, not either/or)
+
+**Choice:** `RecordFieldScorer<I>` provides a programmatic builder API for power users. `DeclarativeScorerFactory` (in simulation-config-core) parses config strings into RecordFieldScorer instances — parallel to `DeclarativeExtractorFactory` for KeyExtractors. Both coexist.
+**Alternatives:**
+- Programmatic only — YAGNI the declarative path. But #329 (strategy configuration) and #330 (domain configuration) are planned; programmatic-only forces a retrofit.
+- Declarative only — all scorers from config. Loses type safety and complex scoring (custom lambdas, domain logic).
+**Rationale:** #325 established the `DeclarativeExtractorFactory` pattern — config strings → functional instances. NearestMatch follows the same trajectory. The programmatic API handles complex cases; the declarative factory handles common cases via config. #329/#330 extend the declarative layer without reworking NearestMatch.
+**Trade-offs:** Two paths to the same result (code vs config). Acceptable — same pattern as KeyExtractor.
+**Sources:** DeclarativeExtractorFactory.java (simulation-config-core), #329, #330
+**Depends on:** D16 (Jackson ObjectMapper.convertValue for field access — same mechanism reused)
+**Exploration:** quick (user correction on YAGNI call)
+**Status:** captured
+
+## D19: Threshold as config property, no-match throws SimulationNoMatchException
+
+**Choice:** Threshold is a config property (`casehub.simulation.<spi>.<method>.threshold=0.7`, default 0.0). When no corpus entry exceeds the threshold, `canResolve()` returns false (strategy declines, decorator falls through to delegate). When `resolve()` is called and no match exceeds threshold, throw `SimulationNoMatchException`.
+**Alternatives:**
+- Threshold on the scorer — couples scoring and matching decisions. Scorer should only score; the strategy decides what's "good enough."
+- Fall through silently — return null or empty. Violates the strategy contract (resolve must return a value or throw).
+**Rationale:** `canResolve()` + `resolve()` contract from `SimulationStrategy<I, O>` already handles this. The decorator checks `canResolve()` first — if false, it delegates to the real backend. Threshold on the strategy (not the scorer) keeps concerns separate.
+**Trade-offs:** Default threshold 0.0 means any match wins — may return poor matches. Acceptable for dev/test; production simulation configs should set explicit thresholds.
+**Sources:** SimulationStrategy.java (canResolve/resolve contract), SimulationDecoratorProcessor generated code
+**Exploration:** quick
+**Status:** captured
+
+## D20: O(n) corpus scan, no indexing
+
+**Choice:** NearestMatchStrategy scans all corpus entries for the qualified name, scores each, returns the best above threshold. No indexing, no pre-filtering.
+**Alternatives:**
+- Pre-index corpus entries by key dimensions — amortised lookup. But corpora are small (10-50 entries in test fixtures) and the scan runs in dev/test, not production hot paths.
+- Approximate nearest neighbor (ANN) — vector-based. Overkill for small corpora; introduces embedding dependency.
+**Rationale:** Issue #317 says "naive O(n) scan first, optimise later." Corpora are small. The SimilarityScorer is called per-entry — for 50 entries with a simple field scorer, this is sub-millisecond.
+**Trade-offs:** Doesn't scale to large corpora (1000+ entries). If needed, add optional indexing as a follow-on — the strategy contract doesn't change.
+**Sources:** Issue #317 ("Corpus indexing — efficient lookup in large corpora. Naive O(n) scan first, optimise later.")
+**Exploration:** quick
+**Status:** captured
+
 ## D14: YAML corpus uses Object-typed input/output (no type-aware deserialization)
 
 **Choice:** YAML corpus fixtures store input/output as native YAML types (String, Map, List, Number). `InvocationRecord<Object, Object>` is used for YAML-loaded entries. Type erasure means this works at runtime.
@@ -178,6 +390,59 @@
 **Rationale:** YAML corpus is for quick scenarios and dev/demo environments. Typed corpus construction belongs to the programmatic API and corpus builders (#328). The simulation guide's DataRealism spectrum already classifies YAML fixtures as `DOMAIN_PLAUSIBLE`, not type-precise. Documenting the limitation is sufficient.
 **Trade-offs:** SPIs with rich domain return types (e.g., `List<Memory>`) can't use YAML corpus directly — they need programmatic seeding. This is expected and documented.
 **Sources:** InvocationRecord.java (generic record), simulation-guide.md (corpus population section), #328 (corpus builders)
+**Exploration:** quick
+**Status:** captured
+
+---
+
+# Phase 3 — #317 NearestMatchStrategy
+
+## D17: Generic SimilarityScorer<I> in simulation-api, not CBR reuse
+
+**Choice:** Define `SimilarityScorer<I>` as a `@FunctionalInterface` in simulation-api (`double score(I query, I candidate)`). NearestMatchStrategy takes this interface. No dependency on neocortex-memory-api's CBR infrastructure.
+**Alternatives:**
+- Direct CBR reuse — NearestMatchStrategy takes CbrSimilarityScorer + CbrFeatureSchema directly. Tight coupling, wrong dependency direction (simulation is platform, CBR is neocortex).
+- Shared similarity-core module — extract CBR's similarity primitives into a shared module. Clean but requires migration for marginal reuse.
+**Rationale:** CBR's `CbrSimilarityScorer` operates on `Map<String, FeatureValue>` with `CbrFeatureSchema` — domain-specific to case retrieval. Simulation operates on arbitrary SPI input types. Forcing inputs through CBR's type system is unnatural. The bridge to CBR is a consumer concern: implement `SimilarityScorer<I>` by converting to FeatureValue maps and delegating to CbrSimilarityScorer. This keeps simulation-core zero-dep on neocortex.
+**Trade-offs:** No shared similarity primitives — per-field scoring functions (exact, numeric range, Jaccard) are reimplemented in simulation-core's `RecordFieldScorer`. Acceptable because the implementations are trivial (1-3 lines each) and the abstraction levels differ.
+**Sources:** CbrSimilarityScorer.java (neocortex-memory-api), LocalSimilarityFunction.java, SimilaritySpec.java, KeyExtractor.java (simulation-api parallel)
+**Exploration:** quick (first-principles analysis confirmed spec's existing direction)
+**Status:** captured
+
+## D18: Programmatic builder + declarative config factory (both, not either/or)
+
+**Choice:** `RecordFieldScorer<I>` provides a programmatic builder API for power users. `DeclarativeScorerFactory` (in simulation-config-core) parses config strings into RecordFieldScorer instances — parallel to `DeclarativeExtractorFactory` for KeyExtractors. Both coexist.
+**Alternatives:**
+- Programmatic only — YAGNI the declarative path. But #329 (strategy configuration) and #330 (domain configuration) are planned; programmatic-only forces a retrofit.
+- Declarative only — all scorers from config. Loses type safety and complex scoring (custom lambdas, domain logic).
+**Rationale:** #325 established the `DeclarativeExtractorFactory` pattern — config strings → functional instances. NearestMatch follows the same trajectory. The programmatic API handles complex cases; the declarative factory handles common cases via config. #329/#330 extend the declarative layer without reworking NearestMatch.
+**Trade-offs:** Two paths to the same result (code vs config). Acceptable — same pattern as KeyExtractor.
+**Sources:** DeclarativeExtractorFactory.java (simulation-config-core), #329, #330
+**Depends on:** D16 (Jackson ObjectMapper.convertValue for field access — same mechanism reused)
+**Exploration:** quick (user correction on YAGNI call)
+**Status:** captured
+
+## D19: Threshold as config property, no-match throws SimulationNoMatchException
+
+**Choice:** Threshold is a config property (`casehub.simulation.<spi>.<method>.threshold=0.7`, default 0.0). When no corpus entry exceeds the threshold, `canResolve()` returns false (strategy declines, decorator falls through to delegate). When `resolve()` is called and no match exceeds threshold, throw `SimulationNoMatchException`.
+**Alternatives:**
+- Threshold on the scorer — couples scoring and matching decisions. Scorer should only score; the strategy decides what's "good enough."
+- Fall through silently — return null or empty. Violates the strategy contract (resolve must return a value or throw).
+**Rationale:** `canResolve()` + `resolve()` contract from `SimulationStrategy<I, O>` already handles this. The decorator checks `canResolve()` first — if false, it delegates to the real backend. Threshold on the strategy (not the scorer) keeps concerns separate.
+**Trade-offs:** Default threshold 0.0 means any match wins — may return poor matches. Acceptable for dev/test; production simulation configs should set explicit thresholds.
+**Sources:** SimulationStrategy.java (canResolve/resolve contract), SimulationDecoratorProcessor generated code
+**Exploration:** quick
+**Status:** captured
+
+## D20: O(n) corpus scan, no indexing
+
+**Choice:** NearestMatchStrategy scans all corpus entries for the qualified name, scores each, returns the best above threshold. No indexing, no pre-filtering.
+**Alternatives:**
+- Pre-index corpus entries by key dimensions — amortised lookup. But corpora are small (10-50 entries in test fixtures) and the scan runs in dev/test, not production hot paths.
+- Approximate nearest neighbor (ANN) — vector-based. Overkill for small corpora; introduces embedding dependency.
+**Rationale:** Issue #317 says "naive O(n) scan first, optimise later." Corpora are small. The SimilarityScorer is called per-entry — for 50 entries with a simple field scorer, this is sub-millisecond.
+**Trade-offs:** Doesn't scale to large corpora (1000+ entries). If needed, add optional indexing as a follow-on — the strategy contract doesn't change.
+**Sources:** Issue #317 ("Corpus indexing — efficient lookup in large corpora. Naive O(n) scan first, optimise later.")
 **Exploration:** quick
 **Status:** captured
 
@@ -192,6 +457,59 @@
 **Exploration:** quick
 **Status:** captured
 
+---
+
+# Phase 3 — #317 NearestMatchStrategy
+
+## D17: Generic SimilarityScorer<I> in simulation-api, not CBR reuse
+
+**Choice:** Define `SimilarityScorer<I>` as a `@FunctionalInterface` in simulation-api (`double score(I query, I candidate)`). NearestMatchStrategy takes this interface. No dependency on neocortex-memory-api's CBR infrastructure.
+**Alternatives:**
+- Direct CBR reuse — NearestMatchStrategy takes CbrSimilarityScorer + CbrFeatureSchema directly. Tight coupling, wrong dependency direction (simulation is platform, CBR is neocortex).
+- Shared similarity-core module — extract CBR's similarity primitives into a shared module. Clean but requires migration for marginal reuse.
+**Rationale:** CBR's `CbrSimilarityScorer` operates on `Map<String, FeatureValue>` with `CbrFeatureSchema` — domain-specific to case retrieval. Simulation operates on arbitrary SPI input types. Forcing inputs through CBR's type system is unnatural. The bridge to CBR is a consumer concern: implement `SimilarityScorer<I>` by converting to FeatureValue maps and delegating to CbrSimilarityScorer. This keeps simulation-core zero-dep on neocortex.
+**Trade-offs:** No shared similarity primitives — per-field scoring functions (exact, numeric range, Jaccard) are reimplemented in simulation-core's `RecordFieldScorer`. Acceptable because the implementations are trivial (1-3 lines each) and the abstraction levels differ.
+**Sources:** CbrSimilarityScorer.java (neocortex-memory-api), LocalSimilarityFunction.java, SimilaritySpec.java, KeyExtractor.java (simulation-api parallel)
+**Exploration:** quick (first-principles analysis confirmed spec's existing direction)
+**Status:** captured
+
+## D18: Programmatic builder + declarative config factory (both, not either/or)
+
+**Choice:** `RecordFieldScorer<I>` provides a programmatic builder API for power users. `DeclarativeScorerFactory` (in simulation-config-core) parses config strings into RecordFieldScorer instances — parallel to `DeclarativeExtractorFactory` for KeyExtractors. Both coexist.
+**Alternatives:**
+- Programmatic only — YAGNI the declarative path. But #329 (strategy configuration) and #330 (domain configuration) are planned; programmatic-only forces a retrofit.
+- Declarative only — all scorers from config. Loses type safety and complex scoring (custom lambdas, domain logic).
+**Rationale:** #325 established the `DeclarativeExtractorFactory` pattern — config strings → functional instances. NearestMatch follows the same trajectory. The programmatic API handles complex cases; the declarative factory handles common cases via config. #329/#330 extend the declarative layer without reworking NearestMatch.
+**Trade-offs:** Two paths to the same result (code vs config). Acceptable — same pattern as KeyExtractor.
+**Sources:** DeclarativeExtractorFactory.java (simulation-config-core), #329, #330
+**Depends on:** D16 (Jackson ObjectMapper.convertValue for field access — same mechanism reused)
+**Exploration:** quick (user correction on YAGNI call)
+**Status:** captured
+
+## D19: Threshold as config property, no-match throws SimulationNoMatchException
+
+**Choice:** Threshold is a config property (`casehub.simulation.<spi>.<method>.threshold=0.7`, default 0.0). When no corpus entry exceeds the threshold, `canResolve()` returns false (strategy declines, decorator falls through to delegate). When `resolve()` is called and no match exceeds threshold, throw `SimulationNoMatchException`.
+**Alternatives:**
+- Threshold on the scorer — couples scoring and matching decisions. Scorer should only score; the strategy decides what's "good enough."
+- Fall through silently — return null or empty. Violates the strategy contract (resolve must return a value or throw).
+**Rationale:** `canResolve()` + `resolve()` contract from `SimulationStrategy<I, O>` already handles this. The decorator checks `canResolve()` first — if false, it delegates to the real backend. Threshold on the strategy (not the scorer) keeps concerns separate.
+**Trade-offs:** Default threshold 0.0 means any match wins — may return poor matches. Acceptable for dev/test; production simulation configs should set explicit thresholds.
+**Sources:** SimulationStrategy.java (canResolve/resolve contract), SimulationDecoratorProcessor generated code
+**Exploration:** quick
+**Status:** captured
+
+## D20: O(n) corpus scan, no indexing
+
+**Choice:** NearestMatchStrategy scans all corpus entries for the qualified name, scores each, returns the best above threshold. No indexing, no pre-filtering.
+**Alternatives:**
+- Pre-index corpus entries by key dimensions — amortised lookup. But corpora are small (10-50 entries in test fixtures) and the scan runs in dev/test, not production hot paths.
+- Approximate nearest neighbor (ANN) — vector-based. Overkill for small corpora; introduces embedding dependency.
+**Rationale:** Issue #317 says "naive O(n) scan first, optimise later." Corpora are small. The SimilarityScorer is called per-entry — for 50 entries with a simple field scorer, this is sub-millisecond.
+**Trade-offs:** Doesn't scale to large corpora (1000+ entries). If needed, add optional indexing as a follow-on — the strategy contract doesn't change.
+**Sources:** Issue #317 ("Corpus indexing — efficient lookup in large corpora. Naive O(n) scan first, optimise later.")
+**Exploration:** quick
+**Status:** captured
+
 ## D16: Declarative KeyExtractors use Jackson ObjectMapper.convertValue for field access
 
 **Choice:** Declarative extractors (`field:domain`, `composite:x,y`) convert typed SPI inputs to `Map<String, Object>` via Jackson `ObjectMapper.convertValue()`, then do map field access.
@@ -201,5 +519,58 @@
 **Rationale:** Jackson is already on the classpath for YAML corpus loading. ObjectMapper.convertValue handles records, POJOs, and Maps uniformly. Declarative extractors are convenience — complex extraction stays programmatic.
 **Trade-offs:** Jackson conversion has overhead (serialise then deserialise). Acceptable at startup (extractor factory creates the lambda once) and acceptable per-call (simulation is not a hot path in production — it's dev/test).
 **Sources:** KeyExtractor.java (FunctionalInterface), Jackson ObjectMapper API
+**Exploration:** quick
+**Status:** captured
+
+---
+
+# Phase 3 — #317 NearestMatchStrategy
+
+## D17: Generic SimilarityScorer<I> in simulation-api, not CBR reuse
+
+**Choice:** Define `SimilarityScorer<I>` as a `@FunctionalInterface` in simulation-api (`double score(I query, I candidate)`). NearestMatchStrategy takes this interface. No dependency on neocortex-memory-api's CBR infrastructure.
+**Alternatives:**
+- Direct CBR reuse — NearestMatchStrategy takes CbrSimilarityScorer + CbrFeatureSchema directly. Tight coupling, wrong dependency direction (simulation is platform, CBR is neocortex).
+- Shared similarity-core module — extract CBR's similarity primitives into a shared module. Clean but requires migration for marginal reuse.
+**Rationale:** CBR's `CbrSimilarityScorer` operates on `Map<String, FeatureValue>` with `CbrFeatureSchema` — domain-specific to case retrieval. Simulation operates on arbitrary SPI input types. Forcing inputs through CBR's type system is unnatural. The bridge to CBR is a consumer concern: implement `SimilarityScorer<I>` by converting to FeatureValue maps and delegating to CbrSimilarityScorer. This keeps simulation-core zero-dep on neocortex.
+**Trade-offs:** No shared similarity primitives — per-field scoring functions (exact, numeric range, Jaccard) are reimplemented in simulation-core's `RecordFieldScorer`. Acceptable because the implementations are trivial (1-3 lines each) and the abstraction levels differ.
+**Sources:** CbrSimilarityScorer.java (neocortex-memory-api), LocalSimilarityFunction.java, SimilaritySpec.java, KeyExtractor.java (simulation-api parallel)
+**Exploration:** quick (first-principles analysis confirmed spec's existing direction)
+**Status:** captured
+
+## D18: Programmatic builder + declarative config factory (both, not either/or)
+
+**Choice:** `RecordFieldScorer<I>` provides a programmatic builder API for power users. `DeclarativeScorerFactory` (in simulation-config-core) parses config strings into RecordFieldScorer instances — parallel to `DeclarativeExtractorFactory` for KeyExtractors. Both coexist.
+**Alternatives:**
+- Programmatic only — YAGNI the declarative path. But #329 (strategy configuration) and #330 (domain configuration) are planned; programmatic-only forces a retrofit.
+- Declarative only — all scorers from config. Loses type safety and complex scoring (custom lambdas, domain logic).
+**Rationale:** #325 established the `DeclarativeExtractorFactory` pattern — config strings → functional instances. NearestMatch follows the same trajectory. The programmatic API handles complex cases; the declarative factory handles common cases via config. #329/#330 extend the declarative layer without reworking NearestMatch.
+**Trade-offs:** Two paths to the same result (code vs config). Acceptable — same pattern as KeyExtractor.
+**Sources:** DeclarativeExtractorFactory.java (simulation-config-core), #329, #330
+**Depends on:** D16 (Jackson ObjectMapper.convertValue for field access — same mechanism reused)
+**Exploration:** quick (user correction on YAGNI call)
+**Status:** captured
+
+## D19: Threshold as config property, no-match throws SimulationNoMatchException
+
+**Choice:** Threshold is a config property (`casehub.simulation.<spi>.<method>.threshold=0.7`, default 0.0). When no corpus entry exceeds the threshold, `canResolve()` returns false (strategy declines, decorator falls through to delegate). When `resolve()` is called and no match exceeds threshold, throw `SimulationNoMatchException`.
+**Alternatives:**
+- Threshold on the scorer — couples scoring and matching decisions. Scorer should only score; the strategy decides what's "good enough."
+- Fall through silently — return null or empty. Violates the strategy contract (resolve must return a value or throw).
+**Rationale:** `canResolve()` + `resolve()` contract from `SimulationStrategy<I, O>` already handles this. The decorator checks `canResolve()` first — if false, it delegates to the real backend. Threshold on the strategy (not the scorer) keeps concerns separate.
+**Trade-offs:** Default threshold 0.0 means any match wins — may return poor matches. Acceptable for dev/test; production simulation configs should set explicit thresholds.
+**Sources:** SimulationStrategy.java (canResolve/resolve contract), SimulationDecoratorProcessor generated code
+**Exploration:** quick
+**Status:** captured
+
+## D20: O(n) corpus scan, no indexing
+
+**Choice:** NearestMatchStrategy scans all corpus entries for the qualified name, scores each, returns the best above threshold. No indexing, no pre-filtering.
+**Alternatives:**
+- Pre-index corpus entries by key dimensions — amortised lookup. But corpora are small (10-50 entries in test fixtures) and the scan runs in dev/test, not production hot paths.
+- Approximate nearest neighbor (ANN) — vector-based. Overkill for small corpora; introduces embedding dependency.
+**Rationale:** Issue #317 says "naive O(n) scan first, optimise later." Corpora are small. The SimilarityScorer is called per-entry — for 50 entries with a simple field scorer, this is sub-millisecond.
+**Trade-offs:** Doesn't scale to large corpora (1000+ entries). If needed, add optional indexing as a follow-on — the strategy contract doesn't change.
+**Sources:** Issue #317 ("Corpus indexing — efficient lookup in large corpora. Naive O(n) scan first, optimise later.")
 **Exploration:** quick
 **Status:** captured
