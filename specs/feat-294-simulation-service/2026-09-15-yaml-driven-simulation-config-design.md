@@ -360,8 +360,16 @@ single construction point for the runtime — consumers inject
 ### Activation
 
 The module activates by classpath presence — add `simulation-config` as
-a compile dependency. When absent, consumers must implement
-`SimulationConfig` manually (the current state).
+a compile dependency. This module is **required** alongside
+`simulation-generator` — the generated `@Decorator` beans inject
+`SimulationRuntime`, which has no CDI producer without this module.
+Without `simulation-config`, Quarkus fails at build time with
+unsatisfied injection points.
+
+A @DefaultBean fallback for SimulationRuntime is planned (#321) but
+not in scope here. Until then, consumers using `@SimulationEligible`
+must add both `simulation-generator` (provided) and `simulation-config`
+(compile).
 
 ### Boot sequence
 
@@ -402,6 +410,10 @@ a compile dependency. When absent, consumers must implement
   Use programmatic extractors for nested access.
 - **YAML-driven strategy registration** — strategies are selected by
   config key (`strategy=sequential`), not defined in YAML.
+- **IDE auto-completion for config keys** — manual prefix scanning
+  trades SmallRye @ConfigMapping IDE support for robustness against
+  SmallRye gotchas. Strategy names are validated at runtime by
+  `SimulationRuntime.createStrategy()`.
 
 ## References
 
