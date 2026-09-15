@@ -1,0 +1,25 @@
+# Work Plan — issue-294-simulation-service
+
+## State
+branch: issue-294-simulation-service
+state: active
+issue-repo: casehubio/platform
+covers: casehubio/platform#312
+Current: casehubio/platform#312 — feat: simulation-api — core SPI, strategy contracts, corpus types
+date: 2026-09-15
+
+## Queue
+- [ ] casehubio/platform#312 — feat: simulation-api — core SPI, strategy contracts, corpus types ← active
+- [ ] casehubio/platform#313 — feat: simulation-core — standard strategy implementations
+- [ ] casehubio/platform#314 — feat: simulation corpus storage — in-memory and filesystem backends
+- [ ] casehubio/platform#315 — feat: AgentProvider simulation adapter — LLM response simulation
+- [ ] casehubio/platform#327 — docs:
+- [ ] casehubio/platform#325 — YAML-driven
+- [ ] casehubio/platform#320 — CaseMemoryStore
+- [ ] casehubio/platform#317 — nearest-match
+- [ ] casehubio/platform#318 — event
+- [ ] casehubio/platform#326 — timed
+- [ ] casehubio/platform#319 — REST
+- [ ] casehubio/platform#321 — DefaultBean
+- [ ] casehubio/platform#322 — pages
+- [ ] casehubio/platform#323 — consumer
