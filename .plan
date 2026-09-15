@@ -13,21 +13,12 @@ flyway-next-v: unknown
 
 ## Queue
 - [ ] casehubio/parent#478 — Issue #478 ← active
-  - [ ] Batch 1: Platform Panache Purge
-    - [ ] Task 1: Strip PanacheEntityBase from entities and stores
-  - [ ] Batch 2: Consumer Panache Porting
-    - [ ] Task 2: Port ledger Panache
-    - [ ] Task 3: Port work Panache
-    - [ ] Task 4: Port qhorus Panache
-  - [ ] Batch 3: Missing -spring Modules
-    - [ ] Task 5: Create work-spring
-    - [ ] Task 6: Create ledger-spring
-    - [ ] Task 7: Create eidos-spring
-  - [ ] Batch 4: Generator Plugin Wiring
-    - [ ] Task 8: Wire targeted gen plugins
-  - [ ] Batch 5: mcp-spring Runtime
-    - [ ] Task 9: SpringModelScanner + registrar
-  - [ ] Batch 6: callback-spring
-    - [ ] Task 10: Decorator wrapping
-  - [ ] Batch 7: Blocks Push
-    - [ ] Task 11: Push blocks to origin/main
+  - [ ] Batch 1: Batch 1
+    - [ ] Task 1: Platform Panache Purge/Task 1: Strip PanacheEntityBase from entities and stores
+
+## Deferred
+- [ ] parent#479: llm-config-core extraction (XS / Low) []
+- [ ] parent#480: Pattern 2 migration qhorus (M / Med) []
+- [ ] parent#481: Pattern 2 migration neocortex (S / Low) []
+- [ ] parent#482: Wire graphql-spring-gen in consumer repos (S / Low) []
+- [ ] parent#483: Spring REST for non-domain @Path resources (M / Med) []
