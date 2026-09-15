@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-478-spring-deployment-completion
-state: scaffolded
+state: active
 project-sha: 6cc0f66c0383398c620f5b97893ff500f0066fe8
 date: 2026-09-15
 issue-repo: casehubio/parent

@@ -2,40 +2,44 @@
 
 ## Last Session
 
-Completed #288 (cloud model sources) end-to-end: brainstorm (8 decisions, light decision review with revisions), design spec (light spec review, 12 findings addressed — separate modules for Vertex/Bedrock, priority-sorted refresh, cache alignment, CloudModelSource interface), 7-task implementation plan, all 7 tasks implemented with TDD. Issue closed.
+Two major workstreams this session under casehubio/parent#478 (Spring deployment completion):
 
-Key deliverables landed on branch:
-- `CloudModelSource` interface extending `ModelSource` with `status()` method
-- `CloudSourceStatus` record with `State` enum (ACTIVE/INACTIVE/ERROR) + factory methods
-- `AnthropicCloudModelSource` + `OpenAiCloudModelSource` — wrap existing VendorClients, priority 5, last-known-good caching
-- `VertexCloudModelSource` + `BedrockCloudModelSource` — inject via `Instance<VendorClient>`, graceful when module absent
-- New module `llm-config-vertex/` — `VertexClient` with Google ADC auth (`google-auth-library-oauth2-http`)
-- New module `llm-config-bedrock/` — `BedrockClient` with manual SigV4 signing (`software.amazon.awssdk:auth`)
-- `CloudSourceCredentialBootstrap` — env var detection (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`), `LlmCredentialStore` seeding at platform scope
-- `cloudSourceStatus()` query on `LlmConfigApi` for onboarding guidance
-- `ModelRegistryRefresher` — priority-sorted refresh (seed=0 before cloud=5 before configured=10)
-- HttpClient reuse fix in AnthropicClient, OpenAiClient, GoogleClient
-- 75+ tests across all modules, full build green
+**1. Generator infrastructure improvements.** Extracted shared MCP domain scan model to generator-common — `McpDomainJandexScanner`, `ResolvedOperation`, `ResolvedParam`, `DomainScanResult`, `OperationType`, `GeneratorUtils`. This gives both APT and Maven plugin generators a single scan model. Then rewrote graphql-spring-generator for full annotation parity with the Quarkus graphql-generator: @PlatformStream→@SubscriptionMapping+SseEmitter, @RestName, @RestStatus, @PaginatedResponse, @RolesAllowed pass-through, @PathParam→@PathVariable with null→404, mutations→201, kebab-case paths, isSimpleType routing. 14 tests covering all features.
+
+**2. Platform Panache purge (Batch 1 complete).** Stripped `extends PanacheEntityBase` from 11 entity files across 6 -jpa modules. Ported all Panache API calls in 3 store files (JpaAccessControlProvider: 20+ calls including find/delete/count/findById/persist; JpaPreferenceStore: find/list/delete/persist; JpaMemoryStore: 2x persist). Removed `quarkus-hibernate-orm-panache` dependency from all 6 pom files, replaced with direct `quarkus-hibernate-orm`. All modules compile.
+
+Also pushed generator modules + new annotation commits to shared local platform repo (`/Users/mdproctor/claude/casehub/platform`) so other slots can access them.
 
 ## Immediate Next Step
 
-Brainstorm #289 (local model sources — Ollama + HuggingFace discovery and lifecycle). Queue advanced, #289 is active.
+Continue with plan Batch 2: Consumer Panache porting — ledger (2 files), work (~21 files), qhorus (~22 files). Issues already filed: ledger#208, work#401, qhorus#440. Same porting pattern established in Batch 1.
 
-## Queue
+## Remaining Batches
 
-Branch `issue-288-cloud-model-sources` has 4 issues queued: #288 (done), #289 (active), #290, #292.
+| Batch | What | Status |
+|-------|------|--------|
+| 1. Platform Panache Purge | 11 entities + 3 stores + 6 poms | Done |
+| 2. Consumer Panache Porting | ledger (2), work (21), qhorus (22) | Next |
+| 3. Missing -spring Modules | work, ledger, eidos | Pending |
+| 4. Generator Plugin Wiring | rest/graphql gen to 5 repos | Pending |
+| 5. mcp-spring Runtime | SpringModelScanner + registrar | Pending |
+| 6. callback-spring | @Decorator → @Bean @Primary | Pending |
+| 7. Blocks Push | 10 commits to origin/main | Pending |
 
-## Key Design Decisions
+## Key Facts
 
-- Cloud sources use plain `apiModelId` (same as seed catalog) — priority resolution handles overlap
-- Vertex/Bedrock VendorClients in separate modules for classpath isolation (Quarkus build-time bean discovery + optional SDK deps = fragile)
-- Credential bootstrap seeds store from env vars but doesn't overwrite wizard-configured credentials
-- Discovery-invocation disconnect acknowledged: Vertex/Bedrock models route through Claude backend (direct API), not cloud platform endpoints — dedicated AgentBackends tracked as downstream
+- Blocks repo has 10 unpushed core extraction commits on local main (rebased onto origin/main). Push needed.
+- Platform Panache tests NOT run yet — compilation verified only. Tests need running before considering Batch 1 truly validated.
+- graphql-generator APT processor NOT yet retrofitted to use shared types (works correctly, lower priority than Spring generators).
+- origin/main may have new commits from other sessions — rebase before continuing.
+
+## Garden Entries Consulted
+
+GE-20260420-7d28fa, GE-0138, GE-20260914-248827
 
 ## References
 
-- Spec: `specs/issue-288-cloud-model-sources/2026-09-12-cloud-model-sources-design.md`
-- Plan: `plans/2026-09-12-cloud-model-sources.md`
-- Decision review: `/Users/mdproctor/reviews/casehub-platform/issue-288-decision-20260912-143409/`
-- Spec review: `/Users/mdproctor/reviews/casehub-platform/issue-288-cloud-model-sources-20260912-151559/`
-- Epic #285: LLM model registry
+- `specs/spring-deployment-completion/2026-09-15-spring-deployment-completion-design.md`
+- `specs/spring-deployment-completion/decisions.md` (4 decisions)
+- `plans/2026-09-15-spring-deployment-completion.md` (11 tasks, 7 batches)
+- casehubio/parent#478 — tracking issue
