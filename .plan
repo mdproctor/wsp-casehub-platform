@@ -13,11 +13,11 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#299 — Issue #299 ← active
-  - [ ] Batch 1: Refactor+SrcVersion
-    - [ ] Task 1: Fix @SupportedSourceVersion
-    - [ ] Task 2: Introduce ResolvedOperation records
-    - [ ] Task 3: Refactor scanAnnotatedInterfaces
-    - [ ] Task 4: Refactor code gen methods
-  - [ ] Batch 2: RoundEnv+Logging
-    - [ ] Task 5: Add RoundEnvironment scanning
-    - [ ] Task 6: Diagnostic logging + class name validation + tests
+  - [x] Batch 1: Refactor+SrcVersion
+    - [x] Task 1: Fix @SupportedSourceVersion
+    - [x] Task 2: Introduce ResolvedOperation records
+    - [x] Task 3: Refactor scanAnnotatedInterfaces
+    - [x] Task 4: Refactor code gen methods
+  - [x] Batch 2: RoundEnv+Logging
+    - [x] Task 5: Add RoundEnvironment scanning
+    - [x] Task 6: Diagnostic logging + class name validation + tests
