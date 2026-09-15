@@ -152,3 +152,54 @@
 **Sources:** CorpusSourceAdapter (casehub-engine-api, io.casehub.api.spi.CorpusSourceAdapter), NoOpCorpusSourceAdapter (engine runtime)
 **Exploration:** quick (surfaced by review R1-14)
 **Status:** captured
+
+---
+
+# Phase 2 — #325 YAML-driven simulation configuration
+
+## D13: Config binding via manual prefix scanning (not @ConfigMapping)
+
+**Choice:** Implement `SimulationConfig` by scanning `ConfigProvider.getConfig().getPropertyNames()` for the `casehub.simulation.*` prefix and parsing qualified names from keys.
+**Alternatives:**
+- @ConfigMapping with nested `Map<String, Map<String, MethodConfig>>` — type-safe but risks ghost entries when fixed sibling methods (e.g. `corpus()`) share the prefix (GE-20260609-4c6577), multi-level map silently returns `Optional.empty()` (GE-20260519-b9719e), and strict prefix ownership blocks `@ConfigProperty` under the same prefix (GE-20260612-ed9ff0)
+- Hybrid (@ConfigMapping for shape, manual for discovery) — more code for marginal type-safety gain
+**Rationale:** Five garden entries document SmallRye Config gotchas with the exact two-level dynamic key pattern this feature needs. Both precedent modules (endpoints-config, config) use `@ConfigProperty` + manual parsing, not `@ConfigMapping`. SimulationConfig is already a 3-method interface — the implementation is a thin wrapper over a `Map<String, MethodConfig>` built at startup.
+**Trade-offs:** No IDE auto-completion for config keys. No SmallRye validation of typos. Acceptable because: (1) strategy names are already validated at runtime by SimulationRuntime.createStrategy(), (2) the config key namespace is documented in the guide.
+**Sources:** GE-20260519-b9719e, GE-20260609-4c6577, GE-20260612-ed9ff0, GE-20260804-6076a3, endpoints-config/EndpointsConfigBeans.java, config/ConfigBeans.java
+**Exploration:** quick
+**Status:** captured
+
+## D14: YAML corpus uses Object-typed input/output (no type-aware deserialization)
+
+**Choice:** YAML corpus fixtures store input/output as native YAML types (String, Map, List, Number). `InvocationRecord<Object, Object>` is used for YAML-loaded entries. Type erasure means this works at runtime.
+**Alternatives:**
+- Jackson type-aware deserialization (input-type/output-type fields in YAML) — works but verbose YAML, fragile to refactoring
+- JSON string serialisation — most control but ugly YAML
+**Rationale:** YAML corpus is for quick scenarios and dev/demo environments. Typed corpus construction belongs to the programmatic API and corpus builders (#328). The simulation guide's DataRealism spectrum already classifies YAML fixtures as `DOMAIN_PLAUSIBLE`, not type-precise. Documenting the limitation is sufficient.
+**Trade-offs:** SPIs with rich domain return types (e.g., `List<Memory>`) can't use YAML corpus directly — they need programmatic seeding. This is expected and documented.
+**Sources:** InvocationRecord.java (generic record), simulation-guide.md (corpus population section), #328 (corpus builders)
+**Exploration:** quick
+**Status:** captured
+
+## D15: Single module — simulation-config-core + simulation-config
+
+**Choice:** All three deliverables (config binding, corpus populator, declarative extractors) live in one new module pair: `simulation-config-core` (POJO) + `simulation-config` (Quarkus beans).
+**Alternatives:**
+- Split into simulation-config + simulation-corpus-yaml — more granular, consumers who want config only don't pull Jackson. But adds a module for a startup-only concern.
+**Rationale:** All three are startup-time configuration concerns sharing the `casehub.simulation.*` prefix. One module, one dependency to add. Follows the config/ and endpoints-config/ pattern.
+**Trade-offs:** Consumers who only want config binding also get Jackson/SnakeYAML on the classpath. Acceptable — simulation is opt-in and the dependencies are transitives of Quarkus anyway.
+**Sources:** config-core/ + config/, endpoints-config-core/ + endpoints-config/
+**Exploration:** quick
+**Status:** captured
+
+## D16: Declarative KeyExtractors use Jackson ObjectMapper.convertValue for field access
+
+**Choice:** Declarative extractors (`field:domain`, `composite:x,y`) convert typed SPI inputs to `Map<String, Object>` via Jackson `ObjectMapper.convertValue()`, then do map field access.
+**Alternatives:**
+- Reflection-based property access — no Jackson dep, but fragile, records need special handling, no nested path support
+- Map-only (typed inputs not supported declaratively) — simplest but limits utility
+**Rationale:** Jackson is already on the classpath for YAML corpus loading. ObjectMapper.convertValue handles records, POJOs, and Maps uniformly. Declarative extractors are convenience — complex extraction stays programmatic.
+**Trade-offs:** Jackson conversion has overhead (serialise then deserialise). Acceptable at startup (extractor factory creates the lambda once) and acceptable per-call (simulation is not a hot path in production — it's dev/test).
+**Sources:** KeyExtractor.java (FunctionalInterface), Jackson ObjectMapper API
+**Exploration:** quick
+**Status:** captured
