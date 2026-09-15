@@ -235,43 +235,51 @@ Same pattern for the eidos repo.
 
 ## Batch 4: Targeted Generator Plugin Wiring
 
-### Task 8: Audit annotations and wire generator plugins
+### Task 8: Wire generator plugins based on annotation audit
+
+Annotation audit results:
+
+| Repo | @Path | @McpDomain | @Tool | Generators to wire |
+|------|:-:|:-:|:-:|---|
+| platform | 5 | 11 | 0 | rest + graphql |
+| engine | ~8 | 2 | 0 | rest + graphql |
+| work | ~25 | 4 | 0 | rest + graphql |
+| qhorus | ~3 | ~8 | 0 | spring-gen + rest + graphql |
+| ledger | 2 | 4 | 0 | rest + graphql |
+| eidos | 0 | 0 | 0 | spring-gen only |
+| neocortex | 0 | 1 | 0 | spring-gen + graphql |
+| blocks | 0 | 0 | 0 | none (spring-gen already present) |
+| connectors | 0 | 0 | 0 | spring-gen only |
+
+No @Tool in any core repo — mcp-spring-generator only needed for connector repos (out of scope).
 
 **Files:**
-- Modify: -spring pom.xml files across all repos that have matching annotations
+- Modify: -spring pom.xml files per table above
 
 **Interfaces:**
-- Consumes: Annotation audit results (which repos have @Path, @McpDomain, @Tool)
+- Consumes: Existing -spring modules from Batches 1-3
 - Produces: Generator plugins wired, verify goals passing
 
-- [ ] **Step 1: Run IntelliJ annotation audit**
+- [ ] **Step 1: Fix repos with missing spring-generator**
 
-Use `ide_search_text` across all repos to count @Path classes, @McpDomain interfaces, and @Tool methods. Record which modules in each repo have which annotations.
+Add `casehub-platform-spring-generator` plugin to -spring poms that are missing it: qhorus/runtime-spring, neocortex/*-spring, connectors/connectors-spring, eidos/eidos-spring (new from Batch 3).
 
-- [ ] **Step 2: Fix repos with missing spring-generator**
+- [ ] **Step 2: Add rest-spring-generator to platform, engine, work, qhorus, ledger**
 
-Add `casehub-platform-spring-generator` plugin to -spring poms that are missing it: qhorus/runtime-spring, neocortex/*-spring, connectors/connectors-spring.
+Add plugin declaration to each repo's -spring pom.xml, pointing `<quarkusModule>` at the runtime module containing @Path resources.
 
-- [ ] **Step 3: Add rest-spring-generator where @Path resources exist**
+- [ ] **Step 3: Add graphql-spring-generator to platform, engine, work, qhorus, ledger, neocortex**
 
-For each repo/module with @Path-annotated classes, add the rest-spring-generator plugin declaration to the corresponding -spring pom.xml.
+Add plugin declaration where @McpDomain interfaces exist.
 
-- [ ] **Step 4: Add graphql-spring-generator where @McpDomain interfaces exist**
-
-Same pattern for @McpDomain.
-
-- [ ] **Step 5: Add mcp-spring-generator where @Tool methods exist**
-
-Same pattern for @Tool.
-
-- [ ] **Step 6: Run verify goals across all repos**
+- [ ] **Step 4: Run verify goals across all repos**
 
 For each repo with -spring modules:
 ```
 mvn --batch-mode verify -pl <spring-module>
 ```
 
-- [ ] **Step 7: Commit per repo**
+- [ ] **Step 5: Commit per repo**
 
 ---
 
