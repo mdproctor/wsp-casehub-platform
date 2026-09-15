@@ -1,7 +1,7 @@
 format_version: 1
-state: DECISION_CAPTURE
-entered: 2026-09-15T20:22:00Z
-decision_count: 3
+state: SPEC_SELF_REVIEW
+entered: 2026-09-15T20:25:00Z
+decision_count: 4
 dimensions_completed: 0
 dimensions_total: 0
 ordered: false
