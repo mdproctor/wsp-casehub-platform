@@ -2,46 +2,50 @@
 
 ## Last Session
 
-Validated and completed Batches 1-2 of casehubio/parent#478 (Spring deployment completion).
+Git hygiene and Batch 3 of casehubio/parent#478 (Spring deployment completion).
 
-**1. Batch 1 test validation.** Platform Panache purge was compilation-only from the prior session. Ran tests on all 5 purged -jpa modules. Found 5 test files in persistence-jpa and acl-jpa still using Panache API calls (deleteAll, persist, count, list, find). Ported all to EntityManager + JPQL. All 5 modules pass (persistence-jpa, acl-jpa, notification-settings-jpa, digest-jpa, platform-view-jpa). Batch 1 is now fully validated.
+**1. Git hygiene.** Pushed workspace to origin (8 commits). Squashed WIP commits in work (3 → 1: `eec5771a`) and qhorus (8 → 1: `de57d7b1`). Both branches now have a single clean commit ready to merge.
 
-**2. Batch 2 consumer Panache porting (complete).** Ported Panache out of all 3 consumer repos:
+**2. Spring generator fixes.** Two bugs found and fixed in `spring-generator`:
 
-| Repo | Branch | Entities | Stores | Poms | Compilation |
-|------|--------|----------|--------|------|-------------|
-| ledger | n/a | 0 (already done prior session) | 0 | 0 | Clean |
-| work | `issue-401-panache-purge` | 21 stripped | 30+ ported | 9 updated | Clean (2 pre-existing: engine-adapter missing InboundWorkItemRequest, federation missing markCompensated) |
-| qhorus | `issue-440-panache-purge` | 18 stripped | 20 ported + 4 PanacheRepo classes deleted | 2 updated | All 27 modules clean |
+- **Abstract return types:** Producer methods returning abstract SPIs (e.g., `AgentGraphBackfill`) caused `new AbstractType()` in generated code. Fixed by changing producers in eidos and ledger to return concrete types (e.g., `NoOpAgentGraphBackfill`). CDI still resolves by supertypes — no behavior change.
+- **`@ConfigMapping` parameter detection:** Scanner didn't detect Quarkus `@ConfigMapping` types as CDI dependencies, generating uncompilable Spring code referencing runtime-only types. Fixed: `JandexProducerScanner` now checks parameter types against `@ConfigMapping` annotation in Jandex. `SpringVerifyMojo` now excludes `requiresManualConfig()` descriptors from drift check.
 
-Work repo: 3 commits (entity strip, store port, pom cleanup).
-Qhorus repo: 8 commits (entity strip, store ports in batches, PanacheRepo removal, pom cleanup).
+**3. Batch 3: Created missing -spring modules.**
 
-Both repos have WIP commits that need squashing before merge.
+| Repo | Module | Branch | Types | Commit |
+|------|--------|--------|:-----:|--------|
+| eidos | eidos-spring | `issue-478-spring-modules` | 18/18 | `1c4cae8` |
+| ledger | ledger-spring | `issue-478-spring-modules` | 7/7 | `c63aa6a` |
+| work | work-spring | `issue-478-spring-modules` | 6/6 | `39c70e81` |
+
+Each parent pom received: `spring-boot.version=4.1.0`, `version.io.casehub=0.2-SNAPSHOT`, `spring-boot-dependencies` BOM import, and the new module declaration.
+
+IntelliJ was opened for eidos and ledger in slot 192 for the producer return type changes.
 
 ## Immediate Next Step
 
-Batch 3: Create missing -spring modules (work-spring, ledger-spring, eidos-spring). These live in their respective repos — each needs a pom.xml with spring-generator plugin, parent pom module declaration, and `<quarkusModule>` pointing at the Quarkus runtime module. Follow existing pattern from platform-spring.
+Batch 4: Targeted Generator Plugin Wiring. Audit each source module for `@Path`, `@McpDomain`, `@Tool` annotations using IntelliJ. Add `rest-spring-generator`, `graphql-spring-generator`, `mcp-spring-generator` plugins only where annotations exist. Also fix 3 repos with -spring modules but no `spring-generator` plugin: qhorus, neocortex, connectors.
 
 ## Remaining Batches
 
 | Batch | What | Status |
 |-------|------|--------|
 | 1. Platform Panache Purge | 11 entities + 3 stores + 6 poms | Done + tested |
-| 2. Consumer Panache Porting | ledger, work, qhorus | Done (WIP commits need squash) |
-| 3. Missing -spring Modules | work, ledger, eidos | Next |
-| 4. Generator Plugin Wiring | rest/graphql gen to 5 repos | Pending |
+| 2. Consumer Panache Porting | ledger, work, qhorus | Done (squashed, ready to merge) |
+| 3. Missing -spring Modules | work, ledger, eidos | Done |
+| 4. Generator Plugin Wiring | rest/graphql gen to 5 repos | Next |
 | 5. mcp-spring Runtime | SpringModelScanner + registrar | Pending |
 | 6. callback-spring | @Decorator → @Bean @Primary | Pending |
 | 7. Blocks Push | 10 commits to origin/main | Pending (needs squash first) |
 
 ## Key Facts
 
-- Work and qhorus branches have WIP commits. Squash before merging to main.
-- Work repo has 2 pre-existing compilation failures (engine-adapter, federation) unrelated to Panache — cross-repo interface evolution.
-- Blocks repo still has 10 unpushed core extraction commits on local main.
-- graphql-generator APT processor NOT yet retrofitted to use shared types (lower priority).
-- Platform branch `issue-478-spring-deployment-completion` has 2 commits ahead of origin/main.
+- Work and qhorus Panache branches are squashed single commits, not yet merged to main.
+- Platform branch `issue-478-spring-deployment-completion` has 3 commits ahead of origin/main (Batch 1 Panache + test fix + generator fix).
+- Eidos, ledger, work each have `issue-478-spring-modules` branches with 1 commit.
+- Workspace pushed to origin.
+- IntelliJ has eidos and ledger from slot 192 open (in addition to existing projects).
 
 ## Garden Entries Consulted
 
