@@ -1,0 +1,33 @@
+# Work Plan — issue-478-spring-deployment-completion
+
+## State
+branch: issue-478-spring-deployment-completion
+state: scaffolded
+project-sha: 6cc0f66c0383398c620f5b97893ff500f0066fe8
+date: 2026-09-15
+issue-repo: casehubio/parent
+covers: 478
+design-repo: project
+design-section-hashes: 
+flyway-next-v: unknown
+
+## Queue
+- [ ] casehubio/parent#478 — Issue #478 ← active
+  - [ ] Batch 1: Platform Panache Purge
+    - [ ] Task 1: Strip PanacheEntityBase from entities and stores
+  - [ ] Batch 2: Consumer Panache Porting
+    - [ ] Task 2: Port ledger Panache
+    - [ ] Task 3: Port work Panache
+    - [ ] Task 4: Port qhorus Panache
+  - [ ] Batch 3: Missing -spring Modules
+    - [ ] Task 5: Create work-spring
+    - [ ] Task 6: Create ledger-spring
+    - [ ] Task 7: Create eidos-spring
+  - [ ] Batch 4: Generator Plugin Wiring
+    - [ ] Task 8: Wire targeted gen plugins
+  - [ ] Batch 5: mcp-spring Runtime
+    - [ ] Task 9: SpringModelScanner + registrar
+  - [ ] Batch 6: callback-spring
+    - [ ] Task 10: Decorator wrapping
+  - [ ] Batch 7: Blocks Push
+    - [ ] Task 11: Push blocks to origin/main
