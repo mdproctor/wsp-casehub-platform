@@ -12,11 +12,9 @@ design-section-hashes:
 flyway-next-v: unknown
 
 ## Queue
-- [ ] casehubio/parent#478 — Issue #478 ← active
-  - [ ] Batch 1: Batch 1
-    - [ ] Task 1: Platform Panache Purge/Task 1: Strip PanacheEntityBase from entities and stores
-- [ ] casehubio/parent#479 — llm-config-core extraction
-- [ ] casehubio/parent#483 — Spring REST for non-domain @Path resources
-- [ ] casehubio/parent#480 — Pattern 2 migration qhorus
-- [ ] casehubio/parent#481 — Pattern 2 migration neocortex
+- [x] casehubio/parent#478 — Issue #478
+- [x] casehubio/parent#479 — llm-config-core extraction
+- [x] casehubio/parent#483 — Spring REST for non-domain @Path resources
+- [x] casehubio/parent#480 — Pattern 2 migration qhorus
+- [ ] casehubio/parent#481 — Pattern 2 migration neocortex ← active
 - [ ] casehubio/parent#482 — Wire graphql-spring-gen in consumer repos

@@ -2,31 +2,25 @@
 
 ## Last Session
 
-Continued #480 (Pattern 2 qhorus migration). Fixed all ledger-core extraction import breakage across qhorus — 19 files changed, compliance-report tests replaced and passing (146/146).
+Advanced to #481 (Pattern 2 neocortex migration). Complete — CognitionResolver replaced with CognitionApi SPI interface + CognitionService impl + APT-generated resolver. 50 tests pass.
 
-**#480: Ledger-core import fix — executed.**
+**#481: Pattern 2 neocortex — executed.**
 
-The ledger repo (branch `issue-478-spring-modules`) extracted types from `io.casehub.ledger.runtime.service` and `io.casehub.ledger.runtime.privacy` to `ledger-core` packages. Qhorus had stale imports across 4 modules:
+Single resolver class (`CognitionResolver`) in `cognitive-observability` migrated:
 
-- `TrustGateService` → `io.casehub.ledger.core.trust`
-- `ComplianceReport`, `DecisionRecord` → `io.casehub.ledger.core.compliance`
-- `ContentSanitiser` → `io.casehub.ledger.core.privacy`
-- `AttestationRecordedEvent` → `io.casehub.ledger.core.model`
-- `LedgerMerkleTree` → `io.casehub.ledger.core.merkle`
-- `LedgerMerkleFrontier` → `io.casehub.ledger.api.model` (from runtime.model)
+- `CognitionApi` interface: `@McpDomain("cognition")` + 5 `@PlatformQuery` methods (inspect, entity, health, diff, trace)
+- `CognitionService`: `@ApplicationScoped`, constructor-injected `Instance<CognitiveProfile>` and `Instance<SnapshotStore>` for optional deps, boxed types for defaulted params
+- APT wired with `-AgenerateRest=false` (REST generation deferred to #482 spring generator wiring)
+- `CognitionApi` stays in `cognitive-observability` (not `cognitive-api`) because return types (`GraphHealthReport`, `GraphDiffResult`, etc.) depend on `mindmap-core` types — moving them would break `cognitive-api`'s zero-dep nature
+- Jandex plugin added for index generation
+- Generated class: `io.casehub.platform.graphql.generated.GeneratedCognitionResolver`
 
-Types that stayed in `io.casehub.ledger.runtime.service`: `LedgerVerificationService`, `LedgerComplianceReportService`, `LedgerMerklePublisher`.
-
-Replaced `ComplianceQueryResolverTest` and `ComplianceMutationResolverTest` (referenced deleted resolver classes) with `ComplianceServiceTest` — tests the Pattern 2 `ComplianceService` directly with constructor injection and domain types.
-
-Qhorus commit (on branch `issue-440-panache-purge`):
-- `d39f995c` — fix imports for ledger-core extraction (19 files, 145 insertions, 175 deletions)
-
-**Pre-existing issue:** runtime module Quarkus extension descriptor fails due to Panache deployment dependency mismatch (from the Panache purge work on this branch). Not caused by #480 import fixes.
+Neocortex commit (on branch `issue-478-spring-modules`):
+- `9543188a` — feat(#481): Pattern 2 migration — move @McpDomain to CognitionApi SPI interface
 
 ## Immediate Next Step
 
-#480 is now complete — all compilation errors fixed, tests passing. Advance to #481 (Pattern 2 neocortex) via `work next`.
+Advance to #482 (Wire graphql-spring-gen in consumer repos) via `work next`.
 
 ## Queue State
 
@@ -35,21 +29,19 @@ Qhorus commit (on branch `issue-440-panache-purge`):
 | 0 | parent#478 | L | High | Done |
 | 1 | parent#479 | XS | Low | Done |
 | 2 | parent#483 | M | Med | Done |
-| 3 | parent#480 | M | Med | Active — import fix complete, tests green |
-| 4 | parent#481 | S | Low | Pending — Pattern 2 neocortex |
-| 5 | parent#482 | S | Low | Pending — Wire graphql-spring-gen |
+| 3 | parent#480 | M | Med | Done |
+| 4 | parent#481 | S | Low | Done |
+| 5 | parent#482 | S | Low | Active — wire graphql-spring-gen |
 
 ## Key Facts
 
 - Platform branch `issue-478-spring-deployment-completion` — unchanged this session.
-- Qhorus branch `issue-440-panache-purge` — 6 commits total from #480 work (5 prior + 1 this session).
-- Ledger installed from branch `issue-478-spring-modules` (api, ledger-core, annotations, runtime) to local Maven repo.
-- `runtime-core` and `compliance-report` compile and test clean.
-- `runtime` compiles at source level but fails at Quarkus extension descriptor step (pre-existing Panache purge issue).
+- Neocortex branch `issue-478-spring-modules` — 2 commits total (1 prior + 1 this session).
+- cognitive-observability installed to local Maven repo.
+- All Pattern 2 migrations now complete: engine#1095 (done), qhorus#480 (done), neocortex#481 (done).
 
 ## References
 
 - `specs/issue-478-spring-deployment-completion/2026-09-15-pattern2-qhorus-design.md`
-- `specs/issue-478-spring-deployment-completion/pattern2-qhorus-decisions.md`
-- casehubio/parent#478, #480
+- casehubio/parent#478, #481
 - Memory: `project_pattern2_migration.md`
