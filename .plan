@@ -18,5 +18,5 @@ flyway-next-v: none
     - [x] Task 2: Update Spring generator consumers
   - [x] Batch 2: APT
     - [x] Task 3: GraphQLResolverProcessor class support
-  - [ ] Batch 3: Runtime
-    - [ ] Task 4: GraphQLModelScanner class support
+  - [x] Batch 3: Runtime
+    - [x] Task 4: GraphQLModelScanner class support
