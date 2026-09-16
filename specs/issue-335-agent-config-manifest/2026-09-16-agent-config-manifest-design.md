@@ -270,7 +270,7 @@ All guards log warnings — a misconfigured source chain should degrade, not cra
 
 #### Security
 
-Remote sources use HTTPS for transport-level integrity and confidentiality. Authentication headers (bearer tokens, mTLS) and content integrity verification (checksums) are follow-on concerns — tracked as a separate issue. The initial implementation trusts HTTPS endpoints and caches last-known-good snapshots.
+Remote sources use HTTPS for transport-level integrity and confidentiality. Authentication headers (bearer tokens, mTLS) and content integrity verification (checksums) are follow-on concerns — tracked as casehubio/platform#336. The initial implementation trusts HTTPS endpoints and caches last-known-good snapshots.
 
 ### Accumulation Rules
 
@@ -314,21 +314,45 @@ After step 1, `BackendInstanceCoordinator` runs its normal startup sequence at `
 
 1. Collect all model descriptors from the merged manifest
 2. If `apiModelId` is omitted on a model entry, default to the model's `id` (matching `SeedCatalogModelSource` behavior)
-3. Register via `MutableModelRegistry.replaceSource("manifest", priority, models)`
+3. Register via `MutableModelRegistry.replaceSource("manifest", 8, models)`
 4. Normal `ModelRegistryRefresher` cycle keeps cloud-discovered models current
+
+Priority **8** places the manifest above cloud sources (5) but below per-tenant configured sources (10):
+
+| Source | sourceId | priority | Authority |
+|--------|----------|----------|-----------|
+| SeedCatalogModelSource | `"seed-catalog"` | 0 | Static fallback (disabled when manifest active — see §Unchanged) |
+| OllamaModelSource | `"local:ollama"` | 3 | Live local discovery |
+| Cloud sources | `"cloud:{vendor}"` | 5 | Live vendor API discovery |
+| **Manifest** | `"manifest"` | **8** | **Explicit declarative config** |
+| ConfiguredModelSource | `"configured:{v}:{t}"` | 10 | Per-tenant runtime config |
+
+Manifest models override cloud-discovered models (explicit declaration beats auto-discovery). Per-tenant runtime configuration via `LlmConfigService` still wins (runtime beats static config).
 
 #### Step 3 — Local Models → Reconciliation
 
+ManifestProcessor accepts a `LocalModelReconciler` functional interface as a constructor parameter:
+
+```java
+@FunctionalInterface
+public interface LocalModelReconciler {
+    void ensurePresent(String modelId);
+}
+```
+
+The Quarkus wiring layer (`AgentConfigBeans`) provides an implementation that delegates to `OllamaModelSource` (availability check) and `LlmConfigService.pullModel()` (pull trigger) — both in `llm-config/`, accessible only from the Quarkus layer.
+
 For each local model with `ensure: present`:
-1. Check availability via OllamaModelSource
-2. If missing: trigger pull via `LlmConfigService.pullModel()`
-3. If missing: warn and continue (non-blocking) — model will be available after pull completes, subsequent invocations will find it
+1. Call `reconciler.ensurePresent(modelId)`
+2. The implementation checks availability, triggers pull if missing, warns and continues (non-blocking) — model will be available after pull completes, subsequent invocations will find it
+
+This follows the same dependency-injection pattern used for vendor field requirements (R1-08): ManifestProcessor in `agent-config-core` operates on an abstraction; the Quarkus wiring layer provides the concrete implementation with `llm-config` dependencies.
 
 #### Step 4 — Aliases + Defaults → ManifestResult
 
-1. Parse each alias: `ModelConstraints` → `ModelQuery` (filter fields) + optional `preferVendor` (tiebreaker)
+1. Parse each alias: `ModelConstraints` → `ModelQuery` (all fields including `preferVendor`)
 2. Determine effective default backend: manifest `defaults.backend` if declared, else fall back to `RoutingAgentConfig.defaultBackend()` (which defaults to `"claude"` via `@WithDefault`)
-3. Produce `ManifestResult` record: `Map<String, ModelQuery> aliases`, `Map<String, String> aliasVendorPreferences`, `String defaultBackendKey`
+3. Produce `ManifestResult` record: `Map<String, ModelQuery> aliases`, `String defaultBackendKey`
 
 `ManifestResult` is a CDI bean produced by `AgentConfigBeans`. `RouterBeans` consumes it as an optional dependency — if present, its aliases and default backend key override config-property values. `RoutingAgentProvider` gains a new constructor accepting aliases:
 
@@ -336,8 +360,7 @@ For each local model with `ensure: present`:
 public RoutingAgentProvider(BackendInstanceRegistry registry,
                             String defaultBackendKey,
                             ModelRegistry modelRegistry,
-                            Map<String, ModelQuery> aliases,
-                            Map<String, String> aliasVendorPreferences)
+                            Map<String, ModelQuery> aliases)
 ```
 
 After step 4, `agentProvider.invoke()` works. No custom code.
@@ -355,13 +378,13 @@ resolve(model):
   4. Fail fast
 ```
 
-Tiebreaking (steps 0 and 1): among matching models, prefer (1) default backend, then (2) `aliasVendorPreferences.get(aliasName)` for step 0 (carried separately from the ModelQuery, not as a field on it — see §ModelQuery Extension), then (3) first match.
+Tiebreaking (steps 0 and 1): among matching models, prefer (1) default backend, then (2) `query.preferVendor()` if set, then (3) first match.
 
-`prefer-vendor` is a tiebreaking hint, not a filter. It lives in a separate `Map<String, String> aliasVendorPreferences` (alias name → vendor), not in `ModelQuery`. This keeps `ModelQuery` purely about filtering — `InMemoryModelRegistry.query()` doesn't need to know about tiebreaking semantics.
+`prefer-vendor` is a tiebreaking hint, not a filter. It lives on `ModelQuery` as metadata but is NOT used by `InMemoryModelRegistry.query()` — the registry ignores it during filtering. The router reads it after filtering for tiebreaking. This works uniformly for named aliases (step 0), tier references (step 1), and inline `ModelConstraints` in eidos task definitions.
 
 ## ModelQuery Extension
 
-Two new filter fields added to `ModelQuery`:
+Three new fields added to `ModelQuery`:
 
 ```java
 public record ModelQuery(
@@ -373,7 +396,8 @@ public record ModelQuery(
     CostTier maxCostTier,
     String authMethod,
     Integer minContextWindow,    // NEW — null = no minimum
-    Integer minMaxOutput         // NEW — null = no minimum
+    Integer minMaxOutput,        // NEW — null = no minimum
+    String preferVendor          // NEW — tiebreaker, not a filter — null = no preference
 ) { ... }
 ```
 
@@ -400,12 +424,12 @@ Pure filtering, no scoring. Deterministic.
 | `max-cost` | `maxCostTier` | Enum parse |
 | `min-context` | `minContextWindow` | Direct |
 | `min-output` | `minMaxOutput` | Direct |
-| `prefer-vendor` | *(not in ModelQuery)* | Carried in `aliasVendorPreferences` map |
+| `prefer-vendor` | `preferVendor` | Direct — tiebreaker, not used by `query()` |
 | *(not in schema)* | `authMethod` | Not exposed in manifest — set to null |
 
-`prefer-vendor` is intentionally NOT added to `ModelQuery`. `ModelQuery` is a pure filter type — every field participates in `InMemoryModelRegistry.query()` filtering. `prefer-vendor` is a tiebreaking hint (preference among models that already match the filter), not a filter predicate. Mixing filter and tiebreaking semantics in one type creates ambiguity — "does `preferVendor` narrow results or rank them?" Keeping them separate makes both types honest about what they do.
+`preferVendor` lives on `ModelQuery` but is NOT used by `InMemoryModelRegistry.query()` — it's metadata carried on the query for the router's tiebreaking logic. The filter pipeline ignores it; the router reads it after filtering. This ensures `prefer-vendor` works in all contexts — named aliases, inline `ModelConstraints` in eidos task definitions, and org descriptor model selections — without requiring a separate side-channel.
 
-The two types serve different layers: `ModelConstraints` is the schema-generated YAML record; `ModelQuery` is the platform runtime filter. They overlap in fields because filtering IS the primary purpose of model selection constraints — but they are not duplicates. `ModelConstraints` carries `prefer-vendor` (a user-facing concept for the manifest schema); `ModelQuery` carries `authMethod` (a platform-internal filter). Neither is a superset of the other.
+The two types serve different layers: `ModelConstraints` is the schema-generated YAML record; `ModelQuery` is the platform runtime type. They overlap in fields because filtering IS the primary purpose of model selection constraints — but they are not duplicates. `ModelQuery` carries `authMethod` (a platform-internal filter not exposed in the schema). Neither is a superset of the other.
 
 ## Module Structure
 
@@ -424,8 +448,9 @@ Framework-neutral. Pure Java + Jackson. Depends on `platform-api` (zero-dependen
 | `SourceDeclaration` | Record: uri, priority |
 | `CredentialRef` | Sealed interface: EnvRef, FileRef, ExternalRef — parsed from prefix |
 | `ManifestLoader` | Discovers resources from hierarchy, parses YAML, merges. Cycle detection via URI set, max depth 3, 10s timeout per remote fetch, max 20 total sources. |
-| `ManifestProcessor` | Drives existing SPIs from merged manifest. Accepts vendor required fields as `Map<String, List<String>>` constructor parameter (injected by Quarkus layer from `VendorClient` beans). |
-| `ManifestResult` | Record: `Map<String, ModelQuery> aliases`, `Map<String, String> aliasVendorPreferences`, `String defaultBackendKey` |
+| `ManifestProcessor` | Drives existing SPIs from merged manifest. Accepts vendor required fields as `Map<String, List<String>>` and a `LocalModelReconciler` as constructor parameters (injected by Quarkus layer). |
+| `ManifestResult` | Record: `Map<String, ModelQuery> aliases`, `String defaultBackendKey` |
+| `LocalModelReconciler` | Functional interface: `void ensurePresent(String modelId)`. Implementation provided by Quarkus wiring layer (delegates to `OllamaModelSource` + `LlmConfigService`). |
 | `ManifestCredentialResolver` | Resolves CredentialRef to plain values. Handles `env:` and `file:` directly; delegates `ref:` to `CredentialResolver` SPI (from platform-api, injected via constructor). |
 
 The resolver is named `ManifestCredentialResolver` (not `CredentialRefResolver`) to avoid confusion with the existing `CredentialResolver` SPI in `platform-api`. `CredentialResolver` resolves credentials by logical name; `ManifestCredentialResolver` resolves credential references with `env:`/`file:`/`ref:` prefixes. Different operation, distinct name.
@@ -438,7 +463,7 @@ Quarkus wiring. Thin.
 
 | Type | Purpose |
 |------|---------|
-| `AgentConfigBeans` | `@Observes @Priority(50) StartupEvent` — runs ManifestLoader + ManifestProcessor, produces `ManifestResult` as CDI bean. Collects `VendorClient` beans to extract vendor required fields for ManifestProcessor. |
+| `AgentConfigBeans` | `@Observes @Priority(50) StartupEvent` — runs ManifestLoader + ManifestProcessor, produces `ManifestResult` as CDI bean. Collects `VendorClient` beans to extract vendor required fields. Provides `LocalModelReconciler` implementation (delegates to `OllamaModelSource` + `LlmConfigService`). |
 
 No separate `QuarkusCredentialRefResolver` — `ManifestCredentialResolver` in agent-config-core handles all three prefixes via `CredentialResolver` SPI injection.
 
@@ -629,25 +654,27 @@ The manifest unifies existing independent mechanisms:
 - `Manifest` record type
 - `ManifestLoader` — discovers, parses, merges resources (with cycle detection, depth limits)
 - `ManifestProcessor` — drives existing SPIs from merged manifest
-- `ManifestResult` — CDI-produced record carrying aliases, vendor preferences, default backend
+- `ManifestResult` — CDI-produced record carrying aliases and default backend
 - `ManifestCredentialResolver` — prefix-based credential reference resolution
+- `LocalModelReconciler` — functional interface for local model reconciliation (impl in Quarkus layer)
 - `model-selection.schema.json` — JSON Schema for type-safe YAML
-- Alias registry + vendor preference map in RoutingAgentProvider
+- Alias registry in RoutingAgentProvider
 
 **Extended:**
-- `ModelQuery` — add `minContextWindow`, `minMaxOutput`
-- `RoutingAgentProvider` — new constructor with aliases + vendor preferences; `resolve()` gains alias lookup step
+- `ModelQuery` — add `minContextWindow`, `minMaxOutput`, `preferVendor`
+- `RoutingAgentProvider` — new constructor with aliases; `resolve()` gains alias lookup step
 - `AgentSessionConfig` — add `withModel(String)` method
 
 **Deprecated:**
 - `CloudSourceCredentialBootstrap` — disabled when manifest processing is active; superseded by manifest `providers:` section
+- `SeedCatalogModelSource` — disabled when manifest processing is active (`@IfBuildProperty` same pattern). The manifest's resource chain starts with `classpath:models/seed-catalog.yaml` (priority 0), loading the same file. Without disabling, both would register the same models under different source IDs (`"manifest"` at priority 8 and `"seed-catalog"` at priority 0) — functionally harmless (priority resolution picks the manifest version) but semantically wasteful. When no manifest module is on the classpath, `SeedCatalogModelSource` remains active as the air-gapped fallback.
 
 **Unchanged:**
 - ModelSource, ModelRegistry, MutableModelRegistry
 - LlmCredentialStore, BackendInstanceRegistry, BackendInstanceCoordinator
 - All AgentBackend implementations (Claude, OpenAI, Ollama, Gemini, etc.)
 - LlmConfigService (stays as imperative API)
-- SeedCatalogModelSource, CloudModelSource, OllamaModelSource
+- CloudModelSource, OllamaModelSource
 
 ## Downstream
 
