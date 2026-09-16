@@ -20,17 +20,19 @@ date: 2026-09-15
 - [x] casehubio/platform#318 — event
 - [x] casehubio/platform#326 — timed
 - [x] casehubio/platform#319 — REST
-- [ ] casehubio/platform#321 — DefaultBean ← active
-  - [x] Batch 1: Generator
-    - [x] Task 1: Remove abstract/default from SimulationDecoratorProcessor
-    - [x] Task 2: Apply same to RestClientSimulationProcessor
-  - [x] Batch 2: Module
-    - [x] Task 3: Create platform-simulation-core module
-    - [x] Task 4: Integration test — decorator wraps DefaultBean
-  - [x] Batch 3: Docs
-    - [x] Task 5: Platform SPIs section in simulation guide
-    - [x] Task 6: Update CLAUDE.md module entry
-- [ ] casehubio/platform#322 — pages
+- [x] casehubio/platform#321 — DefaultBean
+- [ ] casehubio/platform#322 — pages ← active
+  - [x] Batch 1: Overlay infra
+    - [x] Task 1: JournalEntry and InvocationJournal
+    - [x] Task 2: MapSimulationConfig and SimulationOverlay
+    - [x] Task 3: SimulationRuntime overlay stack
+  - [x] Batch 2: Generator
+    - [x] Task 4: Update decorator template for journal
+  - [x] Batch 3: Pages integration
+    - [x] Task 5: SimulationSpec record and parser
+    - [x] Task 6: ScenarioOrchestrator lifecycle hooks
+  - [x] Batch 4: Docs
+    - [x] Task 7: Update simulation guide and CLAUDE.md
 - [ ] casehubio/platform#323 — consumer
 - [ ] casehubio/platform#328 — domain-specific
 - [ ] casehubio/platform#329 — strategy
