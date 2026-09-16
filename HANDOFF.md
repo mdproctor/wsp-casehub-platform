@@ -2,37 +2,32 @@
 
 ## What happened this session
 
-Two issues completed (#318, #326), advancing the queue from position 8/18 to 10/18.
+Two issues completed (#326, #319), advancing the queue from position 9/18 to 11/18.
 
-**#318 — Event simulation core (push-side strategies):** New `event-simulation-core` module (POJO, no CDI). `SimulatedEventEmitter` with `tick()` method — iterates configured event sources, resolves CloudEvents from `SimulationStrategy<EventTrigger, CloudEvent>`, stamps fresh id/time per emission, fires via `Consumer<CloudEvent>` callback. `CloudEventFixtureBuilder` converts between YAML-friendly `Map<String, Object>` and `CloudEvent` instances. `EventTrigger`, `EventSourceConfig`, `EmissionResult`, `EmittedEvent`, `EmissionFailure` records. Per-source error isolation. CDI bus injection path (`Event<CloudEvent>.fireAsync()`) for full pipeline fidelity — events traverse DataSourceRouter's tenancy check. 21 tests.
+**#326 — Timed event simulation (closed from previous session):** All tasks were already done. Closed on GitHub and advanced the queue at session start.
 
-**#326 — Timed event simulation:** Extended `event-simulation-core` with `TimedEntry<E>` + `TimedSequence<E>` — generic ordered sequences with relative delays, `withMultiplier(double)` for speed control, `fromRecorded(List<InvocationRecord>)` for timing derivation from captured data. `EventSequenceRunner` executes sequences with `Thread.sleep()` between events (virtual-thread friendly). `SequenceResult` for execution reporting. New `event-simulation` Quarkus module with CDI wiring: `@Produces SimulatedEventEmitter` with `Event<CloudEvent>.fireAsync()` sink, `@Produces EventSequenceRunner`, `@Scheduled` continuous tick (configurable interval, OFF by default). Config-driven `EventSourceConfig` loading from `casehub.simulation.event.sources.*` properties. 21 additional tests (42 total across both modules).
+**#319 — REST client simulation:** New `rest-client-simulation-generator` module with `RestClientSimulationProcessor` APT. Generates `@Decorator` classes for `@RegisterRestClient` interfaces with `@RestClient`-qualified delegates and `RestInvocation` inputs. Reads JAX-RS annotations (`@GET`/`@POST`/`@Path`/`@PathParam`/`@QueryParam`) for HTTP metadata at compile time. Skips `@SimulationEligible` interfaces (handled by base generator). Foundation types in `simulation-core`: `RestInvocation` record (spiName, methodName, httpMethod, pathTemplate, params, body) and `RestClientKeyExtractor` (httpMethod + resolved path key). `rest-client` extractor registered in `DeclarativeExtractorFactory`. 24 tests (8 foundation + 16 processor). Decision review (light) revised 4 decisions: separate processor module (D32), module-level opt-in (D35), RestInvocation in simulation-core not simulation-api (D36), defer reactive support (D37).
 
 ## Decisions
 
-- **D21: Dedicated event-simulation-core module** — separate from simulation-core (SPI interception). Follows agent-simulation-core precedent.
-- **D22: CDI Event bus injection** — full pipeline fidelity via `Event<CloudEvent>.fireAsync()`. Same path as real stream processors.
-- **D23: tick()-based emitter** — synchronous, deterministic. @Scheduled wrapper deferred to #326 (then delivered).
-- **D24: Strategy resolves CloudEvent directly** — corpus stores complete CloudEvent templates. Emitter stamps id/time.
-- **D25-D26: Scope split** — #318 = what/how, #326 = when. Clean separation delivered.
-- **D27: Relative delays** — each TimedEntry carries Duration from previous entry. Natural for replay.
-- **D28: Virtual-thread sleep** — Thread.sleep() between events. Simple, blocking, cheap on virtual threads.
-- **D29: Core/Quarkus split** — TimedSequence in event-simulation-core (POJO), CDI wiring in event-simulation.
-- **D30: Derive timing from recordedAt** — TimedSequence.fromRecorded() computes gaps. No capture changes needed.
-- **D31: Multiplier on TimedSequence** — withMultiplier(10.0) divides all delays. Scheduler stays simple.
+- **D32: Separate RestClientSimulationProcessor** — own module, not extending base generator. Preserves framework-agnosticism.
+- **D33: Hybrid input** — Java method level interception with HTTP metadata. Superset of pure Java-only.
+- **D34: RestInvocation uniform type** — single record for all REST client methods. Self-describing corpus entries.
+- **D35: Auto-detect @RegisterRestClient** — scoped by processor module opt-in. Adding the module IS the opt-in.
+- **D36: New rest-client-simulation-generator module** — RestInvocation + key extractor in simulation-core.
+- **D37: Defer reactive support** — blocking only for now. No reactive REST clients exist in platform.
 
 ## References
 
 | Artifact | Path |
 |----------|------|
-| Design spec (#318) | `wksp/specs/feat-294-simulation-service/2026-09-16-event-simulation-design.md` |
-| Design spec (#326) | `wksp/specs/feat-294-simulation-service/2026-09-16-timed-event-simulation-design.md` |
-| Implementation plan (#318) | `wksp/plans/2026-09-16-event-simulation.md` |
-| Implementation plan (#326) | `wksp/plans/2026-09-16-timed-event-simulation.md` |
-| Decisions (D21-D31) | `wksp/specs/feat-294-simulation-service/decisions.md` |
+| Design spec (#319) | `wksp/specs/feat-294-simulation-service/2026-09-16-rest-client-simulation-design.md` |
+| Implementation plan (#319) | `wksp/plans/2026-09-16-rest-client-simulation.md` |
+| Decisions (D32-D37) | `wksp/specs/feat-294-simulation-service/decisions.md` |
+| Decision review | `/Users/mdproctor/reviews/casehub-slots/319-rest-client-simulation-decision-20260916-105234/` |
 | Simulation guide | `proj/docs/guides/simulation-guide.md` |
-| .plan | `wksp/.plan` (position 10/18, #319 active) |
+| .plan | `wksp/.plan` (position 11/18, #321 active) |
 
 ## Next action
 
-Start #319 — REST client simulation. `@RegisterRestClient` proxy interception with strategy dispatch for simulating external HTTP services. Different interception mechanism from Path A (decorator) and Path B (backend) — needs its own brainstorming. The design spec notes this as Phase 3 scope. Key question: MicroProfile REST Client proxy mechanism vs CDI decorator on the client interface.
+Start #321 — DefaultBean simulation patterns. This issue is about ensuring simulation decorators work alongside the existing `@DefaultBean` no-op pattern — the decorator wraps the real implementation (or the DefaultBean when no real impl exists). May need brainstorming to clarify scope.
