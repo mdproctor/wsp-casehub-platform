@@ -14,7 +14,7 @@
 
 ## D2: DomainScanResult field naming
 
-**Choice:** Rename `spiInterfaceFqcn` / `spiInterfaceSimple` to `declaringTypeFqcn` / `declaringTypeSimple`.
+**Choice:** Rename `declaringTypeFqcn` / `declaringTypeSimple` to `declaringTypeFqcn` / `declaringTypeSimple`.
 **Alternatives:**
 - Keep spiInterface* names + add isInterface boolean — avoids downstream changes but semantically wrong for classes
 **Rationale:** Pre-release platform — breaking changes cost nothing. The field names are used by spring generators (graphql-spring-generator, potentially rest-spring-generator). Fixing the name now is trivial; fixing it later after external adoption is expensive.

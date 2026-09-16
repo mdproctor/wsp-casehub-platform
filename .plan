@@ -14,12 +14,12 @@ context: DX audit: reduce verbosity and ceremony across Spring and Quarkus. Star
 
 ## Queue
 - [ ] casehubio/parent#489 — Issue #489 ← active
-  - [ ] Batch 1: Generator_Foundation
-    - [ ] Task 1: DomainScanResult_rename_and_scanner_fix
-    - [ ] Task 2: APT_processor_class_support
-  - [ ] Batch 2: SpringModelScanner_Parity
-    - [ ] Task 3: Class-first_scan
-  - [ ] Batch 3: POJO_Migration
-    - [ ] Task 4: Annotate_SubscriptionService_EventTypeService
+  - [x] Batch 1: Generator_Foundation
+    - [x] Task 1: DomainScanResult_rename_and_scanner_fix
+    - [x] Task 2: APT_processor_class_support
+  - [x] Batch 2: SpringModelScanner_Parity
+    - [x] Task 3: Class-first_scan
+  - [x] Batch 3: POJO_Migration
+    - [x] Task 4: Annotate_SubscriptionService_EventTypeService
   - [ ] Batch 4: Spring_Drift_Elimination
     - [ ] Task 5: Wire_generators_delete_controllers

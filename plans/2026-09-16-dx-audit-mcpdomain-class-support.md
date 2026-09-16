@@ -77,8 +77,8 @@ Expected: FAIL — `McpDomainJandexScanner` skips non-interface classes; also `d
 - [ ] **Step 3: Rename DomainScanResult fields**
 
 Use `ide_refactor_rename` to rename fields in `DomainScanResult.java`:
-- `spiInterfaceFqcn` → `declaringTypeFqcn`
-- `spiInterfaceSimple` → `declaringTypeSimple`
+- `declaringTypeFqcn` → `declaringTypeFqcn`
+- `declaringTypeSimple` → `declaringTypeSimple`
 
 This automatically updates all consumers (SpringGraphqlControllerWriter:29-30, SpringDomainRestControllerWriter:46-47, factory methods, test references).
 

@@ -37,7 +37,7 @@ if (!java.lang.reflect.Modifier.isInterface(classInfo.flags())) { continue; }
 
 **Changes:**
 - Remove the interface filter
-- Rename `DomainScanResult` fields: `spiInterfaceFqcn` → `declaringTypeFqcn`, `spiInterfaceSimple` → `declaringTypeSimple`
+- Rename `DomainScanResult` fields: `declaringTypeFqcn` → `declaringTypeFqcn`, `declaringTypeSimple` → `declaringTypeSimple`
 - Update factory methods: `of(domainName, declaringTypeFqcn, declaringTypeSimple, basePath)`
 - Update all consumers of these fields in `graphql-spring-generator`
 
