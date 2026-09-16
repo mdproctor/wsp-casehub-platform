@@ -284,7 +284,7 @@ For each provider in the merged manifest:
 For each local model with `ensure: present`:
 1. Check availability via OllamaModelSource
 2. If missing: trigger pull via `LlmConfigService.pullModel()`
-3. Block startup until available (with timeout), or warn and continue
+3. If missing: warn and continue (non-blocking) — model will be available after pull completes, subsequent invocations will find it
 
 ### Step 4 — Aliases → Router
 
