@@ -1,0 +1,22 @@
+# Work Plan — issue-489-dx-audit
+
+## State
+branch: issue-489-dx-audit
+state: scaffolded
+project-sha: slot-creation
+date: 2026-09-16
+issue-repo: casehubio/parent
+covers: 489,490,491,492
+design-repo: project
+design-section-hashes: 
+flyway-next-v: unknown
+context: DX audit: reduce verbosity and ceremony across Spring and Quarkus. Starts with Embabel comparison, broadens to comprehensive framework DX review.
+
+## Queue
+- [ ] casehubio/parent#489 — Issue #489 ← active
+  - [ ] Batch 1: casehubio/parent#490
+    - [ ] Task 1: Measure_remaining_ceremony_gap
+  - [ ] Batch 2: casehubio/parent#492
+    - [ ] Task 2: Verify_Spring-side_cascade_from_impl_scanning
+  - [ ] Batch 3: casehubio/parent#491
+    - [ ] Task 3: Identify_SPI_interfaces_for_removal
