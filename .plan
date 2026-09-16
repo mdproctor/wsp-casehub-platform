@@ -23,11 +23,11 @@ date: 2026-09-15
 - [x] casehubio/platform#321 — DefaultBean
 - [x] casehubio/platform#322 — pages
 - [ ] casehubio/platform#323 — consumer ← active
-  - [ ] Batch 1: Guide+fixtures
-    - [ ] Task 1: Consumer adoption guide section
-    - [ ] Task 2: YAML corpus fixtures
-  - [ ] Batch 2: Closeout
-    - [ ] Task 3: Follow-on issue + close
+  - [x] Batch 1: Guide+fixtures
+    - [x] Task 1: Consumer adoption guide section
+    - [x] Task 2: YAML corpus fixtures
+  - [x] Batch 2: Closeout
+    - [x] Task 3: Follow-on issue + close
 - [ ] casehubio/platform#328 — domain-specific
 - [ ] casehubio/platform#329 — strategy
 - [ ] casehubio/platform#330 — domain
