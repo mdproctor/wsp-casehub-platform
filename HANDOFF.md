@@ -2,40 +2,57 @@
 
 ## Last Session
 
-Completed #288 (cloud model sources) end-to-end: brainstorm (8 decisions, light decision review with revisions), design spec (light spec review, 12 findings addressed — separate modules for Vertex/Bedrock, priority-sorted refresh, cache alignment, CloudModelSource interface), 7-task implementation plan, all 7 tasks implemented with TDD. Issue closed.
+Completed #481 (Pattern 2 neocortex), #482 (graphql-spring-gen wiring), #487 (spring-generator Clock fix). Filed follow-up epic #488 with 4 child issues, plus DX audit #489.
 
-Key deliverables landed on branch:
-- `CloudModelSource` interface extending `ModelSource` with `status()` method
-- `CloudSourceStatus` record with `State` enum (ACTIVE/INACTIVE/ERROR) + factory methods
-- `AnthropicCloudModelSource` + `OpenAiCloudModelSource` — wrap existing VendorClients, priority 5, last-known-good caching
-- `VertexCloudModelSource` + `BedrockCloudModelSource` — inject via `Instance<VendorClient>`, graceful when module absent
-- New module `llm-config-vertex/` — `VertexClient` with Google ADC auth (`google-auth-library-oauth2-http`)
-- New module `llm-config-bedrock/` — `BedrockClient` with manual SigV4 signing (`software.amazon.awssdk:auth`)
-- `CloudSourceCredentialBootstrap` — env var detection (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`), `LlmCredentialStore` seeding at platform scope
-- `cloudSourceStatus()` query on `LlmConfigApi` for onboarding guidance
-- `ModelRegistryRefresher` — priority-sorted refresh (seed=0 before cloud=5 before configured=10)
-- HttpClient reuse fix in AnthropicClient, OpenAiClient, GoogleClient
-- 75+ tests across all modules, full build green
+### #481: Pattern 2 neocortex — done
+
+CognitionResolver → CognitionApi SPI interface + CognitionService impl in cognitive-observability. APT generates GeneratedCognitionResolver. 50 tests pass. Interface stays in cognitive-observability (not cognitive-api) because return types depend on mindmap-core.
+
+Neocortex commit: `9543188a` on branch `issue-478-spring-modules`.
+
+### #482: Wire graphql-spring-gen — done (partial)
+
+- **Qhorus** — `runtime-spring/pom.xml`: graphql-spring-generator plugin added pointing at `../api`. spring-graphql, spring-webmvc, jakarta.validation-api deps added. 8 Spring classes generated (4 GraphQL + 4 REST controllers). Commit `39b85496` on branch `issue-440-panache-purge`.
+- **Neocortex** — new `cognitive-observability-spring` module created. 2 Spring classes generated. Commit `cd807229` on branch `issue-478-spring-modules`.
+- Engine/work blocked on their Pattern 2 migrations (#484, #485).
+
+### #487: spring-generator Clock fix — done
+
+Two fixes in platform spring-generator (commit `8c30ffe3`):
+1. JandexProducerScanner: skip `java.*` return types (abstract JDK types can't be new'd)
+2. AutoConfigurationWriter: don't fall back to skipped descriptor type for anchor
+
+Qhorus runtime-spring now compiles clean: 35 beans + 8 controllers.
+
+### Filed issues
+
+- **#488** — Spring follow-up epic (parent of #484, #485, #486, #487)
+- **#489** — DX audit: CaseHub agent/tool DX vs Embabel — covers both Quarkus and Spring
 
 ## Immediate Next Step
 
-Brainstorm #289 (local model sources — Ollama + HuggingFace discovery and lifecycle). Queue advanced, #289 is active.
+#486 (cognitive-observability core extraction) is active. Extract CognitionService to a -core POJO with `List<T>` instead of CDI `Instance<T>`, enabling the spring-generator to produce a Spring bean.
 
-## Queue
+## Queue State
 
-Branch `issue-288-cloud-model-sources` has 4 issues queued: #288 (done), #289 (active), #290, #292.
+| # | Issue | Scale | Complexity | Status |
+|---|-------|-------|------------|--------|
+| 0 | parent#478 | L | High | Done |
+| 1 | parent#479 | XS | Low | Done |
+| 2 | parent#483 | M | Med | Done |
+| 3 | parent#480 | M | Med | Done |
+| 4 | parent#481 | S | Low | Done |
+| 5 | parent#482 | S | Low | Done |
+| 6 | parent#487 | XS | Low | Done |
+| 7 | parent#486 | S | Med | Active — next session |
+| 8 | parent#484 | S | Low | Pending — blocked on engine#1095 |
+| 9 | parent#485 | S | Low | Pending — blocked on work#400 |
 
-## Key Design Decisions
+## Key Facts
 
-- Cloud sources use plain `apiModelId` (same as seed catalog) — priority resolution handles overlap
-- Vertex/Bedrock VendorClients in separate modules for classpath isolation (Quarkus build-time bean discovery + optional SDK deps = fragile)
-- Credential bootstrap seeds store from env vars but doesn't overwrite wizard-configured credentials
-- Discovery-invocation disconnect acknowledged: Vertex/Bedrock models route through Claude backend (direct API), not cloud platform endpoints — dedicated AgentBackends tracked as downstream
-
-## References
-
-- Spec: `specs/issue-288-cloud-model-sources/2026-09-12-cloud-model-sources-design.md`
-- Plan: `plans/2026-09-12-cloud-model-sources.md`
-- Decision review: `/Users/mdproctor/reviews/casehub-platform/issue-288-decision-20260912-143409/`
-- Spec review: `/Users/mdproctor/reviews/casehub-platform/issue-288-cloud-model-sources-20260912-151559/`
-- Epic #285: LLM model registry
+- Platform branch `issue-478-spring-deployment-completion` — 1 commit this session (spring-generator fix).
+- Qhorus branch `issue-440-panache-purge` — 1 commit this session (graphql-spring-gen wiring).
+- Neocortex branch `issue-478-spring-modules` — 2 commits this session (Pattern 2 migration + observability-spring module).
+- spring-generator installed to local Maven repo with both fixes.
+- cognitive-observability and cognitive-observability-spring installed to local Maven repo.
+- Embabel DX audit filed as #489 — covers Quarkus (source of truth) and Spring (generated).
