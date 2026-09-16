@@ -115,8 +115,13 @@ Consumers can override with the existing declarative config:
 `jar` packaging. Follows the same structure as `simulation-generator`:
 
 **Dependencies:**
-- `casehub-platform-simulation-core` (RestInvocation, SimulationRuntime)
+- `casehub-platform-simulation-api` (SimulationEligible — for skip detection)
 - `io.smallrye:jandex` (Jandex index scanning)
+
+Note: the processor generates source code as strings. It does not compile against
+RestInvocation or SimulationRuntime directly. The consumer module that compiles
+the generated code needs `simulation-core` (for RestInvocation) and
+`simulation-config` (for SimulationRuntime CDI bean) on its classpath.
 
 **Compiler config:** `<proc>none</proc>` to prevent self-processing.
 

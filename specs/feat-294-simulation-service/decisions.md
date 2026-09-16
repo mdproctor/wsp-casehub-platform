@@ -773,7 +773,7 @@
 
 ## D36: New rest-client-simulation-generator module; RestInvocation + key extractor in simulation-core
 
-**Choice:** New `rest-client-simulation-generator` module (`maven-plugin` packaging) for `RestClientSimulationProcessor`. `RestInvocation` record and `RestClientKeyExtractor` in simulation-core (not simulation-api).
+**Choice:** New `rest-client-simulation-generator` module (`jar` packaging) for `RestClientSimulationProcessor`. `RestInvocation` record and `RestClientKeyExtractor` in simulation-core (not simulation-api).
 **Alternatives:**
 - Everything in existing modules — would pollute simulation-api with REST-specific types (R1-10) and the base generator with Quarkus-specific logic (R1-06)
 - Full core/Quarkus split — heavy for S-scale
