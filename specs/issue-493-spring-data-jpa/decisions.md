@@ -34,3 +34,15 @@
 **Sources:** Existing uniform patterns: every CDI module has a -core counterpart (37 core modules already exist)
 **Exploration:** quick
 **Status:** captured
+
+## D4: Test database strategy for Spring JPA modules
+
+**Choice:** H2 with `MODE=PostgreSQL` for all modules. Only `@Disabled` for genuinely incompatible features (FTS `websearch_to_tsquery` in memory-jpa, recursive CTEs in acl-jpa). Revisit if coverage gaps appear.
+**Alternatives:**
+- Testcontainers PostgreSQL — full fidelity but slower CI, requires Docker
+- H2 + Testcontainers selectively — mixed strategy, inconsistent test infrastructure
+**Rationale:** Matches existing Quarkus test strategy (H2). PostgreSQL mode covers most dialect features (`SELECT FOR UPDATE SKIP LOCKED`, PG-style casts). Keeps CI fast and dependency-light. Only 2 of 10 modules have truly incompatible features.
+**Trade-offs:** FTS and recursive CTE paths are untested in Spring. Acceptable risk since the same SQL runs in Quarkus tests against the same H2 constraints.
+**Sources:** Existing Quarkus test pom.xml (quarkus-jdbc-h2 test scope), H2 MODE=PostgreSQL documentation
+**Exploration:** quick
+**Status:** captured
