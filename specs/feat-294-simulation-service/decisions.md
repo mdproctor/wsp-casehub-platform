@@ -574,3 +574,67 @@
 **Sources:** Issue #317 ("Corpus indexing — efficient lookup in large corpora. Naive O(n) scan first, optimise later.")
 **Exploration:** quick
 **Status:** captured
+
+---
+
+# Phase 4 — #318 Event Simulation
+
+## D21: Dedicated event-simulation-core module
+
+**Choice:** New `event-simulation-core` module (POJO, no CDI) for the emitter logic and CloudEvent building. Paired later with `event-simulation` (Quarkus beans) for CDI wiring (`Event<CloudEvent>` injection, `@Produces` for the emitter).
+**Alternatives:**
+- In simulation-core — keeps module count down but mixes SPI interception strategies (zero-CDI POJOs) with event emission logic. simulation-core is currently a clean strategy-only module.
+- In simulation-config-core — already has Jackson and startup concerns, but mixing config parsing with runtime event emission is a responsibility stretch.
+**Rationale:** Event emission is a fundamentally different concern from SPI method interception. agent-simulation-core already established the pattern of domain-specific simulation modules separate from simulation-core. The *-core naming convention (POJO + Quarkus wrapper) is established across the platform.
+**Trade-offs:** Another module pair. Acceptable — simulation is opt-in and the module boundary is clean. The core module depends on simulation-api (for SimulationStrategy, SimulationCorpus) and cloudevents-api (for CloudEvent building).
+**Sources:** agent-simulation-core/ (precedent for domain-specific simulation module), simulation-core/ (strategy-only module to keep clean), GE-20260909-c81437 (module-core/module/module-spring naming convention)
+**Depends on:** D2 (simulation-api as the SPI home)
+**Exploration:** quick
+**Status:** captured
+
+## D22: CDI Event bus injection — full pipeline fidelity
+
+**Choice:** SimulatedEventEmitter fires via `Consumer<CloudEvent>` callback (CDI wiring provides `Event<CloudEvent>.fireAsync()`). Events traverse DataSourceRouter's tenancy check and acceptedEventTypes filter before reaching wired DataSources.
+**Alternatives:**
+- Direct DataSource.add() — bypasses DataSourceRouter, injects straight into the alpha network. Faster but skips the routing/filtering layer that real events traverse.
+- Both configurable — let config choose injection mode per emitter instance. More surface area for marginal benefit.
+**Rationale:** The primary use case is pipeline testing — verifying end-to-end from event → DataSource → SubscriptionEngine → NotificationDispatcher. Full fidelity requires events to take the same path as real events. DataSourceRouter's tenancy check and acceptedEventTypes filter are part of the pipeline being tested. Direct injection would give false confidence by skipping routing.
+**Trade-offs:** Requires properly constructed CloudEvents with `id`, `type`, `source`, `time`, `data`, and `tenancyid` extension. No shortcut past routing. Acceptable — CloudEvents are simple records and the corpus stores them complete.
+**Sources:** DataSourceRouter.java (lines 159-188: tenancy check + acceptedEventTypes filter), WebhookResource.java (line 109-111: CDI bus pattern), KafkaStreamProcessor.java (lines 153-168: CloudEvent construction)
+**Exploration:** quick
+**Status:** captured
+
+## D23: tick()-based emitter, not @Scheduled
+
+**Choice:** Core logic in a `tick()` method that emits one batch of events per invocation. Tests call directly for deterministic, synchronous verification. No `@Scheduled` annotation — timed emission is #326's concern.
+**Alternatives:**
+- @Scheduled only — timer-driven emission. Tests must wait for scheduler ticks or mock the Quarkus scheduler. Matches the design spec's sketch but conflicts with pipeline testing needs.
+- Both (tick() + @Scheduled wrapper) — core logic in tick(), separate @Scheduled bean calls tick() on interval. Clean separation but two beans for one concern in this issue; the @Scheduled wrapper is exactly what #326 delivers.
+**Rationale:** Pipeline testing needs deterministic, synchronous invocation. DigestFlushScheduler and DeliveryRetryProcessor already use the tick() pattern successfully — both have a `tick()` method called externally, not @Scheduled. The @Scheduled wrapper is a thin layer that #326 adds for continuous background simulation.
+**Trade-offs:** No continuous background emission until #326. Acceptable — the queue has #326 (timed simulation) as the next issue.
+**Sources:** DigestFlushScheduler.java (tick() at line 49), DeliveryRetryProcessor.java (tick() at line 58), issue #326 (timed simulation)
+**Exploration:** quick
+**Status:** captured
+
+## D24: Strategy resolves CloudEvent directly
+
+**Choice:** `SimulationStrategy<EventTrigger, CloudEvent>`. The corpus stores complete CloudEvents (or serialisable templates). The emitter calls `strategy.resolve(trigger)` and fires the result via CDI bus.
+**Alternatives:**
+- Strategy resolves payload, emitter builds CloudEvent — `SimulationStrategy<EventTrigger, EventPayload>`. Strategy returns event data; emitter wraps in CloudEvent with id/type/source/time/tenancyid. More control over CloudEvent metadata at emission time but adds a fabrication layer between strategy and injection.
+**Rationale:** Keeps the emitter thin — it's a loop over configured event sources calling `strategy.resolve()` then `fireAsync()`. CloudEvent metadata (type, source, tenancyid) is part of the corpus data, not fabricated at emission time. This aligns with D8 (unified contract for request/response and events) — events are just another output type. The corpus is the single source of truth for what gets emitted.
+**Trade-offs:** Corpus entries must include full CloudEvent structure (type, source, tenancyid, data). Acceptable — CloudEvents are simple records with 5-6 fields. YAML fixtures express them naturally. Per-invocation metadata (id, time) can be stamped by the emitter after strategy resolution.
+**Sources:** D8 (unified contract), CloudEventBuilder.v1() API, simulation-service-design.md (event simulation section)
+**Depends on:** D8 (unified contract for events), D22 (CDI bus injection)
+**Exploration:** quick
+**Status:** captured
+
+## D25: Scope — core emitter + injection only, timing deferred to #326
+
+**Choice:** This issue delivers: EventEmitter with tick(), EventTrigger record, CloudEvent corpus fixtures, CDI bus injection. Sequential/key-lookup strategies from the existing framework handle event selection. No timing patterns (interval, jitter, burst) — those are #326.
+**Alternatives:**
+- Include timing patterns now — configurable interval, random jitter, burst mode. More complete but overlaps #326's explicit scope and adds complexity to the emitter's first iteration.
+**Rationale:** Clean separation: #318 = what events to emit and how to inject them. #326 = when to emit them. The existing strategies (sequential, key-lookup, random) already handle the "what" selection from the corpus. The emitter's tick() provides the "how" injection. Timing is orthogonal.
+**Trade-offs:** No background drip until #326. Acceptable — #326 is the next item in the queue.
+**Sources:** Issue #318 (event simulation), issue #326 (timed simulation), .plan (queue position 8/18, #326 at position 9)
+**Exploration:** quick
+**Status:** captured
