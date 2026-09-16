@@ -857,3 +857,83 @@
 **Sources:** SimulationDecoratorProcessor.java (lines 159-166 — abstract/default branch), AccessControlProvider.java (pure-default interface)
 **Exploration:** quick
 **Status:** captured
+
+---
+
+# Phase 8 — #322 Pages Scenario Integration
+
+## D43: Layered runtime overlay — no ThreadLocal
+
+**Choice:** `SimulationRuntime` gains a stack of `SimulationOverlay` objects. `pushOverlay(config, corpus)` adds a layer; `popOverlay(overlay)` removes it. Strategy resolution walks the stack top-down — first overlay with a strategy for a given qualified name wins, then falls through to base config. No ThreadLocal anywhere.
+**Alternatives:**
+- ThreadLocal-scoped context — scope travels with execution thread. Rejected: ThreadLocal causes subtle bugs, leaks across pooled threads, and is hard to debug. Platform has near-zero ThreadLocal usage and should stay that way.
+- Named scope registry — decorators look up active scope by name. Requires associating execution with a scope name — indirection without benefit over direct overlay.
+- Config + corpus namespacing — prefix qualified names with a scope ID. Zero infrastructure but awkward and error-prone naming convention.
+**Rationale:** Decorators already inject `SimulationRuntime`. The overlay stack is invisible to them — `strategyFor()` just returns a different result when an overlay is active. No API changes needed downstream. The push/pop model naturally supports mid-scenario switching (multiple layers). Sequential scenario execution (pages ScenarioOrchestrator is single-scenario) means no concurrency concerns on the stack.
+**Trade-offs:** Global mutable state on SimulationRuntime — concurrent overlays from different callers would conflict. Acceptable because the scenario orchestrator is single-scenario and this is dev/test infrastructure.
+**Sources:** SimulationRuntime.java (strategyFor, strategy cache), D11 (boot-time config — this extends D11 to support runtime overlays), ThreadLocal audit (UUIDv7 only, platform is clean)
+**Depends on:** D11 (extends boot-time config)
+**Exploration:** quick
+**Status:** captured
+
+## D44: Isolated corpus per overlay — no bleed between scenarios
+
+**Choice:** Each `SimulationOverlay` gets its own fresh `InMemorySimulationCorpus`. Scenario seeds only its own data. On `popOverlay()`, the corpus is discarded. The base corpus (boot-time seeded) is only consulted when no overlay is active.
+**Alternatives:**
+- Layered corpus (overlay + fallback to base) — overlay checked first, then base. More flexible but scenarios can accidentally depend on base corpus state, creating hidden coupling.
+- Same corpus, clear/restore — scenario clears relevant qualified names, seeds, runs, restores. Fragile — crash during scenario leaves corrupt corpus state.
+**Rationale:** Clean isolation is the design constraint from #322. Each scenario should be fully self-contained. If a scenario needs base corpus data, it explicitly seeds it — no implicit inheritance. Discarding on pop guarantees no bleed.
+**Trade-offs:** Scenarios can't "extend" base corpus data without re-seeding. Acceptable — explicit is better than implicit for test isolation.
+**Sources:** InMemorySimulationCorpus.java (ConcurrentHashMap, seed/clear), issue #322 (design constraint: scenario isolation)
+**Depends on:** D43 (overlay stack)
+**Exploration:** quick
+**Status:** captured
+
+## D45: Invocation journal on overlay for assertion support
+
+**Choice:** Each `SimulationOverlay` contains an `InvocationJournal` that records every intercepted call — `JournalEntry(qualifiedName, input, output, timestamp, simulated)`. The `simulated` flag distinguishes strategy-resolved calls from passthrough-to-delegate. After scenario execution, the caller queries the journal for assertions. Discarded with the overlay.
+**Alternatives:**
+- Reuse capture mode (corpus.record()) — conflates corpus building with assertion verification. Capture is for replay; journal is for inspection.
+- CDI event-based — fire SimulationInvocationEvent on every call. More decoupled but adds CDI event overhead on every intercepted call in dev/test.
+**Rationale:** The journal is a read-only record of what happened. Capture mode writes to the corpus for future replay — different purpose, different lifecycle. Keeping them separate means capture can be enabled independently (for corpus building) alongside the journal (for assertions). The journal is always active when an overlay is present — no config needed.
+**Trade-offs:** Every intercepted call records a journal entry when an overlay is active. Acceptable — overlays are dev/test only, and the journal is an in-memory list.
+**Sources:** Issue #322 (assertion support), InvocationRecord.java (similar shape — journal entry is lighter)
+**Depends on:** D43 (overlay stack), D44 (isolated corpus)
+**Exploration:** quick
+**Status:** captured
+
+## D46: Mid-scenario strategy switching included in initial design
+
+**Choice:** Support `pushOverlay()` at any point during scenario execution. The overlay stack handles multiple layers. Strategy resolution walks top-down, so a new push shadows earlier overlays for the qualified names it declares. Strategy cache is invalidated per qualified name on push (not globally).
+**Alternatives:**
+- Defer to follow-on — simpler initial design (setup-once, run, teardown). But the overlay stack model supports this naturally; deferring adds no simplification.
+- Step-level config in scenario YAML — each step declares its own overrides. Maximum flexibility but tightly couples platform API to scenario YAML schema.
+**Rationale:** The push/pop model already supports multiple layers — "mid-scenario switching" is just "push another overlay." The strategy cache invalidation is per qualified name: when a new overlay declares a strategy for `agent-provider.invoke`, only that cache entry is evicted. Other cached strategies remain valid. The implementation cost is one cache eviction loop on push.
+**Trade-offs:** Stack depth grows with mid-scenario pushes. All layers must be popped on teardown. Mitigated by `popAll()` convenience method on SimulationRuntime.
+**Sources:** D43 (overlay stack), SimulationRuntime.java (strategyCache ConcurrentHashMap)
+**Depends on:** D43 (overlay stack)
+**Exploration:** quick
+**Status:** captured
+
+## D47: SimulationOverlay API in simulation-core — no new modules
+
+**Choice:** `SimulationOverlay`, `InvocationJournal`, and `JournalEntry` live in `simulation-core` alongside `SimulationRuntime`. No new modules needed.
+**Alternatives:**
+- New simulation-context module — clean separation but adds a module for 3-4 classes that are tightly coupled to SimulationRuntime.
+- In simulation-api — keeps it zero-dep. But simulation-api is intentionally minimal (strategy contracts only) and the overlay depends on SimulationRuntime internals.
+**Rationale:** The overlay is an extension of SimulationRuntime's behaviour. It accesses the strategy cache, the config resolution chain, and the corpus. Putting it in a separate module would require exposing internals. Same module, same dependency footprint.
+**Trade-offs:** simulation-core grows slightly. Acceptable — the addition is 3-4 small classes.
+**Sources:** simulation-core/ (SimulationRuntime.java, strategy implementations), D2 (simulation-api is minimal)
+**Exploration:** quick
+**Status:** captured
+
+## D48: Cross-repo design — platform API + pages consumer together
+
+**Choice:** Design both platform-side API (#322) and pages-side consumer (casehub-pages#450) in one spec. Implement platform first, then pages. Both repos are in slot 195.
+**Alternatives:**
+- Platform-only design — design the API in isolation. Risks misalignment with actual consumer usage patterns.
+**Rationale:** The API shape should be driven by how the scenario orchestrator actually uses it. Designing both together ensures the platform API serves the real consumer without speculative abstractions.
+**Trade-offs:** Larger spec scope. Acceptable — the pages side is thin (lifecycle hooks + YAML schema extension).
+**Sources:** casehub-pages ScenarioOrchestrator.java, issue #322, casehub-pages#450
+**Exploration:** quick
+**Status:** captured
