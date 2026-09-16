@@ -927,6 +927,81 @@
 **Exploration:** quick
 **Status:** captured
 
+---
+
+# Phase 9 — #323 Consumer Adoption
+
+## D49: Platform-side docs + example fixtures only — consumer changes via issues
+
+**Choice:** Scope #323 to platform repo only: extend simulation-guide.md with a Consumer Adoption section, create minimal YAML corpus fixture templates at `docs/examples/simulation/<app>/`, and file GitHub issues on consumer repos for actual adoption work.
+**Alternatives:**
+- Modify consumer repos directly — more complete but violates the platform repo constraint ("do not modify these repos — raise issues instead")
+- Documentation only, no fixtures — less useful; consumers need concrete examples to copy
+**Rationale:** The consumer repos (clinical, devtown, aml, fsitrading) are not in this slot and CLAUDE.md explicitly constrains modifications. Example fixtures in the platform repo give consumers something concrete to adapt without cross-repo changes. Comprehensive corpora deferred to a separate issue once the framework matures.
+**Trade-offs:** Consumers must copy and adapt fixtures themselves. Acceptable — the fixtures are minimal templates (2-3 entries per SPI), not production data.
+**Sources:** CLAUDE.md (consumer repo constraint), issue #323
+**Exploration:** quick
+**Status:** captured
+
+## D50: Per-app sections in simulation-guide.md
+
+**Choice:** Organise the Consumer Adoption section by application. Each app gets a subsection with: SPI priority table, recommended strategy per SPI, pointer to example fixtures. Migration patterns and CI guidance are shared sections.
+**Alternatives:**
+- Per-pattern sections — organise by simulation pattern (agent, memory, REST client) with per-app annotations. Better for cross-app developers but forces reading multiple sections for one app's picture.
+- Matrix table — single apps × SPIs table. Compact but no room for rationale or app-specific nuance.
+**Rationale:** Each app has a genuinely different simulation profile (clinical = agent-first, devtown = REST-client-first, aml/fsitrading = memory+governance). Per-app sections make the guide actionable for a developer adopting simulation in one specific consumer.
+**Trade-offs:** Some repetition across app sections (e.g. CaseMemoryStore appears in all four). Acceptable — the sections are short and the repetition provides self-contained reading.
+**Sources:** Issue #323 (per-app priorities), simulation-guide.md (existing structure)
+**Exploration:** quick
+**Status:** captured
+
+## D51: Minimal corpus templates — 2-3 entries per SPI per app
+
+**Choice:** Create minimal YAML corpus fixtures with 2-3 entries per SPI per app. Domain-plausible field values (real-ish patient IDs, GitHub repo names, AML entity names). Comprehensive corpora deferred to a follow-on issue.
+**Alternatives:**
+- Comprehensive starter sets (10-15 entries) — more useful out of the box but significant manual authoring, risk of going stale before consumers adopt, and overlaps with #328 (corpus builders) and #330 (domain data generation)
+- One app deep, others minimal — proves the pattern end-to-end but unevenly useful
+**Rationale:** The fixtures demonstrate shape and config wiring, not production data. Later issues (#328, #330) deliver programmatic and LLM-driven corpus population that supersedes hand-authored YAML for comprehensive coverage.
+**Trade-offs:** Minimal fixtures are not enough for real testing — consumers need to extend them. Acceptable — that's the explicit intent (templates to copy and adapt).
+**Sources:** Issue #323, #328 (domain-specific corpus builders), #330 (domain data generation)
+**Exploration:** quick
+**Status:** captured
+
+## D52: Generic @InjectMock → simulation migration patterns
+
+**Choice:** Document 2-3 generic migration patterns showing before/after code: (1) mock SPI method return → key-lookup strategy, (2) mock sequential returns → sequential strategy, (3) mock with verify → capture + journal assertions. Not tied to specific consumer code.
+**Alternatives:**
+- Skip migration section — the Quick Start and tutorial tests already show how to use simulation. But the mental model shift from "mock the bean" to "configure a strategy" is non-obvious and worth documenting explicitly.
+**Rationale:** The biggest adoption friction is conceptual, not mechanical. Developers know @InjectMock; they need to see the equivalent in simulation terms. Generic patterns let each consumer map their own tests without the guide going stale when consumer code changes.
+**Trade-offs:** Generic examples may not cover every mock pattern (e.g. ArgumentCaptor, verify with times()). Acceptable — the verification API (#332) will address the assertion side.
+**Sources:** simulation-guide.md (Quick Start, tutorial tests), #332 (verification API)
+**Exploration:** quick
+**Status:** captured
+
+## D53: Quarkus profile-based CI guidance
+
+**Choice:** Document the CI integration pattern using Quarkus profiles: `%test` enables simulation strategies, `%staging`/`%prod` has no simulation config (passthrough). Show the application.properties layout with profile-scoped keys.
+**Alternatives:**
+- Maven profile + CI config example — go further with Maven profile activation for simulation deps and sample GitHub Actions steps. More involved than needed for a config convention.
+**Rationale:** Simulation activation is entirely config-driven (D11). The profile pattern is the natural Quarkus mechanism — no new code, no Maven profiles, no CI changes. Just profile-scoped properties.
+**Trade-offs:** Doesn't cover Maven dependency scoping (test vs compile for simulation modules). Acceptable — the Quick Start already documents dependency scopes.
+**Sources:** D11 (boot-time configuration), Quarkus profile documentation, simulation-guide.md (Configuration Reference)
+**Depends on:** D11 (configuration is boot-time)
+**Exploration:** quick
+**Status:** captured
+
+## D54: Fixtures at docs/examples/simulation/<app>/
+
+**Choice:** Example YAML corpus fixtures live at `docs/examples/simulation/<app>/` (e.g. `docs/examples/simulation/clinical/`, `docs/examples/simulation/devtown/`). One YAML file per SPI.
+**Alternatives:**
+- simulation-config/src/test/resources/ — alongside tutorial tests. Discoverable but conflates reference material with module test fixtures.
+- simulation-core/src/test/resources/examples/ — same concern; test resources are module-specific.
+**Rationale:** These are reference material for consumers, not runtime artifacts or test fixtures for platform modules. `docs/examples/` makes the intent clear and keeps them out of module builds.
+**Trade-offs:** Not on any module's classpath — can't be loaded by tests directly. Acceptable — consumers copy them into their own repos.
+**Sources:** Issue #323, docs/ directory structure
+**Exploration:** quick
+**Status:** captured
+
 ## D48: Cross-repo design — platform API + pages consumer together
 
 **Choice:** Design both platform-side API (#322) and pages-side consumer (casehub-pages#450) in one spec. Implement platform first, then pages. Both repos are in slot 195.
