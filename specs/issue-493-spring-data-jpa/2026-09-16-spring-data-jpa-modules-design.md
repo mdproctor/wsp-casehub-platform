@@ -171,7 +171,13 @@ public class NotificationsJpaAutoConfiguration {
 }
 ```
 
-`@ConditionalOnMissingBean` on SPI type ensures the JPA store only activates when no higher-priority implementation is present (mirrors `@DefaultBean` in Quarkus). Modules that are `@Alternative @Priority(1)` in Quarkus get `@Primary` in Spring.
+`@ConditionalOnMissingBean` on SPI type ensures that the first auto-config to load claims the bean. Loading order is controlled via `@AutoConfiguration(before = ...)`:
+
+- InMem auto-config loads first (highest priority) — `before = *JpaAutoConfiguration.class`
+- JPA auto-config loads second — `before = PlatformDefaultsManualConfig.class`
+- Mock fallback in platform-spring loads last
+
+This mirrors the Quarkus CDI priority chain: `@Alternative @Priority(100)` inmem → `@ApplicationScoped` JPA → `@DefaultBean` mock.
 
 ### Flyway Configuration
 
@@ -186,10 +192,9 @@ PostgreSQL-only features (`websearch_to_tsquery` in memory-jpa, recursive CTEs i
 ### Migration of Existing Modules
 
 Existing `-jpa` modules are modified:
-1. Entity classes and SQL files **move** to `-jpa-common`
+1. Entity classes and SQL files **move** to `-jpa-common` (same Java package — only the Maven module changes, no import edits needed in store implementations)
 2. `-jpa` pom.xml adds dependency on `-jpa-common`
-3. Store implementations update imports (entity package changes from `*.jpa` to `*.jpa.common` or similar)
-4. Tests remain in `-jpa` unchanged (they test the Quarkus store implementations)
+3. Tests remain in `-jpa` unchanged (they test the Quarkus store implementations)
 
 This is a refactor with no behaviour change for existing `-jpa` modules.
 
