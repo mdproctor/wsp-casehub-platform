@@ -19,12 +19,12 @@ date: 2026-09-15
 - [x] casehubio/platform#317 — nearest-match
 - [x] casehubio/platform#318 — event
 - [ ] casehubio/platform#326 — timed ← active
-  - [ ] Batch 1: Core
-    - [ ] Task 1: TimedEntry+TimedSequence
-    - [ ] Task 2: EventSequenceRunner
-  - [ ] Batch 2: CDI+Docs
-    - [ ] Task 3: event-simulation Quarkus module
-    - [ ] Task 4: Documentation update
+  - [x] Batch 1: Core
+    - [x] Task 1: TimedEntry+TimedSequence
+    - [x] Task 2: EventSequenceRunner
+  - [x] Batch 2: CDI+Docs
+    - [x] Task 3: event-simulation Quarkus module
+    - [x] Task 4: Documentation update
 - [ ] casehubio/platform#319 — REST
 - [ ] casehubio/platform#321 — DefaultBean
 - [ ] casehubio/platform#322 — pages
