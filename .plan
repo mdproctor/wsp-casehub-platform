@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-335-agent-config-manifest
-state: scaffolded
+state: active
 project-sha: 3ffb988daeb79be62231665bc93b5a2a43b729ae
 date: 2026-09-16
 issue-repo: casehubio/platform
@@ -13,13 +13,13 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#335 — Issue #335 ← active
-  - [ ] Batch 1: Foundation
-    - [ ] Task 1: Extend ModelQuery with range constraints
-    - [ ] Task 2: Manifest data model + CredentialRef + ManifestCredentialResolver
-  - [ ] Batch 2: Loader
-    - [ ] Task 3: ManifestLoader — YAML parsing and file discovery and merging
-    - [ ] Task 4: ManifestProcessor — drives existing SPIs
-    - [ ] Task 5: Router extension — alias lookup + preferVendor tiebreaking
-  - [ ] Batch 3: Wiring
-    - [ ] Task 6: agent-config Quarkus module
-    - [ ] Task 7: JSON Schema + CLAUDE.md + documentation
+  - [x] Batch 1: Foundation
+    - [x] Task 1: Extend ModelQuery with range constraints
+    - [x] Task 2: Manifest data model + CredentialRef + ManifestCredentialResolver
+  - [x] Batch 2: Loader
+    - [x] Task 3: ManifestLoader — YAML parsing and file discovery and merging
+    - [x] Task 4: ManifestProcessor — drives existing SPIs
+    - [x] Task 5: Router extension — alias lookup + preferVendor tiebreaking
+  - [x] Batch 3: Wiring
+    - [x] Task 6: agent-config Quarkus module
+    - [x] Task 7: JSON Schema + CLAUDE.md + documentation
