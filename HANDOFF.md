@@ -1,41 +1,34 @@
-# HANDOFF — casehub-platform
+# HANDOFF — issue-296-generator-nested-paths-enum
 
-## Last Session
+**Branch:** `issue-296-generator-nested-paths-enum`
+**Covers:** #296 (generator enhancements), #297 (batch 2 migration)
+**Progress:** All 4 tasks complete. Ready for work-end.
 
-Completed #288 (cloud model sources) end-to-end: brainstorm (8 decisions, light decision review with revisions), design spec (light spec review, 12 findings addressed — separate modules for Vertex/Bedrock, priority-sorted refresh, cache alignment, CloudModelSource interface), 7-task implementation plan, all 7 tasks implemented with TDD. Issue closed.
+## What Happened
 
-Key deliverables landed on branch:
-- `CloudModelSource` interface extending `ModelSource` with `status()` method
-- `CloudSourceStatus` record with `State` enum (ACTIVE/INACTIVE/ERROR) + factory methods
-- `AnthropicCloudModelSource` + `OpenAiCloudModelSource` — wrap existing VendorClients, priority 5, last-known-good caching
-- `VertexCloudModelSource` + `BedrockCloudModelSource` — inject via `Instance<VendorClient>`, graceful when module absent
-- New module `llm-config-vertex/` — `VertexClient` with Google ADC auth (`google-auth-library-oauth2-http`)
-- New module `llm-config-bedrock/` — `BedrockClient` with manual SigV4 signing (`software.amazon.awssdk:auth`)
-- `CloudSourceCredentialBootstrap` — env var detection (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`), `LlmCredentialStore` seeding at platform scope
-- `cloudSourceStatus()` query on `LlmConfigApi` for onboarding guidance
-- `ModelRegistryRefresher` — priority-sorted refresh (seed=0 before cloud=5 before configured=10)
-- HttpClient reuse fix in AnthropicClient, OpenAiClient, GoogleClient
-- 75+ tests across all modules, full build green
+1. Designed and reviewed spec for @RestPath annotation + simple type detection + batch 2 endpoint migration
+2. Implemented @RestPath annotation in platform-api and generator support (resolveRestPath, Jandex-based enum/fromString/valueOf detection)
+3. Migrated AclResource → AclApi SPI + AclService. 21 tests pass.
+4. Migrated PreferenceResource → PreferenceApi SPI + PreferenceService. PreferenceSchemaResource stays hand-written for ETag. 27 tests pass.
+5. Migrated NotificationResource + SuppressionResource → NotificationApi + NotificationSuppressionApi SPIs + services. 40 tests pass.
 
-## Immediate Next Step
+## Key Decisions
 
-Brainstorm #289 (local model sources — Ollama + HuggingFace discovery and lifecycle). Queue advanced, #289 is active.
+- D7 (RoundEnvironment scanning) dropped — SPIs go in dependency modules (platform-api, preferences-editor-core) following batch 1 pattern
+- Batch DELETE endpoints changed to POST (DELETE with body is non-standard HTTP)
+- registerParent uses String params (ResourceId fromString detection unreliable in APT context)
+- Stale annotationProcessorPaths JAR: always `mvn install -pl graphql-generator` before building modules that use the APT, and `rm -rf target/` on the consuming module to force clean generation
+- addMute/activateSnooze return 200 (was 201) — generator wraps non-void returns in Response.ok()
+- Preference SPIs placed in preferences-editor-core (not platform-api) — requires jandex-maven-plugin addition
+- PreferenceSchemaResource annotated with @McpDomain for documentation/future skip detection
 
-## Queue
+## Commits
 
-Branch `issue-288-cloud-model-sources` has 4 issues queued: #288 (done), #289 (active), #290, #292.
+1. `10f1cf0e` feat(#296): @RestPath annotation + simple type detection via Jandex
+2. `527bc868` feat(#297): migrate AclResource to generated @McpDomain approach
+3. `bdcbf631` feat(#297): migrate PreferenceResource to generated @McpDomain approach
+4. `eb6be20d` feat(#297): migrate notification + suppression endpoints to generated @McpDomain
 
-## Key Design Decisions
+## Next Action
 
-- Cloud sources use plain `apiModelId` (same as seed catalog) — priority resolution handles overlap
-- Vertex/Bedrock VendorClients in separate modules for classpath isolation (Quarkus build-time bean discovery + optional SDK deps = fragile)
-- Credential bootstrap seeds store from env vars but doesn't overwrite wizard-configured credentials
-- Discovery-invocation disconnect acknowledged: Vertex/Bedrock models route through Claude backend (direct API), not cloud platform endpoints — dedicated AgentBackends tracked as downstream
-
-## References
-
-- Spec: `specs/issue-288-cloud-model-sources/2026-09-12-cloud-model-sources-design.md`
-- Plan: `plans/2026-09-12-cloud-model-sources.md`
-- Decision review: `/Users/mdproctor/reviews/casehub-platform/issue-288-decision-20260912-143409/`
-- Spec review: `/Users/mdproctor/reviews/casehub-platform/issue-288-cloud-model-sources-20260912-151559/`
-- Epic #285: LLM model registry
+Run `work end` to close the branch — all tasks and both issues are complete.
