@@ -823,3 +823,25 @@
 **Sources:** platform-api .governance package (ExecutionPolicy, RetryPolicy — data records), governance/ module (PolicyEnforcer — concrete class)
 **Exploration:** quick
 **Status:** captured
+
+## D40: Single integration test for CDI ordering verification
+
+**Choice:** One `@QuarkusTest` that verifies the generated decorator correctly wraps a `@DefaultBean` NoOp for one representative SPI (e.g. `AccessControlProvider`). Seeds a corpus, configures a strategy, and asserts the decorator intercepts the NoOp's response. The other 10 SPIs use identical generated code — testing each adds no coverage.
+**Alternatives:**
+- Test every generated decorator (11 tests) — proves every listing entry generates correctly, but the APT is deterministic and already tested in `SimulationDecoratorProcessorTest`. Coverage gain is marginal.
+**Rationale:** The risk is CDI ordering (`@Decorator @Priority(APPLICATION + 200)` wrapping a `@DefaultBean`), not code generation correctness. One integration test proves the ordering. The APT's unit tests in simulation-generator already verify that listing-file-based generation produces correct Java source.
+**Trade-offs:** If a specific SPI has an unusual method signature that the APT mishandles, it won't be caught until that SPI is used. Mitigated by the APT's existing method-signature test coverage.
+**Sources:** SimulationDecoratorProcessorTest.java, SimulatedCaseMemoryStoreTest.java (precedent for single-SPI verification)
+**Exploration:** quick
+**Status:** captured
+
+## D41: Platform SPI simulation section in the existing simulation guide
+
+**Choice:** Add a "Platform SPIs" section to the existing simulation guide documenting which SPIs are available, their qualified names, and quick-start config snippets. No separate migration guide document.
+**Alternatives:**
+- Separate migration-guide.md — standalone document. More discoverable as a standalone artifact but fragments simulation documentation across two files
+**Rationale:** The simulation guide already has "Quick start", "Named patterns", and "Core concepts" sections. A "Platform SPIs" table with qualified names and example config fits naturally after the existing content. Consumers already go to the simulation guide — don't split the docs.
+**Trade-offs:** The guide grows longer. Acceptable — a table of 11 SPIs with qualified names is compact.
+**Sources:** docs/guides/simulation-guide.md (existing structure)
+**Exploration:** quick
+**Status:** captured
