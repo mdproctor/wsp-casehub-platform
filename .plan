@@ -13,3 +13,10 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#341 — Issue #341 ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: DomainScanResult rename + McpDomainJandexScanner
+    - [ ] Task 2: Update Spring generator consumers
+  - [ ] Batch 2: APT
+    - [ ] Task 3: GraphQLResolverProcessor class support
+  - [ ] Batch 3: Runtime
+    - [ ] Task 4: GraphQLModelScanner class support
