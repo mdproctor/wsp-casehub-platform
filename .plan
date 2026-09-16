@@ -13,3 +13,13 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#335 — Issue #335 ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: Extend ModelQuery with range constraints
+    - [ ] Task 2: Manifest data model + CredentialRef + ManifestCredentialResolver
+  - [ ] Batch 2: Loader
+    - [ ] Task 3: ManifestLoader — YAML parsing and file discovery and merging
+    - [ ] Task 4: ManifestProcessor — drives existing SPIs
+    - [ ] Task 5: Router extension — alias lookup + preferVendor tiebreaking
+  - [ ] Batch 3: Wiring
+    - [ ] Task 6: agent-config Quarkus module
+    - [ ] Task 7: JSON Schema + CLAUDE.md + documentation
