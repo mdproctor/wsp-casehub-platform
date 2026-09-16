@@ -262,7 +262,7 @@ The assertion queries the overlay's journal:
 @Inject SimulationRuntime simulationRuntime;
 ```
 
-This requires `casehub-pages` to add `casehub-platform-simulation-core` as a compile dependency (alongside its existing platform dependencies). The dependency is opt-in at the module level — if simulation-core is absent, the `simulation:` block in scenario YAML is ignored (graceful degradation).
+This requires `casehub-pages` to add `casehub-platform-simulation-core` as a compile dependency in the `scenario-runtime` module (alongside its existing platform dependencies).
 
 ## Testing
 
