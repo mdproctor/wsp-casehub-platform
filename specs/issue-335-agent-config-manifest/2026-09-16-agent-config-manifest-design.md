@@ -82,8 +82,9 @@ Every resource in the chain uses the same schema. All sections are optional.
 # Models — contributes descriptors to the catalog
 models:
   - id: my-fine-tune
-    apiModelId: ft:gpt-4-0613:my-org::abc123
+    apiModelId: ft:gpt-4-0613:my-org::abc123  # defaults to id if omitted
     backendKey: openai
+    backendInstanceId: default                  # optional — defaults to null (→ "default" at resolution)
     vendor: openai
     family: gpt-4
     displayName: My Fine-Tuned GPT-4
@@ -147,9 +148,9 @@ Manifest credential fields are references, never raw values.
 | `file:/path` | File contents | Kubernetes mounted secrets |
 | `ref:credential-ref` | `CredentialResolver` SPI → Quarkus `CredentialsProvider` → Vault/AWS/GCP | Production |
 
-The existing `credentials-quarkus/` module bridges `ref:` to Quarkus CredentialsProvider. Adding a Vault extension to the classpath makes `ref:vault/anthropic-key` work automatically.
+The existing `credentials-quarkus/` module bridges `CredentialResolver.resolve()` to Quarkus `CredentialsProvider`. `ManifestCredentialResolver` delegates `ref:` prefixes to `CredentialResolver` (platform-api SPI), which routes through the Quarkus bridge when `credentials-quarkus/` is on the classpath. Adding a Vault extension makes `ref:vault/anthropic-key` work automatically.
 
-Outside Quarkus (JS demo, non-Quarkus tests), only `env:` and `file:` are available — correct for those contexts.
+Outside Quarkus (Spring, standalone), only `env:` and `file:` are available unless a `CredentialResolver` implementation is provided — correct for those contexts.
 
 ### Provider Credential Resolution
 
@@ -238,7 +239,9 @@ The loader walks a fixed hierarchy, checking for files at each level:
 | Project | `./agent-config.yaml` | 30 | If exists |
 | Project profile | `./agent-config-{profile}.yaml` | 35 | If exists and profile matches |
 
-Profile determined by `CASEHUB_AGENT_PROFILE` env var. In Quarkus, falls back to `QUARKUS_PROFILE` if the CaseHub var is unset.
+Profile determined by `CASEHUB_AGENT_PROFILE` env var. In Quarkus environments, falls back to `QUARKUS_PROFILE` if `CASEHUB_AGENT_PROFILE` is unset — a convenience default for deployments where agent config aligns with the application profile. When the two diverge (e.g., `QUARKUS_PROFILE=dev` but agent tests target CI Ollama), set `CASEHUB_AGENT_PROFILE` explicitly.
+
+Outside Quarkus (Spring Boot, standalone), only `CASEHUB_AGENT_PROFILE` is checked — no framework-specific fallback. If no profile env var is set, profile-specific config files are ignored (base config applies).
 
 ### Explicit Remote Sources
 
@@ -252,50 +255,92 @@ sources:
 
 Remote sources are fetched at startup and accumulated into the merged manifest. Last-known-good caching (already built for CloudModelSource) handles network failures.
 
+#### Recursive Loading Guards
+
+Source loading is recursive — a loaded manifest can declare more sources. Guards:
+
+| Guard | Value | Behavior |
+|-------|-------|----------|
+| Cycle detection | URI set | If a URI is already in the loading stack, skip with warning |
+| Max depth | 3 | Sources nested deeper than 3 levels are ignored with warning |
+| Fetch timeout | 10 seconds | Per-fetch HTTP timeout; unreachable source uses last-known-good or is skipped |
+| Max total sources | 20 | After 20 unique source URIs are loaded, additional sources are ignored with warning |
+
+All guards log warnings — a misconfigured source chain should degrade, not crash startup.
+
+#### Security
+
+Remote sources use HTTPS for transport-level integrity and confidentiality. Authentication headers (bearer tokens, mTLS) and content integrity verification (checksums) are follow-on concerns — tracked as a separate issue. The initial implementation trusts HTTPS endpoints and caches last-known-good snapshots.
+
 ### Accumulation Rules
 
 - **Models:** by `id`. Higher priority wins. A project manifest can override a seed catalog model's properties.
 - **Providers:** by `vendor`. Higher priority wins. A project profile can switch the anthropic credential source.
 - **Aliases:** by name. Higher priority wins. A project can redefine what `reasoning-heavy` means.
 - **Defaults:** last writer wins. Profile defaults override base defaults.
-- **Sources:** all sources from all manifests are loaded (union, not override).
+- **Sources:** union by URI. If the same URI appears in multiple manifests, the highest priority wins. Duplicate URIs are fetched only once.
 - **Local models:** union of all `ensure: present` declarations.
 
 ## Startup Processing
 
-ManifestProcessor drives existing SPIs from the merged manifest:
+### Startup Ordering
 
-### Step 1 — Providers → Credentials → Backends
+`AgentConfigBeans` observes `StartupEvent` at `@Priority(50)` — before `BackendInstanceCoordinator` (75) and `ModelRegistryRefresher` (default CDI priority). This follows the established priority sequence from the cloud-model-sources design:
+
+| Priority | Bean | Responsibility |
+|----------|------|----------------|
+| 50 | `AgentConfigBeans` | Load manifest, store credentials, prepare aliases + defaults |
+| 75 | `BackendInstanceCoordinator` | Discover credentials → create backend instances |
+| default | `ModelRegistryRefresher` | Refresh all model sources (seed, cloud, configured) |
+
+`AgentConfigBeans` replaces `CloudSourceCredentialBootstrap`'s credential seeding role — the manifest handles env var detection declaratively. `CloudSourceCredentialBootstrap` is disabled via `@IfBuildProperty(name = "casehub.agent.manifest.enabled", stringValue = "true", enableIfMissing = false)` and deprecated in this issue.
+
+### ManifestProcessor Pipeline
+
+ManifestProcessor drives existing SPIs from the merged manifest. It receives vendor field requirements as a constructor parameter (`Map<String, List<String>>`, extracted from `VendorClient` beans by the Quarkus wiring layer), keeping `agent-config-core` free of `llm-config` dependencies.
+
+#### Step 1 — Providers → Credentials
 
 For each provider in the merged manifest:
 1. Resolve credential references (`env:`, `file:`, `ref:`) → plain values
-2. Validate against `VendorInfo.requiredFields()` — fail fast if missing
-3. Store in `LlmCredentialStore.store(PLATFORM_TENANT_ID, vendorKey, credentials)`
-4. `BackendInstanceCoordinator` runs its normal startup sequence — discovers credentials in the store, uses `BackendInstanceFactory` to create backend instances, registers with `BackendInstanceRegistry`
+2. Validate against vendor required fields (injected map) — fail fast if missing
+3. Store in `LlmCredentialStore.store(PLATFORM_TENANT_ID, "cloud-{vendorKey}", credentials)`
 
-### Step 2 — Models → Registry
+The credential ref follows the existing `"cloud-{vendorKey}"` convention (e.g., `"cloud-openai"`, `"cloud-anthropic"`). This is the contract that `BackendInstanceFactory` implementations pattern-match against — `OpenAiDirectBackendFactory.deriveInstanceId("cloud-openai")` returns `"default"`. Using a bare vendor key would produce incorrect instance IDs.
+
+After step 1, `BackendInstanceCoordinator` runs its normal startup sequence at `@Priority(75)` — discovers credentials in the store, uses `BackendInstanceFactory` to create backend instances, registers with `BackendInstanceRegistry`.
+
+#### Step 2 — Models → Registry
 
 1. Collect all model descriptors from the merged manifest
-2. Register via `MutableModelRegistry.replaceSource("manifest", priority, models)`
-3. Normal `ModelRegistryRefresher` cycle keeps cloud-discovered models current
+2. If `apiModelId` is omitted on a model entry, default to the model's `id` (matching `SeedCatalogModelSource` behavior)
+3. Register via `MutableModelRegistry.replaceSource("manifest", priority, models)`
+4. Normal `ModelRegistryRefresher` cycle keeps cloud-discovered models current
 
-### Step 3 — Local Models → Reconciliation
+#### Step 3 — Local Models → Reconciliation
 
 For each local model with `ensure: present`:
 1. Check availability via OllamaModelSource
 2. If missing: trigger pull via `LlmConfigService.pullModel()`
 3. If missing: warn and continue (non-blocking) — model will be available after pull completes, subsequent invocations will find it
 
-### Step 4 — Aliases → Router
+#### Step 4 — Aliases + Defaults → ManifestResult
 
-1. Register alias map with `RoutingAgentProvider`: `Map<String, ModelQuery>`
-2. Each alias name maps to a parsed `ModelQuery` from the `ModelConstraints` schema
+1. Parse each alias: `ModelConstraints` → `ModelQuery` (filter fields) + optional `preferVendor` (tiebreaker)
+2. Determine effective default backend: manifest `defaults.backend` if declared, else fall back to `RoutingAgentConfig.defaultBackend()` (which defaults to `"claude"` via `@WithDefault`)
+3. Produce `ManifestResult` record: `Map<String, ModelQuery> aliases`, `Map<String, String> aliasVendorPreferences`, `String defaultBackendKey`
 
-### Step 5 — Defaults → Router
+`ManifestResult` is a CDI bean produced by `AgentConfigBeans`. `RouterBeans` consumes it as an optional dependency — if present, its aliases and default backend key override config-property values. `RoutingAgentProvider` gains a new constructor accepting aliases:
 
-1. Set default backend key on `RoutingAgentProvider`
+```java
+public RoutingAgentProvider(BackendInstanceRegistry registry,
+                            String defaultBackendKey,
+                            ModelRegistry modelRegistry,
+                            Map<String, ModelQuery> aliases,
+                            Map<String, String> aliasVendorPreferences)
+```
 
-After step 5, `agentProvider.invoke()` works. No custom code.
+After step 4, `agentProvider.invoke()` works. No custom code.
 
 ## Router Extension
 
@@ -310,7 +355,9 @@ resolve(model):
   4. Fail fast
 ```
 
-Tiebreaking (steps 0 and 1): among matching models, prefer (1) default backend, then (2) `preferVendor` from constraints, then (3) first match.
+Tiebreaking (steps 0 and 1): among matching models, prefer (1) default backend, then (2) `aliasVendorPreferences.get(aliasName)` for step 0 (carried separately from the ModelQuery, not as a field on it — see §ModelQuery Extension), then (3) first match.
+
+`prefer-vendor` is a tiebreaking hint, not a filter. It lives in a separate `Map<String, String> aliasVendorPreferences` (alias name → vendor), not in `ModelQuery`. This keeps `ModelQuery` purely about filtering — `InMemoryModelRegistry.query()` doesn't need to know about tiebreaking semantics.
 
 ## ModelQuery Extension
 
@@ -339,13 +386,34 @@ public record ModelQuery(
 
 Pure filtering, no scoring. Deterministic.
 
+### ModelConstraints → ModelQuery Conversion
+
+`ModelConstraints` (generated from `model-selection.schema.json`) is the YAML/JSON representation. `ModelQuery` is the runtime type. The conversion:
+
+| ModelConstraints field | ModelQuery field | Notes |
+|---|---|---|
+| `vendor` | `vendor` | Direct |
+| `family` | `family` | Direct |
+| `tier` | `tier` | Enum parse |
+| `capabilities` | `requiredCapabilities` | Direct |
+| `locality` | `locality` | Enum parse |
+| `max-cost` | `maxCostTier` | Enum parse |
+| `min-context` | `minContextWindow` | Direct |
+| `min-output` | `minMaxOutput` | Direct |
+| `prefer-vendor` | *(not in ModelQuery)* | Carried in `aliasVendorPreferences` map |
+| *(not in schema)* | `authMethod` | Not exposed in manifest — set to null |
+
+`prefer-vendor` is intentionally NOT added to `ModelQuery`. `ModelQuery` is a pure filter type — every field participates in `InMemoryModelRegistry.query()` filtering. `prefer-vendor` is a tiebreaking hint (preference among models that already match the filter), not a filter predicate. Mixing filter and tiebreaking semantics in one type creates ambiguity — "does `preferVendor` narrow results or rank them?" Keeping them separate makes both types honest about what they do.
+
+The two types serve different layers: `ModelConstraints` is the schema-generated YAML record; `ModelQuery` is the platform runtime filter. They overlap in fields because filtering IS the primary purpose of model selection constraints — but they are not duplicates. `ModelConstraints` carries `prefer-vendor` (a user-facing concept for the manifest schema); `ModelQuery` carries `authMethod` (a platform-internal filter). Neither is a superset of the other.
+
 ## Module Structure
 
 Following the established core/Quarkus pattern:
 
 ### `agent-config-core` (new)
 
-Framework-neutral. Pure Java + Jackson.
+Framework-neutral. Pure Java + Jackson. Depends on `platform-api` (zero-dependency SPI layer — gives access to `CredentialResolver`, `LlmCredentialStore`, `ModelQuery`, `ModelRegistry`).
 
 | Type | Purpose |
 |------|---------|
@@ -355,9 +423,14 @@ Framework-neutral. Pure Java + Jackson.
 | `LocalModelDeclaration` | Record: id, ensure |
 | `SourceDeclaration` | Record: uri, priority |
 | `CredentialRef` | Sealed interface: EnvRef, FileRef, ExternalRef — parsed from prefix |
-| `ManifestLoader` | Discovers resources from hierarchy, parses YAML, merges |
-| `ManifestProcessor` | Drives existing SPIs from merged manifest |
-| `CredentialRefResolver` | Resolves CredentialRef to plain values (env, file) |
+| `ManifestLoader` | Discovers resources from hierarchy, parses YAML, merges. Cycle detection via URI set, max depth 3, 10s timeout per remote fetch, max 20 total sources. |
+| `ManifestProcessor` | Drives existing SPIs from merged manifest. Accepts vendor required fields as `Map<String, List<String>>` constructor parameter (injected by Quarkus layer from `VendorClient` beans). |
+| `ManifestResult` | Record: `Map<String, ModelQuery> aliases`, `Map<String, String> aliasVendorPreferences`, `String defaultBackendKey` |
+| `ManifestCredentialResolver` | Resolves CredentialRef to plain values. Handles `env:` and `file:` directly; delegates `ref:` to `CredentialResolver` SPI (from platform-api, injected via constructor). |
+
+The resolver is named `ManifestCredentialResolver` (not `CredentialRefResolver`) to avoid confusion with the existing `CredentialResolver` SPI in `platform-api`. `CredentialResolver` resolves credentials by logical name; `ManifestCredentialResolver` resolves credential references with `env:`/`file:`/`ref:` prefixes. Different operation, distinct name.
+
+`VendorInfo` stays in `llm-config/` — `agent-config-core` does not depend on `llm-config`. Instead, ManifestProcessor accepts vendor field requirements as a parameter (`Map<String, List<String>>`), and the Quarkus wiring layer extracts this from `VendorClient` beans.
 
 ### `agent-config` (new)
 
@@ -365,8 +438,9 @@ Quarkus wiring. Thin.
 
 | Type | Purpose |
 |------|---------|
-| `AgentConfigBeans` | `@Startup` producer — runs ManifestLoader + ManifestProcessor at boot |
-| `QuarkusCredentialRefResolver` | Extends CredentialRefResolver — adds `ref:` via CredentialResolver SPI |
+| `AgentConfigBeans` | `@Observes @Priority(50) StartupEvent` — runs ManifestLoader + ManifestProcessor, produces `ManifestResult` as CDI bean. Collects `VendorClient` beans to extract vendor required fields for ManifestProcessor. |
+
+No separate `QuarkusCredentialRefResolver` — `ManifestCredentialResolver` in agent-config-core handles all three prefixes via `CredentialResolver` SPI injection.
 
 ### `agent-config-spring` (generated)
 
@@ -382,11 +456,24 @@ This is the correct separation: the manifest answers "what does this deployment 
 
 ## Consumer Integration
 
+### AgentSessionConfig Extension
+
+`AgentSessionConfig` gains a `withModel()` method for fluent model override:
+
+```java
+public record AgentSessionConfig(...) {
+    public AgentSessionConfig withModel(String model) {
+        return new AgentSessionConfig(systemPrompt, userPrompt, mcpServers, timeout, correlationId, model);
+    }
+}
+```
+
 ### Java code
 ```java
 @Inject AgentProvider agentProvider;
 
 // By alias
+var config = AgentSessionConfig.of("You are an analyst.", "Analyze this.");
 agentProvider.invoke(config.withModel("reasoning-heavy"));
 
 // By tier
@@ -415,13 +502,12 @@ tasks:
 
 ### Tests
 ```java
-// No TestAgentProvider. No CLI passthrough. Just inject and use.
 @Inject AgentProvider agentProvider;
 
 @Test
 void testAnalysis() {
     var events = agentProvider.invoke(
-        new AgentSessionConfig(null, "Analyze this", null, null, null, "tier:FAST")
+        AgentSessionConfig.of("You are a test agent.", "Analyze this", "tier:FAST")
     ).collect().asList().await().indefinitely();
     assertFalse(events.isEmpty());
 }
@@ -541,14 +627,20 @@ The manifest unifies existing independent mechanisms:
 
 **New (the glue layer):**
 - `Manifest` record type
-- `ManifestLoader` — discovers, parses, merges resources
+- `ManifestLoader` — discovers, parses, merges resources (with cycle detection, depth limits)
 - `ManifestProcessor` — drives existing SPIs from merged manifest
+- `ManifestResult` — CDI-produced record carrying aliases, vendor preferences, default backend
+- `ManifestCredentialResolver` — prefix-based credential reference resolution
 - `model-selection.schema.json` — JSON Schema for type-safe YAML
-- Alias registry in RoutingAgentProvider
+- Alias registry + vendor preference map in RoutingAgentProvider
 
 **Extended:**
 - `ModelQuery` — add `minContextWindow`, `minMaxOutput`
-- `RoutingAgentProvider.resolve()` — add alias lookup step
+- `RoutingAgentProvider` — new constructor with aliases + vendor preferences; `resolve()` gains alias lookup step
+- `AgentSessionConfig` — add `withModel(String)` method
+
+**Deprecated:**
+- `CloudSourceCredentialBootstrap` — disabled when manifest processing is active; superseded by manifest `providers:` section
 
 **Unchanged:**
 - ModelSource, ModelRegistry, MutableModelRegistry
@@ -559,7 +651,7 @@ The manifest unifies existing independent mechanisms:
 
 ## Downstream
 
-- **CloudSourceCredentialBootstrap** becomes redundant once the manifest handles env var detection. Can be deprecated in a follow-on, not in this issue.
+- **CloudSourceCredentialBootstrap** is disabled when manifest processing is active (`@IfBuildProperty(name = "casehub.agent.manifest.enabled", stringValue = "true", enableIfMissing = false)`) and deprecated. Note: `CloudSourceCredentialBootstrap.detectAndSeed()` is currently not wired to any startup observer in production code (only called from tests), so there is no runtime coexistence conflict. The manifest subsumes its function entirely — credential detection via `providers:` section replaces the hardcoded env var detection.
 - **Eidos integration** — eidos case definitions `$ref` the model-selection schema for task-level model requirements. Follow-on issue after schema is published.
 - **Org descriptor integration** — org roles reference model selection for agent assignment. Follow-on issue.
 - **Web app implementation** — separate issue. This spec defines the schema and pipeline it consumes.
