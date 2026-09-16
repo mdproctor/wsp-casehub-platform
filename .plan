@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-489-dx-audit
-state: scaffolded
+state: active
 project-sha: slot-creation
 date: 2026-09-16
 issue-repo: casehubio/parent
@@ -14,9 +14,12 @@ context: DX audit: reduce verbosity and ceremony across Spring and Quarkus. Star
 
 ## Queue
 - [ ] casehubio/parent#489 — Issue #489 ← active
-  - [ ] Batch 1: casehubio/parent#490
-    - [ ] Task 1: Measure_remaining_ceremony_gap
-  - [ ] Batch 2: casehubio/parent#492
-    - [ ] Task 2: Verify_Spring-side_cascade_from_impl_scanning
-  - [ ] Batch 3: casehubio/parent#491
-    - [ ] Task 3: Identify_SPI_interfaces_for_removal
+  - [ ] Batch 1: Generator_Foundation
+    - [ ] Task 1: DomainScanResult_rename_and_scanner_fix
+    - [ ] Task 2: APT_processor_class_support
+  - [ ] Batch 2: SpringModelScanner_Parity
+    - [ ] Task 3: Class-first_scan
+  - [ ] Batch 3: POJO_Migration
+    - [ ] Task 4: Annotate_SubscriptionService_EventTypeService
+  - [ ] Batch 4: Spring_Drift_Elimination
+    - [ ] Task 5: Wire_generators_delete_controllers
