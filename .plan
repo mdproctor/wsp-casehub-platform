@@ -17,14 +17,14 @@ date: 2026-09-15
 - [x] casehubio/platform#325 — YAML-driven
 - [x] casehubio/platform#320 — CaseMemoryStore
 - [x] casehubio/platform#317 — nearest-match
-- [ ] casehubio/platform#318 — event ← active
-  - [x] Batch 1: Records+Builder
-    - [x] Task 1: Module scaffold+records
-    - [x] Task 2: CloudEventFixtureBuilder
-  - [x] Batch 2: Emitter+Docs
-    - [x] Task 3: SimulatedEventEmitter tick()
-    - [x] Task 4: Documentation update
-- [ ] casehubio/platform#326 — timed
+- [x] casehubio/platform#318 — event
+- [ ] casehubio/platform#326 — timed ← active
+  - [ ] Batch 1: Core
+    - [ ] Task 1: TimedEntry+TimedSequence
+    - [ ] Task 2: EventSequenceRunner
+  - [ ] Batch 2: CDI+Docs
+    - [ ] Task 3: event-simulation Quarkus module
+    - [ ] Task 4: Documentation update
 - [ ] casehubio/platform#319 — REST
 - [ ] casehubio/platform#321 — DefaultBean
 - [ ] casehubio/platform#322 — pages
