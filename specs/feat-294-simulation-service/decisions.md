@@ -845,3 +845,15 @@
 **Sources:** docs/guides/simulation-guide.md (existing structure)
 **Exploration:** quick
 **Status:** captured
+
+## D42: Intercept all interface methods — remove abstract/default distinction
+
+**Choice:** Remove the `isAbstract` check from `SimulationDecoratorProcessor`. All interface methods (abstract and default) get simulation interception logic. The config layer (`casehub.simulation.<spi>.<method>.strategy=...`) controls which methods are active — unconfigured methods passthrough regardless.
+**Alternatives:**
+- Listing file format extension (`FQCN=spi-name:method1,method2`) — backward compatible method specifiers. Unnecessary complexity for a pre-release codebase with one listing file.
+- Intercept abstract only (status quo) — excludes pure-default interfaces like AccessControlProvider. Artificial limitation.
+**Rationale:** The generator's abstract/default distinction was premature. The config layer is the real activation gate, not the generated code. Generating simulation logic for every method costs nothing when unconfigured (one ConcurrentHashMap lookup returning Optional.empty). This removes a category of "can't simulate this SPI" failures. AccessControlProvider (14 default methods, zero abstract) becomes simulatable.
+**Trade-offs:** Slightly more generated code per decorator. Negligible — the methods are small and the overhead is a map lookup.
+**Sources:** SimulationDecoratorProcessor.java (lines 159-166 — abstract/default branch), AccessControlProvider.java (pure-default interface)
+**Exploration:** quick
+**Status:** captured
