@@ -41,13 +41,25 @@ Actual SPI usage verified by source audit of each consumer repo:
 | SPI | Usage | Current test pattern | Simulation path |
 |-----|-------|---------------------|-----------------|
 | **AgentProvider** | Heavy — ClinicalAgentSupport, 5 test classes | 4× `@InjectMock AgentProvider`, 3× `mock(AgentProvider.class)` | Path B (agent-simulation-core) |
-| **CaseMemoryStore** | Via CbrCaseMemoryStore — ClinicalCbrService, ClinicalMemoryService, ConsentWithdrawalService | `mock(CbrCaseMemoryStore.class)` in 3 tests | Path A (memory-simulation-core) |
+| **CbrCaseMemoryStore** | ClinicalCbrService, ClinicalMemoryService, ConsentWithdrawalService | `mock(CbrCaseMemoryStore.class)` in 3 tests | **Not covered** — see note below |
 
 No @RegisterRestClient interfaces. NotificationStore usage is domain-specific
 (SponsorNotificationStore), not the platform SPI.
 
+**CbrCaseMemoryStore gap:** Clinical and aml use `CbrCaseMemoryStore`
+(extends CbrCaseStore, CbrCaseRetriever, CbrCaseLifecycle, CbrCaseAdmin),
+which is a completely separate interface from `CaseMemoryStore`. The
+`memory-simulation-core` module generates a decorator for `CaseMemoryStore`
+only — it does not intercept `CbrCaseMemoryStore` injection points.
+Simulating CbrCaseMemoryStore requires either a new listing in a
+neocortex simulation module or the listing-file approach in the consumer
+repo. This is consumer-side work — the adoption guide notes the gap and
+recommends programmatic corpus seeding for CBR methods (which have rich
+domain types like `CbrCase`, `CbrRetrievalRequest`).
+
 **Simulation profile:** Agent-first. AgentProvider is the highest-value
-target — 7 mock sites across tests. CaseMemoryStore second.
+target — 7 mock sites across tests. CbrCaseMemoryStore second (requires
+consumer-side enablement).
 
 ### devtown
 
@@ -66,14 +78,15 @@ CaseMemoryStore second.
 
 | SPI | Usage | Current test pattern | Simulation path |
 |-----|-------|---------------------|-----------------|
-| **CaseMemoryStore** | Via CbrCaseMemoryStore — AmlCbrSchemaRegistrar, AmlErasureService | `InMemoryCbrCaseMemoryStore` in tests (already uses in-memory, not mocks) | Path A (memory-simulation-core) |
+| **CbrCaseMemoryStore** | AmlCbrSchemaRegistrar, AmlErasureService | `InMemoryCbrCaseMemoryStore` in tests (already uses in-memory, not mocks) | **Not covered** — same CbrCaseMemoryStore gap as clinical |
 | **ModelRegistry** | DomainModelRegistry in MCP test only | Direct instantiation | Path A (platform-simulation-core) |
 
 Does NOT use ExpressionEngine directly (corrects the issue's assumption).
 No @RegisterRestClient interfaces.
 
 **Simulation profile:** Memory-first. Already using in-memory implementations
-rather than mocks — smallest adoption gap. ModelRegistry is a minor target.
+rather than mocks — smallest adoption gap. CbrCaseMemoryStore has the same
+gap as clinical. ModelRegistry is a minor target.
 
 ### fsitrading
 
@@ -90,6 +103,24 @@ added in the fsitrading repo.
 **Simulation profile:** Agent + domain SPI. AgentProvider via blocks is the
 highest platform-SPI value target. Domain-specific banking SPIs need
 @SimulationEligible annotation (consumer-side work).
+
+**Consumer-side @SimulationEligible guidance:** For domain-specific SPIs
+(fsitrading's banking/payment interfaces, clinical's domain notification
+store), consumers have two enablement paths:
+
+1. **Annotation path** — add `simulation-api` as a compile dependency to
+   the domain API module, annotate the SPI with `@SimulationEligible`.
+   The simulation-generator APT generates the decorator. Introduces a
+   platform simulation dependency into the consumer's API module.
+2. **Listing-file path** — add `META-INF/simulation-eligible.txt` in the
+   module that should host the generated decorator. No annotation
+   dependency on the SPI. Requires the SPI's JAR on
+   `annotationProcessorPaths`. This is the same mechanism
+   `memory-simulation-core` uses for `CaseMemoryStore`.
+
+The adoption guide documents both paths. The listing-file path is
+recommended when the SPI is in a separate API module that shouldn't
+depend on simulation-api.
 
 ---
 
@@ -130,11 +161,16 @@ the existing "Scenario Integration" section. Structure:
 
 A numbered checklist that every consumer follows:
 
-1. Add simulation dependencies (simulation-core, simulation-config,
-   simulation-generator as provided scope)
-2. Add the appropriate simulation module for your SPIs
-   (agent-simulation-core, memory-simulation-core, platform-simulation-core,
-   rest-client-simulation-generator)
+1. Add simulation dependencies:
+   - `casehub-platform-simulation-api` (compile)
+   - `casehub-platform-simulation-core` (compile)
+   - `casehub-platform-simulation-config` (compile)
+   - `casehub-platform-simulation-generator` (provided — APT)
+2. Add the appropriate simulation module for your SPIs:
+   - `agent-simulation-core` (compile) — for AgentProvider
+   - `memory-simulation-core` (compile) — for CaseMemoryStore
+   - `platform-simulation-core` (compile) — for platform-api SPIs
+   - `rest-client-simulation-generator` (provided — APT) — for @RegisterRestClient
 3. Create YAML corpus fixtures (copy from `docs/examples/simulation/<app>/`)
 4. Add `%test` profile simulation config to `application.properties`
 5. Migrate @InjectMock tests to simulation-based tests
@@ -188,6 +224,11 @@ var overlay = runtime.pushOverlay(config, corpus);
 assertThat(overlay.journal().countFor("agent-provider.invoke")).isEqualTo(2);
 ```
 
+This is the low-level journal API. Issue #332 (verification API) will add
+a convenience DSL (`wasCalled()`, `wasCalledWith()`, `verifyInOrder()`)
+over this same journal. The journal-based pattern shown here remains valid
+— #332 adds sugar, not a replacement.
+
 ### CI integration
 
 Document the Quarkus profile pattern:
@@ -201,7 +242,16 @@ Document the Quarkus profile pattern:
 ```
 
 No Maven profile changes needed. Simulation modules are compile-scope
-dependencies — present at all times but inert without config.
+dependencies — present at all times but inert without config (no strategy
+configured = passthrough).
+
+**Production overhead note:** Generated `@Decorator` classes are active
+CDI beans in production. Each intercepted call enters the decorator,
+performs a `ConcurrentHashMap.get()` that returns `Optional.empty()`, and
+delegates. The per-call overhead is nanoseconds — negligible for most SPIs.
+For high-frequency SPIs in latency-sensitive paths, consumers can use
+Maven profile gating to exclude simulation modules from production builds
+if the overhead is a concern.
 
 ---
 
@@ -210,25 +260,28 @@ dependencies — present at all times but inert without config.
 ```
 docs/examples/simulation/
 ├── clinical/
-│   ├── agent-provider-corpus.yaml
-│   └── case-memory-store-corpus.yaml
+│   └── agent-provider-corpus.yaml
 ├── devtown/
 │   ├── github-api-corpus.yaml
 │   └── case-memory-store-corpus.yaml
 ├── aml/
-│   ├── case-memory-store-corpus.yaml
 │   └── model-registry-corpus.yaml
 └── fsitrading/
     ├── agent-provider-corpus.yaml
-    ├── case-memory-store-corpus.yaml
     └── model-registry-corpus.yaml
 ```
+
+Clinical and aml's CbrCaseMemoryStore is not covered by existing simulation
+modules — no YAML fixture provided. Devtown and fsitrading use
+CaseMemoryStore directly (via engine) so fixtures are included.
 
 Each YAML file follows the existing corpus fixture format from
 simulation-config-core's `YamlCorpusLoader`. Top-level keys are qualified
 SPI names, each mapping to a list of entries. No `recorded-at` field —
-the loader injects `Instant.now()` at parse time. All field names are
-kebab-case.
+the loader injects `Instant.now()` at parse time. Top-level entry fields
+(`tenancy-id`, `key`, `input`, `output`) are kebab-case. Nested fields
+within `input` and `output` must match the SPI's actual field names
+(typically camelCase for Java records).
 
 ```yaml
 # agent-provider-corpus.yaml
@@ -253,6 +306,18 @@ agent-provider.invoke:
 
 2-3 entries per file. Domain-plausible values — real enough to demonstrate
 the fixture shape, not enough for real testing.
+
+**Type limitation (per D14):** YAML fixtures store input/output as
+untyped Objects (Maps/Lists/Strings). This works for key-lookup and
+sequential strategies where the output is consumed as raw data. For SPIs
+with rich domain return types (e.g. `CaseMemoryStore.query()` returns
+`List<Memory>`), YAML fixtures may not deserialize correctly into the
+expected types. Use programmatic corpus seeding for these cases.
+
+The `case-memory-store-corpus.yaml` fixtures in devtown and fsitrading
+demonstrate the YAML shape for simple query scenarios. Clinical and aml
+use CbrCaseMemoryStore (not covered by memory-simulation-core) and would
+need programmatic seeding regardless.
 
 ---
 
