@@ -638,3 +638,80 @@
 **Sources:** Issue #318 (event simulation), issue #326 (timed simulation), .plan (queue position 8/18, #326 at position 9)
 **Exploration:** quick
 **Status:** captured
+
+---
+
+# Phase 5 — #326 Timed Event Simulation
+
+## D26: Full scope — scheduler + timed sequences + timing preservation
+
+**Choice:** All three deliverables: @Scheduled wrapper for continuous emission, TimedSequence with per-event delays, and corpus timing derivation from InvocationRecord.recordedAt().
+**Alternatives:**
+- Simple scheduler only — @Scheduled + CDI wiring. TimedSequence deferred. Smaller scope but leaves the timing model incomplete.
+- Scheduler + TimedSequence only — without timing preservation. Corpora must be manually authored with delays. Misses the replay use case.
+**Rationale:** The three deliverables form a coherent unit: TimedSequence is the data model, the scheduler executes it, and timing preservation populates it from real data. Splitting them creates a half-built system.
+**Trade-offs:** Larger implementation scope. Acceptable — the pieces are well-defined and independent.
+**Sources:** Issue #326, D8 (unified contract), D23 (tick() pattern), D25 (scope split with #318)
+**Exploration:** quick
+**Status:** captured
+
+## D27: Relative delays between events
+
+**Choice:** Each `TimedEntry` has a `Duration delay` relative to the previous entry. First entry's delay is the initial wait before the sequence starts.
+**Alternatives:**
+- Absolute offsets from sequence start — easier to reason about total timeline but requires arithmetic for inter-event gaps.
+- Both (relative stored, absolute computed) — most flexible but adds API surface.
+**Rationale:** Relative delays map naturally to captured timing gaps (gap between consecutive recordedAt timestamps). The scheduler sleeps for the delay, fires the event, sleeps for the next delay — no arithmetic needed. Absolute positions can be computed if needed: `sequence.entries().stream().mapToLong(e -> e.delay().toMillis()).sum()`.
+**Trade-offs:** Computing "when does event N fire relative to sequence start?" requires summing delays. Acceptable — this is a rare query and trivial to compute.
+**Sources:** InvocationRecord.recordedAt() (existing field), DigestFlushScheduler tick() pattern
+**Exploration:** quick
+**Status:** captured
+
+## D28: Virtual-thread sleep for delay execution
+
+**Choice:** The scheduler runs the timed sequence on a virtual thread. Between events, `Thread.sleep(delay)` pauses execution. The whole sequence is one blocking task.
+**Alternatives:**
+- ScheduledExecutorService — schedule each event as a separate task with computed delays. Non-blocking but harder to track sequence state, cancel, and report results.
+- @Scheduled tick with internal clock — fixed-interval ticks check if the next event is due. No sleeping but tick interval limits timing resolution.
+**Rationale:** Virtual threads make blocking sleep cheap — no platform thread consumed during the wait. The sequence runs as a coherent unit: start, sleep, emit, sleep, emit, done. Cancellation is a thread interrupt. Result reporting is a return value. The platform already uses virtual threads for blocking SPIs.
+**Trade-offs:** Timing accuracy depends on OS scheduling — delays are minimum durations, not exact. Acceptable for simulation use cases (demo, testing, load replay).
+**Sources:** Governance module (PolicyEnforcer uses Executors.newVirtualThreadPerTaskExecutor()), Java 21 virtual threads
+**Depends on:** D26 (full scope includes scheduler)
+**Exploration:** quick
+**Status:** captured
+
+## D29: TimedSequence in event-simulation-core, scheduler in event-simulation
+
+**Choice:** `TimedSequence`, `TimedEntry`, time multiplier logic stay in `event-simulation-core` (POJO). The `@Scheduled` wrapper, CDI `Event<CloudEvent>` wiring, and `@Produces` beans go in a new `event-simulation` Quarkus module.
+**Alternatives:**
+- Everything in event-simulation — simpler module count but mixes pure data types with CDI. Breaks the *-core convention.
+- Extend simulation-config — already has @Startup and config. But mixes event emission with general config.
+**Rationale:** Follows the established *-core / Quarkus module split (D21, GE-20260909-c81437). TimedSequence is a pure data type — no reason to couple it to CDI. The Quarkus module is thin: wires the emitter with Event<CloudEvent> and adds @Scheduled.
+**Trade-offs:** Two modules for event simulation. Acceptable — the split is clean and follows the platform convention.
+**Sources:** D21 (event-simulation-core module), agent-simulation-core/ pattern, GE-20260909-c81437
+**Depends on:** D21 (event-simulation-core exists)
+**Exploration:** quick
+**Status:** captured
+
+## D30: Derive timing from InvocationRecord.recordedAt()
+
+**Choice:** `TimedSequence.fromRecorded(List<InvocationRecord<I, O>>)` computes delays as gaps between consecutive `recordedAt` timestamps. No changes to the capture infrastructure or InvocationRecord data model.
+**Alternatives:**
+- Explicit delay field in InvocationRecord — more explicit but changes the universal data model. Simulation-specific timing metadata doesn't belong in the general-purpose record.
+**Rationale:** InvocationRecord already stores `recordedAt` (an Instant). The timing information is there — it just needs to be extracted. A factory method on TimedSequence reads the existing data; no schema migration, no capture changes.
+**Trade-offs:** Only works for captured data with real timing. YAML-authored corpora must specify delays explicitly (via TimedEntry constructor, not fromRecorded). This is fine — the two seeding paths are already distinct.
+**Sources:** InvocationRecord.java (recordedAt field), simulation-api
+**Exploration:** quick
+**Status:** captured
+
+## D31: Time multiplier on TimedSequence, not scheduler
+
+**Choice:** `TimedSequence.withMultiplier(double)` returns a new sequence with all delays divided by the multiplier. Pure data transform — scheduler sleeps for whatever delay the sequence provides.
+**Alternatives:**
+- Multiplier on the scheduler — applies at sleep time. Preserves original timing data in the sequence but makes the scheduler aware of a concern it doesn't need to own.
+**Rationale:** Keeps the scheduler simple — it just iterates entries and sleeps for the delay. The multiplier is a sequence construction concern, not a scheduling concern. `withMultiplier(10.0)` on a 30-minute patient case gives a 3-minute demo — the scheduler doesn't need to know this happened.
+**Trade-offs:** Original timing is lost after `withMultiplier()`. The caller can always keep a reference to the original sequence. Not a concern in practice — the multiplied sequence is created for a specific run.
+**Sources:** Issue #326 (time multiplier for fast-forward), D27 (relative delays — multiplier divides each delay)
+**Depends on:** D27 (relative delays)
+**Exploration:** quick
+**Status:** captured
