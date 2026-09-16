@@ -16,7 +16,7 @@ flyway-next-v: none
   - [x] Batch 1: Foundation
     - [x] Task 1: DomainScanResult rename + McpDomainJandexScanner
     - [x] Task 2: Update Spring generator consumers
-  - [ ] Batch 2: APT
-    - [ ] Task 3: GraphQLResolverProcessor class support
+  - [x] Batch 2: APT
+    - [x] Task 3: GraphQLResolverProcessor class support
   - [ ] Batch 3: Runtime
     - [ ] Task 4: GraphQLModelScanner class support
