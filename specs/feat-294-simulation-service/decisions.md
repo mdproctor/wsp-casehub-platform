@@ -795,3 +795,31 @@
 **Sources:** Decision review R1-13 (YAGNI), ScimClient (blocking return types verified)
 **Exploration:** quick → revised after decision review (light)
 **Status:** revised
+
+---
+
+# Phase 7 — #321 DefaultBean Simulation Patterns
+
+## D38: Single platform-simulation-core module for all platform-api SPIs
+
+**Choice:** One new `platform-simulation-core` module with a single `META-INF/simulation-eligible.txt` listing all 11 eligible platform-api SPIs. The APT generates 11 decorators at compile time; they're inert without config.
+**Alternatives:**
+- Listing file in simulation-config — muddies simulation-config's purpose (SmallRye Config binding) with decorator generation for platform-specific SPIs
+- Per-domain modules (acl-simulation-core, notification-simulation-core, etc.) — creates 6+ modules for mechanical listing files in the same repo; the memory-simulation-core precedent applies to cross-repo SPIs, not same-repo
+**Rationale:** All 11 SPIs are in platform-api in this repo. The decorator is inert without `casehub.simulation.<spi>.<method>.strategy=...` config — no cost to generating all 11 even if a consumer only simulates 2. One module, one dependency. Follows the memory-simulation-core precedent for listing-file-based generation.
+**Trade-offs:** Consumers who want simulation for just one SPI still pull all 11 generated decorators onto the classpath. Acceptable — decorators without config are zero-overhead passthrough.
+**Sources:** memory-simulation-core/src/main/resources/META-INF/simulation-eligible.txt, SimulationDecoratorProcessor.java (listing file path), DefaultBeans.java (all 35 NoOps)
+**Exploration:** quick
+**Status:** captured
+
+## D39: PolicyEnforcer excluded — not an SPI interface
+
+**Choice:** Exclude PolicyEnforcer from the listing. It's a concrete `@ApplicationScoped` class in the governance/ module, not an SPI interface. The simulation decorator pattern requires an interface to wrap.
+**Alternatives:**
+- Extract a PolicyEnforcer SPI interface — adds an interface for the sole purpose of simulation, when PolicyEnforcer is rarely swapped (it's generic retry/timeout machinery, not domain-specific)
+- Wrap PolicyEnforcer via a different mechanism — CDI interceptor on the class. Adds complexity for marginal value
+**Rationale:** The governance SPI types in platform-api are data records (ExecutionPolicy, RetryPolicy, CircuitBreakerPolicy) — configuration, not behaviour. PolicyEnforcer applies these policies. Simulating it means simulating retry/timeout behaviour, which is better tested by configuring the policy records themselves.
+**Trade-offs:** No simulation path for PolicyEnforcer. Acceptable — you can already control its behaviour by configuring ExecutionPolicy records.
+**Sources:** platform-api .governance package (ExecutionPolicy, RetryPolicy — data records), governance/ module (PolicyEnforcer — concrete class)
+**Exploration:** quick
+**Status:** captured
