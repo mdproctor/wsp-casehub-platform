@@ -225,31 +225,30 @@ docs/examples/simulation/
 ```
 
 Each YAML file follows the existing corpus fixture format from
-simulation-config's `YamlCorpusLoader`:
+simulation-config-core's `YamlCorpusLoader`. Top-level keys are qualified
+SPI names, each mapping to a list of entries. No `recorded-at` field —
+the loader injects `Instant.now()` at parse time. All field names are
+kebab-case.
 
 ```yaml
-qualified-name: agent-provider.invoke
-entries:
+# agent-provider-corpus.yaml
+agent-provider.invoke:
   - tenancy-id: default
     key: triage-prompt
     input:
       systemPrompt: "You are a clinical triage agent..."
       userPrompt: "Patient presents with chest pain"
-      model: null
     output:
       - type: TextDelta
         text: "Based on the symptoms, I recommend..."
-    recorded-at: 2026-09-16T12:00:00Z
   - tenancy-id: default
     key: routing-prompt
     input:
       systemPrompt: "Route this case to the appropriate specialist..."
       userPrompt: "AML screening flagged entity"
-      model: null
     output:
       - type: TextDelta
         text: "Routing to compliance review..."
-    recorded-at: 2026-09-16T12:01:00Z
 ```
 
 2-3 entries per file. Domain-plausible values — real enough to demonstrate
