@@ -720,17 +720,18 @@
 
 # Phase 6 — #319 REST Client Simulation
 
-## D32: Extend simulation-generator for @RegisterRestClient (not hand-written decorators or HTTP interceptors)
+## D32: Separate RestClientSimulationProcessor (not extending the base generator)
 
-**Choice:** Teach the existing `SimulationDecoratorProcessor` to auto-detect `@RegisterRestClient` interfaces and generate `@Decorator` with `@RestClient`-qualified delegate. Reuses all existing infrastructure: SimulationRuntime, strategies, corpus, config.
+**Choice:** Create a dedicated `RestClientSimulationProcessor` APT in a new `rest-client-simulation-generator` module. Detects `@RegisterRestClient` interfaces, generates `@Decorator` with `@RestClient`-qualified delegate, reads JAX-RS annotations for HTTP metadata. Reuses SimulationRuntime, strategies, corpus, config from the existing framework.
 **Alternatives:**
-- Hand-written decorators per client — no generator changes but doesn't scale (5 GitHub clients in devtown alone) and standardizes nothing
-- HTTP-layer interceptor (ClientRequestFilter) — loses type safety, operates on raw HTTP, essentially reinvents WireMock which is already used in tests
-**Rationale:** Path A already handles SPI decoration. REST client interfaces are CDI beans. The generator does 90% of the work — the delta is detecting `@RegisterRestClient`, emitting `@RestClient` qualifier, reading JAX-RS annotations, and handling reactive returns.
-**Trade-offs:** Adds Quarkus REST client awareness to the generator (currently framework-agnostic). Generator now has two detection modes: `@SimulationEligible` and `@RegisterRestClient`.
-**Sources:** SimulationDecoratorProcessor.java, SimulatedCaseMemoryStore (generated example), ScimClient/Mem0Client/GraphitiClient (platform REST clients)
-**Exploration:** quick
-**Status:** captured
+- Extend existing SimulationDecoratorProcessor — simpler but adds Quarkus REST client awareness to a currently framework-agnostic generator (R1-06)
+- Hand-written decorators per client — doesn't scale (5 GitHub clients in devtown alone)
+- HTTP-layer interceptor (ClientRequestFilter) — loses type safety, reinvents WireMock
+**Rationale:** Keeping the base generator clean preserves its framework-agnosticism. A separate processor also solves the opt-in question — adding the processor module to your build IS the opt-in. The processor follows the same Jandex-scanning pattern as the base generator.
+**Trade-offs:** One additional module (`rest-client-simulation-generator`). Acceptable — the processor has distinct concerns (JAX-RS annotation reading, @RestClient qualifier, RestInvocation construction) that don't belong in the base generator.
+**Sources:** SimulationDecoratorProcessor.java, decision review R1-06 (framework-agnosticism), R1-03 (opt-in pattern)
+**Exploration:** quick → revised after decision review (light)
+**Status:** revised
 
 ## D33: Hybrid input — Java method level interception with HTTP metadata
 
@@ -746,7 +747,7 @@
 
 ## D34: RestInvocation record as uniform input type
 
-**Choice:** A single `RestInvocation` record in simulation-api: `RestInvocation(String spiName, String methodName, String httpMethod, String pathTemplate, Map<String,Object> params, Object body)`. All REST client methods use this as the strategy input type. Self-describing for corpus entries.
+**Choice:** A single `RestInvocation` record in simulation-core: `RestInvocation(String spiName, String methodName, String httpMethod, String pathTemplate, Map<String,Object> params, Object body)`. All REST client methods use this as the strategy input type. Self-describing for corpus entries.
 **Alternatives:**
 - Object[] parameter array — minimal but loses HTTP metadata and method identity
 - Map<String,Object> named params — better than array but still no HTTP metadata
@@ -757,39 +758,40 @@
 **Exploration:** quick
 **Status:** captured
 
-## D35: Auto-detect @RegisterRestClient — no explicit annotation needed
+## D35: Auto-detect @RegisterRestClient — scoped by processor module opt-in
 
-**Choice:** Generator scans Jandex indexes for `@RegisterRestClient` alongside `@SimulationEligible`. When found, derives spi-name from the `configKey` attribute (falling back to kebab-cased class name). Zero friction for consumers — existing REST clients become simulation-eligible automatically.
+**Choice:** `RestClientSimulationProcessor` auto-detects all `@RegisterRestClient` interfaces in the Jandex index and generates decorators. The opt-in is at the module level: you add `rest-client-simulation-generator` as an APT dependency only in modules where you want REST client simulation. Derives spi-name from `configKey` attribute (falling back to kebab-cased class name).
 **Alternatives:**
-- Explicit @SimulationEligible required — more explicit but adds friction and requires simulation-api dependency on every REST client module
+- Explicit @SimulationEligible required alongside @RegisterRestClient — adds friction and requires simulation-api dependency on every REST client module
 - Listing file only (META-INF/simulation-eligible.txt) — no annotation dependency but manual maintenance
-**Rationale:** REST clients are already annotated with `@RegisterRestClient`. The generator already scans Jandex. Auto-detection eliminates friction — consumers don't need to touch their client interfaces to enable simulation.
-**Trade-offs:** All `@RegisterRestClient` interfaces in the Jandex index get decorators generated, even if simulation is never configured. The decorator is inert without config — `strategyFor()` returns empty, so the delegate is called directly. Slight compile-time overhead.
-**Sources:** SimulationDecoratorProcessor.java (existing Jandex scanning), @RegisterRestClient configKey attribute
-**Exploration:** quick
-**Status:** captured
+**Rationale:** The opt-in pattern is preserved at the module level (R1-03). Within a module that has opted in, auto-detection eliminates friction. The decorator is inert without config — `strategyFor()` returns empty, so the delegate is called directly.
+**Trade-offs:** All `@RegisterRestClient` interfaces visible in Jandex get decorators when the processor is present. Acceptable — the module author chose to add the processor.
+**Depends on:** D32 (separate processor)
+**Sources:** Decision review R1-03 (opt-in pattern), @RegisterRestClient configKey attribute
+**Exploration:** quick → revised after decision review (light)
+**Status:** revised
 
-## D36: Extend existing modules — no new modules
+## D36: New rest-client-simulation-generator module; RestInvocation + key extractor in simulation-core
 
-**Choice:** `RestInvocation` in simulation-api (zero-dep, pure Java). Generator changes in simulation-generator. `RestClientKeyExtractor` in simulation-core. No new modules — REST client support is a feature of the existing simulation framework.
+**Choice:** New `rest-client-simulation-generator` module (`maven-plugin` packaging) for `RestClientSimulationProcessor`. `RestInvocation` record and `RestClientKeyExtractor` in simulation-core (not simulation-api).
 **Alternatives:**
-- New rest-client-simulation module — isolates REST concerns but adds a module for ~3 files
-- New core/Quarkus split (rest-client-simulation-core + rest-client-simulation) — maximum isolation but heavy for S-scale
-**Rationale:** The changes are small and naturally extend existing modules. RestInvocation is a pure Java record (fits simulation-api). The generator already lives in simulation-generator. Key extractors live in simulation-core.
-**Trade-offs:** simulation-api gains a REST-flavoured type. Generator gains framework-specific detection logic. Acceptable for S-scale scope.
-**Depends on:** D32 (extend generator approach)
-**Sources:** simulation-api (zero-dep module), simulation-generator (APT processor), simulation-core (strategy impls)
-**Exploration:** quick
-**Status:** captured
+- Everything in existing modules — would pollute simulation-api with REST-specific types (R1-10) and the base generator with Quarkus-specific logic (R1-06)
+- Full core/Quarkus split — heavy for S-scale
+**Rationale:** simulation-api is a zero-dep pure Java SPI module — RestInvocation introduces REST coupling that doesn't belong there (R1-10). simulation-core already contains strategy implementations and is a compile dependency of consumer modules. The processor gets its own module because it has distinct concerns (JAX-RS annotation reading, @RestClient qualifier emission).
+**Trade-offs:** One new module. Acceptable — the processor's Quarkus/MicroProfile dependencies don't belong in the framework-agnostic base generator.
+**Depends on:** D32 (separate processor)
+**Sources:** Decision review R1-06 (framework-agnosticism), R1-10 (API module coupling)
+**Exploration:** quick → revised after decision review (light)
+**Status:** revised
 
-## D37: Wrap reactive returns in Uni/Multi at generation time
+## D37: Defer reactive return type support — blocking only for now
 
-**Choice:** Generator detects return type at compile time. If `Uni<T>`, wraps `strategy.resolve()` in `Uni.createFrom().item()`. If `Multi<T>`, wraps in `Multi.createFrom().item()`. Capture delegates to the real client and maps the reactive result.
+**Choice:** Generate simulation only for blocking REST client methods. Skip `Uni<T>` and `Multi<T>` return types with a pass-through to the delegate.
 **Alternatives:**
-- Block on synchronous only — skip Uni/Multi with pass-through. Simpler but limits coverage since many REST clients in Quarkus are reactive.
-**Rationale:** Many `@RegisterRestClient` interfaces use reactive return types. Skipping them would leave large gaps in simulation coverage. The wrapping is mechanical — the generator already inspects return types.
-**Trade-offs:** Generator now needs Mutiny type awareness (detecting `Uni`/`Multi` by class name in Jandex, emitting wrapping code). Generated code imports Mutiny. Acceptable since the generated decorator compiles in a module that already depends on Quarkus.
-**Depends on:** D32 (extend generator approach)
-**Sources:** Quarkus REST client reactive patterns, existing ScimClient/Mem0Client/GraphitiClient
-**Exploration:** quick
-**Status:** captured
+- Wrap strategy result in Uni/Multi at generation time — adds Mutiny type awareness to the processor for a capability not yet needed
+**Rationale:** All current `@RegisterRestClient` interfaces in platform (ScimClient) are blocking. Mem0Client and GraphitiClient are in neocortex, not platform. No reactive REST clients exist to simulate (R1-13). When reactive clients appear, the extension is straightforward — the processor already inspects return types.
+**Trade-offs:** Reactive REST clients won't be simulation-eligible until this is added. Acceptable — YAGNI.
+**Depends on:** D32 (separate processor)
+**Sources:** Decision review R1-13 (YAGNI), ScimClient (blocking return types verified)
+**Exploration:** quick → revised after decision review (light)
+**Status:** revised
