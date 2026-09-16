@@ -16,5 +16,5 @@ flyway-next-v: unknown
 - [x] casehubio/parent#479 — llm-config-core extraction
 - [x] casehubio/parent#483 — Spring REST for non-domain @Path resources
 - [x] casehubio/parent#480 — Pattern 2 migration qhorus
-- [ ] casehubio/parent#481 — Pattern 2 migration neocortex ← active
-- [ ] casehubio/parent#482 — Wire graphql-spring-gen in consumer repos
+- [x] casehubio/parent#481 — Pattern 2 migration neocortex
+- [ ] casehubio/parent#482 — Wire graphql-spring-gen in consumer repos ← active

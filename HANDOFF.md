@@ -2,25 +2,27 @@
 
 ## Last Session
 
-Advanced to #481 (Pattern 2 neocortex migration). Complete — CognitionResolver replaced with CognitionApi SPI interface + CognitionService impl + APT-generated resolver. 50 tests pass.
+Completed final two queue items: #481 (Pattern 2 neocortex) and #482 (Wire graphql-spring-gen).
 
 **#481: Pattern 2 neocortex — executed.**
 
-Single resolver class (`CognitionResolver`) in `cognitive-observability` migrated:
+CognitionResolver replaced with CognitionApi SPI interface + CognitionService impl in cognitive-observability. APT generates GeneratedCognitionResolver. 50 tests pass. CognitionApi stays in cognitive-observability (not cognitive-api) because return types depend on mindmap-core.
 
-- `CognitionApi` interface: `@McpDomain("cognition")` + 5 `@PlatformQuery` methods (inspect, entity, health, diff, trace)
-- `CognitionService`: `@ApplicationScoped`, constructor-injected `Instance<CognitiveProfile>` and `Instance<SnapshotStore>` for optional deps, boxed types for defaulted params
-- APT wired with `-AgenerateRest=false` (REST generation deferred to #482 spring generator wiring)
-- `CognitionApi` stays in `cognitive-observability` (not `cognitive-api`) because return types (`GraphHealthReport`, `GraphDiffResult`, etc.) depend on `mindmap-core` types — moving them would break `cognitive-api`'s zero-dep nature
-- Jandex plugin added for index generation
-- Generated class: `io.casehub.platform.graphql.generated.GeneratedCognitionResolver`
+Neocortex commit: `9543188a` on branch `issue-478-spring-modules`.
 
-Neocortex commit (on branch `issue-478-spring-modules`):
-- `9543188a` — feat(#481): Pattern 2 migration — move @McpDomain to CognitionApi SPI interface
+**#482: Wire graphql-spring-gen — partially executed.**
 
-## Immediate Next Step
+Wired for repos with Pattern 2 complete:
 
-Advance to #482 (Wire graphql-spring-gen in consumer repos) via `work next`.
+- **Qhorus** — `runtime-spring/pom.xml`: graphql-spring-generator plugin added pointing at `../api`. spring-graphql, spring-webmvc, jakarta.validation-api deps added. 8 Spring classes generated (4 GraphQL + 4 REST controllers). Pre-existing compilation errors (TrustGateService import, Clock instantiation) unrelated to this change.
+  - Commit `39b85496` on branch `issue-440-panache-purge`
+
+- **Neocortex** — new `cognitive-observability-spring` module created. graphql-spring-generator pointing at `../cognitive-observability`. 2 Spring classes generated (CognitionGraphqlController + CognitionRestController). Compiles clean.
+  - Commit `cd807229` on branch `issue-478-spring-modules`
+
+**Not wired (blocked):**
+- Engine — engine#1095 (Pattern 2 migration) still open
+- Work — work#400 (Pattern 2 migration) not merged
 
 ## Queue State
 
@@ -31,17 +33,15 @@ Advance to #482 (Wire graphql-spring-gen in consumer repos) via `work next`.
 | 2 | parent#483 | M | Med | Done |
 | 3 | parent#480 | M | Med | Done |
 | 4 | parent#481 | S | Low | Done |
-| 5 | parent#482 | S | Low | Active — wire graphql-spring-gen |
+| 5 | parent#482 | S | Low | Done (partial — engine/work blocked) |
+
+All queue items complete. Branch ready for work-end.
 
 ## Key Facts
 
 - Platform branch `issue-478-spring-deployment-completion` — unchanged this session.
-- Neocortex branch `issue-478-spring-modules` — 2 commits total (1 prior + 1 this session).
+- Qhorus branch `issue-440-panache-purge` — 7 commits total.
+- Neocortex branch `issue-478-spring-modules` — 3 commits total (1 prior + 2 this session).
 - cognitive-observability installed to local Maven repo.
-- All Pattern 2 migrations now complete: engine#1095 (done), qhorus#480 (done), neocortex#481 (done).
-
-## References
-
-- `specs/issue-478-spring-deployment-completion/2026-09-15-pattern2-qhorus-design.md`
-- casehubio/parent#478, #481
-- Memory: `project_pattern2_migration.md`
+- cognitive-observability-spring compiles and generates clean.
+- All Pattern 2 migrations complete: engine#1095 (still open), qhorus#480 (done), neocortex#481 (done).
