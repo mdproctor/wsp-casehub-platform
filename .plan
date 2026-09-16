@@ -21,19 +21,13 @@ date: 2026-09-15
 - [x] casehubio/platform#326 — timed
 - [x] casehubio/platform#319 — REST
 - [x] casehubio/platform#321 — DefaultBean
-- [ ] casehubio/platform#322 — pages ← active
-  - [x] Batch 1: Overlay infra
-    - [x] Task 1: JournalEntry and InvocationJournal
-    - [x] Task 2: MapSimulationConfig and SimulationOverlay
-    - [x] Task 3: SimulationRuntime overlay stack
-  - [x] Batch 2: Generator
-    - [x] Task 4: Update decorator template for journal
-  - [x] Batch 3: Pages integration
-    - [x] Task 5: SimulationSpec record and parser
-    - [x] Task 6: ScenarioOrchestrator lifecycle hooks
-  - [x] Batch 4: Docs
-    - [x] Task 7: Update simulation guide and CLAUDE.md
-- [ ] casehubio/platform#323 — consumer
+- [x] casehubio/platform#322 — pages
+- [ ] casehubio/platform#323 — consumer ← active
+  - [ ] Batch 1: Guide+fixtures
+    - [ ] Task 1: Consumer adoption guide section
+    - [ ] Task 2: YAML corpus fixtures
+  - [ ] Batch 2: Closeout
+    - [ ] Task 3: Follow-on issue + close
 - [ ] casehubio/platform#328 — domain-specific
 - [ ] casehubio/platform#329 — strategy
 - [ ] casehubio/platform#330 — domain
