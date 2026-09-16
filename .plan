@@ -10,6 +10,22 @@ date: 2026-09-16
 
 ## Queue
 - [ ] casehubio/parent#493 — Platform Spring Data JPA (10 modules) ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: Extract entities to jpa-common
+  - [ ] Batch 2: Pattern
+    - [ ] Task 2: persistence-spring-jpa
+  - [ ] Batch 3: Simple
+    - [ ] Task 3: digest-spring-jpa
+    - [ ] Task 4: memory-spring-jpa
+  - [ ] Batch 4: Events
+    - [ ] Task 5: notifications-spring-jpa
+    - [ ] Task 6: subscriptions + datasource spring-jpa
+  - [ ] Batch 5: Complex
+    - [ ] Task 7: notification-settings + delivery-tracking
+    - [ ] Task 8: acl-spring-jpa
+    - [ ] Task 9: platform-view-spring-jpa
+  - [ ] Batch 6: Verify
+    - [ ] Task 10: Full build + CLAUDE.md
 - [ ] casehubio/parent#497 — Engine Spring Data Hibernate
 - [ ] casehubio/parent#496 — Neocortex Spring Data JPA (2 modules)
 - [ ] casehubio/parent#498 — Work Spring Data MongoDB
