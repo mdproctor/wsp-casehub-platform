@@ -21,15 +21,15 @@ date: 2026-09-15
 - [x] casehubio/platform#326 — timed
 - [x] casehubio/platform#319 — REST
 - [ ] casehubio/platform#321 — DefaultBean ← active
-  - [ ] Batch 1: Generator
-    - [ ] Task 1: Remove abstract/default from SimulationDecoratorProcessor
-    - [ ] Task 2: Apply same to RestClientSimulationProcessor
-  - [ ] Batch 2: Module
-    - [ ] Task 3: Create platform-simulation-core module
-    - [ ] Task 4: Integration test — decorator wraps DefaultBean
-  - [ ] Batch 3: Docs
-    - [ ] Task 5: Platform SPIs section in simulation guide
-    - [ ] Task 6: Update CLAUDE.md module entry
+  - [x] Batch 1: Generator
+    - [x] Task 1: Remove abstract/default from SimulationDecoratorProcessor
+    - [x] Task 2: Apply same to RestClientSimulationProcessor
+  - [x] Batch 2: Module
+    - [x] Task 3: Create platform-simulation-core module
+    - [x] Task 4: Integration test — decorator wraps DefaultBean
+  - [x] Batch 3: Docs
+    - [x] Task 5: Platform SPIs section in simulation guide
+    - [x] Task 6: Update CLAUDE.md module entry
 - [ ] casehubio/platform#322 — pages
 - [ ] casehubio/platform#323 — consumer
 - [ ] casehubio/platform#328 — domain-specific
