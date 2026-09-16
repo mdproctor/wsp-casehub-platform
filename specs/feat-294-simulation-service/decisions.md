@@ -715,3 +715,81 @@
 **Depends on:** D27 (relative delays)
 **Exploration:** quick
 **Status:** captured
+
+---
+
+# Phase 6 — #319 REST Client Simulation
+
+## D32: Extend simulation-generator for @RegisterRestClient (not hand-written decorators or HTTP interceptors)
+
+**Choice:** Teach the existing `SimulationDecoratorProcessor` to auto-detect `@RegisterRestClient` interfaces and generate `@Decorator` with `@RestClient`-qualified delegate. Reuses all existing infrastructure: SimulationRuntime, strategies, corpus, config.
+**Alternatives:**
+- Hand-written decorators per client — no generator changes but doesn't scale (5 GitHub clients in devtown alone) and standardizes nothing
+- HTTP-layer interceptor (ClientRequestFilter) — loses type safety, operates on raw HTTP, essentially reinvents WireMock which is already used in tests
+**Rationale:** Path A already handles SPI decoration. REST client interfaces are CDI beans. The generator does 90% of the work — the delta is detecting `@RegisterRestClient`, emitting `@RestClient` qualifier, reading JAX-RS annotations, and handling reactive returns.
+**Trade-offs:** Adds Quarkus REST client awareness to the generator (currently framework-agnostic). Generator now has two detection modes: `@SimulationEligible` and `@RegisterRestClient`.
+**Sources:** SimulationDecoratorProcessor.java, SimulatedCaseMemoryStore (generated example), ScimClient/Mem0Client/GraphitiClient (platform REST clients)
+**Exploration:** quick
+**Status:** captured
+
+## D33: Hybrid input — Java method level interception with HTTP metadata
+
+**Choice:** Intercept at the Java method level (consistent with Path A) but enrich the input with HTTP metadata extracted from JAX-RS annotations (`@GET`, `@Path`, `@QueryParam`). The hybrid is a strict superset of Java-only — HTTP metadata is optional for key extraction.
+**Alternatives:**
+- Pure Java method level — consistent with Path A but no HTTP-level key extraction. Limits corpus portability.
+- Pure HTTP level — diverges from Path A, adds complexity, more appropriate for WireMock-style interception
+**Rationale:** HTTP metadata is free at compile time (generator reads JAX-RS annotations). Adding it to the input enables richer key extraction (`GET /groups/*/members` vs just `membersOf`) without forcing consumers to use it. The Java-only path still works — just ignore the HTTP fields.
+**Trade-offs:** RestInvocation is a richer type than raw Object[] parameters. Slightly more complex generated code. Strategy implementations receive RestInvocation instead of domain-specific types.
+**Sources:** Issue #319 (mentions "extracts invocation context (method, path, params, body)")
+**Exploration:** quick
+**Status:** captured
+
+## D34: RestInvocation record as uniform input type
+
+**Choice:** A single `RestInvocation` record in simulation-api: `RestInvocation(String spiName, String methodName, String httpMethod, String pathTemplate, Map<String,Object> params, Object body)`. All REST client methods use this as the strategy input type. Self-describing for corpus entries.
+**Alternatives:**
+- Object[] parameter array — minimal but loses HTTP metadata and method identity
+- Map<String,Object> named params — better than array but still no HTTP metadata
+**Rationale:** Uniform type enables uniform key extractors. The record is self-describing: a corpus entry of `{spiName: "scim-client", methodName: "membersOf", httpMethod: "GET", pathTemplate: "/Groups/{id}/Members", params: {id: "grp-1"}}` is readable and portable.
+**Trade-offs:** Strategy input is always RestInvocation, not domain-specific. Key extractors and scorers must work with RestInvocation rather than typed domain objects. For REST clients this is acceptable — the HTTP contract IS the domain.
+**Depends on:** D33 (hybrid input)
+**Sources:** SimulationStrategy<I,O> contract, existing Object-typed corpus (D14)
+**Exploration:** quick
+**Status:** captured
+
+## D35: Auto-detect @RegisterRestClient — no explicit annotation needed
+
+**Choice:** Generator scans Jandex indexes for `@RegisterRestClient` alongside `@SimulationEligible`. When found, derives spi-name from the `configKey` attribute (falling back to kebab-cased class name). Zero friction for consumers — existing REST clients become simulation-eligible automatically.
+**Alternatives:**
+- Explicit @SimulationEligible required — more explicit but adds friction and requires simulation-api dependency on every REST client module
+- Listing file only (META-INF/simulation-eligible.txt) — no annotation dependency but manual maintenance
+**Rationale:** REST clients are already annotated with `@RegisterRestClient`. The generator already scans Jandex. Auto-detection eliminates friction — consumers don't need to touch their client interfaces to enable simulation.
+**Trade-offs:** All `@RegisterRestClient` interfaces in the Jandex index get decorators generated, even if simulation is never configured. The decorator is inert without config — `strategyFor()` returns empty, so the delegate is called directly. Slight compile-time overhead.
+**Sources:** SimulationDecoratorProcessor.java (existing Jandex scanning), @RegisterRestClient configKey attribute
+**Exploration:** quick
+**Status:** captured
+
+## D36: Extend existing modules — no new modules
+
+**Choice:** `RestInvocation` in simulation-api (zero-dep, pure Java). Generator changes in simulation-generator. `RestClientKeyExtractor` in simulation-core. No new modules — REST client support is a feature of the existing simulation framework.
+**Alternatives:**
+- New rest-client-simulation module — isolates REST concerns but adds a module for ~3 files
+- New core/Quarkus split (rest-client-simulation-core + rest-client-simulation) — maximum isolation but heavy for S-scale
+**Rationale:** The changes are small and naturally extend existing modules. RestInvocation is a pure Java record (fits simulation-api). The generator already lives in simulation-generator. Key extractors live in simulation-core.
+**Trade-offs:** simulation-api gains a REST-flavoured type. Generator gains framework-specific detection logic. Acceptable for S-scale scope.
+**Depends on:** D32 (extend generator approach)
+**Sources:** simulation-api (zero-dep module), simulation-generator (APT processor), simulation-core (strategy impls)
+**Exploration:** quick
+**Status:** captured
+
+## D37: Wrap reactive returns in Uni/Multi at generation time
+
+**Choice:** Generator detects return type at compile time. If `Uni<T>`, wraps `strategy.resolve()` in `Uni.createFrom().item()`. If `Multi<T>`, wraps in `Multi.createFrom().item()`. Capture delegates to the real client and maps the reactive result.
+**Alternatives:**
+- Block on synchronous only — skip Uni/Multi with pass-through. Simpler but limits coverage since many REST clients in Quarkus are reactive.
+**Rationale:** Many `@RegisterRestClient` interfaces use reactive return types. Skipping them would leave large gaps in simulation coverage. The wrapping is mechanical — the generator already inspects return types.
+**Trade-offs:** Generator now needs Mutiny type awareness (detecting `Uni`/`Multi` by class name in Jandex, emitting wrapping code). Generated code imports Mutiny. Acceptable since the generated decorator compiles in a module that already depends on Quarkus.
+**Depends on:** D32 (extend generator approach)
+**Sources:** Quarkus REST client reactive patterns, existing ScimClient/Mem0Client/GraphitiClient
+**Exploration:** quick
+**Status:** captured
