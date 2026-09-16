@@ -46,3 +46,36 @@
 **Sources:** Existing Quarkus test pom.xml (quarkus-jdbc-h2 test scope), H2 MODE=PostgreSQL documentation
 **Exploration:** quick
 **Status:** captured
+
+## D5: Spring auto-configuration strategy
+
+**Choice:** Each `-spring-jpa` module self-configures via its own `@AutoConfiguration` class + `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
+**Alternatives:**
+- Central aggregator module — single config class importing all JPA modules. Tight coupling, harder to use subsets.
+**Rationale:** Follows established pattern (platform-spring, callback-spring). Spring Boot auto-discovers each module independently. Consumers add only the modules they need.
+**Trade-offs:** None significant — this is standard Spring Boot practice.
+**Sources:** platform-spring/PlatformDefaultsManualConfig.java, spring-generator/AutoConfigurationWriter.java
+**Exploration:** quick
+**Status:** captured
+
+## D6: Scheduled task translation
+
+**Choice:** Independent Spring `@Scheduled` methods in each `-spring-jpa` module. Same retention logic, Spring annotations, `@Value` for config.
+**Alternatives:**
+- Core-extract retention logic to shared POJO — adds complexity for simple query+delete+log operations
+**Rationale:** Retention tasks are 10-20 line methods (query expired rows, delete, log count). Core extraction adds a module and indirection for no reuse benefit. The SQL is slightly different between Spring Data and EntityManager anyway.
+**Trade-offs:** Retention logic is duplicated between Quarkus and Spring. Acceptable — it's simple, stable, and changes rarely.
+**Sources:** AclRetentionPurge.java, NotificationRetentionScheduler.java, DigestBufferEntity retention in JpaDigestBuffer.java
+**Exploration:** quick
+**Status:** captured
+
+## D7: CDI Event to Spring Event translation
+
+**Choice:** Spring store implementations use `ApplicationEventPublisher.publishEvent()` with the same event record types from platform-api.
+**Alternatives:**
+- Core-extract store logic with Consumer<T> callbacks — follows inmem-core pattern but unnecessary for JPA stores
+**Rationale:** Event records (NotificationCreated, SubscriptionUpdated, etc.) are already framework-neutral records in platform-api. Spring's ApplicationEventPublisher accepts any object. No translation layer needed.
+**Trade-offs:** None — the event types are shared, only the publishing mechanism differs.
+**Sources:** notifications-inmem-core/InMemoryNotificationStore.java (Consumer<T> pattern), platform-api event records
+**Exploration:** quick
+**Status:** captured
