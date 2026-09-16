@@ -8,3 +8,4 @@ blocks:issue-474-spring-boot-generators=stamped
 connectors:issue-474-spring-boot-generators=stamped
 platform:issue-474-spring-boot-generators=stamped
 ledger:issue-474-spring-boot-generators=stamped
+default=promoted

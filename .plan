@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-478-spring-deployment-completion
-state: active
+state: closing:promoted
 project-sha: 6cc0f66c0383398c620f5b97893ff500f0066fe8
 date: 2026-09-15
 issue-repo: casehubio/parent
@@ -11,6 +11,7 @@ design-repo: project
 design-section-hashes: 
 flyway-next-v: unknown
 
+evidence-era: true
 ## Queue
 - [x] casehubio/parent#478 — Issue #478
 - [x] casehubio/parent#479 — llm-config-core extraction
