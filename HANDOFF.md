@@ -2,33 +2,37 @@
 
 ## What happened this session
 
-Two issues completed (#320, #317), advancing the queue from position 6/18 to 8/18.
+Two issues completed (#318, #326), advancing the queue from position 8/18 to 10/18.
 
-**#320 — CaseMemoryStore simulation adapter (Path A):** Three generator enhancements + new module. (1) Generator now distinguishes abstract vs default methods — abstract methods get simulation/capture logic, default methods delegate to the wrapped bean. (2) Generator reads `META-INF/simulation-eligible.txt` listing files alongside annotation scan — enables simulation for SPIs in peer repos that can't depend on simulation-api. On-demand Jandex indexing from classpath for JARs without pre-built indexes. (3) New `memory-simulation-core` module with listing file for CaseMemoryStore — `SimulatedCaseMemoryStore` @Decorator generated at compile time. 5 integration tests verify strategy interception, capture, passthrough, and default method delegation.
+**#318 — Event simulation core (push-side strategies):** New `event-simulation-core` module (POJO, no CDI). `SimulatedEventEmitter` with `tick()` method — iterates configured event sources, resolves CloudEvents from `SimulationStrategy<EventTrigger, CloudEvent>`, stamps fresh id/time per emission, fires via `Consumer<CloudEvent>` callback. `CloudEventFixtureBuilder` converts between YAML-friendly `Map<String, Object>` and `CloudEvent` instances. `EventTrigger`, `EventSourceConfig`, `EmissionResult`, `EmittedEvent`, `EmissionFailure` records. Per-source error isolation. CDI bus injection path (`Event<CloudEvent>.fireAsync()`) for full pipeline fidelity — events traverse DataSourceRouter's tenancy check. 21 tests.
 
-**Key discovery:** CaseMemoryStore migrated from platform-api to neocortex-memory-api (neocortex#56). The issue assumed it was still in platform-api. The listing-file mechanism was built anyway — it's needed for any SPI in a peer repo, and keeps the change self-contained in platform.
-
-**#317 — NearestMatchStrategy:** Constraint weighting and similarity scoring. `SimilarityScorer<I>` functional interface in simulation-api (parallel to KeyExtractor). `NearestMatchStrategy` in simulation-core — O(n) corpus scan, threshold-based matching. `RecordFieldScorer` + `FieldSimilarity` (EXACT, SUBSTRING, NUMERIC_RANGE, IGNORE) in simulation-config-core — field-based scoring via Jackson decomposition. `DeclarativeScorerFactory` parses config strings (`fields:domain:exact:1.0,question:substring:0.5`) into scorer instances. 22 tests across strategy, scorer, and factory. RecordFieldScorer placed in simulation-config-core (not simulation-core) because it needs Jackson — simulation-core remains zero-dep.
+**#326 — Timed event simulation:** Extended `event-simulation-core` with `TimedEntry<E>` + `TimedSequence<E>` — generic ordered sequences with relative delays, `withMultiplier(double)` for speed control, `fromRecorded(List<InvocationRecord>)` for timing derivation from captured data. `EventSequenceRunner` executes sequences with `Thread.sleep()` between events (virtual-thread friendly). `SequenceResult` for execution reporting. New `event-simulation` Quarkus module with CDI wiring: `@Produces SimulatedEventEmitter` with `Event<CloudEvent>.fireAsync()` sink, `@Produces EventSequenceRunner`, `@Scheduled` continuous tick (configurable interval, OFF by default). Config-driven `EventSourceConfig` loading from `casehub.simulation.event.sources.*` properties. 21 additional tests (42 total across both modules).
 
 ## Decisions
 
-- **D17: Generic SimilarityScorer, not CBR reuse** — CBR's CbrSimilarityScorer operates on FeatureValue maps, wrong abstraction for arbitrary SPI inputs. Bridge to CBR is a consumer concern.
-- **D18: Programmatic + declarative (both)** — RecordFieldScorer builder for power users, DeclarativeScorerFactory for config-driven. #329/#330 extend the declarative layer.
-- **D19: Threshold on strategy, not scorer** — canResolve() returns false below threshold, resolve() throws SimulationNoMatchException. Default 0.0.
-- **D20: O(n) scan, no indexing** — corpora are small (10-50 entries). Indexing is a follow-on if needed.
+- **D21: Dedicated event-simulation-core module** — separate from simulation-core (SPI interception). Follows agent-simulation-core precedent.
+- **D22: CDI Event bus injection** — full pipeline fidelity via `Event<CloudEvent>.fireAsync()`. Same path as real stream processors.
+- **D23: tick()-based emitter** — synchronous, deterministic. @Scheduled wrapper deferred to #326 (then delivered).
+- **D24: Strategy resolves CloudEvent directly** — corpus stores complete CloudEvent templates. Emitter stamps id/time.
+- **D25-D26: Scope split** — #318 = what/how, #326 = when. Clean separation delivered.
+- **D27: Relative delays** — each TimedEntry carries Duration from previous entry. Natural for replay.
+- **D28: Virtual-thread sleep** — Thread.sleep() between events. Simple, blocking, cheap on virtual threads.
+- **D29: Core/Quarkus split** — TimedSequence in event-simulation-core (POJO), CDI wiring in event-simulation.
+- **D30: Derive timing from recordedAt** — TimedSequence.fromRecorded() computes gaps. No capture changes needed.
+- **D31: Multiplier on TimedSequence** — withMultiplier(10.0) divides all delays. Scheduler stays simple.
 
 ## References
 
 | Artifact | Path |
 |----------|------|
-| Design spec (Phase 1) | `wksp/specs/feat-294-simulation-service/2026-09-15-simulation-service-design.md` |
-| Design spec (#317) | `wksp/specs/feat-294-simulation-service/2026-09-16-nearest-match-strategy-design.md` |
-| Implementation plan (#320) | `wksp/plans/2026-09-15-casememorystore-simulation-adapter.md` |
-| Implementation plan (#317) | `wksp/plans/2026-09-16-nearest-match-strategy.md` |
-| Decisions (D13-D20) | `wksp/specs/feat-294-simulation-service/decisions.md` |
+| Design spec (#318) | `wksp/specs/feat-294-simulation-service/2026-09-16-event-simulation-design.md` |
+| Design spec (#326) | `wksp/specs/feat-294-simulation-service/2026-09-16-timed-event-simulation-design.md` |
+| Implementation plan (#318) | `wksp/plans/2026-09-16-event-simulation.md` |
+| Implementation plan (#326) | `wksp/plans/2026-09-16-timed-event-simulation.md` |
+| Decisions (D21-D31) | `wksp/specs/feat-294-simulation-service/decisions.md` |
 | Simulation guide | `proj/docs/guides/simulation-guide.md` |
-| .plan | `wksp/.plan` (position 8/18, #318 active) |
+| .plan | `wksp/.plan` (position 10/18, #319 active) |
 
 ## Next action
 
-Start #318 — event simulation. SimulatedEventEmitter + DataSource pipeline integration + @Scheduled emission. This is a different subsystem from strategies/scoring — needs its own brainstorming. The design spec sketches EventTrigger record and a scheduled emitter that resolves from a strategy and injects CloudEvents into the DataSource pipeline. Key question: tenant context for @Scheduled (runs outside request context — no CurrentPrincipal available).
+Start #319 — REST client simulation. `@RegisterRestClient` proxy interception with strategy dispatch for simulating external HTTP services. Different interception mechanism from Path A (decorator) and Path B (backend) — needs its own brainstorming. The design spec notes this as Phase 3 scope. Key question: MicroProfile REST Client proxy mechanism vs CDI decorator on the client interface.
