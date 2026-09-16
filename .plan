@@ -19,6 +19,6 @@ flyway-next-v: unknown
 - [x] casehubio/parent#481 — Pattern 2 migration neocortex
 - [x] casehubio/parent#482 — Wire graphql-spring-gen in consumer repos
 - [x] casehubio/parent#487 — Fix qhorus runtime-spring compilation
-- [ ] casehubio/parent#486 — Cognitive-observability core extraction ← active
-- [ ] casehubio/parent#484 — Engine graphql-spring-gen wiring
-- [ ] casehubio/parent#485 — Work graphql-spring-gen wiring
+- [x] casehubio/parent#486 — Cognitive-observability core extraction
+- [x] casehubio/parent#484 — Engine graphql-spring-gen wiring
+- [x] casehubio/parent#485 — Work graphql-spring-gen wiring
