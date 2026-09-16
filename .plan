@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-489-dx-audit
-state: active
+state: closing:promoted
 project-sha: slot-creation
 date: 2026-09-16
 issue-repo: casehubio/parent
@@ -12,6 +12,7 @@ design-section-hashes:
 flyway-next-v: unknown
 context: DX audit: reduce verbosity and ceremony across Spring and Quarkus. Starts with Embabel comparison, broadens to comprehensive framework DX review.
 
+evidence-era: true
 ## Queue
 - [ ] casehubio/parent#489 — Issue #489 ← active
   - [x] Batch 1: Generator_Foundation
