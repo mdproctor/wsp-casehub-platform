@@ -18,12 +18,12 @@ date: 2026-09-15
 - [x] casehubio/platform#320 — CaseMemoryStore
 - [x] casehubio/platform#317 — nearest-match
 - [ ] casehubio/platform#318 — event ← active
-  - [ ] Batch 1: Records+Builder
-    - [ ] Task 1: Module scaffold+records
-    - [ ] Task 2: CloudEventFixtureBuilder
-  - [ ] Batch 2: Emitter+Docs
-    - [ ] Task 3: SimulatedEventEmitter tick()
-    - [ ] Task 4: Documentation update
+  - [x] Batch 1: Records+Builder
+    - [x] Task 1: Module scaffold+records
+    - [x] Task 2: CloudEventFixtureBuilder
+  - [x] Batch 2: Emitter+Docs
+    - [x] Task 3: SimulatedEventEmitter tick()
+    - [x] Task 4: Documentation update
 - [ ] casehubio/platform#326 — timed
 - [ ] casehubio/platform#319 — REST
 - [ ] casehubio/platform#321 — DefaultBean
