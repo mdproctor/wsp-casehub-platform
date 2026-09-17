@@ -1136,6 +1136,21 @@
 
 ---
 
+## D65: Data catalogue as planned infrastructure layer — not in #328 scope
+
+**Choice:** The simulation framework's data realism stack has three layers: catalogue (curate + store + discover), synthesis (compose + perturb), seeding (accumulate + register). #328 delivers the seeding layer. #347 delivers synthesis. A future issue delivers the catalogue — persistent, metadata-rich, relationship-aware storage of exemplar data fragments. CorpusSeed remains the universal accumulation point for all three layers.
+**Alternatives:**
+- Include catalogue in #328 or #347 — too much scope. The catalogue has its own design surface (metadata schema, canonical sequence relationships, search/discovery, external data importers, version-controlled storage format).
+- Skip catalogue entirely — synthesis works on ad-hoc captured data. But without curation, metadata, and relationships between fragments, synthesis quality is limited. Random mix-and-match without knowing which fragments form real canonical sequences produces implausible transitions.
+**Rationale:** The catalogue is what separates "perturb some captured data" from "compose realistic multi-phase scenarios." Cardiac rhythm simulation needs to know that pre-arrest, arrest-onset, and post-arrest exemplars are related — and which specific exemplars were captured from the same real event. Financial simulation needs to know that a "flash crash" pattern was captured during specific market conditions. The richer the catalogue metadata, the better the synthetic output. External domain data sources (PhysioNet for clinical, Kaggle for financial) can be imported and normalized. GitHub repos serve as natural catalogue repositories — version-controlled, shareable, CI-validatable.
+**Trade-offs:** #328 alone produces structurally correct but statistically naive data. Consumers needing temporal realism wait for #347 + catalogue. Mitigated by the LLM hybrid path — few-shot examples from any available data improve generation quality incrementally.
+**Sources:** D64 (synthesis extension), TimedSequence (temporal data), capture mode (exemplar acquisition), existing domain data sources (PhysioNet, Kaggle, MIMIC)
+**Depends on:** D55 (CorpusSeed), D64 (synthesis extension)
+**Exploration:** deep-analysis (emerged from first-principles discussion of data realism requirements)
+**Status:** captured
+
+---
+
 ## D48: Cross-repo design — platform API + pages consumer together
 
 **Choice:** Design both platform-side API (#322) and pages-side consumer (casehub-pages#450) in one spec. Implement platform first, then pages. Both repos are in slot 195.
