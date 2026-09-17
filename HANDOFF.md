@@ -2,30 +2,26 @@
 
 ## What Happened
 
-Brainstormed and designed Spring Data JPA modules for issue casehubio/parent#493 (first issue in the epic #501 queue, position 0/8). Captured 7 design decisions (D1-D7) covering query style, entity sharing, uniformity, test DB, auto-config, scheduled tasks, and event translation. Wrote and self-reviewed the design spec. Wrote implementation plan with 10 tasks in 6 batches covering 20 new Maven modules (10 jpa-common + 10 spring-jpa).
+Executed Task 1 (Batch 1: Foundation) of the Spring Data JPA plan for casehubio/parent#493. Created 10 jpa-common Maven modules, moved 20 Java entity/helper files and 11 Flyway SQL migrations from existing -jpa modules into their shared -jpa-common counterparts using IntelliJ MCP `ide_move_file`. Updated all 10 existing -jpa pom.xml files to depend on their new -jpa-common module. Added all 10 jpa-common modules to the parent pom.xml reactor.
 
-No code changes to the project repo — all artifacts are in the workspace (specs, decisions, plan, pipeline state).
+Fixed three dependency issues discovered during build verification:
+- Added `jackson-databind` (provided) to datasource-jpa-common, memory-jpa-common, and acl-jpa-common (entities use ObjectMapper for JSON columns)
+- Added `hibernate-core` (provided) to acl-jpa-common (AclAuditLogEntity uses @JdbcTypeCode)
+- Added `jandex-maven-plugin` to all 10 jpa-common modules (Quarkus Hibernate ORM discovers entities via Jandex index)
 
-Cross-repo note: neocortex session fixed `JandexProducerScanner` in the upstream platform spring-generator (broken QdrantClient constructor, empty/duplicate generated classes). Fix is at `/Users/mdproctor/claude/casehub/platform/spring-generator/`. Slot 198 hasn't rebased to pick it up — not blocking since we hand-write spring-jpa auto-configs.
+Build verification: full compilation passes (`mvn install -DskipTests`), all 260 tests across 9 modified -jpa modules pass. Two pre-existing test failures noted: `RestControllerWriterTest#mapsVoidReturnToNoContent` (rest-spring-generator) and `EventTypeResourceTest` (subscriptions), plus `agent-claude` tests fail without local Claude CLI.
 
-## Decisions
+Pre-existing: `memory-jpa` module is not in the parent pom reactor — was never listed there. Not introduced by this change.
 
-- **D1:** Idiomatic Spring Data JPA repositories (JpaRepository interfaces, derived queries, @Query)
-- **D2:** Extract entities + Flyway SQL to `*-jpa-common` shared modules (jakarta.persistence-api only)
-- **D3:** Uniform three-tier pattern for all 10 domains
-- **D4:** H2 with `MODE=PostgreSQL` for tests; `@Disabled` only for FTS and recursive CTEs
-- **D5:** Self-contained `@AutoConfiguration` per module (no central aggregator)
-- **D6:** Independent Spring `@Scheduled` retention tasks (not core-extracted)
-- **D7:** `ApplicationEventPublisher.publishEvent()` with existing platform-api event records
+Branch: `feat/493-spring-data-jpa` (4 commits on project repo, workspace branch created to match).
 
 ## What's Next
 
 | Item | Scale | Complexity | Notes |
 |------|-------|------------|-------|
-| Execute plan Batch 1: jpa-common extraction | L | Low | Move 17 entities + 12 SQL files to 10 new modules |
-| Execute plan Batch 2-5: spring-jpa modules | L | Med | 10 new Spring Data JPA modules, pattern from Task 2 |
-| Execute plan Batch 6: verification | S | Low | Full build + CLAUDE.md update |
-| Rebase slot to pick up spring-generator fix | XS | Low | Optional, not blocking |
+| Task 2: persistence-spring-jpa (pattern module) | M | Med | Full TDD — establishes the pattern for all 9 remaining spring-jpa modules |
+| Tasks 3-9: remaining spring-jpa modules | L | Low-Med | Follow Task 2 pattern, increasing complexity per batch |
+| Task 10: full build verification + CLAUDE.md | S | Low | Final verification pass |
 
 ## References
 
@@ -33,7 +29,6 @@ Cross-repo note: neocortex session fixed `JandexProducerScanner` in the upstream
 |----------|------|
 | Design spec | `specs/issue-493-spring-data-jpa/2026-09-16-spring-data-jpa-modules-design.md` |
 | Decisions | `specs/issue-493-spring-data-jpa/decisions.md` |
-| Pipeline state | `specs/issue-493-spring-data-jpa/pipeline.state` |
 | Plan | `plans/2026-09-16-spring-data-jpa-modules.md` |
-| .plan queue | `.plan` — 8 issues, #493 active, 10 tasks injected |
+| .plan queue | `.plan` — 8 issues, #493 active, position 0/8 |
 | Epic | casehubio/parent#501 |
