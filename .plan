@@ -2,7 +2,7 @@
 
 ## State
 branch: feat/493-spring-data-jpa
-state: closing:review
+state: closing:promoted
 issue-repo: casehubio/parent
 covers: casehubio/parent#493
 Current: casehubio/parent#493 — Platform Spring Data JPA (10 modules)
