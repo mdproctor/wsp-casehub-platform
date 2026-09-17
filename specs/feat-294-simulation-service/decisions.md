@@ -1121,6 +1121,21 @@
 **Exploration:** quick
 **Status:** captured
 
+## D64: Pattern-based synthesis as a planned extension — not in #328 scope
+
+**Choice:** #328 delivers CorpusSeed + descriptors + LlmCorpusPopulator. Pattern-based synthesis (PatternLibrary, perturbation primitives, segment composition, boundary smoothing) is a separate follow-on issue. CorpusSeed is designed as the universal accumulation point — synthesis primitives add entries via the same `seed.add()` path, no architecture changes needed.
+**Alternatives:**
+- Include synthesis primitives in #328 — larger scope but coherent. Rejected because synthesis has its own design surface (perturbation distributions, temporal correlation, constraint validation, boundary smoothing, named pattern vocabulary) that warrants dedicated brainstorming.
+- Defer entirely without architectural accommodation — risks a design that can't support synthesis later. Rejected because CorpusSeed's `add()` + `build()` API already accommodates it naturally.
+**Rationale:** Three data realism paths compose at different levels: (1) LLM generation — good at domain vocabulary and structural correctness, bad at temporal patterns. (2) Pattern synthesis — good at statistical realism and temporal fidelity, needs exemplar data. (3) Capture replay — perfect fidelity, zero variation. The hybrid is: capture → label → synthesize → LLM-enrich. #328 delivers the accumulation point (CorpusSeed) and LLM path. Synthesis is the next layer. The architecture supports the full stack without #328 needing to anticipate synthesis internals.
+**Trade-offs:** #328 alone doesn't solve temporal/statistical data realism. Consumers needing plausible time-series data (stock prices, patient vitals, sensor readings) must wait for the synthesis follow-on. Mitigated by the hybrid LLM path — few-shot examples from real data produce better results than pure schema-based generation.
+**Sources:** TimedSequence (event-simulation-core), capture mode, LlmCorpusPopulator (D62), CorpusSeed (D55)
+**Depends on:** D55 (CorpusSeed as universal accumulator), D62 (LlmCorpusPopulator)
+**Exploration:** deep-analysis (first-principles examination of data realism paths — LLM vs synthesis vs capture)
+**Status:** captured
+
+---
+
 ## D48: Cross-repo design — platform API + pages consumer together
 
 **Choice:** Design both platform-side API (#322) and pages-side consumer (casehub-pages#450) in one spec. Implement platform first, then pages. Both repos are in slot 195.
