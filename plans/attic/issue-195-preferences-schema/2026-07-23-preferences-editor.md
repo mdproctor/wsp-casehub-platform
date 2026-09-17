@@ -323,7 +323,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(#193): NoOpPrefe
 
 **Files:**
 - Create: `persistence-jpa/src/main/resources/db/platform/migration/V2__add_tenancy_id_to_platform_preference.sql`
-- Modify: `persistence-jpa/src/main/java/io/casehub/platform/persistence/jpa/PreferenceEntry.java`
+- Modify: `../../../../persistence-jpa-common/src/main/java/io/casehub/platform/persistence/jpa/PreferenceEntry.java`
 - Modify: `persistence-jpa/src/main/java/io/casehub/platform/persistence/jpa/JpaPreferenceProvider.java`
 - Create: `persistence-jpa/src/main/java/io/casehub/platform/persistence/jpa/JpaPreferenceStore.java`
 - Modify: `persistence-jpa/src/test/java/io/casehub/platform/persistence/jpa/JpaPreferenceProviderTest.java`
@@ -352,7 +352,7 @@ ALTER TABLE platform_preference ADD CONSTRAINT uq_platform_preference
 
 - [ ] **Step 2: Add tenancyId to PreferenceEntry entity**
 
-Use `ide_edit_member` on `PreferenceEntry` in `persistence-jpa/src/main/java/io/casehub/platform/persistence/jpa/PreferenceEntry.java`:
+Use `ide_edit_member` on `PreferenceEntry` in `../../../../persistence-jpa-common/src/main/java/io/casehub/platform/persistence/jpa/PreferenceEntry.java`:
 
 Add field via `ide_insert_member` after `id`:
 

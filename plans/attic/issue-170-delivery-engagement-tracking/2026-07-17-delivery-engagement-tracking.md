@@ -44,7 +44,7 @@ Flyway, AssertJ, JUnit 5
 - Modify: `platform-api/src/main/java/io/casehub/platform/api/delivery/DeliveryAttemptStore.java` — add 3 methods
 - Modify: `platform-api/src/test/java/io/casehub/platform/api/delivery/DeliveryAttemptTest.java` — update all constructors
 - Modify: `platform/src/main/java/io/casehub/platform/delivery/NoOpDeliveryAttemptStore.java` — add no-op implementations
-- Modify: `delivery-tracking-jpa/src/main/java/io/casehub/platform/delivery/tracking/jpa/DeliveryAttemptEntity.java` — add 2 fields, update fromDomain/toDomain
+- Modify: `../../../../delivery-tracking-jpa-common/src/main/java/io/casehub/platform/delivery/tracking/jpa/DeliveryAttemptEntity.java` — add 2 fields, update fromDomain/toDomain
 - Modify: `delivery-tracking-inmem/src/main/java/io/casehub/platform/delivery/tracking/inmem/InMemoryDeliveryAttemptStore.java:62` — claimRetryable constructor
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/DeliveryTracker.java` — 5 constructor calls
 - Modify: `notification-dispatch/src/main/java/io/casehub/platform/notification/dispatch/DeliveryRetryProcessor.java` — 3 constructor calls
@@ -787,7 +787,7 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(#170): InMemory 
 
 **Files:**
 - Create: `delivery-tracking-jpa/src/main/resources/db/delivery-tracking/migration/V3001__engagement_event.sql`
-- Create: `delivery-tracking-jpa/src/main/java/io/casehub/platform/delivery/tracking/jpa/EngagementEventEntity.java`
+- Create: `../../../../delivery-tracking-jpa-common/src/main/java/io/casehub/platform/delivery/tracking/jpa/EngagementEventEntity.java`
 - Modify: `delivery-tracking-jpa/src/main/java/io/casehub/platform/delivery/tracking/jpa/JpaDeliveryAttemptStore.java`
 - Modify: `delivery-tracking-jpa/src/test/java/io/casehub/platform/delivery/tracking/jpa/JpaDeliveryAttemptStoreTest.java`
 
@@ -894,7 +894,7 @@ public class EngagementEventEntity {
 }
 ```
 
-Use `ide_create_file` for `delivery-tracking-jpa/src/main/java/io/casehub/platform/delivery/tracking/jpa/EngagementEventEntity.java`.
+Use `ide_create_file` for `../../../../delivery-tracking-jpa-common/src/main/java/io/casehub/platform/delivery/tracking/jpa/EngagementEventEntity.java`.
 
 - [ ] **Step 3: Write failing tests for JPA engagement**
 

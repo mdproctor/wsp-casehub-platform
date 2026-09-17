@@ -1138,12 +1138,12 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(#175): platform-
 
 **Files:**
 - Create: `platform-view-jpa/pom.xml`
-- Create: `platform-view-jpa/src/main/java/io/casehub/platform/view/jpa/SubjectViewEntity.java`
-- Create: `platform-view-jpa/src/main/java/io/casehub/platform/view/jpa/ViewMembershipEntity.java`
+- Create: `../../../../platform-view-jpa-common/src/main/java/io/casehub/platform/view/jpa/SubjectViewEntity.java`
+- Create: `../../../../platform-view-jpa-common/src/main/java/io/casehub/platform/view/jpa/ViewMembershipEntity.java`
 - Create: `platform-view-jpa/src/main/java/io/casehub/platform/view/jpa/JpaSubjectViewStore.java`
 - Create: `platform-view-jpa/src/main/java/io/casehub/platform/view/jpa/JpaViewMembershipTracker.java`
-- Create: `platform-view-jpa/src/main/java/io/casehub/platform/view/jpa/LabelPatternPredicates.java`
-- Create: `platform-view-jpa/src/main/java/io/casehub/platform/view/jpa/JpaLabelPatternQuerySupport.java`
+- Create: `../../../../platform-view-jpa-common/src/main/java/io/casehub/platform/view/jpa/LabelPatternPredicates.java`
+- Create: `../../../../platform-view-jpa-common/src/main/java/io/casehub/platform/view/jpa/JpaLabelPatternQuerySupport.java`
 - Create: `platform-view-jpa/src/main/resources/db/view/migration/V5000__subject_view.sql`
 - Create: `platform-view-jpa/src/main/resources/application.properties`
 - Test: `platform-view-jpa/src/test/java/io/casehub/platform/view/jpa/LabelPatternPredicatesTest.java`

@@ -235,9 +235,9 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
 
 **Files:**
 - Create: `acl-jpa/src/main/resources/db/acl/migration/V2__acl_tenant_isolation.sql`
-- Create: `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/ResourceParentKey.java`
-- Modify: `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/AclEntryEntity.java`
-- Modify: `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/ResourceParentEntity.java`
+- Create: `../../../../acl-jpa-common/src/main/java/io/casehub/platform/acl/jpa/ResourceParentKey.java`
+- Modify: `../../../../acl-jpa-common/src/main/java/io/casehub/platform/acl/jpa/AclEntryEntity.java`
+- Modify: `../../../../acl-jpa-common/src/main/java/io/casehub/platform/acl/jpa/ResourceParentEntity.java`
 - Modify: `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/JpaAccessControlProvider.java`
 - Modify: `acl-inmem/src/main/java/io/casehub/platform/acl/inmem/InMemoryAccessControlProvider.java`
 - Modify: `platform-api/src/test/java/io/casehub/platform/api/acl/AccessControlProviderContractTest.java`
@@ -278,7 +278,7 @@ Use `ide_edit_member` on `AclEntryEntity` to update the `@UniqueConstraint`:
 
 - [ ] **Step 3: Create ResourceParentKey and update ResourceParentEntity**
 
-Create `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/ResourceParentKey.java` via `ide_create_file`:
+Create `../../../../acl-jpa-common/src/main/java/io/casehub/platform/acl/jpa/ResourceParentKey.java` via `ide_create_file`:
 
 ```java
 package io.casehub.platform.acl.jpa;

@@ -40,7 +40,7 @@ tasks use the updated constructor from the start.
 **Files:**
 - Modify: `platform-api/src/main/java/io/casehub/platform/api/view/SubjectViewSpec.java`
 - Modify: `platform-api/src/test/java/io/casehub/platform/api/view/SubjectViewSpecTest.java`
-- Modify: `platform-view-jpa/src/main/java/io/casehub/platform/view/jpa/SubjectViewEntity.java`
+- Modify: `../../../../platform-view-jpa-common/src/main/java/io/casehub/platform/view/jpa/SubjectViewEntity.java`
 - Create: `platform-view-jpa/src/main/resources/db/view/migration/V5001__subject_view_additional_conditions.sql`
 - Modify: `platform-view-inmem/src/main/java/io/casehub/platform/view/inmem/InMemorySubjectViewStore.java`
 - Modify: `platform-view-inmem/src/test/java/io/casehub/platform/view/inmem/InMemorySubjectViewStoreTest.java`

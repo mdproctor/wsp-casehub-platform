@@ -938,7 +938,7 @@ Refs casehubio/parent#501"
 - `specs/issue-493-spring-data-jpa/2026-09-16-spring-data-jpa-modules-design.md` — design spec
 - `specs/issue-493-spring-data-jpa/decisions.md` — D1-D7 design decisions
 - `persistence-jpa/src/main/java/io/casehub/platform/persistence/jpa/JpaPreferenceStore.java` — Quarkus store pattern
-- `persistence-jpa/src/main/java/io/casehub/platform/persistence/jpa/PreferenceEntry.java` — pure JPA entity pattern
+- `../../persistence-jpa-common/src/main/java/io/casehub/platform/persistence/jpa/PreferenceEntry.java` — pure JPA entity pattern
 - `platform-spring/src/main/java/io/casehub/platform/spring/PlatformDefaultsManualConfig.java` — Spring auto-config mock fallback
 - `spring-generator/src/main/java/io/casehub/platform/spring/generator/AutoConfigurationWriter.java` — generated auto-config structure
 - `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/JpaAccessControlProvider.java` — most complex store (460 lines)

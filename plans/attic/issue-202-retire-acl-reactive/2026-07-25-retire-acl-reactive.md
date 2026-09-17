@@ -182,9 +182,9 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `acl-jpa/pom.xml`
-- Modify: `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/AclEntryEntity.java`
-- Modify: `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/AclAuditLogEntity.java`
-- Modify: `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/ResourceParentEntity.java`
+- Modify: `../../../../acl-jpa-common/src/main/java/io/casehub/platform/acl/jpa/AclEntryEntity.java`
+- Modify: `../../../../acl-jpa-common/src/main/java/io/casehub/platform/acl/jpa/AclAuditLogEntity.java`
+- Modify: `../../../../acl-jpa-common/src/main/java/io/casehub/platform/acl/jpa/ResourceParentEntity.java`
 - Modify: `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/JpaAccessControlProvider.java`
 - Modify: `acl-jpa/src/test/java/io/casehub/platform/acl/jpa/JpaAccessControlProviderTest.java`
 - Modify: `acl-jpa/src/test/resources/application.properties`

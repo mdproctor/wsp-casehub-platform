@@ -113,7 +113,7 @@ Update subscription store implementations and REST layer for userId→ownerId, t
 **Files:**
 - Modify: `subscriptions-inmem/src/main/java/io/casehub/platform/subscription/inmem/InMemorySubscriptionStore.java`
 - Modify: `subscriptions-inmem/src/main/java/io/casehub/platform/subscription/inmem/InMemoryReactiveSubscriptionStore.java`
-- Modify: `subscriptions-jpa/src/main/java/io/casehub/platform/subscription/jpa/SubscriptionEntity.java`
+- Modify: `../../../../subscriptions-jpa-common/src/main/java/io/casehub/platform/subscription/jpa/SubscriptionEntity.java`
 - Modify: `subscriptions-jpa/src/main/java/io/casehub/platform/subscription/jpa/JpaSubscriptionStore.java`
 - Modify: `subscriptions-jpa/src/main/java/io/casehub/platform/subscription/jpa/JpaReactiveSubscriptionStore.java`
 - Create: `subscriptions-jpa/src/main/resources/db/subscription/migration/V2__subscription_targets.sql`
@@ -472,12 +472,12 @@ New `notification-settings-jpa/` module. JPA entities, Flyway V1 migration, JpaN
 
 **Files:**
 - Create: `notification-settings-jpa/pom.xml`
-- Create: `notification-settings-jpa/src/main/java/io/casehub/platform/notification/settings/jpa/NotificationPreferencesEntity.java`
-- Create: `notification-settings-jpa/src/main/java/io/casehub/platform/notification/settings/jpa/MuteRuleEntity.java`
-- Create: `notification-settings-jpa/src/main/java/io/casehub/platform/notification/settings/jpa/SnoozeEntity.java`
+- Create: `../../../../notification-settings-jpa-common/src/main/java/io/casehub/platform/notification/settings/jpa/NotificationPreferencesEntity.java`
+- Create: `../../../../notification-settings-jpa-common/src/main/java/io/casehub/platform/notification/settings/jpa/MuteRuleEntity.java`
+- Create: `../../../../notification-settings-jpa-common/src/main/java/io/casehub/platform/notification/settings/jpa/SnoozeEntity.java`
 - Create: `notification-settings-jpa/src/main/java/io/casehub/platform/notification/settings/jpa/JpaNotificationPreferenceStore.java`
 - Create: `notification-settings-jpa/src/main/java/io/casehub/platform/notification/settings/jpa/JpaSuppressionStore.java`
-- Create: `notification-settings-jpa/src/main/resources/db/notification-settings/migration/V1__notification_settings.sql`
+- Create: `../../../../notification-settings-jpa-common/src/main/resources/db/notification-settings/migration/V1__notification_settings.sql`
 - Create: `notification-settings-jpa/src/test/java/io/casehub/platform/notification/settings/jpa/JpaNotificationPreferenceStoreTest.java`
 - Create: `notification-settings-jpa/src/test/java/io/casehub/platform/notification/settings/jpa/JpaSuppressionStoreTest.java`
 - Create: `notification-settings-jpa/src/test/resources/application.properties`

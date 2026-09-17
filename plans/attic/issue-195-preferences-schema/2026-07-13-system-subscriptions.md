@@ -624,7 +624,7 @@ by ownerId. NoOp stores pass scope through.
 
 **Files:**
 - Create: `subscriptions-jpa/src/main/resources/db/subscription/migration/V3__subscription_scope.sql`
-- Modify: `subscriptions-jpa/src/main/java/io/casehub/platform/subscription/jpa/SubscriptionEntity.java`
+- Modify: `../../../../subscriptions-jpa-common/src/main/java/io/casehub/platform/subscription/jpa/SubscriptionEntity.java`
 - Modify: `subscriptions-jpa/src/main/java/io/casehub/platform/subscription/jpa/JpaReactiveSubscriptionStore.java`
 
 **Interfaces:**

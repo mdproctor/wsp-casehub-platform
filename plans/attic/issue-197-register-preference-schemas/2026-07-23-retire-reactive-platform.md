@@ -162,7 +162,7 @@ The current `JpaNotificationStore` delegates to `JpaReactiveNotificationStore` v
 **Files:**
 - Delete: `notifications-jpa/src/main/java/io/casehub/platform/notification/jpa/JpaReactiveNotificationStore.java`
 - Modify: `notifications-jpa/src/main/java/io/casehub/platform/notification/jpa/JpaNotificationStore.java` — complete rewrite
-- Modify: `notifications-jpa/src/main/java/io/casehub/platform/notification/jpa/NotificationEntity.java` — remove `PanacheEntityBase`
+- Modify: `../../../../notifications-jpa-common/src/main/java/io/casehub/platform/notification/jpa/NotificationEntity.java` — remove `PanacheEntityBase`
 - Modify: `notifications-jpa/src/main/java/io/casehub/platform/notification/jpa/NotificationRetentionScheduler.java` — rewrite from `Mutiny.SessionFactory` to EntityManager
 - Modify: `notifications-jpa/pom.xml` — swap reactive deps for standard JPA
 - Modify: `notifications-jpa/src/test/java/io/casehub/platform/notification/jpa/JpaNotificationStoreTest.java` — remove reactive tests, update `clearState()`
@@ -465,7 +465,7 @@ Same pattern as Task 4 but for subscriptions.
 **Files:**
 - Delete: `subscriptions-jpa/src/main/java/io/casehub/platform/subscription/jpa/JpaReactiveSubscriptionStore.java`
 - Modify: `subscriptions-jpa/src/main/java/io/casehub/platform/subscription/jpa/JpaSubscriptionStore.java` — complete rewrite
-- Modify: `subscriptions-jpa/src/main/java/io/casehub/platform/subscription/jpa/SubscriptionEntity.java` — remove `PanacheEntityBase`
+- Modify: `../../../../subscriptions-jpa-common/src/main/java/io/casehub/platform/subscription/jpa/SubscriptionEntity.java` — remove `PanacheEntityBase`
 - Modify: `subscriptions-jpa/pom.xml` — swap reactive deps for standard JPA
 - Modify: `subscriptions-jpa/src/test/java/io/casehub/platform/subscription/jpa/JpaSubscriptionStoreTest.java` — remove reactive tests, update `clearState()`
 - Test: `subscriptions-jpa/src/test/java/io/casehub/platform/subscription/jpa/JpaSubscriptionStoreTest.java`

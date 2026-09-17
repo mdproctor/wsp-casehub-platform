@@ -684,9 +684,9 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(platform#172): D
 **Files:**
 - Create: `datasource-jpa/pom.xml`
 - Create: `datasource-jpa/src/main/java/io/casehub/platform/datasource/jpa/JpaDataSourceRegistry.java`
-- Create: `datasource-jpa/src/main/java/io/casehub/platform/datasource/jpa/DataSourceDescriptorEntity.java`
-- Create: `datasource-jpa/src/main/java/io/casehub/platform/datasource/jpa/RegistryKey.java`
-- Create: `datasource-jpa/src/main/resources/db/datasource/migration/V4000__datasource_descriptor.sql`
+- Create: `../../../../datasource-jpa-common/src/main/java/io/casehub/platform/datasource/jpa/DataSourceDescriptorEntity.java`
+- Create: `../../../../datasource-jpa-common/src/main/java/io/casehub/platform/datasource/jpa/RegistryKey.java`
+- Create: `../../../../datasource-jpa-common/src/main/resources/db/datasource/migration/V4000__datasource_descriptor.sql`
 - Create: `datasource-jpa/src/test/java/io/casehub/platform/datasource/jpa/JpaDataSourceRegistryTest.java`
 - Create: `datasource-jpa/src/test/resources/application.properties`
 - Modify: `pom.xml` (parent) — add `<module>datasource-jpa</module>`
@@ -796,7 +796,7 @@ Write `datasource-jpa/pom.xml` — follows delivery-tracking-jpa pattern:
 
 - [ ] **Step 2: Write Flyway migration**
 
-Create `datasource-jpa/src/main/resources/db/datasource/migration/V4000__datasource_descriptor.sql`:
+Create `../../../../datasource-jpa-common/src/main/resources/db/datasource/migration/V4000__datasource_descriptor.sql`:
 
 ```sql
 -- DataSource descriptor persistence (platform#171)
@@ -828,14 +828,14 @@ quarkus.flyway.migrate-at-start=true
 
 - [ ] **Step 4: Write DataSourceDescriptorEntity**
 
-Create `datasource-jpa/src/main/java/io/casehub/platform/datasource/jpa/DataSourceDescriptorEntity.java`.
+Create `../../../../datasource-jpa-common/src/main/java/io/casehub/platform/datasource/jpa/DataSourceDescriptorEntity.java`.
 Follow `DeliveryAttemptEntity` pattern — public fields, `fromDomain()`/`toDomain()`.
 Use `@IdClass` with a composite key class or `@EmbeddedId`. JSON fields as TEXT with
 Jackson serialization in fromDomain/toDomain.
 
 - [ ] **Step 5: Write RegistryKey**
 
-Create `datasource-jpa/src/main/java/io/casehub/platform/datasource/jpa/RegistryKey.java`:
+Create `../../../../datasource-jpa-common/src/main/java/io/casehub/platform/datasource/jpa/RegistryKey.java`:
 
 ```java
 package io.casehub.platform.datasource.jpa;

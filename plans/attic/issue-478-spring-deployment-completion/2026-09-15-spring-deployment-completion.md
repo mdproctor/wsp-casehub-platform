@@ -30,17 +30,17 @@
 ### Task 1: Strip PanacheEntityBase from platform -jpa entities and stores
 
 **Files:**
-- Modify: `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/AclEntryEntity.java`
-- Modify: `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/AclAuditLogEntity.java`
-- Modify: `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/ResourceParentEntity.java`
-- Modify: `notification-settings-jpa/src/main/java/io/casehub/platform/notification/settings/jpa/SnoozeEntity.java`
-- Modify: `notification-settings-jpa/src/main/java/io/casehub/platform/notification/settings/jpa/MuteRuleEntity.java`
-- Modify: `notification-settings-jpa/src/main/java/io/casehub/platform/notification/settings/jpa/NotificationPreferencesEntity.java`
-- Modify: `platform-view-jpa/src/main/java/io/casehub/platform/view/jpa/SubjectViewEntity.java`
-- Modify: `platform-view-jpa/src/main/java/io/casehub/platform/view/jpa/ViewMembershipEntity.java`
-- Modify: `persistence-jpa/src/main/java/io/casehub/platform/persistence/jpa/PreferenceEntry.java`
-- Modify: `memory-jpa/src/main/java/io/casehub/platform/memory/jpa/MemoryEntry.java`
-- Modify: `digest-jpa/src/main/java/io/casehub/platform/delivery/digest/jpa/DigestBufferEntity.java`
+- Modify: `../../../../acl-jpa-common/src/main/java/io/casehub/platform/acl/jpa/AclEntryEntity.java`
+- Modify: `../../../../acl-jpa-common/src/main/java/io/casehub/platform/acl/jpa/AclAuditLogEntity.java`
+- Modify: `../../../../acl-jpa-common/src/main/java/io/casehub/platform/acl/jpa/ResourceParentEntity.java`
+- Modify: `../../../../notification-settings-jpa-common/src/main/java/io/casehub/platform/notification/settings/jpa/SnoozeEntity.java`
+- Modify: `../../../../notification-settings-jpa-common/src/main/java/io/casehub/platform/notification/settings/jpa/MuteRuleEntity.java`
+- Modify: `../../../../notification-settings-jpa-common/src/main/java/io/casehub/platform/notification/settings/jpa/NotificationPreferencesEntity.java`
+- Modify: `../../../../platform-view-jpa-common/src/main/java/io/casehub/platform/view/jpa/SubjectViewEntity.java`
+- Modify: `../../../../platform-view-jpa-common/src/main/java/io/casehub/platform/view/jpa/ViewMembershipEntity.java`
+- Modify: `../../../../persistence-jpa-common/src/main/java/io/casehub/platform/persistence/jpa/PreferenceEntry.java`
+- Modify: `../../../../memory-jpa-common/src/main/java/io/casehub/platform/memory/jpa/MemoryEntry.java`
+- Modify: `../../../../digest-jpa-common/src/main/java/io/casehub/platform/delivery/digest/jpa/DigestBufferEntity.java`
 - Modify: `acl-jpa/src/main/java/io/casehub/platform/acl/jpa/JpaAccessControlProvider.java` (6 persist calls)
 - Modify: `persistence-jpa/src/main/java/io/casehub/platform/persistence/jpa/JpaPreferenceStore.java` (1 persist call)
 - Modify: `memory-jpa/src/main/java/io/casehub/platform/memory/jpa/JpaMemoryStore.java` (2 persist calls)

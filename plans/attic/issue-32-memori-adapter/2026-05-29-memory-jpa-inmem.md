@@ -34,9 +34,9 @@
 - `../../../../memory-inmem/src/test/java/io/casehub/platform/memory/inmem/InMemoryMemoryStoreTest.java`
 - `memory-jpa/pom.xml`
 - `memory-jpa/src/main/java/io/casehub/platform/memory/jpa/MemoryJpaConfig.java`
-- `memory-jpa/src/main/java/io/casehub/platform/memory/jpa/MemoryEntry.java`
+- `../../../../memory-jpa-common/src/main/java/io/casehub/platform/memory/jpa/MemoryEntry.java`
 - `memory-jpa/src/main/java/io/casehub/platform/memory/jpa/JpaMemoryStore.java`
-- `memory-jpa/src/main/resources/db/memory/migration/V1000__memory_entry.sql`
+- `../../../../memory-jpa-common/src/main/resources/db/memory/migration/V1000__memory_entry.sql`
 - `memory-jpa/src/test/java/io/casehub/platform/memory/jpa/JpaMemoryStoreTest.java`
 - `memory-jpa/src/test/resources/application.properties`
 
@@ -1088,8 +1088,8 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(#32): memory-inm
 **Files:**
 - Create: `memory-jpa/pom.xml`
 - Create: `memory-jpa/src/main/java/io/casehub/platform/memory/jpa/MemoryJpaConfig.java`
-- Create: `memory-jpa/src/main/java/io/casehub/platform/memory/jpa/MemoryEntry.java`
-- Create: `memory-jpa/src/main/resources/db/memory/migration/V1000__memory_entry.sql`
+- Create: `../../../../memory-jpa-common/src/main/java/io/casehub/platform/memory/jpa/MemoryEntry.java`
+- Create: `../../../../memory-jpa-common/src/main/resources/db/memory/migration/V1000__memory_entry.sql`
 - Create: `memory-jpa/src/test/resources/application.properties`
 - Create: `memory-jpa/src/test/java/io/casehub/platform/memory/jpa/JpaMemoryStoreTest.java` (skeleton only)
 
