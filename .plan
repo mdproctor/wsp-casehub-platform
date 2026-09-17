@@ -1,0 +1,27 @@
+# Work Plan — issue-501-spring-deployment-readiness
+
+## State
+branch: issue-501-spring-deployment-readiness
+state: scaffolded
+project-sha: 59d36593bb3af4551f1aa83d730eb263ccb4b957
+date: 2026-09-17
+issue-repo: casehubio/parent
+covers: 501
+design-repo: project
+design-section-hashes: 4d2cc5ab:## §1 Introduction and Goals|4f6b26ef:## §2 Constraints|39b76cb9:## §3 Context and Scope|74aa736f:## §4 Solution Strategy|9ca8de62:## §5 Building Block View|f1938c56:## §6 Runtime View|65807a21:## §7 Deployment View|a03d508f:## §8 Crosscutting Concepts|b2e1b57c:## §9 Journeys and Chapters|598f3a04:## §10 Architectural Decisions|1f604475:## §11 Quality Requirements|af5f260f:## §12 Risks and Technical Debt|42d51385:## §13 Glossary
+flyway-next-v: none
+
+## Queue
+- [ ] casehubio/parent#501 — Issue #501 ← active
+- [ ] casehubio/parent#499 — E2E Spring Boot verification test
+- [ ] casehubio/parent#504 — Agent spring auto-configurations
+- [ ] casehubio/parent#500 — Callback-spring-generator
+- [ ] casehubio/parent#505 — Spring configuration metadata
+- [ ] casehubio/parent#506 — Consumer guide Spring Boot section
+- [ ] casehubio/parent#508 — OIDC CurrentPrincipal and SCIM for Spring Security
+- [ ] casehubio/parent#507 — Streams core extraction and Spring Cloud Stream
+- [ ] casehubio/parent#496 — Neocortex Spring Data JPA
+- [ ] casehubio/parent#497 — Engine Spring Data persistence-hibernate
+- [ ] casehubio/parent#498 — Work Spring Data MongoDB
+- [ ] casehubio/parent#494 — Work generate 28 Spring REST controllers
+- [ ] casehubio/parent#495 — Qhorus generate 10 Spring REST controllers
