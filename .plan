@@ -2,12 +2,13 @@
 
 ## State
 branch: feat/493-spring-data-jpa
-state: active
+state: closing:review
 issue-repo: casehubio/parent
 covers: casehubio/parent#493
 Current: casehubio/parent#493 — Platform Spring Data JPA (10 modules)
 date: 2026-09-16
 
+evidence-era: true
 ## Queue
 - [x] casehubio/parent#493 — Platform Spring Data JPA (10 modules)
 - [ ] casehubio/parent#497 — Engine Spring Data Hibernate ← active
