@@ -53,7 +53,7 @@ Final concrete class. Lives in simulation-api because its only dependencies are 
 public final class CorpusSeed<I, O> {
     private final String qualifiedName;
     private final String defaultTenancyId;
-    private final List<InvocationRecord<I, O>> records = new ArrayList<>();
+    private final List<InvocationRecord<I, O>> records = new ArrayList<>(); // not thread-safe — corpus seeding is single-threaded test setup
     private KeyExtractor<I> keyExtractor;
     private Function<I, O> outputMapper;
 
@@ -221,7 +221,7 @@ public final class AgentCorpus {
     private AgentCorpus() {}
 
     public static CorpusSeed<AgentSimulationInput, List<AgentEvent>> invoke(String tenancyId) {
-        return new CorpusSeed<>(SimulatedAgentBackend.QN_INVOKE, tenancyId)
+        return new CorpusSeed<>(AgentProviderQN.INVOKE, tenancyId)
             .withKeyExtractor(SimulatedAgentBackend.defaultKeyExtractor());
     }
 
@@ -294,13 +294,17 @@ public final class LlmCorpusPopulator {
         String prompt = buildPrompt(inputSchema, outputSchema, existing, count, domainContext);
         String response = llmFunction.apply(prompt);
 
-        List<CorpusEntry<I, O>> entries = parseResponse(response, inputType, outputType);
-        for (var entry : entries) {
-            seed.add(entry.input(), entry.output());
+        JsonNode parsed = objectMapper.readTree(response);
+        for (JsonNode entry : parsed) {
+            I input = objectMapper.treeToValue(entry.get("input"), inputType);
+            O output = objectMapper.treeToValue(entry.get("output"), outputType);
+            seed.add(input, output);
         }
     }
 }
 ```
+
+**Prompt structure:** the generated prompt includes (1) JSON Schema for input and output types, (2) serialized existing entries as few-shot examples (if any), (3) the requested count, (4) the domain context string. Expected response format: a JSON array of `{"input": ..., "output": ...}` objects matching the schemas.
 
 **Hybrid few-shot pattern:** existing entries in the seed serve as examples in the LLM prompt. Seed with 2-3 hand-crafted entries, then `populate()` generates 10-50 more consistent with the examples.
 
@@ -350,10 +354,12 @@ runtime.registerExtractor(ModelRegistryQN.RESOLVE_BY_ID, id -> id);
 ```java
 import static io.casehub.platform.simulation.testing.NotificationCorpus.*;
 
-store("hospital-a")
-    .add(input("SLA Breached", "sla.breach", URGENT))
-    .add(input("Case Updated", "case.update", INFO))
-    .seedInto(corpus);
+var seed = store("hospital-a");
+seed.add(input("SLA Breached", "sla.breach", URGENT));
+seed.add(input("Case Updated", "case.update", INFO));
+
+seed.seedInto(corpus);
+runtime.registerExtractor(seed.qualifiedName(), seed.keyExtractor());
 ```
 
 ### LLM hybrid (few-shot + generation)
@@ -406,7 +412,8 @@ runtime.popOverlay(overlay);
     </dependency>
     <dependency>
         <groupId>io.casehub</groupId>
-        <artifactId>casehub-platform-simulation-core</artifactId>
+        <artifactId>casehub-platform-platform-simulation-core</artifactId>
+        <!-- Generated QN constants for platform-api SPIs -->
     </dependency>
     <dependency>
         <groupId>io.casehub</groupId>
