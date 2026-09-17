@@ -79,3 +79,26 @@
 **Sources:** notifications-inmem-core/InMemoryNotificationStore.java (Consumer<T> pattern), platform-api event records
 **Exploration:** quick
 **Status:** captured
+
+## D8: Flyway 12 incompatibility with Spring Boot 3.4 FlywayAutoConfiguration
+
+**Choice:** Disable Flyway in spring-jpa tests (`spring.flyway.enabled=false`) and use Hibernate DDL generation (`spring.jpa.hibernate.ddl-auto=create-drop`) instead.
+**Alternatives:**
+- Pin Flyway 10.x for spring-jpa modules — version conflict with Quarkus BOM (Flyway 12)
+- Exclude flyway-core from spring-jpa test classpath — still needed at compile scope for production
+**Rationale:** Flyway 12 (pulled by Quarkus BOM) removed `cleanOnValidationError()` which Spring Boot 3.4's `FlywayAutoConfiguration` calls. Since the entities define the schema fully via JPA annotations, Hibernate DDL generation creates identical tables. Flyway migrations are tested in the Quarkus -jpa module tests. Production Spring Boot deployments will use Flyway 10.x from the Spring Boot BOM (not the Quarkus BOM).
+**Trade-offs:** Spring-jpa tests don't exercise Flyway migrations. Acceptable — same migrations are tested in Quarkus.
+**Sources:** persistence-spring-jpa test failure, Flyway 12 changelog (cleanOnValidationError removed), Spring Boot 3.4.5 FlywayAutoConfiguration source
+**Exploration:** discovered during Task 2 implementation
+**Status:** captured
+
+## D9: @DataJpaTest configuration without @SpringBootApplication
+
+**Choice:** Add `@AutoConfigurationPackage`, `@EnableJpaRepositories(basePackageClasses = ...)`, and `@EntityScan(basePackageClasses = ...)` to the test `@Configuration` class.
+**Alternatives:**
+- Add a test-only `@SpringBootApplication` class — works but creates a confusing package-scanning anchor
+**Rationale:** `@DataJpaTest` needs auto-configuration package registration to discover repositories. Without a `@SpringBootApplication` class, the base packages are unknown. The three annotations explicitly declare what to scan — no hidden scanning behaviour.
+**Trade-offs:** Slightly more verbose test config. Consistent across all spring-jpa modules.
+**Sources:** persistence-spring-jpa test failure (Unable to retrieve @EnableAutoConfiguration base packages)
+**Exploration:** discovered during Task 2 implementation
+**Status:** captured
