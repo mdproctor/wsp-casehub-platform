@@ -167,6 +167,8 @@ public final class AclCorpus {
 
 #### Example: ModelCorpus
 
+`ModelRegistry.resolveById()` returns `Optional<ModelDescriptor>` — the corpus output type must match the SPI return type for the generated decorator's cast to succeed. The `found()` wrapper keeps `add()` calls clean while producing the required `Optional` value.
+
 ```java
 public final class ModelCorpus {
 
@@ -177,13 +179,19 @@ public final class ModelCorpus {
             .withKeyExtractor(id -> id);
     }
 
-    public static ModelDescriptor model(String id, String vendor, String family,
-                                         ModelTier tier, ModelLocality locality) {
-        return new ModelDescriptor(id, id, vendor, null, vendor, family, family,
+    public static Optional<ModelDescriptor> found(ModelDescriptor descriptor) {
+        return Optional.of(descriptor);
+    }
+
+    public static ModelDescriptor model(String id, String backendKey, String vendor,
+                                         String family, ModelTier tier, ModelLocality locality) {
+        return new ModelDescriptor(id, id, backendKey, null, vendor, family, family,
             tier, Set.of(ModelCapabilities.TEXT), 128000, 4096, locality, null, null, Map.of());
     }
 }
 ```
+
+For Optional-returning SPIs, each descriptor provides a wrapper method (`found()`) that pairs with the domain factory (`model()`). This keeps CorpusSeed generic — the wrapping concern belongs in the descriptor layer where SPI-specific knowledge lives.
 
 #### Example: NotificationCorpus (with output mapper)
 
@@ -209,6 +217,54 @@ public final class NotificationCorpus {
             input.tenancyId(), input.title(), input.body(), input.category(),
             input.severity(), input.actionUrl(), input.source(),
             NotificationStatus.UNREAD, Instant.now(), null, null);
+    }
+}
+```
+
+#### Example: PreferenceCorpus
+
+`PreferenceProvider.resolve(SettingsScope)` returns `Preferences` (the interface — `MapPreferences` is the concrete implementation used in test fixtures). Input type is `SettingsScope` (a 3-arg record: tenancyId, scope Path, effectiveAt Instant).
+
+```java
+public final class PreferenceCorpus {
+
+    private PreferenceCorpus() {}
+
+    public static CorpusSeed<SettingsScope, Preferences> resolve(String tenancyId) {
+        return new CorpusSeed<>(PreferenceProviderQN.RESOLVE, tenancyId)
+            .withKeyExtractor(scope -> scope.scope().value());
+    }
+
+    public static SettingsScope scope(String tenancyId, String... pathSegments) {
+        return SettingsScope.of(tenancyId, Path.of(pathSegments));
+    }
+
+    public static Preferences preferences(Map<String, Object> values) {
+        return new MapPreferences(values);
+    }
+}
+```
+
+#### Example: CredentialCorpus
+
+`CredentialResolver.resolve(String)` returns `Map<String, String>` — the simplest descriptor. Input key is the credential ref string itself.
+
+```java
+public final class CredentialCorpus {
+
+    private CredentialCorpus() {}
+
+    public static CorpusSeed<String, Map<String, String>> resolve(String tenancyId) {
+        return new CorpusSeed<>(CredentialResolverQN.RESOLVE, tenancyId)
+            .withKeyExtractor(ref -> ref);
+    }
+
+    public static Map<String, String> credential(String key, String value) {
+        return Map.of(key, value);
+    }
+
+    public static Map<String, String> credential(String k1, String v1, String k2, String v2) {
+        return Map.of(k1, v1, k2, v2);
     }
 }
 ```
@@ -266,6 +322,11 @@ public final class AccessControlProviderQN {
 
 Descriptors import these constants. A listing file rename or SPI method rename causes a compile error, not a silent runtime mismatch.
 
+**Implementation scope:** `generateFromIndex()` currently produces only decorator sources — QN constants classes are new. Implementation requires:
+1. Add `generateQNSource(ClassInfo spiClass, String spiName)` method to `SimulationDecoratorProcessor`
+2. Emit one additional `GeneratedSource` per SPI with constants derived from `spiName + "." + method.name()` (same construction as the decorator's qualified name on line 171)
+3. Update `SimulationDecoratorProcessorTest` to verify QN class generation alongside decorators
+
 ### LlmCorpusPopulator (simulation-testing)
 
 Takes `Function<String, String>` — framework-agnostic (D62). Uses `PlatformSchemaGenerator` to produce JSON Schema from Java types.
@@ -287,28 +348,43 @@ public final class LlmCorpusPopulator {
     public <I, O> void populate(CorpusSeed<I, O> seed,
                                  Class<I> inputType, Class<O> outputType,
                                  int count, String domainContext) {
+        populate(seed, inputType, outputType, Function.identity(), count, domainContext);
+    }
+
+    public <I, O, R> void populate(CorpusSeed<I, O> seed,
+                                    Class<I> inputType, Class<R> rawOutputType,
+                                    Function<R, O> outputAdapter,
+                                    int count, String domainContext) {
         List<InvocationRecord<I, O>> existing = seed.build();
         JsonNode inputSchema = schemaGen.generate(inputType);
-        JsonNode outputSchema = schemaGen.generate(outputType);
+        JsonNode outputSchema = schemaGen.generate(rawOutputType);
 
         String prompt = buildPrompt(inputSchema, outputSchema, existing, count, domainContext);
         String response = llmFunction.apply(prompt);
 
-        JsonNode parsed = objectMapper.readTree(response);
-        for (JsonNode entry : parsed) {
-            I input = objectMapper.treeToValue(entry.get("input"), inputType);
-            O output = objectMapper.treeToValue(entry.get("output"), outputType);
-            seed.add(input, output);
+        try {
+            JsonNode parsed = objectMapper.readTree(response);
+            for (JsonNode entry : parsed) {
+                I input = objectMapper.treeToValue(entry.get("input"), inputType);
+                R rawOutput = objectMapper.treeToValue(entry.get("output"), rawOutputType);
+                seed.add(input, outputAdapter.apply(rawOutput));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to parse LLM corpus response", e);
         }
     }
 }
 ```
 
+The two-overload design handles Optional-returning SPIs: the convenience overload uses `Function.identity()` for direct types, while the full overload takes a `rawOutputType` and `outputAdapter` for wrapped types. For `ModelCorpus`, the adapter is `Optional::of` — Jackson deserializes into `ModelDescriptor`, the adapter wraps it before calling `seed.add()`.
+
 **Prompt structure:** the generated prompt includes (1) JSON Schema for input and output types, (2) serialized existing entries as few-shot examples (if any), (3) the requested count, (4) the domain context string. Expected response format: a JSON array of `{"input": ..., "output": ...}` objects matching the schemas.
 
 **Hybrid few-shot pattern:** existing entries in the seed serve as examples in the LLM prompt. Seed with 2-3 hand-crafted entries, then `populate()` generates 10-50 more consistent with the examples.
 
-**Error handling:** all exceptions propagate — invalid JSON, schema mismatch, function errors. Tests fail fast on corpus generation errors (D62).
+**Object[] input limitation:** SPIs with multi-param methods (e.g., AclCorpus) use `Object[]` as the input type. `PlatformSchemaGenerator.generate(Object[].class)` produces an "array of any" schema — unusable for LLM generation. LLM population is limited to SPIs with typed input classes (ModelCorpus, NotificationCorpus, CredentialCorpus, PreferenceCorpus). This is inherent in the `Object[]` representation and not a design flaw — multi-param SPIs use hand-authored corpora.
+
+**Error handling:** Jackson's `readTree()` and `treeToValue()` throw checked `JsonProcessingException extends IOException`. These are wrapped in `UncheckedIOException` — all exceptions propagate as unchecked. Invalid JSON, schema mismatch, function errors (rate limit, timeout, content filter) all fail fast. Tests see clear stack traces without checked exception ceremony (D62).
 
 ## End-to-end usage
 
@@ -337,16 +413,17 @@ class AuthorizationTest {
 }
 ```
 
-### Model registry simulation (single-param method)
+### Model registry simulation (single-param method, Optional return)
 
 ```java
 import static io.casehub.platform.simulation.testing.ModelCorpus.*;
 
-resolveById("tenant-1")
-    .add("claude-opus-5", model("claude-opus-5", "claude", "Opus", FLAGSHIP, CLOUD))
-    .add("gpt-4o", model("gpt-4o", "openai", "GPT-4", STANDARD, CLOUD))
-    .seedInto(corpus);
-runtime.registerExtractor(ModelRegistryQN.RESOLVE_BY_ID, id -> id);
+var seed = resolveById("tenant-1");
+seed.add("claude-opus-5", found(model("claude-opus-5", "claude", "Anthropic", "Opus", FLAGSHIP, CLOUD)));
+seed.add("gpt-4o", found(model("gpt-4o", "openai", "OpenAI", "GPT-4", STANDARD, CLOUD)));
+
+seed.seedInto(corpus);
+runtime.registerExtractor(seed.qualifiedName(), seed.keyExtractor());
 ```
 
 ### Notification pipeline with output derivation
@@ -368,14 +445,16 @@ runtime.registerExtractor(seed.qualifiedName(), seed.keyExtractor());
 var populator = new LlmCorpusPopulator(AgentCorpus.llmFunction(agentProvider), objectMapper);
 
 var seed = resolveById("tenant-1");
-seed.add("claude-opus-5", model("claude-opus-5", "claude", "Opus", FLAGSHIP, CLOUD));
-seed.add("gpt-4o", model("gpt-4o", "openai", "GPT-4", STANDARD, CLOUD));
+seed.add("claude-opus-5", found(model("claude-opus-5", "claude", "Anthropic", "Opus", FLAGSHIP, CLOUD)));
+seed.add("gpt-4o", found(model("gpt-4o", "openai", "OpenAI", "GPT-4", STANDARD, CLOUD)));
 
-populator.populate(seed, String.class, ModelDescriptor.class, 10,
+populator.populate(seed, String.class, ModelDescriptor.class, Optional::of, 10,
     "Generate realistic AI model descriptors for a healthcare platform");
 
 seed.seedInto(corpus);
 ```
+
+The adapter overload (`Optional::of`) tells the populator to deserialize into `ModelDescriptor` and wrap each result before calling `seed.add()`. For SPIs with direct return types (NotificationCorpus, CredentialCorpus), use the convenience overload without an adapter.
 
 ### Overlay integration (per-test isolation)
 
@@ -387,6 +466,8 @@ canAccess("hospital-a")
 // ... test ...
 runtime.popOverlay(overlay);
 ```
+
+Note: `SimulationOverlay.corpus()` returns raw `SimulationCorpus` (no type params). `CorpusSeed.seedInto()` accepts this via raw-type compatibility — produces an unchecked warning. Test code using this pattern will typically suppress with `@SuppressWarnings("unchecked")` on the test method. This is inherent in the overlay's raw-type design and not a CorpusSeed concern.
 
 ## Module layout
 
@@ -432,17 +513,17 @@ No agent-api dependency. The `Function<String, String>` abstraction keeps agent 
 
 ### In scope (5 high-value SPIs)
 
-| Descriptor | SPI | Key methods | Input shape |
-|-----------|-----|-------------|-------------|
-| AclCorpus | AccessControlProvider | canAccess, accessibleResources | Object[] (3 params) |
-| ModelCorpus | ModelRegistry | resolveById, query, all | String / ModelQuery / null |
-| NotificationCorpus | NotificationStore | store, find | NotificationInput / NotificationQuery |
-| PreferenceCorpus | PreferenceProvider | resolve | SettingsScope |
-| CredentialCorpus | CredentialResolver | resolve | String |
+| Descriptor | SPI | Key methods | Input shape | LLM generation |
+|-----------|-----|-------------|-------------|----------------|
+| AclCorpus | AccessControlProvider | canAccess, accessibleResources | Object[] (3 params) | No — Object[] schema unusable |
+| ModelCorpus | ModelRegistry | resolveById, query, all | String / ModelQuery / null | Yes (via adapter) |
+| NotificationCorpus | NotificationStore | store, find | NotificationInput / NotificationQuery | Yes |
+| PreferenceCorpus | PreferenceProvider | resolve | SettingsScope | Yes |
+| CredentialCorpus | CredentialResolver | resolve | String | Yes |
 
-### Deferred (6 SPIs — mechanical to add later)
+### Deferred (6 SPIs — mechanical to add later, tracked as #TBD)
 
-DataSourceRegistry, EndpointRegistry, SubscriptionStore, ExpressionEngineRegistry, DocumentSigningService, CurrentPrincipal. Consumers can seed these directly via CorpusSeed without convenience factories.
+DataSourceRegistry, EndpointRegistry, SubscriptionStore, ExpressionEngineRegistry, DocumentSigningService, CurrentPrincipal. Consumers can seed these directly via CorpusSeed without convenience factories. Umbrella issue to be filed before implementation begins.
 
 ## Testing strategy
 
