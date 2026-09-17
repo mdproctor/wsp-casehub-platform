@@ -1002,6 +1002,125 @@
 **Exploration:** quick
 **Status:** captured
 
+---
+
+# Phase 10 — #328 Domain-Specific Corpus Builders
+
+## D55: Composition over inheritance — CorpusSeed<I,O> is final, not abstract
+
+**Choice:** `CorpusSeed<I, O>` is a final concrete class in simulation-core. Per-SPI descriptor classes are utility classes with only static members. No abstract base class, no per-SPI subclasses.
+**Alternatives:**
+- Abstract `CorpusBuilder<I, O>` with per-SPI subclasses (issue's original proposal) — familiar builder pattern. But the base class behavior (accumulate records, seed into corpus) is identical for every SPI. Per-SPI variation is all static (constants, factories, extractors) — none needs virtual dispatch or `this` reference. Inheritance adds a mechanism where none is needed.
+- Static utility + per-SPI builder (no shared type) — duplicates record accumulation logic. No polymorphism, though polymorphism is unused.
+**Rationale:** First-principles analysis: the generator uses `Object[]` for multi-param methods (SimulationDecoratorProcessor lines 186-194). An abstract class hierarchy that types the input as `Object[]` provides no type safety. What actually helps is typed factory methods that construct the `Object[]` correctly — and those are static. Additionally, domain fixture factories (e.g. `resource("case", "c-1")`) are independently useful in non-simulation tests. Locking them in a builder subclass makes them unreachable. Composition separates concerns cleanly: CorpusSeed handles accumulation, descriptors handle domain knowledge.
+**Trade-offs:** Two concepts to learn (CorpusSeed + descriptor) vs one (builder). Acceptable — both concepts are simple and together they produce a static-importable mini-DSL per SPI.
+**Sources:** SimulationDecoratorProcessor.java (lines 186-194 — Object[] for multi-param), InvocationRecord.java, SimulationCorpus.java, issue #328
+**Exploration:** deep-analysis (first-principles re-examination of the issue's proposed approach)
+**Status:** captured
+
+## D56: InvocationRecord.of() convenience factories in simulation-api
+
+**Choice:** Add static factory methods to InvocationRecord: `of(tenancyId, input, output)` and `of(tenancyId, key, input, output)`. Both default `recordedAt` to `Instant.now()`. The first defaults `key` to null.
+**Alternatives:**
+- Leave InvocationRecord as-is — all convenience in CorpusSeed. But InvocationRecord.of() is useful even without CorpusSeed, e.g. when directly calling `corpus.seed()`.
+**Rationale:** The 5-arg constructor (`tenancyId, key, input, output, recordedAt`) is painful when you only care about 2 fields (input, output). Convenience factories eliminate timestamp and null-key boilerplate everywhere — including tutorial tests, YAML loader, and CorpusSeed internals. Zero new types, zero dependencies, zero risk.
+**Trade-offs:** None. This is a strict convenience addition to an existing record.
+**Sources:** InvocationRecord.java, tutorial tests (SimulationGettingStartedTest — helper methods that do exactly this)
+**Depends on:** None
+**Exploration:** quick
+**Status:** captured
+
+## D57: CorpusSeed auto-derives keys via withKeyExtractor()
+
+**Choice:** `CorpusSeed.withKeyExtractor(KeyExtractor<I>)` configures an extractor. When set, `add(input, output)` auto-derives the key from the input — no manual key argument needed. `add(key, input, output)` still available for explicit override. `seedInto(corpus, runtime)` registers the extractor with the runtime alongside seeding.
+**Alternatives:**
+- No key derivation on CorpusSeed — user always provides explicit keys or registers extractors separately. Simpler API but loses the "just works" convenience.
+- Key extractor required (not optional) — forces every CorpusSeed to have an extractor. Overspecified — sequential and random strategies don't use keys.
+**Rationale:** Key-lookup is the most common strategy. Auto-deriving keys means the user only provides `(input, output)` pairs — the key comes from the same extractor the runtime will use at resolution time. This ensures key consistency between corpus seeding and strategy resolution.
+**Trade-offs:** The extractor runs at seed time (inside `add()`) in addition to strategy resolution time. Negligible — corpus seeding is a test setup operation, not a hot path.
+**Sources:** SimulationRuntime.registerExtractor(), KeyLookupStrategy (requires key match), AgentSimulationInput.defaultKeyExtractor() (precedent)
+**Depends on:** D55 (CorpusSeed design)
+**Exploration:** quick
+**Status:** captured
+
+## D58: withOutputMapper() for derivable outputs
+
+**Choice:** `CorpusSeed.withOutputMapper(Function<I, O>)` enables `add(input)` (no output argument) — the output is derived from the input via the mapper. Optional convenience for SPIs where the output is a transformation of the input (e.g. NotificationStore.store: input is NotificationInput, output is Notification with generated id + UNREAD status + timestamps).
+**Alternatives:**
+- No output mapper — user always provides both input and output. Simpler but forces duplicated construction for store-like SPIs.
+**Rationale:** For query SPIs (canAccess, resolveById, find), input and output are independent — no mapper applicable. For store SPIs, the output is derivable from the input with generated fields. The mapper is optional — most descriptors won't set it.
+**Trade-offs:** API surface — one more method on CorpusSeed. Acceptable — it's clearly optional and self-documenting.
+**Sources:** NotificationStore.store(NotificationInput) → Notification, PreferenceStore.set() → PreferenceRecord
+**Depends on:** D55 (CorpusSeed design)
+**Exploration:** quick
+**Status:** captured
+
+## D59: Per-SPI descriptor classes — static members only
+
+**Choice:** Each descriptor is a `public final class` with only static members: qualified name constants, typed `CorpusSeed` factory methods (pre-configured with default extractor), and domain fixture factories (static methods constructing SPI input/output types with sensible defaults). For multi-param methods, typed factory methods return `Object[]` internally — hiding the positional array from the user.
+**Alternatives:**
+- Instance-based descriptors with configuration — each descriptor is instantiated and configured. Adds state and lifecycle for no benefit — the configuration is per-SPI, not per-instance.
+- Enum-based method registry — each method is an enum constant with its qualified name. Type-safe but overly rigid and can't carry factory methods.
+**Rationale:** Static utility classes with static imports produce a clean mini-DSL per SPI. `canAccess("tenant").add(check(...), true).seedInto(corpus, runtime)` reads naturally. The fixture factories (`check()`, `resource()`, `model()`) are independently importable for non-simulation tests. No instantiation, no lifecycle, no state.
+**Trade-offs:** Static methods don't participate in dependency injection. Acceptable — corpus seeding is test setup code, not a CDI concern.
+**Sources:** AgentSimulationInput.from() (precedent for static factory), SimulatedAgentBackend.defaultKeyExtractor() (precedent for static extractor factory)
+**Depends on:** D55 (CorpusSeed design)
+**Exploration:** quick
+**Status:** captured
+
+## D60: simulation-testing module for platform-api SPI descriptors
+
+**Choice:** New `casehub-platform-simulation-testing` module. Depends on simulation-core + platform-api. Contains: AclCorpus, ModelCorpus, NotificationCorpus, PreferenceCorpus, CredentialCorpus, and LlmCorpusPopulator. Consumers add as test-scope.
+**Alternatives:**
+- In simulation-core — but simulation-core is currently domain-agnostic (no platform-api dependency). Adding platform-api couples it to the casehub type system.
+- In platform-simulation-core — alongside generated decorators. But that module's purpose is APT-generated code, not hand-written test utilities. Mixing the concerns invites confusion about what's generated vs authored.
+- In existing testing/ module — but testing/ is for identity fixtures and @Alternative test beans (FixedCurrentPrincipal, InMemoryGroupMembershipProvider). Corpus builders are a different concern.
+**Rationale:** Clean separation: simulation-core = framework, simulation-testing = per-SPI test utilities. Follows the platform convention where test-scope modules are distinct (testing/ for identity fixtures, simulation-testing for corpus fixtures). The module is test-scope only — it doesn't affect production classpaths.
+**Trade-offs:** One new module. Acceptable — it's a test-scope module with a clear, bounded purpose.
+**Sources:** testing/ module pattern, simulation-core (domain-agnostic by design — D2)
+**Depends on:** D55 (CorpusSeed in simulation-core), D59 (descriptor classes)
+**Exploration:** quick
+**Status:** captured
+
+## D61: AgentCorpus descriptor in agent-simulation-core
+
+**Choice:** Add `AgentCorpus` descriptor class to the existing `agent-simulation-core` module alongside `SimulatedAgentBackend` and `AgentSimulationInput`. AgentCorpus provides typed CorpusSeed factories, the existing `defaultKeyExtractor()`, and convenience factories for `AgentSimulationInput` and common `AgentEvent` responses (textResponse, toolCallResponse).
+**Alternatives:**
+- In simulation-testing — but AgentProvider types are in agent-api, not platform-api. simulation-testing would need agent-api as a dependency, pulling all agent types into the test-scope module.
+- New agent-simulation-testing module — too much module proliferation for one descriptor class.
+**Rationale:** agent-simulation-core already has both dependencies (agent-api + simulation-core) and contains the domain-specific types (AgentSimulationInput, SimulatedAgentBackend). Adding a descriptor class alongside them is natural.
+**Trade-offs:** agent-simulation-core gains a hand-written class alongside the existing hand-written types. Acceptable — the module's purpose is agent-specific simulation support.
+**Sources:** agent-simulation-core/ (AgentSimulationInput.java, SimulatedAgentBackend.java), AgentSessionConfig (invoke input type)
+**Depends on:** D55 (CorpusSeed), D59 (descriptor pattern)
+**Exploration:** quick
+**Status:** captured
+
+## D62: LlmCorpusPopulator takes Function<String,String>, not AgentProvider
+
+**Choice:** `LlmCorpusPopulator` takes a `Function<String, String>` (prompt → response text) and an `ObjectMapper`. Framework-agnostic — works with any LLM backend. Uses `PlatformSchemaGenerator` to produce JSON Schema from Java types for the LLM prompt. Lives in simulation-testing. A static adapter method in `AgentCorpus` wires `AgentProvider` → `Function<String, String>` for convenience.
+**Alternatives:**
+- Direct AgentProvider dependency — simpler constructor but couples simulation-testing to agent-api, forcing agent-api onto every test classpath that uses simulation-testing.
+- New simulation-llm-core module — cleanest separation but adds another module for one utility class.
+**Rationale:** The `Function<String, String>` interface decouples corpus generation from the specific LLM backend. simulation-testing depends on simulation-core + platform-api + schema-generator + jackson — no agent-api. The adapter in agent-simulation-core bridges the gap for consumers who use AgentProvider. This means consumers who don't use LLM generation pay zero dependency cost for it.
+**Trade-offs:** The adapter wiring (AgentProvider → Function) is a few lines of code in AgentCorpus. Acceptable — it's authored once.
+**Sources:** PlatformSchemaGenerator.generate(Class<?>) → JsonNode, AgentProvider.invoke() → Multi<AgentEvent>, schema-generator module
+**Depends on:** D55 (CorpusSeed), D60 (simulation-testing module), D61 (AgentCorpus)
+**Exploration:** quick
+**Status:** captured
+
+## D63: High-value SPIs get descriptors first — 5 of 11
+
+**Choice:** Initial scope: AclCorpus (AccessControlProvider), ModelCorpus (ModelRegistry), NotificationCorpus (NotificationStore), PreferenceCorpus (PreferenceProvider), CredentialCorpus (CredentialResolver). The remaining 6 SPIs (DataSourceRegistry, EndpointRegistry, SubscriptionStore, ExpressionEngineRegistry, DocumentSigningService, CurrentPrincipal) are deferred — they are less commonly simulated and their descriptors are mechanical to add later.
+**Alternatives:**
+- All 11 from the start — complete coverage. But 6 of the deferred SPIs are infrastructure registries (DataSource, Endpoint, Subscription, Expression), a security service (DocumentSigning), and an identity accessor (CurrentPrincipal) — rarely simulated at the corpus level.
+- Just the base class + 1 example — proves the pattern but doesn't deliver enough value. Consumers still hand-construct InvocationRecords for 4 other SPIs.
+**Rationale:** The 5 selected SPIs cover the most common simulation use cases: authorization checks (ACL), model selection (ModelRegistry), notification pipeline testing (NotificationStore), configuration testing (PreferenceProvider), and secret resolution (CredentialResolver). Together they give consumers enough coverage to validate the pattern. The remaining SPIs follow the same mechanical pattern and can be added in follow-ons.
+**Trade-offs:** 6 SPIs without descriptors. Consumers can still seed them directly via CorpusSeed — just without convenience factories.
+**Sources:** platform-simulation-core listing (11 SPIs), SPI method catalog (query vs mutation analysis)
+**Depends on:** D60 (simulation-testing module)
+**Exploration:** quick
+**Status:** captured
+
 ## D48: Cross-repo design — platform API + pages consumer together
 
 **Choice:** Design both platform-side API (#322) and pages-side consumer (casehub-pages#450) in one spec. Implement platform first, then pages. Both repos are in slot 195.
