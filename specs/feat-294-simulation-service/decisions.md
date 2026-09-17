@@ -773,7 +773,7 @@
 **Rationale:** Clean separation: simulation-core = framework, simulation-testing = per-SPI test utilities. Follows the platform convention where test-scope modules are distinct (testing/ for identity fixtures, simulation-testing for corpus fixtures). The module is test-scope only — it doesn't affect production classpaths.
 **Trade-offs:** One new module. Acceptable — it's a test-scope module with a clear, bounded purpose.
 **Sources:** testing/ module pattern, simulation-core (domain-agnostic by design — D2)
-**Depends on:** D55 (CorpusSeed in simulation-core), D59 (descriptor classes)
+**Depends on:** D55 (CorpusSeed in simulation-api), D59 (descriptor classes), D66 (generated QN constants)
 **Exploration:** quick
 **Status:** captured
 
