@@ -11,9 +11,13 @@ date: 2026-09-16
 ## Queue
 - [ ] casehubio/parent#493 — Platform Spring Data JPA (10 modules) ← active
   - [ ] Batch 1: Batch 1
-    - [ ] Task 1: Task 2: Pattern module persistence-spring-jpa [DONE]
-    - [ ] Task 2: Task 3: digest-spring-jpa [DONE]
-    - [ ] Task 3: Task 5: notifications-spring-jpa [DONE]
+    - [ ] Task 1: Task 6a: subscriptions-spring-jpa [DONE]
+    - [ ] Task 2: Task 6b: datasource-spring-jpa [DONE]
+    - [ ] Task 3: Task 7a: notification-settings-spring-jpa [DONE]
+    - [ ] Task 4: Task 7b: delivery-tracking-spring-jpa [DONE]
+    - [ ] Task 5: Task 8: acl-spring-jpa [DONE]
+    - [ ] Task 6: Task 9: platform-view-spring-jpa [DONE]
+    - [ ] Task 7: Task 10: CLAUDE.md update [DONE]
 - [ ] casehubio/parent#497 — Engine Spring Data Hibernate
 - [ ] casehubio/parent#496 — Neocortex Spring Data JPA (2 modules)
 - [ ] casehubio/parent#498 — Work Spring Data MongoDB
