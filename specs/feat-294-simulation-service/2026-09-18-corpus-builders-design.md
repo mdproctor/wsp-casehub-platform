@@ -271,6 +271,17 @@ public final class CredentialCorpus {
 
 ### Layer 4: AgentCorpus (agent-simulation-core)
 
+`AgentProvider` already has a hand-written simulation (`SimulatedAgentBackend`) — it is not in any `simulation-eligible.txt` listing file. Adding it would trigger both QN generation and decorator generation, but the decorator would conflict with `SimulatedAgentBackend`. Therefore `AgentProviderQN` is hand-authored alongside `SimulatedAgentBackend` in `agent-simulation-core`, not generated:
+
+```java
+public final class AgentProviderQN {
+    public static final String INVOKE = "agent-provider.invoke";
+    private AgentProviderQN() {}
+}
+```
+
+`SimulatedAgentBackend` should be updated to use this constant (replacing its current `private static final String QN_INVOKE = "agent-provider.invoke"` hardcoded string).
+
 ```java
 public final class AgentCorpus {
 
@@ -518,7 +529,7 @@ No agent-api dependency. The `Function<String, String>` abstraction keeps agent 
 | AclCorpus | AccessControlProvider | canAccess, accessibleResources | Object[] (3 params) | No — Object[] schema unusable |
 | ModelCorpus | ModelRegistry | resolveById, query, all | String / ModelQuery / null | Yes (via adapter) |
 | NotificationCorpus | NotificationStore | store, find | NotificationInput / NotificationQuery | Yes |
-| PreferenceCorpus | PreferenceProvider | resolve | SettingsScope | Yes |
+| PreferenceCorpus | PreferenceProvider | resolve | SettingsScope | Yes (via adapter) |
 | CredentialCorpus | CredentialResolver | resolve | String | Yes |
 
 ### Deferred (6 SPIs — mechanical to add later, tracked as #TBD)
