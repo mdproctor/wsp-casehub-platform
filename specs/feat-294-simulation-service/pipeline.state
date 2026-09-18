@@ -1,7 +1,13 @@
 format_version: 1
+<<<<<<< HEAD
 state: POST_SPEC_REVIEW
 entered: 2026-09-15T11:45:00Z
 decision_count: 12
+=======
+state: PLANNING
+entered: 2026-09-18T20:50:00+01:00
+decision_count: 85
+>>>>>>> issue-294-simulation-service
 dimensions_completed: 0
 dimensions_total: 0
 ordered: false
