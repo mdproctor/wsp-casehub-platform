@@ -463,6 +463,7 @@ populator.populate(seed, String.class, ModelDescriptor.class, Optional::of, 10,
     "Generate realistic AI model descriptors for a healthcare platform");
 
 seed.seedInto(corpus);
+runtime.registerExtractor(seed.qualifiedName(), seed.keyExtractor());
 ```
 
 The adapter overload (`Optional::of`) tells the populator to deserialize into `ModelDescriptor` and wrap each result before calling `seed.add()`. For SPIs with direct return types (NotificationCorpus, CredentialCorpus), use the convenience overload without an adapter.
