@@ -2,12 +2,13 @@
 
 ## State
 branch: issue-294-simulation-service
-state: active
+state: closing:promoted
 issue-repo: casehubio/platform
 covers: casehubio/platform#312
 Current: casehubio/platform#312 — feat: simulation-api — core SPI, strategy contracts, corpus types
 date: 2026-09-15
 
+evidence-era: true
 ## Queue
 - [x] casehubio/platform#312 — feat: simulation-api — core SPI, strategy contracts, corpus types
 - [x] casehubio/platform#313 — feat: simulation-core — standard strategy implementations
