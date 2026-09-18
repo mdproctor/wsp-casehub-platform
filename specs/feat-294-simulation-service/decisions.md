@@ -907,11 +907,12 @@
 - Profiles only — all config must be in a named profile. Cleaner model but breaks every existing config and forces migration.
 - Profiles extend flat config (layered inheritance) — profiles inherit all flat config entries and can override or add. Functionally identical to "flat as default" but described differently. The mental model is the same: profile entries win over flat entries for matching qualified names.
 **Rationale:** Zero migration. Existing `application.properties` files keep working unchanged. Profiles are purely additive — you opt in by declaring a profile and activating it. Users who never use profiles see no change in behavior.
-**Trade-offs:** Two config shapes coexist (flat and profile-nested). Slight complexity in the parser. Acceptable — the parser already does prefix scanning; adding a second prefix depth is mechanical.
-**Sources:** SmallRyeSimulationConfig.java (existing prefix scanning), D13 (config binding via manual prefix scanning)
+**Quarkus profile interaction:** SmallRye Config resolves Quarkus profile-qualified properties (`%test.casehub.simulation.*`) before SmallRyeSimulationConfig scans property names. Quarkus-profiled values are indistinguishable from flat values by scan time. Resolution order is therefore: simulation profile entries → Quarkus-resolved flat entries → empty. `active-profile` itself can be Quarkus-profiled (`%test.casehub.simulation.active-profile=ci-replay`), enabling "Quarkus profile selects which simulation profile to activate." Simulation profile definitions can also be Quarkus-profiled (`%test.casehub.simulation.profiles.ci-replay.*`), though this creates three layers and should be documented as an advanced pattern. Simulation profiles complement Quarkus profiles rather than replacing them: Quarkus profiles handle environment-level switching (test/dev/prod); simulation profiles bundle cross-SPI strategy+corpus config within an environment; the overlay stack handles runtime scenario switching.
+**Trade-offs:** Two config shapes coexist (flat and profile-nested), and two profiling mechanisms interact (Quarkus profiles and simulation profiles). Acceptable — the parser already does prefix scanning; adding a second prefix depth is mechanical. The Quarkus interaction is documented above and follows SmallRye's standard resolution semantics.
+**Sources:** SmallRyeSimulationConfig.java (existing prefix scanning), D13 (config binding via manual prefix scanning), D53 (Quarkus profile-based CI guidance)
 **Depends on:** D68 (scope includes profiles)
 **Exploration:** quick
-**Status:** captured
+**Status:** revised (R1-03: documented Quarkus profile interaction semantics — resolution order, profile-qualified active-profile, and three-layer advanced pattern)
 
 ## D70: Single active profile — overlay stack handles layering
 
@@ -939,36 +940,37 @@
 
 ## D72: SimulationRuntime.pushProfile(name) — convenience over manual overlay
 
-**Choice:** SimulationRuntime gains `pushProfile(String name)` which looks up the named profile via a `ProfileSource` functional interface, loads profile corpus files into an overlay-isolated InMemorySimulationCorpus, and calls the existing `pushOverlay(config, corpus)`. Returns the SimulationOverlay for pop.
+**Choice:** SimulationRuntime gains `pushProfile(String name)` which looks up the named profile via a `ProfileSource` functional interface and calls the existing `pushOverlay(config, corpus)` with the profile's pre-populated config and corpus. Returns the SimulationOverlay for pop. SimulationRuntime performs no file loading — it receives a fully hydrated `SimulationProfile` from `ProfileSource.resolve()`.
 **Alternatives:**
-- Profile resolution only — no new method on SimulationRuntime. Caller resolves the profile and pushes manually. Keeps SimulationRuntime unaware of profiles but forces every scenario consumer to write the same 3-line pattern (resolve, load corpus, push).
-**Rationale:** The 3-line pattern (resolve profile → load corpus → push overlay) is boilerplate that every scenario consumer would repeat. `pushProfile(name)` encapsulates it. The method is thin — resolve, load, push — and uses the existing overlay mechanics unchanged.
+- Profile resolution only — no new method on SimulationRuntime. Caller resolves the profile and pushes manually. Keeps SimulationRuntime unaware of profiles but forces every scenario consumer to write the same resolve-then-push pattern.
+**Rationale:** `pushProfile(name)` encapsulates the resolve-then-push pattern. The method is thin — resolve profile, extract config and corpus, push overlay — and uses the existing overlay mechanics unchanged. No file I/O in SimulationRuntime; the ProfileSource implementation (SmallRyeSimulationConfig) handles corpus hydration.
 **Trade-offs:** SimulationRuntime gains awareness of profiles via the ProfileSource dependency. Acceptable — the dependency is a functional interface set once at startup, not a hard coupling to SmallRye.
 **Sources:** SimulationRuntime.java (pushOverlay, popOverlay), D43 (overlay stack), D44 (isolated corpus per overlay)
 **Depends on:** D70 (single active profile), D71 (SmallRye resolves profiles), D73 (ProfileSource SPI)
 **Exploration:** quick
-**Status:** captured
+**Status:** revised (R1-02: pushProfile no longer loads files — receives fully hydrated profile from ProfileSource)
 
 ## D73: ProfileSource and SimulationProfile in simulation-core — SPI unchanged
 
-**Choice:** New types in simulation-core: `ProfileSource` (functional interface: `Optional<SimulationProfile> resolve(String name)`) and `SimulationProfile` (record: `SimulationConfig config, List<String> corpusFiles`). The `SimulationConfig` interface in simulation-core is unchanged. SmallRyeSimulationConfig implements ProfileSource. SimulationRuntime takes ProfileSource via `setProfileSource(ProfileSource)`.
+**Choice:** New types in simulation-core: `ProfileSource` (functional interface: `Optional<SimulationProfile> resolve(String name)`) and `SimulationProfile` (record: `SimulationConfig config, SimulationCorpus corpus`). The `SimulationConfig` interface in simulation-core is unchanged. SmallRyeSimulationConfig implements ProfileSource — it resolves profile names AND loads corpus data (using YamlCorpusLoader, which it already has access to) before returning a fully hydrated SimulationProfile. SimulationRuntime takes ProfileSource via `setProfileSource(ProfileSource)` and receives ready-to-push profiles.
 **Alternatives:**
+- `SimulationProfile(SimulationConfig config, List<String> corpusFiles)` — file paths instead of pre-populated corpus. Forces SimulationRuntime (in simulation-core) to load YAML files, requiring either a dependency on simulation-config-core (inverts dependency direction) or duplicating YamlCorpusLoader. Rejected per R1-02.
 - Extend SimulationConfig with `resolveProfile()` and `profileNames()` as default methods — widens the SPI for a concern (profile naming) that not all implementations need. MapSimulationConfig and other test configs would inherit do-nothing defaults.
-**Rationale:** SimulationConfig is the strategy dispatch contract — "what strategy for this qualified name?" Profiles are a naming/bundling concern orthogonal to strategy dispatch. A separate functional interface keeps the SPI minimal and avoids forcing every SimulationConfig implementation to understand profiles.
-**Trade-offs:** Two interfaces instead of one. Acceptable — the concerns are genuinely different (dispatch vs naming), and ProfileSource is a single-method functional interface.
-**Sources:** SimulationConfig.java (4-method SPI), MapSimulationConfig.java (test implementation), D2 (simulation-api is minimal)
+**Rationale:** SimulationConfig is the strategy dispatch contract — "what strategy for this qualified name?" Profiles are a naming/bundling concern orthogonal to strategy dispatch. A separate functional interface keeps the SPI minimal. SimulationProfile carrying a pre-populated corpus preserves the dependency direction: simulation-config-core (which has Jackson/YAML) hydrates the profile; simulation-core (which has SimulationRuntime) consumes it. No file I/O crosses the module boundary.
+**Trade-offs:** Two interfaces instead of one. Acceptable — the concerns are genuinely different (dispatch vs naming), and ProfileSource is a single-method functional interface. Profile resolution eagerly loads corpus data — if a profile's YAML files are large, the resolve() call pays the cost even if the profile is never pushed. Acceptable — corpus files are small test fixtures and profiles are resolved infrequently (boot time or scenario setup).
+**Sources:** SimulationConfig.java (4-method SPI), MapSimulationConfig.java (test implementation), D2 (simulation-api is minimal), YamlCorpusLoader.java (lives in simulation-config-core), R1-02 (dependency direction violation)
 **Depends on:** D72 (pushProfile uses ProfileSource)
 **Exploration:** quick
-**Status:** captured
+**Status:** revised (R1-02: SimulationProfile carries pre-populated SimulationCorpus instead of file paths — preserves dependency direction between simulation-core and simulation-config-core)
 
-## D74: Profiles carry corpus files — loaded into overlay-isolated corpus at runtime
+## D74: Profiles carry corpus data — hydrated by ProfileSource, isolated per overlay
 
-**Choice:** Each profile can declare `casehub.simulation.profiles.<name>.corpus.files=<paths>`. At boot time, the active profile's corpus files are loaded into the base corpus alongside base corpus files. At runtime (via `pushProfile(name)`), profile corpus files are loaded into the overlay's isolated InMemorySimulationCorpus — discarded on `popOverlay()`. Consistent with D44 (scenario isolation).
+**Choice:** Each profile can declare `casehub.simulation.profiles.<name>.corpus.files=<paths>`. SmallRyeSimulationConfig (implementing ProfileSource) loads corpus files via YamlCorpusLoader and populates an InMemorySimulationCorpus when `resolve(name)` is called. The returned SimulationProfile carries the pre-populated corpus. At boot time, the active profile's corpus data is merged into the base corpus alongside base corpus data. At runtime (via `pushProfile(name)`), the profile's corpus is used directly as the overlay's isolated corpus — discarded on `popOverlay()`. Consistent with D44 (scenario isolation).
 **Alternatives:**
 - Strategy config only — profiles only bundle strategy/capture/extractor/scorer config. Corpus loading stays global. Users who need different corpora per profile manage it via overlay pushes in code. Simpler but less useful — the whole point of a profile is bundling everything needed for a scenario.
-**Rationale:** A simulation profile that bundles strategies but not the data those strategies resolve against is half a solution. The ci-replay profile needs its captured traffic YAML; the dev-demo profile needs its demo fixtures. Bundling corpus files in the profile declaration makes activation a single action: `pushProfile("ci-replay")` sets up both strategies and data.
-**Trade-offs:** Profile corpus loading adds startup I/O when the active profile has corpus files. Acceptable — corpus files are small YAML fixtures loaded once. Runtime `pushProfile()` also loads files, but this is scenario setup (not hot path).
-**Sources:** SimulationConfigBeans.java (existing corpus loading at startup), YamlCorpusLoader.java (existing YAML corpus parsing), D44 (isolated corpus per overlay), D43 (overlay stack)
-**Depends on:** D69 (flat config as default), D72 (pushProfile), D73 (SimulationProfile record carries corpus files)
+**Rationale:** A simulation profile that bundles strategies but not the data those strategies resolve against is half a solution. The ci-replay profile needs its captured traffic YAML; the dev-demo profile needs its demo fixtures. Bundling corpus files in the profile declaration makes activation a single action: `pushProfile("ci-replay")` sets up both strategies and data. All file I/O stays in simulation-config-core (where YamlCorpusLoader lives), consistent with D73's dependency direction.
+**Trade-offs:** Profile resolution eagerly loads corpus files. Acceptable — corpus files are small YAML fixtures, and profiles are resolved infrequently (boot time or scenario setup, not hot path). At boot time, the active profile's corpus entries are merged into the shared base corpus (not isolated) — a profile corpus entry at boot becomes indistinguishable from a base corpus entry. This is intentional: boot-time profiles configure the application's default simulation behavior.
+**Sources:** SimulationConfigBeans.java (existing corpus loading at startup), YamlCorpusLoader.java (existing YAML corpus parsing), D44 (isolated corpus per overlay), D43 (overlay stack), R1-02 (corpus hydration in ProfileSource, not SimulationRuntime)
+**Depends on:** D69 (flat config as default), D72 (pushProfile), D73 (SimulationProfile carries pre-populated corpus)
 **Exploration:** quick
-**Status:** captured
+**Status:** revised (R1-02: corpus loaded by ProfileSource implementation, not by SimulationRuntime — preserves dependency direction)
