@@ -25,11 +25,10 @@ date: 2026-09-15
 - [x] casehubio/platform#323 — consumer
 - [x] casehubio/platform#328 — domain-specific
 - [x] casehubio/platform#329 — strategy
-- [ ] casehubio/platform#330 — domain ← active
-  - [ ] Batch 1: Core generator
-    - [ ] Task 1: SchemaDataGenerator primitives + constraints
-  - [ ] Batch 2: Object and ref
-    - [ ] Task 2: Object array and ref resolution
-  - [ ] Batch 3: Integration
-    - [ ] Task 3: RandomCorpusPopulator + documentation
-- [ ] casehubio/platform#332 — verification
+- [x] casehubio/platform#330 — domain
+- [ ] casehubio/platform#332 — verification ← active
+  - [x] Batch 1: Batch 1 JournalEntry+runtime
+    - [x] Task 1: JournalEntry tenancyId and update all usages
+  - [x] Batch 2: Batch 2 Verifier
+    - [x] Task 2: SimulationVerifier with count assertions
+    - [x] Task 3: Filtering order exhaustive verification + docs
