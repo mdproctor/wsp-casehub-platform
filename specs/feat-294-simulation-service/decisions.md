@@ -974,3 +974,54 @@
 **Depends on:** D69 (flat config as default), D72 (pushProfile), D73 (SimulationProfile carries pre-populated corpus)
 **Exploration:** quick
 **Status:** revised (R1-02: corpus loaded by ProfileSource implementation, not by SimulationRuntime — preserves dependency direction)
+
+---
+
+# Phase 12 — #330 Domain Data Generation
+
+## D75: Scope — schema-driven random generation with constraint support
+
+**Choice:** #330 delivers `SchemaDataGenerator` — a JSON Schema → random instance generator that respects Jakarta Validation constraints (min/max, pattern, string length, array bounds, enum values). The other 4 data generation paths (capture, YAML fixtures, corpus builders, LLM generation) are already delivered in prior issues.
+**Alternatives:**
+- RandomDataGenerator without constraints — structurally valid but violates every business rule (negative ages, 500-char names). Useless for anything beyond shape testing.
+- Full issue scope as originally written — but paths 1-4 are already done. The issue's value now concentrates entirely in path 5.
+**Rationale:** Constraint support is what makes random generation productive. Without it, generated data fails validation on first use. The schema generator already captures Jakarta Validation annotations into the JSON Schema via JakartaValidationModule — reading them back during generation completes the pipeline.
+**Trade-offs:** No semantic awareness — a constrained random `patientName` will be a valid-length string matching the pattern, but won't look like a real name. That's the DataRealism.STRUCTURALLY_VALID level. DOMAIN_PLAUSIBLE requires LLM generation (already delivered via LlmCorpusPopulator).
+**Sources:** Issue #330, DataRealism.java (5-level enum), PlatformSchemaGenerator.java (JakartaValidationModule), LlmCorpusPopulator.java (already delivers path 4)
+**Exploration:** quick
+**Status:** captured
+
+## D76: Core engine in schema-generator, CorpusSeed integration in simulation-testing
+
+**Choice:** `SchemaDataGenerator` lives in `schema-generator` module — no simulation dependencies. A thin CorpusSeed integration convenience lives in `simulation-testing` alongside LlmCorpusPopulator. The split ensures any developer with schema-generator can generate random test data without pulling in the simulation ecosystem.
+**Alternatives:**
+- All in simulation-testing — ties random data generation to the simulation dependency chain (simulation-api, platform-api, simulation-core). A developer who just wants random test fixtures for a unit test pays the dependency cost of the entire simulation framework.
+- All in schema-generator including CorpusSeed wiring — adds simulation-api as a dependency to schema-generator, coupling a general-purpose module to a domain-specific one.
+**Rationale:** Random data generation from JSON Schema is a schema concern, not a simulation concern. The natural pairing is: `PlatformSchemaGenerator` produces the schema, `SchemaDataGenerator` produces random instances from it. Both in the same module, same dependency footprint. Simulation users get the integrated experience via a thin adapter in simulation-testing.
+**Trade-offs:** Two locations to know about (generator in schema-generator, CorpusSeed integration in simulation-testing). Acceptable — the split follows the existing pattern (PlatformSchemaGenerator in schema-generator, LlmCorpusPopulator in simulation-testing).
+**Sources:** PlatformSchemaGenerator.java (schema-generator module), LlmCorpusPopulator.java (simulation-testing module), schema-generator/pom.xml (no simulation deps)
+**Exploration:** quick
+**Status:** captured
+
+## D77: $ref resolution built in — caller passes root schema
+
+**Choice:** SchemaDataGenerator resolves `$ref` → `$defs` lookups internally. The caller passes the root schema from `PlatformSchemaGenerator.generate()`; the generator follows references to produce nested objects. Standard JSON Schema behavior.
+**Alternatives:**
+- Require pre-resolved schema — caller must flatten $refs before passing. Pushes complexity to every caller for no benefit.
+**Rationale:** Every schema from PlatformSchemaGenerator uses `$defs` + `$ref` (via DEFINITIONS_FOR_ALL_OBJECTS option). Requiring pre-resolution would make every caller write the same $ref-walking code. Internal resolution is a one-time implementation cost.
+**Trade-offs:** The generator must handle recursive $refs (type A references type B which references type A). Mitigated with a depth guard — same pattern as ACL's parent chain traversal (depth 20).
+**Sources:** PlatformSchemaGenerator.java (Option.DEFINITIONS_FOR_ALL_OBJECTS), victools jsonschema-generator output format
+**Exploration:** quick
+**Status:** captured
+
+## D78: Dual API — raw JsonNode + typed convenience
+
+**Choice:** Two overloads: `generate(JsonNode schema, int count)` → `List<JsonNode>` for raw use, and `generate(JsonNode schema, int count, Class<T> targetType, ObjectMapper mapper)` → `List<T>` for typed use. The typed overload is one line of code on top of the raw one.
+**Alternatives:**
+- JsonNode only — keeps the generator focused on generation. But ObjectMapper is already on the classpath (schema-generator uses Jackson), and every caller would write the same `treeToValue` loop.
+**Rationale:** The typed API saves every caller from writing the same deserialization boilerplate. ObjectMapper is already a dependency. The cost is one additional method; the benefit is a better developer experience for the primary use case (generating typed domain objects for tests).
+**Trade-offs:** The typed API may fail on complex types where Jackson deserialization doesn't match the schema structure (e.g., custom deserializers, builder-only construction). In those cases, the raw API remains available. Acceptable — the common case (records, POJOs with standard Jackson support) works.
+**Sources:** PlatformSchemaGenerator.java (uses ObjectMapper internally), LlmCorpusPopulator.java (same pattern — ObjectMapper.treeToValue for deserialization)
+**Depends on:** D77 ($ref resolution)
+**Exploration:** quick
+**Status:** captured
