@@ -883,3 +883,92 @@
 **Sources:** casehub-pages ScenarioOrchestrator.java, issue #322, casehub-pages#450
 **Exploration:** quick
 **Status:** captured
+
+---
+
+# Phase 11 — #329 Strategy Configuration and Profiles
+
+## D68: Scope — profile infrastructure + lifecycle guide, no CLI
+
+**Choice:** #329 delivers named simulation profiles (config bundles) with profile-aware overlay integration, plus a lifecycle progression guide section. No CLI scaffolding tool.
+**Alternatives:**
+- Profiles only — infrastructure without the guide leaves teams to figure out progression themselves from the existing config reference. Low-cost omission that hurts developer onboarding.
+- Profiles + lifecycle guide + CLI — a CLI that scaffolds profile configs for each maturity stage. The profile format isn't battle-tested yet; a CLI adds maintenance cost before the format is proven. Natural follow-on once the format stabilizes from real adoption.
+**Rationale:** The guide section costs almost nothing and directly answers "what should I do at each stage?" for developers new to the simulation framework. A CLI makes sense once the profile config shape is validated by real usage across consumer apps — building it now risks maintaining a tool against a moving target.
+**Trade-offs:** No automated scaffolding. Developers copy-paste from the guide. Acceptable — profile config is a handful of properties lines, not a complex artifact.
+**Sources:** Issue #329, simulation-guide.md (existing Quick Start and Configuration Reference sections)
+**Exploration:** quick
+**Status:** captured
+
+## D69: Flat config as implicit default — profiles override, zero migration
+
+**Choice:** Existing flat config (`casehub.simulation.<spi>.<method>.<property>`) remains as the implicit default. Named profiles (`casehub.simulation.profiles.<name>.<spi>.<method>.<property>`) override individual entries when activated via `casehub.simulation.active-profile=<name>`. Resolution order: active profile entries → flat config entries → empty.
+**Alternatives:**
+- Profiles only — all config must be in a named profile. Cleaner model but breaks every existing config and forces migration.
+- Profiles extend flat config (layered inheritance) — profiles inherit all flat config entries and can override or add. Functionally identical to "flat as default" but described differently. The mental model is the same: profile entries win over flat entries for matching qualified names.
+**Rationale:** Zero migration. Existing `application.properties` files keep working unchanged. Profiles are purely additive — you opt in by declaring a profile and activating it. Users who never use profiles see no change in behavior.
+**Trade-offs:** Two config shapes coexist (flat and profile-nested). Slight complexity in the parser. Acceptable — the parser already does prefix scanning; adding a second prefix depth is mechanical.
+**Sources:** SmallRyeSimulationConfig.java (existing prefix scanning), D13 (config binding via manual prefix scanning)
+**Depends on:** D68 (scope includes profiles)
+**Exploration:** quick
+**Status:** captured
+
+## D70: Single active profile — overlay stack handles layering
+
+**Choice:** One profile at a time via `casehub.simulation.active-profile=ci-replay`. No comma-separated multi-profile support. The overlay stack (D43) already handles layering for scenarios — profiles don't need to replicate that mechanism.
+**Alternatives:**
+- Multiple profiles (comma-separated, later wins on conflict) — more flexible but adds a resolution layer that duplicates what the overlay stack already provides. Scenarios that need multiple layers use `pushProfile()` sequentially.
+**Rationale:** The overlay stack is the layering mechanism. Profiles are the naming mechanism. Mixing the two (multiple boot-time profiles) creates ambiguity about resolution order and duplicates the overlay stack's purpose. A single boot-time profile keeps the config model predictable: one profile, one behavior.
+**Trade-offs:** No boot-time profile composition. If you need elements from two profiles at boot time, build a single profile that combines them. Acceptable — profiles are config, and config is easy to merge manually.
+**Sources:** D43 (layered runtime overlay), SimulationRuntime.pushOverlay() (existing layering API)
+**Depends on:** D69 (flat config as default), D43 (overlay stack)
+**Exploration:** quick
+**Status:** captured
+
+## D71: Extend SmallRyeSimulationConfig — profiles parsed alongside flat config
+
+**Choice:** SmallRyeSimulationConfig gains profile parsing in the same constructor. Properties with a `profiles.<name>.` segment after the prefix are routed into a `Map<String, Map<String, MethodSimulationConfig>>`. The class adds `resolveProfile(name)` returning a composed `SimulationConfig` (profile entries → flat fallback) and `profileNames()` for discovery. Active-profile resolution happens at construction time.
+**Alternatives:**
+- New ProfileSimulationConfig wrapper — a separate class that wraps base and profile configs. Keeps SmallRyeSimulationConfig unchanged but adds a class for a concern that naturally belongs in the same parser. The prefix scanning is identical; splitting it across two classes creates artificial separation.
+**Rationale:** SmallRyeSimulationConfig already does the prefix scanning that profile parsing requires. The property key `casehub.simulation.profiles.ci-replay.agent-provider.invoke.strategy` is parsed by the same `split("\\.")` mechanism — just with 5 parts instead of 3. Keeping it in one class means one pass over `config.getPropertyNames()`, one set of MethodSimulationConfig instances, one place to understand the config model.
+**Trade-offs:** SmallRyeSimulationConfig grows in responsibility. Acceptable — it's still a single concern (simulation config parsing), just with two shapes (flat and profiled).
+**Sources:** SmallRyeSimulationConfig.java (existing prefix scanning, constructor, split logic), MethodSimulationConfig.java (reused for profile entries)
+**Depends on:** D69 (flat config as default), D13 (prefix scanning pattern)
+**Exploration:** quick
+**Status:** captured
+
+## D72: SimulationRuntime.pushProfile(name) — convenience over manual overlay
+
+**Choice:** SimulationRuntime gains `pushProfile(String name)` which looks up the named profile via a `ProfileSource` functional interface, loads profile corpus files into an overlay-isolated InMemorySimulationCorpus, and calls the existing `pushOverlay(config, corpus)`. Returns the SimulationOverlay for pop.
+**Alternatives:**
+- Profile resolution only — no new method on SimulationRuntime. Caller resolves the profile and pushes manually. Keeps SimulationRuntime unaware of profiles but forces every scenario consumer to write the same 3-line pattern (resolve, load corpus, push).
+**Rationale:** The 3-line pattern (resolve profile → load corpus → push overlay) is boilerplate that every scenario consumer would repeat. `pushProfile(name)` encapsulates it. The method is thin — resolve, load, push — and uses the existing overlay mechanics unchanged.
+**Trade-offs:** SimulationRuntime gains awareness of profiles via the ProfileSource dependency. Acceptable — the dependency is a functional interface set once at startup, not a hard coupling to SmallRye.
+**Sources:** SimulationRuntime.java (pushOverlay, popOverlay), D43 (overlay stack), D44 (isolated corpus per overlay)
+**Depends on:** D70 (single active profile), D71 (SmallRye resolves profiles), D73 (ProfileSource SPI)
+**Exploration:** quick
+**Status:** captured
+
+## D73: ProfileSource and SimulationProfile in simulation-core — SPI unchanged
+
+**Choice:** New types in simulation-core: `ProfileSource` (functional interface: `Optional<SimulationProfile> resolve(String name)`) and `SimulationProfile` (record: `SimulationConfig config, List<String> corpusFiles`). The `SimulationConfig` interface in simulation-core is unchanged. SmallRyeSimulationConfig implements ProfileSource. SimulationRuntime takes ProfileSource via `setProfileSource(ProfileSource)`.
+**Alternatives:**
+- Extend SimulationConfig with `resolveProfile()` and `profileNames()` as default methods — widens the SPI for a concern (profile naming) that not all implementations need. MapSimulationConfig and other test configs would inherit do-nothing defaults.
+**Rationale:** SimulationConfig is the strategy dispatch contract — "what strategy for this qualified name?" Profiles are a naming/bundling concern orthogonal to strategy dispatch. A separate functional interface keeps the SPI minimal and avoids forcing every SimulationConfig implementation to understand profiles.
+**Trade-offs:** Two interfaces instead of one. Acceptable — the concerns are genuinely different (dispatch vs naming), and ProfileSource is a single-method functional interface.
+**Sources:** SimulationConfig.java (4-method SPI), MapSimulationConfig.java (test implementation), D2 (simulation-api is minimal)
+**Depends on:** D72 (pushProfile uses ProfileSource)
+**Exploration:** quick
+**Status:** captured
+
+## D74: Profiles carry corpus files — loaded into overlay-isolated corpus at runtime
+
+**Choice:** Each profile can declare `casehub.simulation.profiles.<name>.corpus.files=<paths>`. At boot time, the active profile's corpus files are loaded into the base corpus alongside base corpus files. At runtime (via `pushProfile(name)`), profile corpus files are loaded into the overlay's isolated InMemorySimulationCorpus — discarded on `popOverlay()`. Consistent with D44 (scenario isolation).
+**Alternatives:**
+- Strategy config only — profiles only bundle strategy/capture/extractor/scorer config. Corpus loading stays global. Users who need different corpora per profile manage it via overlay pushes in code. Simpler but less useful — the whole point of a profile is bundling everything needed for a scenario.
+**Rationale:** A simulation profile that bundles strategies but not the data those strategies resolve against is half a solution. The ci-replay profile needs its captured traffic YAML; the dev-demo profile needs its demo fixtures. Bundling corpus files in the profile declaration makes activation a single action: `pushProfile("ci-replay")` sets up both strategies and data.
+**Trade-offs:** Profile corpus loading adds startup I/O when the active profile has corpus files. Acceptable — corpus files are small YAML fixtures loaded once. Runtime `pushProfile()` also loads files, but this is scenario setup (not hot path).
+**Sources:** SimulationConfigBeans.java (existing corpus loading at startup), YamlCorpusLoader.java (existing YAML corpus parsing), D44 (isolated corpus per overlay), D43 (overlay stack)
+**Depends on:** D69 (flat config as default), D72 (pushProfile), D73 (SimulationProfile record carries corpus files)
+**Exploration:** quick
+**Status:** captured
