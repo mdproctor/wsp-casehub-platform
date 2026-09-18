@@ -133,9 +133,12 @@ SmallRyeSimulationConfig (in simulation-config-core) gains:
 
 - **Profile parsing in the constructor.** Properties with a
   `profiles.<name>.` segment after the `casehub.simulation.` prefix are
-  routed into a `Map<String, Map<String, MethodSimulationConfig>>`.
-  The property `profiles.<name>.corpus.files` is stored separately
-  per profile.
+  parsed in two categories: (1) method-level entries matching the
+  `<spi>.<method>.<property>` pattern are routed into a
+  `Map<String, Map<String, MethodSimulationConfig>>`, and (2) the
+  special profile-level key `corpus.files` is stored separately per
+  profile (it doesn't follow the 3-part method pattern — it's a
+  profile-level property parsed before method config routing).
 
 - **`implements ProfileSource`.** The `resolve(name)` method:
   1. Looks up the named profile's method configs
@@ -184,17 +187,29 @@ public SimulationOverlay pushProfile(String name) {
 
 SimulationConfigBeans (in simulation-config) gains:
 
+The `@Produces` method for `SimulationConfig` returns
+`SmallRyeSimulationConfig` (which implements both `SimulationConfig`
+and `ProfileSource`). The startup method injects the concrete type
+to avoid casting:
+
 ```java
-void onStartup(@Observes StartupEvent event, ...) {
-    // Existing: load base corpus files
-    // Existing: register declarative extractors/scorers
+@Produces
+@ApplicationScoped
+public SmallRyeSimulationConfig simulationConfig() {
+    return new SmallRyeSimulationConfig(ConfigProvider.getConfig());
+}
+
+void onStartup(@Observes StartupEvent event,
+               SmallRyeSimulationConfig config,
+               SimulationCorpus corpus,
+               SimulationRuntime runtime, ...) {
+    // Existing: load base corpus files, register extractors/scorers
 
     // New: wire profile source
-    runtime.setProfileSource((SmallRyeSimulationConfig) config);
+    runtime.setProfileSource(config);
 
     // New: load active profile corpus into base corpus
-    var smConfig = (SmallRyeSimulationConfig) config;
-    smConfig.activeProfileCorpusFiles().ifPresent(files -> {
+    config.activeProfileCorpusFiles().ifPresent(files -> {
         var loader = new YamlCorpusLoader();
         loader.loadFromPaths(files).forEach(corpus::seed);
     });
