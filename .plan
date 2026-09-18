@@ -22,13 +22,20 @@ date: 2026-09-15
 - [x] casehubio/platform#319 — REST
 - [x] casehubio/platform#321 — DefaultBean
 - [x] casehubio/platform#322 — pages
-- [ ] casehubio/platform#323 — consumer ← active
-  - [x] Batch 1: Guide+fixtures
-    - [x] Task 1: Consumer adoption guide section
-    - [x] Task 2: YAML corpus fixtures
-  - [x] Batch 2: Closeout
-    - [x] Task 3: Follow-on issue + close
-- [ ] casehubio/platform#328 — domain-specific
+- [x] casehubio/platform#323 — consumer
+- [ ] casehubio/platform#328 — domain-specific ← active
+  - [ ] Batch 1: Core types
+    - [ ] Task 1: InvocationRecord.of() factories
+    - [ ] Task 2: CorpusSeed accumulator
+  - [ ] Batch 2: Generator
+    - [ ] Task 3: QN constants generation
+  - [ ] Batch 3: Descriptors
+    - [ ] Task 4: simulation-testing module + AclCorpus
+    - [ ] Task 5: Model Notification Preference Credential descriptors
+    - [ ] Task 6: LlmCorpusPopulator
+  - [ ] Batch 4: Agent + docs
+    - [ ] Task 7: AgentCorpus + AgentProviderQN
+    - [ ] Task 8: Documentation + full build
 - [ ] casehubio/platform#329 — strategy
 - [ ] casehubio/platform#330 — domain
 - [ ] casehubio/platform#332 — verification
