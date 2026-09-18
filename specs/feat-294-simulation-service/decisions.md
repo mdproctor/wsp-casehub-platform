@@ -1025,3 +1025,92 @@
 **Depends on:** D77 ($ref resolution)
 **Exploration:** quick
 **Status:** captured
+
+---
+
+# Phase 13 — #332 Simulation Verification API
+
+## D79: Journal as data source, not corpus
+
+**Choice:** The verification API operates on `InvocationJournal` (from overlay), not on `SimulationCorpus`. The journal records every intercepted call during a scenario; the corpus stores seed data for strategy resolution.
+**Alternatives:**
+- Corpus-based verification — the issue's original sketch (`SimulationVerifier.forCorpus(corpus)`). But corpus records only captured data (capture mode enabled + real backend present). The journal records everything (simulated + passthrough) during any overlay-active scenario.
+- Both data sources — let the verifier accept either. Adds API complexity for a use case (corpus verification) that has no clear test scenario.
+**Rationale:** Mockito's verify() operates on interaction recordings, not on stub definitions. The journal is the interaction recording; the corpus is the stub definition. The mapping is: corpus+strategy = when/thenReturn, journal = verify(). Operating on corpus conflates setup with assertion.
+**Trade-offs:** No verification path for capture-mode recordings outside overlays. Acceptable — capture mode is for corpus building, not test assertion.
+**Sources:** InvocationJournal.java, SimulationOverlay.java (owns journal per overlay), D45 (journal design)
+**Exploration:** quick (first-principles analysis — Mockito analogy)
+**Status:** captured
+
+## D80: Add tenancyId to JournalEntry
+
+**Choice:** Add `tenancyId` field to `JournalEntry` record. Update `SimulationRuntime.recordJournal()` to accept tenancyId. Update `SimulationDecoratorProcessor` to inject `CurrentPrincipal` and extract tenancyId in generated decorators.
+**Alternatives:**
+- Extract tenancyId from input at assertion time — no schema change, but forces every test to know parameter positions and cast to Object[]. Ugly, error-prone, SPI-specific knowledge at the assertion site.
+- Separate TenantJournalEntry subtype — preserves backward compat but JournalEntry is a record (no inheritance). Would require sealed interface hierarchy. Over-engineered for pre-release.
+**Rationale:** Every platform SPI is tenant-aware. Tenant-scoped verification (`forTenant("hospital-a").wasCalled(2)`) is essential. Pre-release means no backward compatibility constraint. The generated decorators already inject `SimulationRuntime`; adding `CurrentPrincipal` injection is one field. All generated code is re-generated on build — no manual migration.
+**Trade-offs:** Generator change touches all generated decorators. Acceptable — all are re-generated. Hand-written test code that creates JournalEntry directly needs the new parameter — small scope (InvocationJournalTest, SimulationRuntimeTest).
+**Sources:** JournalEntry.java, CurrentPrincipal (platform-api), SimulationDecoratorProcessor.java, D10 (corpus tenant-awareness)
+**Exploration:** quick (pre-release, clear winner)
+**Status:** captured
+
+## D81: matching() predicate takes JournalEntry, not Object
+
+**Choice:** The `matching()` filter predicate is `Predicate<JournalEntry>`, giving access to all fields (qualifiedName, tenancyId, input, output, timestamp, simulated). Not just `Predicate<Object>` on input.
+**Alternatives:**
+- `Predicate<Object>` on input only — simpler signature but loses access to output, tenant, and simulated flag. Users who need to filter by output or simulated status would need separate API methods.
+- Typed predicate via generics — `Predicate<I>` where I is the input type. Type-safe but requires generic plumbing that doesn't work with the journal's untyped storage.
+**Rationale:** JournalEntry contains 6 fields. Restricting the predicate to input alone forces parallel API methods for every other field (forTenant, forSimulated, forOutput). A single `Predicate<JournalEntry>` handles all combinations. Users can cast `entry.input()` to their expected type inside the predicate — the same pattern as Mockito's ArgumentCaptor.
+**Trade-offs:** Casting required inside predicates. Acceptable — the journal is inherently untyped (Object input/output) because it stores heterogeneous SPI calls.
+**Sources:** JournalEntry.java, Mockito ArgumentCaptor pattern
+**Exploration:** quick
+**Status:** captured
+
+## D82: Stateful verifier with noUnverifiedCalls()
+
+**Choice:** `SimulationVerifier` is a stateful object that tracks which qualified names have been verified. `noUnverifiedCalls()` asserts that every method in the journal has been checked by at least one `method()` call. Equivalent to Mockito's `verifyNoMoreInteractions()`.
+**Alternatives:**
+- Stateless static assertions (AssertJ-style) — familiar pattern but cannot track which methods have been verified. `noUnverifiedCalls()` is impossible without state.
+- Both stateless and stateful APIs — two paths to the same thing. Unnecessary complexity; the stateful verifier subsumes the stateless case (just don't call noUnverifiedCalls).
+**Rationale:** `noUnverifiedCalls()` is the assertion that catches unexpected SPI interactions — a method that shouldn't have been called but was. This requires knowing which methods the test has already asserted on. A single stateful verifier handles both targeted assertions and exhaustive verification.
+**Trade-offs:** Users must instantiate a verifier object rather than using static imports. Acceptable — the object construction is one line, and the state tracking is the whole point.
+**Sources:** Mockito.verifyNoMoreInteractions(), Mockito.verifyNoInteractions()
+**Exploration:** quick
+**Status:** captured
+
+## D83: simulation-core module placement
+
+**Choice:** `SimulationVerifier` and `MethodVerification` live in `simulation-core`. No new module.
+**Alternatives:**
+- New simulation-verification module — clean separation but adds a module for 2-3 classes that only depend on JournalEntry and InvocationJournal (both in simulation-core).
+- simulation-testing — but that module is for per-SPI corpus descriptors (data seeding). Verification is a different concern, and simulation-testing has platform-api as a dependency that verification doesn't need.
+**Rationale:** The verifier operates on InvocationJournal and JournalEntry, both in simulation-core. No additional dependencies are needed. Same-module placement avoids circular or unnecessary dependency chains.
+**Trade-offs:** simulation-core grows. Acceptable — 2-3 small classes alongside the existing journal, overlay, and runtime.
+**Sources:** simulation-core/ module (InvocationJournal, JournalEntry, SimulationOverlay, SimulationRuntime)
+**Depends on:** D79 (journal as data source)
+**Exploration:** quick
+**Status:** captured
+
+## D84: Defer migration bridge
+
+**Choice:** The `SimulationMigrator` migration bridge (Mockito expectations → corpus entries) is deferred. Not in #332 scope.
+**Alternatives:**
+- Include migration bridge — helps teams transition from Mockito. But the existing CorpusSeed API already handles manual translation, and the migration bridge adds API surface for a transitional concern that loses value as teams adopt simulation natively.
+**Rationale:** The issue labels it "stretch." Teams can manually translate mock expectations to CorpusSeed calls — the API is already ergonomic (typed factories, auto-key-derivation). A migration tool that auto-translates Mockito stubs requires deep Mockito internals knowledge and produces one-way artifacts. The effort-to-value ratio is poor for pre-release.
+**Trade-offs:** Teams migrating existing Mockito tests do it manually. Acceptable — the number of existing Mockito-based SPI tests is small (pre-release), and the manual path is documented in the simulation guide.
+**Sources:** Issue #332 (labels migration as "stretch"), CorpusSeed.java, simulation-guide.md (migration patterns section from D52)
+**Exploration:** quick
+**Status:** captured
+
+## D85: First-class forTenant() convenience alongside generic matching()
+
+**Choice:** `MethodVerification` provides `forTenant(String tenancyId)` as a dedicated filter method alongside the generic `matching(Predicate<JournalEntry>)`. Both are chainable and composable. `forTenant()` is syntactic sugar over `matching(e -> tenancyId.equals(e.tenancyId()))`.
+**Alternatives:**
+- Generic matching() only — tenant filtering via lambda. Works but verbose and doesn't signal the platform's tenant-first design.
+- Dedicated methods for every JournalEntry field (forTenant, forSimulated, forInput, forOutput) — over-specified. Most fields are adequately served by matching(). Tenant is special because it's the platform's universal scoping dimension.
+**Rationale:** Tenant isolation is the platform's most checked invariant. A first-class method makes tenant verification as easy to write as it is important. Other fields (simulated, output) are adequately covered by `matching()` or dedicated assertion methods (`allSimulated()`).
+**Trade-offs:** One convenience method that could be expressed via matching(). Acceptable — readability and discoverability outweigh minimalism for the platform's primary scoping dimension.
+**Sources:** D10 (tenant-aware corpus), D80 (tenancyId on JournalEntry), MemoryPermissions.assertTenant() (platform pattern)
+**Depends on:** D80 (tenancyId on JournalEntry)
+**Exploration:** quick
+**Status:** captured
