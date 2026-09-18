@@ -24,18 +24,18 @@ date: 2026-09-15
 - [x] casehubio/platform#322 — pages
 - [x] casehubio/platform#323 — consumer
 - [ ] casehubio/platform#328 — domain-specific ← active
-  - [ ] Batch 1: Core types
-    - [ ] Task 1: InvocationRecord.of() factories
-    - [ ] Task 2: CorpusSeed accumulator
-  - [ ] Batch 2: Generator
-    - [ ] Task 3: QN constants generation
-  - [ ] Batch 3: Descriptors
-    - [ ] Task 4: simulation-testing module + AclCorpus
-    - [ ] Task 5: Model Notification Preference Credential descriptors
-    - [ ] Task 6: LlmCorpusPopulator
-  - [ ] Batch 4: Agent + docs
-    - [ ] Task 7: AgentCorpus + AgentProviderQN
-    - [ ] Task 8: Documentation + full build
+  - [x] Batch 1: Core types
+    - [x] Task 1: InvocationRecord.of() factories
+    - [x] Task 2: CorpusSeed accumulator
+  - [x] Batch 2: Generator
+    - [x] Task 3: QN constants generation
+  - [x] Batch 3: Descriptors
+    - [x] Task 4: simulation-testing module + AclCorpus
+    - [x] Task 5: Model Notification Preference Credential descriptors
+    - [x] Task 6: LlmCorpusPopulator
+  - [x] Batch 4: Agent + docs
+    - [x] Task 7: AgentCorpus + AgentProviderQN
+    - [x] Task 8: Documentation + full build
 - [ ] casehubio/platform#329 — strategy
 - [ ] casehubio/platform#330 — domain
 - [ ] casehubio/platform#332 — verification
