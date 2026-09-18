@@ -24,14 +24,12 @@ date: 2026-09-15
 - [x] casehubio/platform#322 — pages
 - [x] casehubio/platform#323 — consumer
 - [x] casehubio/platform#328 — domain-specific
-- [ ] casehubio/platform#329 — strategy ← active
-  - [x] Batch 1: Profile types
-    - [x] Task 1: ProfileSource and SimulationProfile + pushProfile
-  - [x] Batch 2: Profile parsing
-    - [x] Task 2: SmallRyeSimulationConfig profile parsing + ProfileSource
-  - [x] Batch 3: CDI wiring
-    - [x] Task 3: SimulationConfigBeans wiring + integration test
-  - [x] Batch 4: Documentation
-    - [x] Task 4: Lifecycle progression guide + config reference
-- [ ] casehubio/platform#330 — domain
+- [x] casehubio/platform#329 — strategy
+- [ ] casehubio/platform#330 — domain ← active
+  - [ ] Batch 1: Core generator
+    - [ ] Task 1: SchemaDataGenerator primitives + constraints
+  - [ ] Batch 2: Object and ref
+    - [ ] Task 2: Object array and ref resolution
+  - [ ] Batch 3: Integration
+    - [ ] Task 3: RandomCorpusPopulator + documentation
 - [ ] casehubio/platform#332 — verification
