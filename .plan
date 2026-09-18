@@ -23,19 +23,15 @@ date: 2026-09-15
 - [x] casehubio/platform#321 — DefaultBean
 - [x] casehubio/platform#322 — pages
 - [x] casehubio/platform#323 — consumer
-- [ ] casehubio/platform#328 — domain-specific ← active
-  - [x] Batch 1: Core types
-    - [x] Task 1: InvocationRecord.of() factories
-    - [x] Task 2: CorpusSeed accumulator
-  - [x] Batch 2: Generator
-    - [x] Task 3: QN constants generation
-  - [x] Batch 3: Descriptors
-    - [x] Task 4: simulation-testing module + AclCorpus
-    - [x] Task 5: Model Notification Preference Credential descriptors
-    - [x] Task 6: LlmCorpusPopulator
-  - [x] Batch 4: Agent + docs
-    - [x] Task 7: AgentCorpus + AgentProviderQN
-    - [x] Task 8: Documentation + full build
-- [ ] casehubio/platform#329 — strategy
+- [x] casehubio/platform#328 — domain-specific
+- [ ] casehubio/platform#329 — strategy ← active
+  - [ ] Batch 1: Profile types
+    - [ ] Task 1: ProfileSource and SimulationProfile + pushProfile
+  - [ ] Batch 2: Profile parsing
+    - [ ] Task 2: SmallRyeSimulationConfig profile parsing + ProfileSource
+  - [ ] Batch 3: CDI wiring
+    - [ ] Task 3: SimulationConfigBeans wiring + integration test
+  - [ ] Batch 4: Documentation
+    - [ ] Task 4: Lifecycle progression guide + config reference
 - [ ] casehubio/platform#330 — domain
 - [ ] casehubio/platform#332 — verification
