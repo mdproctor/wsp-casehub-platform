@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-352-simulation-dx
-state: scaffolded
+state: active
 project-sha: 261617e51e611d8510808bcca8a6620542648336
 date: 2026-09-19
 issue-repo: casehubio/platform
@@ -12,8 +12,8 @@ design-section-hashes: 4d2cc5ab:## §1 Introduction and Goals|4f6b26ef:## §2 Co
 flyway-next-v: none
 
 ## Queue
-- [ ] casehubio/platform#352 — Issue #352 ← active
-- [ ] casehubio/platform#353 — fluent-harness
+- [x] casehubio/platform#352 — Issue #352
+- [ ] casehubio/platform#353 — fluent-harness ← active
 - [ ] casehubio/platform#354 — seed-applyTo
 - [ ] casehubio/platform#355 — config-builder
 - [ ] casehubio/platform#356 — strategy-aliases
