@@ -14,6 +14,9 @@ flyway-next-v: none
 ## Queue
 - [x] casehubio/platform#352 — Issue #352
 - [ ] casehubio/platform#353 — fluent-harness ← active
+  - [ ] Batch 1: Core
+    - [ ] Task 1: Builder stub/seed/build
+    - [ ] Task 2: Overlay and verifier
 - [ ] casehubio/platform#354 — seed-applyTo
 - [ ] casehubio/platform#355 — config-builder
 - [ ] casehubio/platform#356 — strategy-aliases
