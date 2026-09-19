@@ -1,4 +1,4 @@
-# Decisions — Simulation.forTest() Fluent Test Harness (#353)
+# Decisions — Simulation DX (#352)
 
 ## D1: Strategy selection — implicit from data shape
 
@@ -68,5 +68,84 @@
 **Rationale:** Most tests don't focus on tenant isolation — they need a non-null tenancyId to satisfy CurrentPrincipal assertions. `"test"` is conventional across the platform's test fixtures (FixedCurrentPrincipal uses "test-tenant").
 **Trade-offs:** Tests verifying tenant isolation must use `forTest("tenant-a")` — not a hardship.
 **Sources:** FixedCurrentPrincipal in testing module, InvocationRecord.of() patterns
+**Exploration:** quick
+**Status:** captured
+
+---
+
+# Decisions — Inline Corpus in Unified YAML (#361)
+
+## D7: Config home — dedicated YAML file
+
+**Choice:** A standalone simulation YAML file that combines strategy declarations and corpus entries per qualified name. Loaded by a new parser in simulation-config-core. Platform owns parsing, consumers point to the file.
+**Alternatives:**
+- Extension of existing corpus YAML — extend corpus file format to optionally include strategy declarations. Minimal new surface but conflates two concerns in one format.
+- Embedded in application.yaml — structured YAML section under casehub.simulation key, parsed via SmallRye Config or custom ConfigSource. Fights MicroProfile Config's flat property model.
+**Rationale:** The unified format is structured YAML (lists of maps for corpus entries). MicroProfile Config can't represent this natively. A dedicated file with its own parser is the cleanest approach.
+**Trade-offs:** One more file to discover. Mitigated by convention-based classpath discovery (D10).
+**Sources:** SmallRyeSimulationConfig.java (current flat-property parsing), YamlCorpusLoader.java (current corpus parsing), issue #361 example YAML
+**Exploration:** quick
+**Status:** captured
+
+## D8: Coexistence model — unified file replaces both
+
+**Choice:** The unified YAML file is the single source for strategy config AND corpus data. Drop support for separate MicroProfile Config strategy keys and standalone corpus-only files. One format, one loader.
+**Alternatives:**
+- Additive — unified file supplements existing MicroProfile Config and corpus files. Maximum backward compat but three config paths to maintain and reason about.
+- Unified file replaces corpus files only — strategy config stays in MicroProfile Config properties. Two paths, each single-purpose, but the split remains.
+**Rationale:** One format eliminates configuration scattered across two mechanisms. Existing tests and examples migrate to the new format. Reduces cognitive overhead for consumers.
+**Trade-offs:** Breaking change — existing MicroProfile Config strategy keys stop working. Migration required for all consumers.
+**Depends on:** D7 (dedicated YAML file)
+**Sources:** SmallRyeSimulationConfig.java, SimulationConfigBeans.java
+**Exploration:** quick
+**Status:** captured
+
+## D9: Schema scope — full parity
+
+**Choice:** Support all existing per-method settings (strategy, capture, exhaustion-policy, key-extractor, scorer, threshold) plus corpus entries and profiles in the unified YAML format.
+**Alternatives:**
+- Strategy + corpus only — other settings stay in MicroProfile Config until migrated later. Smaller initial scope but keeps the split config.
+- Strategy + corpus + key-extractor — three most common settings. Pragmatic middle ground but still leaves some config in MicroProfile.
+**Rationale:** Since D8 eliminates MicroProfile Config strategy keys, leaving other settings there creates an inconsistent experience. Full parity means one migration, one format, no leftover dependencies.
+**Trade-offs:** Larger initial implementation scope. Justified by eliminating dual-config complexity permanently.
+**Depends on:** D8 (unified file replaces both)
+**Sources:** MethodSimulationConfig.java (6 per-method settings), SmallRyeSimulationConfig profiles/profile corpus files
+**Exploration:** quick
+**Status:** captured
+
+## D10: Discovery — convention path
+
+**Choice:** Look for `simulation.yaml` (or `simulation.yml`) on the classpath root by convention. A single MicroProfile Config property (`casehub.simulation.config`) can override the path. Zero config for the common case.
+**Alternatives:**
+- Config property only — require explicit `casehub.simulation.config=classpath:path` in application.properties. No magic but more ceremony.
+- Directory scan — scan a classpath directory for all .yaml files and merge. Supports multi-module composition but more complex discovery and ordering.
+**Rationale:** Convention-over-configuration. Most consumers have one simulation config file. The override property handles non-standard paths. Directory scan is premature — multi-file composition is already handled by corpus-files references within the unified format (D11).
+**Trade-offs:** "Magic" classpath discovery can surprise if an unexpected simulation.yaml appears. Low risk in practice — simulation modules are opt-in.
+**Sources:** endpoints-config/ (precedent: casehub.platform.endpoints.files config), Quarkus application.yaml convention
+**Exploration:** quick
+**Status:** captured
+
+## D11: External corpus refs — both inline and file refs
+
+**Choice:** Each qualified name can have inline `corpus:` entries AND/OR a `corpus-files:` list pointing to external YAML files. Inline for small scenarios, file refs for large fixture sets. Entries from both merge (append, not replace).
+**Alternatives:**
+- Inline only — all corpus entries must be inline. Simplest schema but forces large corpora into one file, impractical for domain-specific fixtures.
+- File refs at top level only — per-method corpus is always inline; a top-level key includes external files across all qualified names. Two scopes with different semantics.
+**Rationale:** Real consumers range from 2-entry test stubs to 200-entry domain fixtures. Inline covers the small case (#361's primary goal), file refs cover the large case. Merging preserves composability.
+**Trade-offs:** Two corpus sources per qualified name adds merge-order awareness. Mitigated by append semantics (inline first, then file refs).
+**Sources:** YamlCorpusLoader.loadFromPaths() (existing merge-by-append), issue #361 example
+**Exploration:** quick
+**Status:** captured
+
+## D12: Parser implementation — new YamlSimulationConfig class
+
+**Choice:** A new `YamlSimulationConfig` class in simulation-config-core that parses the unified YAML format via Jackson. Returns a `SimulationConfig` implementation and parsed corpus records. `SmallRyeSimulationConfig` is retired.
+**Alternatives:**
+- Extend YamlCorpusLoader — add strategy/config fields to the corpus parser. Changes YamlCorpusLoader's contract and name becomes misleading (no longer just a corpus loader).
+- Keep SmallRyeSimulationConfig + YAML ConfigSource — register a custom ConfigSource that flattens structured YAML to property keys. Roundabout flattening, and corpus entries still can't be represented as flat properties.
+**Rationale:** The unified format is structured YAML, not flat properties. A purpose-built Jackson parser is simpler, testable, and doesn't fight the MicroProfile Config model. SmallRyeSimulationConfig's prefix-scanning approach is irrelevant when the input is a YAML tree.
+**Trade-offs:** New class to maintain. SmallRyeSimulationConfig retirement requires migration of any direct references (primarily SimulationConfigBeans).
+**Depends on:** D7 (dedicated YAML file), D8 (replaces both)
+**Sources:** SmallRyeSimulationConfig.java, YamlCorpusLoader.java, Jackson YAMLFactory
 **Exploration:** quick
 **Status:** captured
