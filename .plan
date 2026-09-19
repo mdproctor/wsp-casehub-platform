@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-362-simulation-dx-audit
-state: scaffolded
+state: active
 project-sha: a58b19614ff0dc29dffa696aad5c36247e7c7871
 date: 2026-09-19
 issue-repo: casehubio/platform
