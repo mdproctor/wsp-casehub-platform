@@ -22,3 +22,11 @@ flyway-next-v: none
 - [x] casehubio/platform#359 — auto-extractor
 - [x] casehubio/platform#360 — default-tenant
 - [ ] casehubio/platform#361 — inline-corpus ← active
+  - [ ] Batch 1: Parser
+    - [ ] Task 1: YamlSimulationConfig parser + tests
+  - [ ] Batch 2: Migration
+    - [ ] Task 2: CDI wiring migration + retire old classes
+  - [ ] Batch 3: Schema
+    - [ ] Task 3: JSON Schema for validation
+  - [ ] Batch 4: Docs
+    - [ ] Task 4: Documentation migration
