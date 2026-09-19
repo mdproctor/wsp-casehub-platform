@@ -2,7 +2,7 @@
 
 ## State
 branch: main
-state: closing:review
+state: closing:promoted
 project-sha: 261617e51e611d8510808bcca8a6620542648336
 date: 2026-09-19
 issue-repo: casehubio/platform
