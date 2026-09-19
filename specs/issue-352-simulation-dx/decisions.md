@@ -149,3 +149,29 @@
 **Sources:** SmallRyeSimulationConfig.java, YamlCorpusLoader.java, Jackson YAMLFactory
 **Exploration:** quick
 **Status:** captured
+
+## D13: Profile representation — nested in same file
+
+**Choice:** Profiles are nested under a top-level `profiles:` key within the same simulation.yaml file. Each profile contains a `methods:` block that overrides the base `methods:`. Base methods are under a top-level `methods:` key. Known top-level keys: `default-tenancy-id`, `methods`, `profiles`.
+**Alternatives:**
+- Separate profile files — base in simulation.yaml, profiles in simulation-{profile}.yaml. Convention-discovered by active profile name. Mirrors Spring's application-{profile}.yaml but adds file proliferation.
+- Flat schema — qualified names as top-level keys directly, no `methods:` wrapper. Terser but reserves the top-level namespace and makes profile syntax asymmetric.
+**Rationale:** One file is easier to read, discover, and version. The `methods:` wrapper key cleanly separates known framework keys (default-tenancy-id, profiles) from qualified-name keys, avoiding namespace collisions. Profile layering mirrors the existing SmallRyeSimulationConfig inheritance model.
+**Trade-offs:** Large configs with many profiles get long. Acceptable — most consumers have 1-2 profiles.
+**Depends on:** D7 (dedicated YAML file), D9 (full parity)
+**Sources:** SmallRyeSimulationConfig profiles, Spring application-{profile}.yaml convention
+**Exploration:** quick
+**Status:** captured
+
+## D14: Retirement — delete SmallRyeSimulationConfig and YamlCorpusLoader
+
+**Choice:** Remove both classes entirely. YamlSimulationConfig absorbs all corpus loading logic. Tests and SimulationConfigBeans migrate to the new class. Clean break, no dead code.
+**Alternatives:**
+- Keep YamlCorpusLoader internally — reuse it for loading external corpus-files references. Preserves tested loader but adds an internal dependency that YamlSimulationConfig could handle directly.
+- Deprecate both for one release — mark @Deprecated, keep alongside YamlSimulationConfig. Softer migration but dual paths add confusion.
+**Rationale:** This repo is pre-release with no external consumers of these classes directly. The corpus loading logic (InputStream → InvocationRecord list) is simple enough to absorb into YamlSimulationConfig without duplication. No value in keeping deprecated code when there are zero downstream dependencies.
+**Trade-offs:** Existing corpus YAML test fixtures need to be migrated to the new format or loaded through the new parser's corpus-files mechanism.
+**Depends on:** D12 (new YamlSimulationConfig class), D8 (replaces both)
+**Sources:** SmallRyeSimulationConfig.java, YamlCorpusLoader.java, SimulationConfigBeans.java
+**Exploration:** quick
+**Status:** captured
