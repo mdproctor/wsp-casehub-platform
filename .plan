@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-352-simulation-dx
-state: active
+state: transitioning
 project-sha: 261617e51e611d8510808bcca8a6620542648336
 date: 2026-09-19
 issue-repo: casehubio/platform
@@ -21,12 +21,4 @@ flyway-next-v: none
 - [x] casehubio/platform#358 — starter-dep
 - [x] casehubio/platform#359 — auto-extractor
 - [x] casehubio/platform#360 — default-tenant
-- [ ] casehubio/platform#361 — inline-corpus ← active
-  - [x] Batch 1: Parser
-    - [x] Task 1: YamlSimulationConfig parser + tests
-  - [x] Batch 2: Migration
-    - [x] Task 2: CDI wiring migration + retire old classes
-  - [x] Batch 3: Schema
-    - [x] Task 3: JSON Schema for validation
-  - [x] Batch 4: Docs
-    - [x] Task 4: Documentation migration
+- [x] casehubio/platform#361 — inline-corpus
