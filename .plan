@@ -13,3 +13,12 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#352 — Issue #352 ← active
+- [ ] casehubio/platform#353 — fluent-harness
+- [ ] casehubio/platform#354 — seed-applyTo
+- [ ] casehubio/platform#355 — config-builder
+- [ ] casehubio/platform#356 — strategy-aliases
+- [ ] casehubio/platform#357 — verifier-overlay
+- [ ] casehubio/platform#358 — starter-dep
+- [ ] casehubio/platform#359 — auto-extractor
+- [ ] casehubio/platform#360 — default-tenant
+- [ ] casehubio/platform#361 — inline-corpus
