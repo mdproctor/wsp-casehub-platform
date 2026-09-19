@@ -19,10 +19,14 @@
 
 - simulation-config-core must remain POJO — no CDI, no Quarkus imports
 - Jackson YAML is already a compile dependency of simulation-config-core
-- ObjectMapper uses `PropertyNamingStrategies.KEBAB_CASE` for YAML → Java mapping
+- YAML keys use kebab-case; parser accesses via `Map.get("kebab-key")` (no Jackson databinding/naming strategy needed)
 - Corpus entries are `InvocationRecord<Object, Object>` — no typed deserialization
 - External corpus files retain the existing format (qualified-name → list of entries)
+- Per-method `corpus-files:` scopes to the enclosing method's qualified name (semantic change from global `casehub.simulation.corpus.files`). To load all entries from a file across multiple methods, list it under each method or use profile-level `corpus-files:`
 - Environment knobs stay in MicroProfile Config: `casehub.simulation.active-profile`, `casehub.simulation.config`, `casehub.simulation.default-tenancy-id`
+- `casehub.simulation.corpus.files` property is retired. If still set at startup, log a WARNING directing users to migrate to `simulation.yaml`'s `corpus-files:` key
+- Promote the `ObjectMapper(YAMLFactory)` instance to a class field — avoid per-call creation in `loadExternalCorpusFiles()`
+- Remove `smallrye-config` compile dependency from `simulation-config-core/pom.xml` after retiring `SmallRyeSimulationConfig`
 
 ---
 
@@ -36,7 +40,7 @@
 - Create: `simulation-config-core/src/test/resources/simulation/test-simulation.yaml`
 
 **Interfaces:**
-- Consumes: `SimulationConfig` (simulation-api), `ProfileSource` (simulation-core), `InvocationRecord` (simulation-api), `ExhaustionPolicy` (simulation-api), `SimulationProfile` (simulation-core), `InMemorySimulationCorpus` (simulation-inmem), `MapSimulationConfig` (simulation-core)
+- Consumes: `SimulationConfig` (simulation-core), `ProfileSource` (simulation-core), `InvocationRecord` (simulation-api), `ExhaustionPolicy` (simulation-api), `SimulationProfile` (simulation-core), `InMemorySimulationCorpus` (simulation-inmem)
 - Produces: `YamlSimulationConfig` — implements `SimulationConfig` + `ProfileSource`. Public API:
   - `YamlSimulationConfig(InputStream yamlInput)`
   - `YamlSimulationConfig(InputStream yamlInput, String defaultTenancyIdOverride)`
@@ -291,6 +295,8 @@ import java.util.stream.Collectors;
 
 public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
 
+    private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
+
     private final String defaultTenancyId;
     private final Map<String, MethodConfig> methods;
     private final Map<String, ProfileConfig> profiles;
@@ -301,7 +307,7 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
 
     @SuppressWarnings("unchecked")
     public YamlSimulationConfig(InputStream yamlInput, String defaultTenancyIdOverride) {
-        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+        ObjectMapper mapper = YAML_MAPPER;
         try {
             Map<String, Object> root = mapper.readValue(yamlInput, Map.class);
             if (root == null) {
@@ -518,6 +524,10 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
                 (List<Map<String, Object>>) props.get("corpus");
         if (rawCorpus != null) {
             for (Map<String, Object> entry : rawCorpus) {
+                if (!entry.containsKey("output")) {
+                    throw new IllegalArgumentException(
+                            "Corpus entry missing required 'output' field");
+                }
                 corpus.add(new CorpusEntry(
                         (String) entry.get("key"),
                         (String) entry.get("tenancy-id"),
@@ -580,7 +590,7 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
     @SuppressWarnings("unchecked")
     private Map<String, List<InvocationRecord<Object, Object>>> loadExternalCorpusFiles(
             List<String> paths) {
-        ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
+        ObjectMapper yamlMapper = YAML_MAPPER;
         Map<String, List<InvocationRecord<Object, Object>>> merged = new HashMap<>();
         for (String path : paths) {
             try (InputStream is = openStream(path.trim())) {
@@ -871,6 +881,47 @@ void malformedYamlThrowsUncheckedIOException() {
     assertThatThrownBy(() -> load("not: [valid: yaml: {{"))
             .isInstanceOf(UncheckedIOException.class);
 }
+
+@Test
+void emptyInputStreamProducesNoOpConfig() {
+    var config = new YamlSimulationConfig(
+            new ByteArrayInputStream(new byte[0]));
+    assertThat(config.strategyFor("any")).isEmpty();
+    assertThat(config.loadAllCorpus()).isEmpty();
+    assertThat(config.profileNames()).isEmpty();
+}
+
+@Test
+void loadAllCorpusWithProfileLevelCorpusFiles() {
+    var config = load("""
+            default-tenancy-id: t1
+            methods:
+              my-spi.query:
+                strategy: key
+            profiles:
+              demo:
+                methods:
+                  my-spi.query:
+                    strategy: sequential
+                corpus-files:
+                  - classpath:simulation/extra-corpus.yaml
+            """);
+    var corpus = config.loadAllCorpus("demo");
+    assertThat(corpus).containsKey("my-spi.query");
+}
+
+@Test
+void corpusEntryWithoutOutputThrowsAtParseTime() {
+    assertThatThrownBy(() -> load("""
+            methods:
+              test-spi.query:
+                strategy: key
+                corpus:
+                  - input: "hello"
+            """).loadAllCorpus())
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("output");
+}
 ```
 
 - [ ] **Step 9: Run tests to verify they pass**
@@ -1047,6 +1098,15 @@ public class SimulationConfigBeans {
         config.scorerSpecs()
                 .forEach((qn, spec) ->
                         runtime.registerScorer(qn, scorerFactory.create(spec)));
+
+        // Warn if retired property is still set
+        ConfigProvider.getConfig()
+                .getOptionalValue("casehub.simulation.corpus.files", String.class)
+                .ifPresent(v -> java.util.logging.Logger
+                        .getLogger(SimulationConfigBeans.class.getName())
+                        .warning("casehub.simulation.corpus.files is retired. "
+                                + "Move corpus file references into simulation.yaml's "
+                                + "per-method corpus-files: key."));
     }
 
     private InputStream discoverYaml(String configPath) {
@@ -1098,6 +1158,8 @@ Delete `simulation-config/src/test/resources/simulation/it-corpus.yaml` via bash
 ```bash
 rm simulation-config/src/test/resources/simulation/it-corpus.yaml
 ```
+
+Remove `smallrye-config` compile dependency from `simulation-config-core/pom.xml` — only needed by the retired `SmallRyeSimulationConfig`.
 
 - [ ] **Step 6: Run full build for both modules**
 
@@ -1385,6 +1447,7 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Modify: `docs/guides/consumer-guide.md` — update simulation config section
 - Modify: `docs/guides/contributor-guide.md` — update simulation internals section
+- Modify: `docs/guides/simulation-guide.md` — update configuration examples
 - Modify: `docs/examples/simulation/` — update example YAML files to unified format
 
 **Interfaces:**
