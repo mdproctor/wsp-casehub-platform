@@ -14,8 +14,8 @@ flyway-next-v: none
 ## Queue
 - [x] casehubio/platform#352 — Issue #352
 - [x] casehubio/platform#353 — fluent-harness
-- [ ] casehubio/platform#354 — seed-applyTo ← active
-- [ ] casehubio/platform#355 — config-builder
+- [x] casehubio/platform#354 — seed-applyTo
+- [ ] casehubio/platform#355 — config-builder ← active
 - [ ] casehubio/platform#356 — strategy-aliases
 - [ ] casehubio/platform#357 — verifier-overlay
 - [ ] casehubio/platform#358 — starter-dep
