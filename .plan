@@ -16,8 +16,8 @@ flyway-next-v: none
 - [x] casehubio/platform#353 — fluent-harness
 - [x] casehubio/platform#354 — seed-applyTo
 - [x] casehubio/platform#355 — config-builder
-- [ ] casehubio/platform#356 — strategy-aliases ← active
-- [ ] casehubio/platform#357 — verifier-overlay
+- [x] casehubio/platform#356 — strategy-aliases
+- [ ] casehubio/platform#357 — verifier-overlay ← active
 - [ ] casehubio/platform#358 — starter-dep
 - [ ] casehubio/platform#359 — auto-extractor
 - [ ] casehubio/platform#360 — default-tenant
