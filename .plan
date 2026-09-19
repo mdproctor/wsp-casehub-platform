@@ -18,7 +18,7 @@ flyway-next-v: none
 - [x] casehubio/platform#355 — config-builder
 - [x] casehubio/platform#356 — strategy-aliases
 - [x] casehubio/platform#357 — verifier-overlay
-- [ ] casehubio/platform#358 — starter-dep ← active
-- [ ] casehubio/platform#359 — auto-extractor
+- [x] casehubio/platform#358 — starter-dep
+- [ ] casehubio/platform#359 — auto-extractor ← active
 - [ ] casehubio/platform#360 — default-tenant
 - [ ] casehubio/platform#361 — inline-corpus
