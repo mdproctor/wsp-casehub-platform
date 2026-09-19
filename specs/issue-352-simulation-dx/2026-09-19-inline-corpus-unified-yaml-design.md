@@ -177,11 +177,22 @@ record ProfileConfig(
 
 **Corpus loading:**
 
+Two access patterns:
+
 `loadCorpus(String qualifiedName)` returns `List<InvocationRecord<Object, Object>>`:
 1. Convert inline `corpus` entries to InvocationRecords (tenancyId fallback to defaultTenancyId)
-2. If `corpus-files` present, load each file (classpath: or filesystem), parse as the
-   existing corpus format (qualified-name → entries), extract entries for this qualified name
+2. If per-method `corpus-files` present, load each file, extract entries for this qualified name
 3. Append file entries after inline entries (inline first, files second)
+
+`loadAllCorpus()` returns `Map<String, List<InvocationRecord<Object, Object>>>`:
+Iterates all configured methods, calls `loadCorpus()` for each, returns the
+aggregate map. Used by `SimulationConfigBeans.onStartup()` to seed the corpus
+in one pass.
+
+**Profile corpus-files:** A profile can declare `corpus-files` at the profile
+level (outside `methods`). These files contribute entries to all qualified names
+in the profile — they're loaded and merged into whatever method-level corpus
+exists. Profile-level files are appended after per-method files.
 
 The corpus file loading logic is absorbed from `YamlCorpusLoader` — same
 InputStream parsing, same classpath/filesystem resolution, same merge semantics.
