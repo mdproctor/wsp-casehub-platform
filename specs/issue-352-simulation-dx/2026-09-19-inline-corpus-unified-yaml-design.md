@@ -17,6 +17,14 @@ file, declare the file path in `application.properties`, and declare the
 strategy in a separate property. This ceremony is disproportionate for the
 common case.
 
+**Scope rationale:** Issue #361 asks for inline corpus entries. But inline
+corpus requires a structured YAML parser (MicroProfile Config can't represent
+lists of maps). Once a YAML parser exists, unifying all per-method config
+into the same format is the right design — it eliminates configuration
+scattered across two mechanisms and gives consumers a single file to author.
+The scope expands from "add inline corpus" to "unified simulation YAML" because
+the parser is the hard part, and the marginal cost of full parity is low.
+
 ## Scope
 
 **In scope:**
@@ -50,7 +58,7 @@ methods:
     key-extractor: "field:domain"  # optional — declarative extractor spec
     capture: false                 # optional — default false
     exhaustion-policy: WRAP        # optional — WRAP or THROW
-    scorer: "field:domain,question"  # optional — nearest-match scorer spec
+    scorer: "fields:domain:exact:1.0,question:substring:0.5"  # optional — nearest-match scorer spec
     threshold: 0.8                 # optional — nearest-match threshold
     corpus:                        # optional — inline entries
       - key: cardiology
@@ -102,7 +110,7 @@ profiles:
 - `key-extractor` — declarative spec (identity, field:\<path\>, composite:\<f1\>,\<f2\>)
 - `capture` — boolean, default false
 - `exhaustion-policy` — WRAP or THROW
-- `scorer` — nearest-match scorer spec
+- `scorer` — nearest-match scorer spec (`fields:<name>:<scorer>:<weight>,...`; scorers: exact, substring, numeric-range, ignore)
 - `threshold` — nearest-match threshold (0.0–1.0)
 - `corpus` — list of inline entries (each: key, tenancy-id, input, output)
 - `corpus-files` — list of paths to external corpus YAML files
@@ -138,13 +146,24 @@ public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
     private final Map<String, ProfileConfig> profiles;
 
     public YamlSimulationConfig(InputStream yamlInput) {
+        this(yamlInput, null);
+    }
+
+    public YamlSimulationConfig(InputStream yamlInput, String defaultTenancyIdOverride) {
         // Jackson parse → populate fields
+        // If defaultTenancyIdOverride is non-null, it wins over YAML-level default-tenancy-id
+        // This allows MicroProfile Config to override: casehub.simulation.default-tenancy-id
     }
 
     // SimulationConfig methods — delegate to methods map with profile overlay
     // ProfileSource.resolve() — compose profile config + corpus
     // Corpus accessors — return merged inline + external entries
 }
+```
+
+**Jackson naming strategy:** The ObjectMapper uses `PropertyNamingStrategies.KEBAB_CASE`
+to map YAML kebab-case keys (`key-extractor`, `corpus-files`, `exhaustion-policy`)
+to Java record field names (`keyExtractor`, `corpusFiles`, `exhaustionPolicy`).
 ```
 
 **Internal types:**
@@ -186,8 +205,14 @@ Two access patterns:
 
 `loadAllCorpus()` returns `Map<String, List<InvocationRecord<Object, Object>>>`:
 Iterates all configured methods, calls `loadCorpus()` for each, returns the
-aggregate map. Used by `SimulationConfigBeans.onStartup()` to seed the corpus
-in one pass.
+aggregate map keyed by qualified name. Used by `SimulationConfigBeans.onStartup()`
+to seed the corpus in one pass.
+
+`loadAllCorpus(String activeProfile)` — profile-aware variant. Loads base
+methods corpus first, then overlays the active profile's per-method corpus and
+profile-level corpus-files. Profile entries append to (not replace) base entries
+for the same qualified name. This is the variant used at boot when an active
+profile is configured.
 
 **Profile corpus-files:** A profile can declare `corpus-files` at the profile
 level (outside `methods`). These files contribute entries to all qualified names
@@ -208,44 +233,78 @@ Convention-based classpath discovery in `SimulationConfigBeans`:
 
 Environment-level knobs remain as MicroProfile Config properties:
 - `casehub.simulation.active-profile` — selects active profile (supports `%test.` Quarkus qualifier)
-- `casehub.simulation.config` — overrides convention path
+- `casehub.simulation.config` — overrides convention path (`classpath:path/to/file.yaml` for classpath, plain path for filesystem)
 - `casehub.simulation.default-tenancy-id` — can override YAML-level default (MicroProfile wins)
 
 ### 4. SimulationConfigBeans migration
+
+All three existing producers are retained. The `@Produces` method returns the
+concrete `YamlSimulationConfig` type (not the `SimulationConfig` interface) so
+CDI can inject it directly without casting — matching the current pattern.
 
 ```java
 @ApplicationScoped
 public class SimulationConfigBeans {
 
     @Produces @ApplicationScoped
-    SimulationConfig simulationConfig() {
+    YamlSimulationConfig simulationConfig() {
         // 1. Discover simulation.yaml (convention or config override)
-        // 2. Parse via YamlSimulationConfig
-        // 3. Read active-profile from MicroProfile Config
+        //    casehub.simulation.config supports classpath: prefix and filesystem paths
+        // 2. Read casehub.simulation.default-tenancy-id from MicroProfile Config
+        // 3. Parse via YamlSimulationConfig(inputStream, defaultTenancyIdOverride)
         // 4. Return YamlSimulationConfig (implements SimulationConfig + ProfileSource)
     }
 
+    @Produces @ApplicationScoped
+    SimulationCorpus<Object, Object> simulationCorpus() {
+        return new InMemorySimulationCorpus<>();  // unchanged
+    }
+
+    @Produces @ApplicationScoped
+    SimulationRuntime simulationRuntime(YamlSimulationConfig config,
+                                         SimulationCorpus<Object, Object> corpus) {
+        return new SimulationRuntime(config, corpus);  // unchanged
+    }
+
     void onStartup(@Observes StartupEvent event,
-                   SimulationConfig config,
+                   YamlSimulationConfig config,
                    SimulationCorpus<Object, Object> corpus,
                    SimulationRuntime runtime) {
-        var yamlConfig = (YamlSimulationConfig) config;
 
-        // 1. Seed corpus from YAML (inline + corpus-files)
-        yamlConfig.loadAllCorpus().forEach(corpus::seed);
+        // 1. Read active profile from MicroProfile Config
+        String activeProfile = ConfigProvider.getConfig()
+            .getOptionalValue("casehub.simulation.active-profile", String.class)
+            .orElse(null);
 
-        // 2. Register declarative extractors
+        // 2. Seed corpus from YAML (inline + corpus-files, profile-aware)
+        if (activeProfile != null) {
+            config.loadAllCorpus(activeProfile).forEach(corpus::seed);
+        } else {
+            config.loadAllCorpus().forEach(corpus::seed);
+        }
+
+        // 3. Wire ProfileSource for runtime.pushProfile()
+        runtime.setProfileSource(config);
+
+        // 4. Register declarative extractors
         DeclarativeExtractorFactory factory = new DeclarativeExtractorFactory();
-        yamlConfig.extractorSpecs().forEach((qn, spec) ->
+        config.extractorSpecs().forEach((qn, spec) ->
             runtime.registerExtractor(qn, factory.create(spec)));
 
-        // 3. Register declarative scorers
+        // 5. Register declarative scorers
         DeclarativeScorerFactory scorerFactory = new DeclarativeScorerFactory();
-        yamlConfig.scorerSpecs().forEach((qn, spec) ->
+        config.scorerSpecs().forEach((qn, spec) ->
             runtime.registerScorer(qn, scorerFactory.create(spec)));
     }
 }
 ```
+
+**Behavioral fix:** The current `SimulationConfigBeans` has an inconsistency where
+startup corpus loading uses `YamlCorpusLoader()` (null defaultTenancyId) while
+profile resolution uses `YamlCorpusLoader(defaultTenancyId)`. The unified parser
+fixes this — `defaultTenancyId` is a field on `YamlSimulationConfig` and applies
+consistently to all corpus entry loading. Tests relying on null tenancyId for
+startup-loaded corpus entries may need updating.
 
 ### 5. JSON Schema
 
@@ -270,6 +329,12 @@ and rejects malformed variants.
 - `SmallRyeSimulationConfigTest.java` — replaced by `YamlSimulationConfigTest`
 - `YamlCorpusLoaderTest.java` — replaced by corpus loading tests in `YamlSimulationConfigTest`
 
+**Retire property:**
+- `casehub.simulation.corpus.files` MicroProfile Config property is retired.
+  Users should move corpus file references into `simulation.yaml`'s per-method
+  `corpus-files:` key. Existing standalone corpus YAML files remain compatible
+  as external refs via `corpus-files:` — only the property that points to them changes.
+
 **Migrate:**
 - Test corpus YAML files (`test-corpus.yaml`, `extra-corpus.yaml`, `no-tenant-corpus.yaml`)
   become either inline entries in test `simulation.yaml` files or remain as external
@@ -278,6 +343,9 @@ and rejects malformed variants.
 - `docs/guides/consumer-guide.md` — update simulation config section
 - `docs/guides/contributor-guide.md` — update simulation internals section
 - `docs/examples/simulation/` — update example YAML files to unified format
+- ARC42STORIES.MD — update L16 description (currently references SmallRyeSimulationConfig
+  and YamlCorpusLoader)
+- `simulation-guide.md` — update configuration examples
 
 ### 7. Module placement
 
