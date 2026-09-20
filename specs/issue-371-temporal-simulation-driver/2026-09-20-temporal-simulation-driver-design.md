@@ -118,14 +118,16 @@ public class TemporalSimulationDriver<E> {
 
 **Thread safety:** State transitions via `synchronized`. Speed is volatile (single writer). Pause uses `ReentrantLock` + `Condition` for await/signal semantics.
 
-**DriverResult:**
+**DriverResult + DriverFailure:**
 
 ```java
+public record DriverFailure(String label, Exception cause) {}
+
 public record DriverResult(
         int emittedCount,
         int failureCount,
         int loopIterations,
-        List<EmissionFailure> failures) {
+        List<DriverFailure> failures) {
 
     public DriverResult {
         failures = List.copyOf(failures);
@@ -135,7 +137,7 @@ public record DriverResult(
 }
 ```
 
-Reuses `EmissionFailure` from event-simulation-core (or moves it to simulation-core alongside the driver).
+`DriverFailure` is local to simulation-core — no dependency on `EmissionFailure` in event-simulation-core. Uses `label` (from `TimedEntry.label()`) as the failure identifier rather than a positional string.
 
 **TemporalDriverFactory:**
 
@@ -289,7 +291,7 @@ Domains inject `TemporalDriverFactory` + `TemporalProfileRegistry`, call `factor
 
 | Module | Changes |
 |--------|---------|
-| `simulation-core` | + `TimedEntry` (moved), + `TimedSequence` (moved), + `TemporalProfile`, + `TemporalSimulationDriver`, + `DriverResult`, + `TemporalDriverFactory`, + `EmissionFailure` (moved or shared) |
+| `simulation-core` | + `TimedEntry` (moved), + `TimedSequence` (moved), + `TemporalProfile`, + `TemporalSimulationDriver`, + `DriverResult`, + `DriverFailure`, + `TemporalDriverFactory` |
 | `event-simulation-core` | − `TimedEntry` (moved), − `TimedSequence` (moved), update imports in `EventSequenceRunner` + tests |
 | `simulation-config-core` | + `TemporalProfileConfig`, + `TemporalEventConfig`, + `SequenceRef`, + temporal YAML parsing in `YamlSimulationConfig`, + `TemporalProfileRegistry` |
 | `simulation-config` | + `@Produces TemporalProfileRegistry` in `SimulationConfigBeans` |
@@ -345,6 +347,7 @@ Existing `EventSequenceRunnerTest` and `TimedSequenceTest` — update imports af
 | `TemporalProfile<E>` | simulation-core | Sequence + name + loop + qualifiedName + speed |
 | `TemporalSimulationDriver<E>` | simulation-core | Lifecycle controller with journal integration |
 | `DriverResult` | simulation-core | Driver execution result |
+| `DriverFailure` | simulation-core | Per-event failure record (label + cause) |
 | `TemporalDriverFactory<E>` | simulation-core | Functional interface for driver creation |
 | `TemporalProfileConfig` + parsing | simulation-config-core | YAML temporal profile schema + 4 source types |
 | `TemporalProfileRegistry` | simulation-config-core | Resolved profile lookup |
