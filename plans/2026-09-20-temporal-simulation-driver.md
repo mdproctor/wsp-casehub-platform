@@ -32,9 +32,9 @@
 ### Task 1: Move TimedEntry + TimedSequence to simulation-core, add label + qualifiedName
 
 **Files:**
-- Move: `event-simulation-core/src/main/java/io/casehub/platform/simulation/event/TimedEntry.java` → `simulation-core/src/main/java/io/casehub/platform/simulation/TimedEntry.java` (use `ide_move_file`)
-- Move: `event-simulation-core/src/main/java/io/casehub/platform/simulation/event/TimedSequence.java` → `simulation-core/src/main/java/io/casehub/platform/simulation/TimedSequence.java` (use `ide_move_file`)
-- Move: `event-simulation-core/src/test/java/io/casehub/platform/simulation/event/TimedSequenceTest.java` → `simulation-core/src/test/java/io/casehub/platform/simulation/TimedSequenceTest.java` (use `ide_move_file`)
+- Move: `../../simulation-core/src/main/java/io/casehub/platform/simulation/TimedEntry.java` → `simulation-core/src/main/java/io/casehub/platform/simulation/TimedEntry.java` (use `ide_move_file`)
+- Move: `../../simulation-core/src/main/java/io/casehub/platform/simulation/TimedSequence.java` → `simulation-core/src/main/java/io/casehub/platform/simulation/TimedSequence.java` (use `ide_move_file`)
+- Move: `../../simulation-core/src/test/java/io/casehub/platform/simulation/TimedSequenceTest.java` → `simulation-core/src/test/java/io/casehub/platform/simulation/TimedSequenceTest.java` (use `ide_move_file`)
 - Modify: `simulation-core/src/main/java/io/casehub/platform/simulation/TimedEntry.java` (add label + qualifiedName)
 - Modify: `simulation-core/src/main/java/io/casehub/platform/simulation/TimedSequence.java` (preserve label + qualifiedName in withMultiplier)
 - Modify: `simulation-core/src/test/java/io/casehub/platform/simulation/TimedSequenceTest.java` (add label tests)
@@ -45,15 +45,15 @@
 
 - [ ] **Step 1: Move TimedEntry.java via ide_move_file**
 
-Use `ide_move_file` to move from `event-simulation-core/src/main/java/io/casehub/platform/simulation/event/TimedEntry.java` to `simulation-core/src/main/java/io/casehub/platform/simulation/`. IntelliJ updates all imports across the project.
+Use `ide_move_file` to move from `../../simulation-core/src/main/java/io/casehub/platform/simulation/TimedEntry.java` to `simulation-core/src/main/java/io/casehub/platform/simulation/`. IntelliJ updates all imports across the project.
 
 - [ ] **Step 2: Move TimedSequence.java via ide_move_file**
 
-Use `ide_move_file` to move from `event-simulation-core/src/main/java/io/casehub/platform/simulation/event/TimedSequence.java` to `simulation-core/src/main/java/io/casehub/platform/simulation/`.
+Use `ide_move_file` to move from `../../simulation-core/src/main/java/io/casehub/platform/simulation/TimedSequence.java` to `simulation-core/src/main/java/io/casehub/platform/simulation/`.
 
 - [ ] **Step 3: Move TimedSequenceTest.java via ide_move_file**
 
-Use `ide_move_file` to move from `event-simulation-core/src/test/java/io/casehub/platform/simulation/event/TimedSequenceTest.java` to `simulation-core/src/test/java/io/casehub/platform/simulation/`.
+Use `ide_move_file` to move from `../../simulation-core/src/test/java/io/casehub/platform/simulation/TimedSequenceTest.java` to `simulation-core/src/test/java/io/casehub/platform/simulation/`.
 
 - [ ] **Step 4: Verify build compiles after moves**
 

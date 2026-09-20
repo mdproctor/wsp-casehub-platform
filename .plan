@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-371-temporal-simulation-driver
-state: scaffolded
+state: active
 project-sha: b3af58288c32dc9d0512dd89a2efbc38fe0c3bea
 date: 2026-09-20
 issue-repo: casehubio/platform
@@ -13,11 +13,11 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#371 — Issue #371 ← active
-  - [ ] Batch 1: Foundation
-    - [ ] Task 1: Move TimedEntry+TimedSequence add label+qualifiedName
-    - [ ] Task 2: Create TemporalProfile TemporalEventSink DriverResult DriverFailure TemporalDriverFactory
-    - [ ] Task 3: TemporalSimulationDriver full lifecycle
-  - [ ] Batch 2: YAML
-    - [ ] Task 4: Parse temporal-profiles YAML + duration + sequence refs
-  - [ ] Batch 3: CDI
-    - [ ] Task 5: TemporalProfileRegistry + TemporalDriverFactory beans
+  - [x] Batch 1: Foundation
+    - [x] Task 1: Move TimedEntry+TimedSequence add label+qualifiedName
+    - [x] Task 2: Create TemporalProfile TemporalEventSink DriverResult DriverFailure TemporalDriverFactory
+    - [x] Task 3: TemporalSimulationDriver full lifecycle
+  - [x] Batch 2: YAML
+    - [x] Task 4: Parse temporal-profiles YAML + duration + sequence refs
+  - [x] Batch 3: CDI
+    - [x] Task 5: TemporalProfileRegistry + TemporalDriverFactory beans
