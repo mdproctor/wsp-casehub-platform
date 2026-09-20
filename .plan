@@ -13,3 +13,11 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#371 — Issue #371 ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: Move TimedEntry+TimedSequence add label+qualifiedName
+    - [ ] Task 2: Create TemporalProfile TemporalEventSink DriverResult DriverFailure TemporalDriverFactory
+    - [ ] Task 3: TemporalSimulationDriver full lifecycle
+  - [ ] Batch 2: YAML
+    - [ ] Task 4: Parse temporal-profiles YAML + duration + sequence refs
+  - [ ] Batch 3: CDI
+    - [ ] Task 5: TemporalProfileRegistry + TemporalDriverFactory beans
