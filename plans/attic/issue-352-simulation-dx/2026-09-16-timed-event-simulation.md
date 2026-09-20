@@ -32,9 +32,9 @@
 ### Task 1: TimedEntry + TimedSequence
 
 **Files:**
-- Create: `event-simulation-core/src/main/java/io/casehub/platform/simulation/event/TimedEntry.java`
-- Create: `event-simulation-core/src/main/java/io/casehub/platform/simulation/event/TimedSequence.java`
-- Test: `event-simulation-core/src/test/java/io/casehub/platform/simulation/event/TimedSequenceTest.java`
+- Create: `../../../../simulation-core/src/main/java/io/casehub/platform/simulation/TimedEntry.java`
+- Create: `../../../../simulation-core/src/main/java/io/casehub/platform/simulation/TimedSequence.java`
+- Test: `../../../../simulation-core/src/test/java/io/casehub/platform/simulation/TimedSequenceTest.java`
 
 **Interfaces:**
 - Consumes: `InvocationRecord<I, O>` (simulation-api — `recordedAt()` field)
@@ -47,7 +47,7 @@
 
 - [ ] **Step 1: Write failing tests**
 
-Create `event-simulation-core/src/test/java/io/casehub/platform/simulation/event/TimedSequenceTest.java`:
+Create `../../../../simulation-core/src/test/java/io/casehub/platform/simulation/TimedSequenceTest.java`:
 
 ```java
 package io.casehub.platform.simulation.event;
@@ -193,7 +193,7 @@ Expected: FAIL — classes not found
 
 - [ ] **Step 3: Implement TimedEntry**
 
-Create `event-simulation-core/src/main/java/io/casehub/platform/simulation/event/TimedEntry.java`:
+Create `../../../../simulation-core/src/main/java/io/casehub/platform/simulation/TimedEntry.java`:
 
 ```java
 package io.casehub.platform.simulation.event;
@@ -218,7 +218,7 @@ public record TimedEntry<E>(E event, Duration delay) {
 
 - [ ] **Step 4: Implement TimedSequence**
 
-Create `event-simulation-core/src/main/java/io/casehub/platform/simulation/event/TimedSequence.java`:
+Create `../../../../simulation-core/src/main/java/io/casehub/platform/simulation/TimedSequence.java`:
 
 ```java
 package io.casehub.platform.simulation.event;
