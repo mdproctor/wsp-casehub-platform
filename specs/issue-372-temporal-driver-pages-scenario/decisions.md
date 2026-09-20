@@ -48,7 +48,29 @@
 **Exploration:** quick
 **Status:** captured
 
-## D5: Pages step type
+## D5: YAML/Java API parity
+
+**Choice:** Start request supports both named profile reference AND inline profile definition — full parity with YAML temporal-profiles config
+**Alternatives:**
+- Profile-name-only start — forces all profiles to be pre-declared in YAML, no runtime ad-hoc profiles
+**Rationale:** Platform convention: whatever you can do in Java, you can do in pure YAML. Inline profile definition in the API mirrors inline events/loop/speed in YAML config. Named profiles with overrides mirror YAML-declared profiles.
+**Trade-offs:** Richer request type, more validation (profileName vs qualifiedName mutual exclusivity)
+**Sources:** YamlSimulationConfig temporal-profiles parsing, TemporalProfileConfig, platform YAML/Java parity convention
+**Exploration:** quick
+**Status:** captured
+
+## D6: JSON Schema for all YAML surfaces
+
+**Choice:** All new YAML surfaces get JSON Schema definitions — temporal-profiles in simulation.schema.json, temporal step type in Pages scenario schema
+**Alternatives:**
+- Schema-less YAML — undiscoverable, no IDE validation
+**Rationale:** Platform convention: all YAML must have schemas. Enables IDE autocomplete, CI validation, documentation generation.
+**Trade-offs:** Schema must be maintained alongside YAML parser changes
+**Sources:** simulation.schema.json (existing, needs temporal-profiles section added), platform YAML schema convention
+**Exploration:** quick
+**Status:** captured
+
+## D7: Pages step type
 
 **Choice:** New dedicated temporal: step type, independent from existing simulation: overlay step
 **Alternatives:**
