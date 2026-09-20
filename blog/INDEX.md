@@ -18,3 +18,4 @@
 | [2026-09-16-mdp02-cutting-the-ceremony.md](2026-09-16-mdp02-cutting-the-ceremony.md) | 2026-09-16 | Supporting @McpDomain on concrete classes — eliminating the SPI+impl split for single-implementation domains |
 | [2026-09-17-mdp01-nine-stores-one-pattern.md](2026-09-17-mdp01-nine-stores-one-pattern.md) | 2026-09-17 | Spring Data JPA for nine platform persistence modules — the three-tier pattern, Flyway 12 compat, and where complexity actually lives |
 | [2026-09-20-mdp01-temporal-simulation-driver.md](2026-09-20-mdp01-temporal-simulation-driver.md) | 2026-09-20 | Lifecycle-controlled temporal simulation — composing with existing TimedEntry/TimedSequence, virtual-thread driver, YAML profiles, CDI wiring |
+| [2026-09-20-mdp02-temporal-driver-remote-control.md](2026-09-20-mdp02-temporal-driver-remote-control.md) | 2026-09-20 | Remote control API for temporal simulation drivers — @McpDomain service, YAML/Java parity, Pages temporal step type |
