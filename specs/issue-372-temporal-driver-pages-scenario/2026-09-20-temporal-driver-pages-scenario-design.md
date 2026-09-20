@@ -138,7 +138,9 @@ public class TemporalDriverService implements TemporalDriverApi {
 | `status(name)` | Lookup, build `TemporalDriverStatus` from `driver.state()`, `driver.lastResult()`, speed. 404 if not found. |
 | `list()` | Iterate map, build status for each. Includes COMPLETED/STOPPED drivers until explicitly stopped/removed. |
 
-**Conflict handling:** `start()` with a name that already has a RUNNING or PAUSED driver throws `IllegalStateException`. Callers must stop first. COMPLETED and STOPPED drivers remain in the map until `stop()` is called — `stop()` on an already-COMPLETED driver is idempotent and removes it.
+**Conflict handling:** `start()` with a name that already has a RUNNING or PAUSED driver throws `IllegalStateException`. Callers must stop first. COMPLETED and STOPPED drivers are auto-replaced on `start()` — they are not conflicts. `stop()` on an already-COMPLETED driver is idempotent and removes it from the map.
+
+**Driver speed getter:** `TemporalSimulationDriver` currently has no public `speed()` accessor. This spec adds `public double speed()` to the driver — a one-line getter on the existing volatile field. Required for `status()` to report current speed.
 
 **Inline profile building:** When `profileName` is null and `qualifiedName` is set, the service builds a `TemporalProfile<Map<String, Object>>` directly from the request fields. Delay strings are parsed via `DurationParser` (already in simulation-config-core: `"5s"`, `"2m"`, `"500ms"`, bare millis). Events are converted to `TimedEntry<Map<String, Object>>` with payload as the event. `loop` defaults to `false`, `speed` defaults to `1.0`.
 
@@ -287,6 +289,7 @@ The control API operates on profile names, not domain concepts. A domain's tempo
 | Module | Changes |
 |--------|---------|
 | `simulation-api/` (new) | `TemporalDriverApi` @McpDomain SPI + request/response records |
+| `simulation-core/` | Add `public double speed()` getter to `TemporalSimulationDriver` |
 | `event-simulation/` | `TemporalDriverService` @ApplicationScoped implements TemporalDriverApi |
 | `simulation-config-core/` | Update `simulation.schema.json` — add temporal-profiles, temporal-event, sequence-ref definitions |
 | casehub-pages (cross-repo) | New `temporal:` step type in ScenarioOrchestrator + JSON Schema |
