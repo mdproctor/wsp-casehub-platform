@@ -118,7 +118,7 @@ The driver calls `eventSink.deliver(effectiveQualifiedName, label, event)` for e
 
 **Key behaviors:**
 
-1. **start()** — spawns a virtual thread. Iterates entries: `Thread.sleep(delay / speed)` → deliver via `eventSink.deliver(effectiveQualifiedName, label, event)` → record to journal. When `loop=true`, restarts from the beginning and increments `loopIterations`. Throws `IllegalStateException` on non-IDLE driver. On natural completion of a non-looping profile, transitions to COMPLETED.
+1. **start()** — spawns a virtual thread. Iterates entries: `Thread.sleep(delay / speed)` → deliver via `eventSink.deliver(effectiveQualifiedName, label, event)` → record to journal. When `loop=true`, restarts from the beginning and increments `loopIterations`. Throws `IllegalStateException` on non-IDLE driver. On natural completion of a non-looping profile, transitions to COMPLETED. `InterruptedException` from sleep breaks the driver loop and triggers transition to STOPPED (same pattern as `EventSequenceRunner`, where sleep is outside the error-isolation try/catch).
 
 2. **pause()** — sets state to PAUSED. Driver thread blocks on the lock's `Condition`. No events fire while paused.
 
@@ -126,7 +126,7 @@ The driver calls `eventSink.deliver(effectiveQualifiedName, label, event)` for e
 
 4. **stop()** — sets state to STOPPED, interrupts the driver thread. Terminal — cannot restart. Callable from RUNNING, PAUSED, or COMPLETED.
 
-5. **setSpeed(double)** — volatile field. Next sleep uses new value. Mid-sleep is not interrupted — change takes effect on next event.
+5. **setSpeed(double)** — validates `speed > 0` (throws `IllegalArgumentException`, matching `TemporalProfile`'s constructor validation). Volatile field. Next sleep uses new value. Mid-sleep is not interrupted — change takes effect on next event.
 
 6. **Journal integration** — if `SimulationRuntime` is provided, each event delivery calls `simulation.recordJournal(effectiveQualifiedName, tenancyId, label, event, true)`. The `tenancyId` comes from `profile.tenancyId()`. This feeds `SimulationVerifier`.
 
@@ -142,7 +142,7 @@ The driver calls `eventSink.deliver(effectiveQualifiedName, label, event)` for e
 
    If an overlay is popped while a driver is still running (programming error), subsequent journal recording calls become no-ops (empty overlay stack). The driver continues firing events, just without journal recording.
 
-7. **Error isolation** — one failing event delivery doesn't stop the sequence. Failure recorded in `DriverResult` with both the entry's label and its positional index. Same pattern as `EventSequenceRunner`.
+7. **Error isolation** — one failing event delivery doesn't stop the sequence. Failure recorded in `DriverResult` with both the entry's label and its positional index. Same pattern as `EventSequenceRunner`. The error-isolation try/catch covers `eventSink.deliver()` and `recordJournal()` only — `Thread.sleep()` is outside the try/catch so that `InterruptedException` (from `stop()`) breaks the driver loop rather than being swallowed as a `DriverFailure`.
 
 8. **lastResult()** — returns a snapshot of accumulated execution state. Available during RUNNING, PAUSED, COMPLETED, and STOPPED. Returns null before `start()` is called. For looping profiles, counts are cumulative across all completed iterations. The `failures` list is bounded to the last 100 failures; `failureCount` tracks the cumulative total.
 
