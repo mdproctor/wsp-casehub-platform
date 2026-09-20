@@ -14,16 +14,20 @@ The approach composes with existing types (`TimedEntry<E>`, `TimedSequence<E>`) 
 
 ### Data Model Changes
 
-**TimedEntry<E>** — gains optional `label` for per-event journal tracking:
+**TimedEntry<E>** — gains optional `label` and `qualifiedName` for per-event journal tracking:
 
 ```java
 // moves from event-simulation-core to simulation-core
 package io.casehub.platform.simulation;
 
-public record TimedEntry<E>(E event, Duration delay, String label) {
+public record TimedEntry<E>(E event, Duration delay, String label, String qualifiedName) {
 
     public TimedEntry(E event, Duration delay) {
-        this(event, delay, null);
+        this(event, delay, null, null);
+    }
+
+    public TimedEntry(E event, Duration delay, String label) {
+        this(event, delay, label, null);
     }
 
     public TimedEntry {
@@ -34,9 +38,10 @@ public record TimedEntry<E>(E event, Duration delay, String label) {
 }
 ```
 
-Labels like `"motion-cascade"` or `"temperature-drift"` are meaningful in journal verification (`SimulationVerifier` assertions). Positional tracking (`sequence[0]`) breaks on dynamic composition. Label is nullable for backward compatibility.
+- `label` — human-readable identifier for journal verification (`SimulationVerifier` assertions). Positional tracking (`sequence[0]`) breaks on dynamic composition. Nullable for backward compatibility.
+- `qualifiedName` — per-entry override of the profile-level qualifiedName. Nullable — when null, the driver uses the profile's qualifiedName. Set during `sequence:` ref concatenation to preserve each sub-profile's attribution (e.g., `iot.alarm` events inside a `full-demo` profile retain their original qualifiedName rather than inheriting `iot.device-state-change` from the parent profile).
 
-**TimedSequence<E>** — moves from `event-simulation-core` to `simulation-core` unchanged. `withMultiplier()`, `fromRecorded()`, `totalDuration()` carry over. The `withMultiplier()` transform preserves labels.
+**TimedSequence<E>** — moves from `event-simulation-core` to `simulation-core` unchanged. `withMultiplier()`, `fromRecorded()`, `totalDuration()` carry over. The `withMultiplier()` transform preserves labels and qualifiedNames.
 
 **TemporalProfile<E>** — new record wrapping TimedSequence with lifecycle metadata:
 
@@ -46,6 +51,7 @@ package io.casehub.platform.simulation;
 public record TemporalProfile<E>(
         String name,
         String qualifiedName,
+        String tenancyId,
         TimedSequence<E> sequence,
         boolean loop,
         double speed) {
@@ -60,7 +66,8 @@ public record TemporalProfile<E>(
 ```
 
 - `name` — human-readable identifier (e.g. `"morning-routine"`)
-- `qualifiedName` — method name for corpus/journal tracking (e.g. `"iot.device-state-change"`)
+- `qualifiedName` — default method name for corpus/journal tracking (e.g. `"iot.device-state-change"`). Individual `TimedEntry` entries may override this via their own `qualifiedName` field.
+- `tenancyId` — tenant context for journal recording (nullable). Resolved from YAML `tenancy-id:` with fallback to config-level `default-tenancy-id`. Generated decorators get tenancyId from `currentPrincipal.tenancyId()`, but the temporal driver runs on its own virtual thread without a security context — tenancyId must be part of the profile data.
 - `loop` — repeat after last event
 - `speed` — initial speed multiplier (1.0 = real-time, 10.0 = 10x)
 
@@ -72,20 +79,20 @@ Design precedent: `SimulationProfile` wraps `SimulationConfig + SimulationCorpus
 
 Lifecycle controller. Runs a `TemporalProfile` on a virtual thread with pause/resume/stop/speed control and journal integration.
 
-**State machine:** `IDLE → RUNNING ↔ PAUSED → STOPPED`
+**State machine:** `IDLE → RUNNING ↔ PAUSED → STOPPED`, plus `RUNNING → COMPLETED` for non-looping profiles.
 
 ```java
 package io.casehub.platform.simulation;
 
 public class TemporalSimulationDriver<E> {
 
-    private final Consumer<E> eventSink;
+    private final TemporalEventSink<E> eventSink;
     private final SimulationRuntime simulation;  // nullable — journal optional
 
-    enum State { IDLE, RUNNING, PAUSED, STOPPED }
+    enum State { IDLE, RUNNING, PAUSED, STOPPED, COMPLETED }
 
-    public TemporalSimulationDriver(Consumer<E> eventSink, SimulationRuntime simulation);
-    public TemporalSimulationDriver(Consumer<E> eventSink);  // no journal
+    public TemporalSimulationDriver(TemporalEventSink<E> eventSink, SimulationRuntime simulation);
+    public TemporalSimulationDriver(TemporalEventSink<E> eventSink);  // no journal
 
     public void start(TemporalProfile<E> profile);
     public void pause();
@@ -98,30 +105,54 @@ public class TemporalSimulationDriver<E> {
 }
 ```
 
+**TemporalEventSink<E>** — replaces `Consumer<E>` to provide delivery context:
+
+```java
+@FunctionalInterface
+public interface TemporalEventSink<E> {
+    void deliver(String qualifiedName, String label, E event);
+}
+```
+
+The driver calls `eventSink.deliver(effectiveQualifiedName, label, event)` for each entry, where `effectiveQualifiedName` is `entry.qualifiedName() != null ? entry.qualifiedName() : profile.qualifiedName()`. This gives consumers the context needed for CloudEvent construction (qualifiedName → event type) and logging (label → event identity).
+
 **Key behaviors:**
 
-1. **start()** — spawns a virtual thread. Iterates entries: `Thread.sleep(delay / speed)` → deliver to `eventSink` → record to journal. When `loop=true`, restarts from the beginning. Throws `IllegalStateException` on non-IDLE driver.
+1. **start()** — spawns a virtual thread. Iterates entries: `Thread.sleep(delay / speed)` → deliver via `eventSink.deliver(effectiveQualifiedName, label, event)` → record to journal. When `loop=true`, restarts from the beginning and increments `loopIterations`. Throws `IllegalStateException` on non-IDLE driver. On natural completion of a non-looping profile, transitions to COMPLETED.
 
-2. **pause()** — sets state to PAUSED. Driver thread blocks on a `ReentrantLock` `Condition`. No events fire while paused.
+2. **pause()** — sets state to PAUSED. Driver thread blocks on the lock's `Condition`. No events fire while paused.
 
 3. **resume()** — signals the condition, state returns to RUNNING. Sequence continues from where it paused.
 
-4. **stop()** — sets state to STOPPED, interrupts the driver thread. Terminal — cannot restart.
+4. **stop()** — sets state to STOPPED, interrupts the driver thread. Terminal — cannot restart. Callable from RUNNING, PAUSED, or COMPLETED.
 
 5. **setSpeed(double)** — volatile field. Next sleep uses new value. Mid-sleep is not interrupted — change takes effect on next event.
 
-6. **Journal integration** — if `SimulationRuntime` is provided, each event delivery calls `simulation.recordJournal(qualifiedName, tenancyId, label, event, true)`. This feeds `SimulationVerifier`.
+6. **Journal integration** — if `SimulationRuntime` is provided, each event delivery calls `simulation.recordJournal(effectiveQualifiedName, tenancyId, label, event, true)`. The `tenancyId` comes from `profile.tenancyId()`. This feeds `SimulationVerifier`.
 
-7. **Error isolation** — one failing event delivery doesn't stop the sequence. Failure recorded in `DriverResult`. Same pattern as `EventSequenceRunner`.
+   Journal recording is a no-op when no overlay is active on `SimulationRuntime` — this is the standard framework behavior. The same `overlayStack.isEmpty()` fast path is used by all generated decorators. The driver does not manage overlays itself; overlay lifecycle is the caller's responsibility. Typical pattern:
+   - Test pushes an overlay via `SimulationRuntime.pushOverlay()`
+   - Test creates a driver and calls `start(profile)`
+   - Driver records to the top overlay's journal via `recordJournal()`
+   - Test verifies via `SimulationVerifier.on(overlay)`
+   - Test pops the overlay — journal is discarded, isolation complete
+
+   If an overlay is popped while a driver is running, subsequent journal recording calls become no-ops (empty overlay stack). This is safe — the driver continues firing events, just without journal recording.
+
+7. **Error isolation** — one failing event delivery doesn't stop the sequence. Failure recorded in `DriverResult` with both the entry's label and its positional index. Same pattern as `EventSequenceRunner`.
+
+8. **lastResult()** — returns a snapshot of accumulated execution state. Available during RUNNING, PAUSED, COMPLETED, and STOPPED. Returns null before `start()` is called. For looping profiles, counts are cumulative across all completed iterations. The `failures` list is bounded to the last 100 failures; `failureCount` tracks the cumulative total.
+
+9. **Post-completion (non-looping)** — when the sequence completes naturally, the virtual thread terminates and the driver transitions to COMPLETED. `lastResult()` returns the final accumulated result. `stop()` can still be called (transitions to STOPPED, idempotent). `isRunning()` returns false.
 
 **Thread model:** Virtual-thread `Thread.sleep()` — same pattern as `EventSequenceRunner`. Each driver runs its own virtual thread. Avoids ScheduledFuture cancel-clear-reschedule gotcha (GE-20260701-82909e). Virtual threads are cheap for simulation workloads.
 
-**Thread safety:** State transitions via `synchronized`. Speed is volatile (single writer). Pause uses `ReentrantLock` + `Condition` for await/signal semantics.
+**Thread safety:** All state transitions protected by a single `ReentrantLock`. Speed is volatile (single writer, driver thread reads). Pause/resume uses the lock's `Condition` — checking state and awaiting share the same lock, eliminating the race window between state check and condition wait.
 
 **DriverResult + DriverFailure:**
 
 ```java
-public record DriverFailure(String label, Exception cause) {}
+public record DriverFailure(int index, String label, Exception cause) {}
 
 public record DriverResult(
         int emittedCount,
@@ -133,11 +164,13 @@ public record DriverResult(
         failures = List.copyOf(failures);
     }
 
-    public boolean hasFailures() { return !failures.isEmpty(); }
+    public boolean hasFailures() { return failureCount > 0; }
 }
 ```
 
-`DriverFailure` is local to simulation-core — no dependency on `EmissionFailure` in event-simulation-core. Uses `label` (from `TimedEntry.label()`) as the failure identifier rather than a positional string.
+`DriverFailure` includes both `index` (positional within the sequence) and `label` (from `TimedEntry.label()`, nullable). When label is null, the index provides a reliable fallback identifier. `DriverFailure` is local to simulation-core — no dependency on `EmissionFailure` in event-simulation-core.
+
+`failureCount` is the cumulative total across all loop iterations. `failures` is bounded to the last 100 entries (driver-internal); `failureCount` may exceed `failures.size()` for long-running looping profiles with frequent transient errors.
 
 **TemporalDriverFactory:**
 
@@ -148,7 +181,7 @@ public interface TemporalDriverFactory<E> {
 }
 ```
 
-Drivers are lightweight (virtual thread + small state). Multiple profiles can run concurrently with separate driver instances. The factory pattern is cleaner than a reusable singleton since `stop()` is terminal.
+Drivers are lightweight (virtual thread + small state). Multiple profiles can run concurrently with separate driver instances. The factory pattern is cleaner than a reusable singleton since `stop()` is terminal. A custom interface rather than `Supplier<TemporalSimulationDriver<E>>` — CDI bean resolution with nested parameterized types (`Supplier<TemporalSimulationDriver<Map<String, Object>>>`) is fragile and poorly supported; a dedicated type resolves unambiguously.
 
 ### YAML Loading
 
@@ -157,6 +190,7 @@ Drivers are lightweight (virtual thread + small state). Multiple profiles can ru
 ```java
 record TemporalProfileConfig(
         String qualifiedName,
+        String tenancyId,
         boolean loop,
         double speed,
         List<TemporalEventConfig> events,
@@ -196,7 +230,7 @@ record SequenceRef(
 
 **`from-corpus` resolution:** Calls `TimedSequence.fromRecorded(corpus.list(qualifiedName))` — derives timing from `InvocationRecord.recordedAt()` timestamps. Requires corpus data to be loaded first (startup ordering: corpus → temporal profiles).
 
-**`sequence` resolution:** Recursive ref lookup with cycle detection (visited name set). Each ref resolves to a `TimedSequence`, concatenated in order. Optional `delay` on a ref inserts a gap `TimedEntry` between sub-sequences.
+**`sequence` resolution:** Recursive ref lookup with cycle detection (visited name set). Each ref resolves to a `TimedSequence`, concatenated in order. During concatenation, each entry's `qualifiedName` is set to its source profile's `qualifiedName`, preserving per-entry attribution across composed sequences (e.g., `alarm-sequence` entries concatenated into `full-demo` retain `iot.alarm` rather than inheriting `iot.device-state-change`). Optional `delay` on a ref inserts a gap `TimedEntry` between sub-sequences.
 
 **Full YAML example:**
 
@@ -204,6 +238,7 @@ record SequenceRef(
 temporal-profiles:
   morning-routine:
     qualified-name: iot.device-state-change
+    tenancy-id: demo-tenant    # optional — defaults to config default-tenancy-id
     loop: true
     speed: 10.0
     events:
@@ -273,29 +308,48 @@ public class TemporalProfileRegistry {
 }
 ```
 
-**event-simulation** — provides CloudEvent driver factory:
+**event-simulation** — provides driver factory wired to the CDI event bus:
 
 ```java
 // in EventSimulationBeans
 @Produces @ApplicationScoped
-TemporalDriverFactory<CloudEvent> temporalDriverFactory(SimulationRuntime runtime) {
+TemporalDriverFactory<Map<String, Object>> temporalDriverFactory(SimulationRuntime runtime) {
     return () -> new TemporalSimulationDriver<>(
-            event -> cloudEventBus.fireAsync(event),
+            (qualifiedName, label, payload) -> {
+                CloudEvent ce = CloudEventBuilder.v1()
+                        .withType(qualifiedName)
+                        .withId(UUID.randomUUID().toString())
+                        .withSource(URI.create("//simulation"))
+                        .withTime(OffsetDateTime.now())
+                        .withData("application/json",
+                                jsonMapper.writeValueAsBytes(payload))
+                        .build();
+                cloudEventBus.fireAsync(ce);
+            },
             runtime);
 }
 ```
 
-Domains inject `TemporalDriverFactory` + `TemporalProfileRegistry`, call `factory.create()` to get a driver, then `driver.start(profile)`.
+The factory type is `Map<String, Object>` to match `TemporalProfileRegistry`'s resolved type (YAML payloads are maps). The `TemporalEventSink` receives `qualifiedName` from the driver's loop context — the CDI producer uses it as the CloudEvent type. Domains inject `TemporalDriverFactory` + `TemporalProfileRegistry`, call `factory.create()` to get a driver, then `driver.start(profile)`:
+
+```java
+@Inject TemporalDriverFactory<Map<String, Object>> driverFactory;
+@Inject TemporalProfileRegistry registry;
+
+var profile = registry.resolve("morning-routine").get();
+var driver = driverFactory.create();
+driver.start(profile);  // types align — both Map<String, Object>
+```
 
 ### Module Change Summary
 
 | Module | Changes |
 |--------|---------|
-| `simulation-core` | + `TimedEntry` (moved), + `TimedSequence` (moved), + `TemporalProfile`, + `TemporalSimulationDriver`, + `DriverResult`, + `DriverFailure`, + `TemporalDriverFactory` |
+| `simulation-core` | + `TimedEntry` (moved), + `TimedSequence` (moved), + `TemporalProfile`, + `TemporalSimulationDriver`, + `TemporalEventSink`, + `DriverResult`, + `DriverFailure`, + `TemporalDriverFactory` |
 | `event-simulation-core` | − `TimedEntry` (moved), − `TimedSequence` (moved), update imports in `EventSequenceRunner` + tests |
 | `simulation-config-core` | + `TemporalProfileConfig`, + `TemporalEventConfig`, + `SequenceRef`, + temporal YAML parsing in `YamlSimulationConfig`, + `TemporalProfileRegistry` |
 | `simulation-config` | + `@Produces TemporalProfileRegistry` in `SimulationConfigBeans` |
-| `event-simulation` | + `@Produces TemporalDriverFactory<CloudEvent>` in `EventSimulationBeans` |
+| `event-simulation` | + `@Produces TemporalDriverFactory<Map<String, Object>>` in `EventSimulationBeans` |
 
 ## Testing
 
@@ -312,8 +366,11 @@ Domains inject `TemporalDriverFactory` + `TemporalProfileRegistry`, call `factor
 | `TemporalSimulationDriverTest` — stop | Mid-sequence stop, no further events, state is STOPPED |
 | `TemporalSimulationDriverTest` — speed | `speed=10.0` delivers a 1s-delay event in ~100ms (tolerance-based) |
 | `TemporalSimulationDriverTest` — setSpeed mid-flight | Speed change takes effect on next delay |
-| `TemporalSimulationDriverTest` — journal | With SimulationRuntime, overlay journal records each event with label |
-| `TemporalSimulationDriverTest` — error isolation | One failing event doesn't stop the sequence |
+| `TemporalSimulationDriverTest` — journal with overlay | With SimulationRuntime + active overlay, journal records each event with label and qualifiedName |
+| `TemporalSimulationDriverTest` — journal without overlay | With SimulationRuntime but no overlay, journal recording is a no-op — events still fire |
+| `TemporalSimulationDriverTest` — error isolation | One failing event doesn't stop the sequence, failure has both index and label |
+| `TemporalSimulationDriverTest` — completion | Non-looping profile transitions to COMPLETED, lastResult() available |
+| `TemporalSimulationDriverTest` — concat qualifiedNames | Concatenated sequence preserves per-entry qualifiedNames from source profiles |
 
 All driver tests use short delays (10-50ms). Timing assertions use tolerances.
 
@@ -336,26 +393,34 @@ Existing `EventSequenceRunnerTest` and `TimedSequenceTest` — update imports af
 
 ### event-simulation (Quarkus integration)
 
-`@QuarkusTest` verifying `TemporalDriverFactory<CloudEvent>` is injectable and produces a working driver wired to `Event<CloudEvent>`.
+`@QuarkusTest` verifying `TemporalDriverFactory<Map<String, Object>>` is injectable and produces a working driver that converts map payloads to CloudEvents and fires them via `Event<CloudEvent>`.
 
 ## Scope
 
 | Deliverable | Module | Description |
 |-------------|--------|-------------|
-| `TimedEntry<E>` (moved + label) | simulation-core | Add label, relocate from event-simulation-core |
+| `TimedEntry<E>` (moved + label + qualifiedName) | simulation-core | Add label + qualifiedName, relocate from event-simulation-core |
 | `TimedSequence<E>` (moved) | simulation-core | Relocate, unchanged API |
-| `TemporalProfile<E>` | simulation-core | Sequence + name + loop + qualifiedName + speed |
+| `TemporalProfile<E>` | simulation-core | Sequence + name + qualifiedName + tenancyId + loop + speed |
 | `TemporalSimulationDriver<E>` | simulation-core | Lifecycle controller with journal integration |
 | `DriverResult` | simulation-core | Driver execution result |
-| `DriverFailure` | simulation-core | Per-event failure record (label + cause) |
+| `DriverFailure` | simulation-core | Per-event failure record (index + label + cause) |
+| `TemporalEventSink<E>` | simulation-core | Event delivery callback with context (qualifiedName, label, event) |
 | `TemporalDriverFactory<E>` | simulation-core | Functional interface for driver creation |
 | `TemporalProfileConfig` + parsing | simulation-config-core | YAML temporal profile schema + 4 source types |
 | `TemporalProfileRegistry` | simulation-config-core | Resolved profile lookup |
 | CDI `TemporalProfileRegistry` | simulation-config | `@Produces` bean |
-| CDI `TemporalDriverFactory<CloudEvent>` | event-simulation | `@Produces` factory wired to CDI event bus |
+| CDI `TemporalDriverFactory<Map<String, Object>>` | event-simulation | `@Produces` factory wired to CDI event bus (map → CloudEvent conversion) |
 | Import updates | event-simulation-core | `EventSequenceRunner` + tests use new package |
 | Unit tests | simulation-core, simulation-config-core | Driver lifecycle + YAML parsing |
 | Integration test | event-simulation | `@QuarkusTest` CDI wiring |
+
+## Deferred
+
+| Item | Reason | Tracked |
+|------|--------|---------|
+| Pages scenario integration (start/stop/speed-change via `delivery: 'graphql'`) | Substantial cross-repo work spanning casehub-platform and casehub-pages. Requires ScenarioOrchestrator lifecycle hooks and new step types. | casehubio/platform#371 (sub-task) |
+| Speed synchronization with global `SimulationConfig` | `SimulationConfig` has no speed setting today (`strategyFor`, `captureEnabled`, `exhaustionPolicy`, `threshold` only). Per-driver speed via `setSpeed()` is sufficient. Global speed coordination deferred until a `SimulationConfig.speed()` concept exists. | casehubio/platform#371 (sub-task) |
 
 ## References
 
