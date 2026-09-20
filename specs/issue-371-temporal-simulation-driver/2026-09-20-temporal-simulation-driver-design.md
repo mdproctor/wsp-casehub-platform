@@ -134,10 +134,13 @@ The driver calls `eventSink.deliver(effectiveQualifiedName, label, event)` for e
    - Test pushes an overlay via `SimulationRuntime.pushOverlay()`
    - Test creates a driver and calls `start(profile)`
    - Driver records to the top overlay's journal via `recordJournal()`
-   - Test verifies via `SimulationVerifier.on(overlay)`
+   - Test calls `driver.stop()` — ensures no further events fire
+   - Test verifies via `SimulationVerifier.on(overlay)` — counts are final
    - Test pops the overlay — journal is discarded, isolation complete
 
-   If an overlay is popped while a driver is running, subsequent journal recording calls become no-ops (empty overlay stack). This is safe — the driver continues firing events, just without journal recording.
+   The driver must be stopped before overlay pop. If a still-running driver outlives its overlay, and a subsequent test pushes a new overlay, the driver records into the wrong test's journal — cross-test contamination. Stopping the driver first also ensures `lastResult()` has the final count and no events arrive between verification and pop.
+
+   If an overlay is popped while a driver is still running (programming error), subsequent journal recording calls become no-ops (empty overlay stack). The driver continues firing events, just without journal recording.
 
 7. **Error isolation** — one failing event delivery doesn't stop the sequence. Failure recorded in `DriverResult` with both the entry's label and its positional index. Same pattern as `EventSequenceRunner`.
 
@@ -230,7 +233,11 @@ record SequenceRef(
 
 **`from-corpus` resolution:** Calls `TimedSequence.fromRecorded(corpus.list(qualifiedName))` — derives timing from `InvocationRecord.recordedAt()` timestamps. Requires corpus data to be loaded first (startup ordering: corpus → temporal profiles).
 
-**`sequence` resolution:** Recursive ref lookup with cycle detection (visited name set). Each ref resolves to a `TimedSequence`, concatenated in order. During concatenation, each entry's `qualifiedName` is set to its source profile's `qualifiedName`, preserving per-entry attribution across composed sequences (e.g., `alarm-sequence` entries concatenated into `full-demo` retain `iot.alarm` rather than inheriting `iot.device-state-change`). Optional `delay` on a ref inserts a gap `TimedEntry` between sub-sequences.
+**`sequence` resolution:** Recursive ref lookup with cycle detection (visited name set). Each ref resolves to a `TimedSequence`, concatenated in order. During concatenation, each entry's `qualifiedName` is set to its source profile's `qualifiedName`, preserving per-entry attribution across composed sequences (e.g., `alarm-sequence` entries concatenated into `full-demo` retain `iot.alarm` rather than inheriting `iot.device-state-change`).
+
+Optional `delay` on a ref is absorbed into the referenced profile's first entry — the gap duration is added to that entry's existing delay. This avoids inserting a synthetic gap `TimedEntry` (which would require a non-null event, resulting in a phantom event delivery and spurious journal recording). If the referenced profile's sequence is empty, the gap delay is discarded.
+
+Example: `delay: 30s` on `ref: alarm-sequence` means alarm-sequence's first event fires 30s after morning-routine's last event, by adding 30s to that first entry's delay.
 
 **Full YAML example:**
 
@@ -316,15 +323,19 @@ public class TemporalProfileRegistry {
 TemporalDriverFactory<Map<String, Object>> temporalDriverFactory(SimulationRuntime runtime) {
     return () -> new TemporalSimulationDriver<>(
             (qualifiedName, label, payload) -> {
-                CloudEvent ce = CloudEventBuilder.v1()
-                        .withType(qualifiedName)
-                        .withId(UUID.randomUUID().toString())
-                        .withSource(URI.create("//simulation"))
-                        .withTime(OffsetDateTime.now())
-                        .withData("application/json",
-                                jsonMapper.writeValueAsBytes(payload))
-                        .build();
-                cloudEventBus.fireAsync(ce);
+                try {
+                    CloudEvent ce = CloudEventBuilder.v1()
+                            .withType(qualifiedName)
+                            .withId(UUID.randomUUID().toString())
+                            .withSource(URI.create("//simulation"))
+                            .withTime(OffsetDateTime.now())
+                            .withData("application/json",
+                                    jsonMapper.writeValueAsBytes(payload))
+                            .build();
+                    cloudEventBus.fireAsync(ce);
+                } catch (JsonProcessingException e) {
+                    throw new UncheckedIOException(e);
+                }
             },
             runtime);
 }
@@ -381,7 +392,7 @@ All driver tests use short delays (10-50ms). Timing assertions use tolerances.
 | YAML inline events | Parses `events:` with delay/label/payload |
 | YAML events-file | Resolves external file path |
 | YAML from-corpus | Derives TimedSequence from corpus InvocationRecords |
-| YAML sequence refs | Resolves refs, concatenates, inserts gap delays |
+| YAML sequence refs | Resolves refs, concatenates, absorbs gap delays into first entry of referenced sequence |
 | YAML cycle detection | Circular `sequence:` refs → clear error |
 | YAML mutual exclusivity | Two sources on one profile → parse error |
 | YAML inline in profiles | `temporal:` within a profile — refs + inline |
@@ -419,8 +430,8 @@ Existing `EventSequenceRunnerTest` and `TimedSequenceTest` — update imports af
 
 | Item | Reason | Tracked |
 |------|--------|---------|
-| Pages scenario integration (start/stop/speed-change via `delivery: 'graphql'`) | Substantial cross-repo work spanning casehub-platform and casehub-pages. Requires ScenarioOrchestrator lifecycle hooks and new step types. | casehubio/platform#371 (sub-task) |
-| Speed synchronization with global `SimulationConfig` | `SimulationConfig` has no speed setting today (`strategyFor`, `captureEnabled`, `exhaustionPolicy`, `threshold` only). Per-driver speed via `setSpeed()` is sufficient. Global speed coordination deferred until a `SimulationConfig.speed()` concept exists. | casehubio/platform#371 (sub-task) |
+| Pages scenario integration (start/stop/speed-change via `delivery: 'graphql'`) | Substantial cross-repo work spanning casehub-platform and casehub-pages. Requires ScenarioOrchestrator lifecycle hooks and new step types. | [casehubio/platform#372](https://github.com/casehubio/platform/issues/372) |
+| Speed synchronization with global `SimulationConfig` | `SimulationConfig` has no speed setting today (`strategyFor`, `captureEnabled`, `exhaustionPolicy`, `threshold` only). Per-driver speed via `setSpeed()` is sufficient. Global speed coordination deferred until a `SimulationConfig.speed()` concept exists. | [casehubio/platform#373](https://github.com/casehubio/platform/issues/373) |
 
 ## References
 
