@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-372-temporal-driver-pages-scenario
-state: scaffolded
+state: active
 project-sha: c4d38223cfa977d19f9cba7904132d07fd6e74ca
 date: 2026-09-20
 issue-repo: casehubio/platform
@@ -13,10 +13,10 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#372 — Issue #372 ← active
-  - [ ] Batch 1: Platform API
-    - [ ] Task 1: Speed getter on TemporalSimulationDriver
-    - [ ] Task 2: TemporalDriverService McpDomain + records + tests
-  - [ ] Batch 2: Schema
-    - [ ] Task 3: JSON Schema temporal-profiles definitions
-  - [ ] Batch 3: Pages Integration
-    - [ ] Task 4: Temporal step handler in ScenarioOrchestrator
+  - [x] Batch 1: Platform API
+    - [x] Task 1: Speed getter on TemporalSimulationDriver
+    - [x] Task 2: TemporalDriverService McpDomain + records + tests
+  - [x] Batch 2: Schema
+    - [x] Task 3: JSON Schema temporal-profiles definitions
+  - [x] Batch 3: Pages Integration
+    - [x] Task 4: Temporal step handler in ScenarioOrchestrator
