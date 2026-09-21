@@ -284,10 +284,10 @@ Pass `capabilitySet` to `generateDecoratorSource()`.
 For each method whose name is in `capabilitySet`:
 
 1. Resolve the return type via Jandex — it must be an interface (error if not)
-2. **Walk the capability interface's full type hierarchy** to collect all methods: use `ClassInfo.interfaceTypes()` to get direct super-interfaces, then `IndexView.getClassByName()` for each, recursing until the hierarchy is exhausted. Collect all declared methods (`ClassInfo.methods()`) at each level. This is necessary because Jandex's `ClassInfo.methods()` returns only declared methods, not inherited ones — a wrapper implementing `Messaging extends AutoCloseable` must also implement `close()`
+2. **Walk the capability interface's full type hierarchy** to collect all methods: use `ClassInfo.interfaceTypes()` to get direct super-interfaces, then `IndexView.getClassByName()` for each, recursing until the hierarchy is exhausted. Collect all declared methods (`ClassInfo.methods()`) at each level. This is necessary because Jandex's `ClassInfo.methods()` returns only declared methods, not inherited ones — a wrapper implementing `Messaging extends AutoCloseable` must also implement `close()`. **Import collection:** `collectParameterImports()` must also process all methods of each capability interface (including inherited methods from the hierarchy walk) — parameter types, return types, and the capability interface type itself (for the inner class `implements` clause) must be merged into the decorator file's import set
 3. Generate a static inner class implementing the return type's interface
 4. The inner class constructor takes: the delegate's capability return value + SimulationRuntime + CurrentPrincipal
-5. Each method on the inner class (both declared and inherited) follows the same intercept-or-delegate pattern as `generateSimulatedMethod()`, using dotted QNs (`spi.capability.method`). Inherited methods get dotted QNs too (e.g. `chat-platform.messaging.close`). Checked exceptions in method signatures (`throws` clauses) must be preserved in the generated code
+5. **Filter non-overridable methods** before generation: skip synthetic (`method.isSynthetic()`), static (`Modifier.isStatic(method.flags())`), and non-public (`!Modifier.isPublic(method.flags())`) methods — interface static methods (Java 8+) and private methods (Java 9+) cannot be overridden, and generating `@Override` for them produces illegal Java. Each remaining method on the inner class follows the same intercept-or-delegate pattern as `generateSimulatedMethod()`, using dotted QNs (`spi.capability.method`). Inherited methods get dotted QNs too (e.g. `chat-platform.messaging.close`). Checked exceptions in method signatures (`throws` clauses) must be preserved in the generated code. The same filtering should be applied to the existing flat method iteration in `generateDecoratorSource()` for consistency
 6. The top-level decorator's capability method returns an instance of the wrapper, passing `delegate.capability()` as the inner delegate
 
 Generated structure for `@SimulationEligible(name = "chat-platform", capabilities = {"messaging"})`:
@@ -422,6 +422,9 @@ Naming convention: `UPPER(capabilityName) + "_" + UPPER(methodName)`.
 | Non-interface return type error | simulation-generator | Capability method returning non-interface → compilation error |
 | Inherited methods generated | simulation-generator | Capability interface extending another interface → all methods generated |
 | Throws clause preserved | simulation-generator | Inherited method with checked exception → throws clause in wrapper |
+| Capability method type imports | simulation-generator | Types used in capability interface methods are imported in generated file |
+| Static methods filtered | simulation-generator | Interface static method not generated in wrapper (no `@Override`) |
+| Private methods filtered | simulation-generator | Interface private method not generated in wrapper |
 
 ## Scope
 
