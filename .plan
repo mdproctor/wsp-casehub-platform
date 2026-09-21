@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-373-simulation-config-speed-and-capability-wrappers
-state: scaffolded
+state: active
 project-sha: af5c11e56ad4e9907ef8912d06d7547862f2baef
 date: 2026-09-21
 issue-repo: casehubio/platform
@@ -13,10 +13,10 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#373 — Issue #373 ← active
-  - [ ] Batch 1: Global Speed Foundation
-    - [ ] Task 1: SimulationConfig.speed() + MapSimulationConfig
-    - [ ] Task 2: SimulationRuntime.globalSpeed() + driver composition
-    - [ ] Task 3: YamlSimulationConfig + schema + TemporalDriverService
-  - [ ] Batch 2: Capability Wrappers
-    - [ ] Task 4: @SimulationEligible.capabilities + test fixtures
-    - [ ] Task 5: SimulationDecoratorProcessor wrapper generation
+  - [x] Batch 1: Global Speed Foundation
+    - [x] Task 1: SimulationConfig.speed() + MapSimulationConfig
+    - [x] Task 2: SimulationRuntime.globalSpeed() + driver composition
+    - [x] Task 3: YamlSimulationConfig + schema + TemporalDriverService
+  - [x] Batch 2: Capability Wrappers
+    - [x] Task 4: @SimulationEligible.capabilities + test fixtures
+    - [x] Task 5: SimulationDecoratorProcessor wrapper generation
