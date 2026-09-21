@@ -13,3 +13,8 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#376 — Issue #376 ← active
+  - [ ] Batch 1: Client env support
+    - [ ] Task 1: Add env param and refactor CLIOptions
+  - [ ] Batch 2: Factory + catalog
+    - [ ] Task 2: Create ClaudeVertexBackendFactory
+    - [ ] Task 3: Extend seed catalog with Vertex entries
