@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-376-gcp-adc-vertex
-state: scaffolded
+state: active
 project-sha: 7131894128d90d219172d30dc9ba43517d808f4f
 date: 2026-09-21
 issue-repo: casehubio/platform
