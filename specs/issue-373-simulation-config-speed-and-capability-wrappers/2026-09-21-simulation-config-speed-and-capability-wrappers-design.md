@@ -121,7 +121,7 @@ Replace the current simple volatile speed field with a three-level speed resolut
 public class TemporalSimulationDriver<E> {
     private final SimulationRuntime simulation;
     private volatile Double localSpeedOverride;  // null = follow global
-    private TemporalProfile<E> activeProfile;
+    private volatile TemporalProfile<E> activeProfile;
 
     public void start(TemporalProfile<E> profile) {
         // ... existing lock/state check ...
