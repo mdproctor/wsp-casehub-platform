@@ -50,6 +50,8 @@ public interface SimulationConfig {
 
 Backward compatible — existing implementations return 1.0 via the default method.
 
+**Overlay semantics:** Overlay configs (`pushOverlay`) configure per-method behavior (strategies, capture, exhaustion, thresholds). The global speed multiplier is runtime state managed by `SimulationRuntime.setGlobalSpeed()` — overlay configs' `speed()` value is not consulted at runtime. Use `setGlobalSpeed()` to change speed dynamically.
+
 ### MapSimulationConfig Change
 
 Add `speed` field + builder method:
@@ -86,6 +88,41 @@ methods:
 ```
 
 Default 1.0 when absent. Validation: must be positive.
+
+Java changes to `YamlSimulationConfig`:
+
+```java
+public class YamlSimulationConfig implements SimulationConfig, ProfileSource {
+
+    private final double speed;
+    // ... existing fields ...
+
+    @SuppressWarnings("unchecked")
+    public YamlSimulationConfig(InputStream yamlInput, String defaultTenancyIdOverride) {
+        // ... existing parsing ...
+
+        this.speed = root.containsKey("speed")
+                ? ((Number) root.get("speed")).doubleValue() : 1.0;
+        if (this.speed <= 0) {
+            throw new SimulationConfigException("speed must be positive, got: " + this.speed);
+        }
+
+        // ... existing parsing ...
+    }
+
+    @Override
+    public double speed() {
+        return speed;
+    }
+}
+```
+
+Update `KNOWN_TOP_LEVEL_KEYS` to include `"speed"`:
+
+```java
+private static final Set<String> KNOWN_TOP_LEVEL_KEYS =
+        Set.of("default-tenancy-id", "methods", "profiles", "temporal-profiles", "speed");
+```
 
 ### SimulationRuntime Change
 
@@ -147,7 +184,8 @@ public class TemporalSimulationDriver<E> {
         Double local = localSpeedOverride;
         if (local != null) return local;
         double global = (simulation != null) ? simulation.globalSpeed() : 1.0;
-        return activeProfile.speed() * global;
+        double profileSpeed = (activeProfile != null) ? activeProfile.speed() : 1.0;
+        return profileSpeed * global;
     }
 }
 ```
@@ -160,12 +198,25 @@ When `simulation` is null (no-journal constructor), globalSpeed falls back to 1.
 
 ### TemporalDriverService Change
 
-Add `setGlobalSpeed` and `resetSpeed` operations:
+Add `setGlobalSpeed` and `resetSpeed` operations. `SimulationRuntime` must be added as a constructor-injected dependency (existing constructor only injects `TemporalDriverFactory` and `TemporalProfileRegistry`):
 
 ```java
 @McpDomain("temporal-drivers")
 public class TemporalDriverService {
+    private final TemporalDriverFactory<Map<String, Object>> driverFactory;
+    private final TemporalProfileRegistry profileRegistry;
+    private final SimulationRuntime simulationRuntime;
     // existing: start, stop, pause, resume, setSpeed, status, list
+
+    @Inject
+    public TemporalDriverService(
+            TemporalDriverFactory<Map<String, Object>> driverFactory,
+            TemporalProfileRegistry profileRegistry,
+            SimulationRuntime simulationRuntime) {
+        this.driverFactory = driverFactory;
+        this.profileRegistry = profileRegistry;
+        this.simulationRuntime = simulationRuntime;
+    }
 
     @PlatformMutation
     public void setGlobalSpeed(double speed) {
@@ -233,10 +284,11 @@ Pass `capabilitySet` to `generateDecoratorSource()`.
 For each method whose name is in `capabilitySet`:
 
 1. Resolve the return type via Jandex — it must be an interface (error if not)
-2. Generate a static inner class implementing the return type's interface
-3. The inner class constructor takes: the delegate's capability return value + SimulationRuntime + CurrentPrincipal
-4. Each method on the inner class follows the same intercept-or-delegate pattern as `generateSimulatedMethod()`, using dotted QNs (`spi.capability.method`)
-5. The top-level decorator's capability method returns an instance of the wrapper, passing `delegate.capability()` as the inner delegate
+2. **Walk the capability interface's full type hierarchy** to collect all methods: use `ClassInfo.interfaceTypes()` to get direct super-interfaces, then `IndexView.getClassByName()` for each, recursing until the hierarchy is exhausted. Collect all declared methods (`ClassInfo.methods()`) at each level. This is necessary because Jandex's `ClassInfo.methods()` returns only declared methods, not inherited ones — a wrapper implementing `Messaging extends AutoCloseable` must also implement `close()`
+3. Generate a static inner class implementing the return type's interface
+4. The inner class constructor takes: the delegate's capability return value + SimulationRuntime + CurrentPrincipal
+5. Each method on the inner class (both declared and inherited) follows the same intercept-or-delegate pattern as `generateSimulatedMethod()`, using dotted QNs (`spi.capability.method`). Inherited methods get dotted QNs too (e.g. `chat-platform.messaging.close`). Checked exceptions in method signatures (`throws` clauses) must be preserved in the generated code
+6. The top-level decorator's capability method returns an instance of the wrapper, passing `delegate.capability()` as the inner delegate
 
 Generated structure for `@SimulationEligible(name = "chat-platform", capabilities = {"messaging"})`:
 
@@ -266,9 +318,10 @@ public class SimulatedChatPlatform implements ChatPlatform {
     public boolean supports(Class<?> capability) {
         if (capability == Messaging.class) {
             return simulation.strategyFor("chat-platform.messaging.send").isPresent()
+                    || simulation.strategyFor("chat-platform.messaging.listChannels").isPresent()
                     || delegate.supports(capability);
         }
-        // ... one if-block per capability ...
+        // ... one if-block per capability, checking ALL method QNs ...
         return delegate.supports(capability);
     }
 
@@ -306,7 +359,7 @@ Only generated when `capabilities` is non-empty AND the SPI has a `supports(Clas
 2. Collect all method QNs for that capability
 3. Emit an if-block checking `simulation.strategyFor()` for ANY of those QNs
 
-The check uses OR across all methods — if any method in the capability has an active strategy, the capability is considered supported by the simulation.
+The check uses OR across all methods — if any method in the capability has an active strategy, the capability is considered supported by the simulation. **Partial capability semantics:** `supports(Messaging.class)` returns `true` when at least one method has an active strategy. This means a capability may be reported as supported even if not all its methods are simulated — unsimulated methods delegate to the real implementation. Consumers requiring fine-grained capability detection should check `strategyFor()` per method QN. This OR semantic is intentional: "can the simulation do anything with this capability?" is the right threshold for `supports()`, matching the semantics of `delegate.supports()` which reports connector-level availability, not per-method readiness.
 
 #### QN Constant Generation
 
@@ -350,6 +403,7 @@ Naming convention: `UPPER(capabilityName) + "_" + UPPER(methodName)`.
 | TemporalSimulationDriver — resetSpeed | simulation-core | resetSpeed() reverts to global composition |
 | TemporalSimulationDriver — reactive sync | simulation-core | Changing globalSpeed mid-flight affects next delay |
 | TemporalSimulationDriver — null runtime fallback | simulation-core | No runtime → global defaults to 1.0 |
+| TemporalSimulationDriver — pre-start speed | simulation-core | speed() returns 1.0 × globalSpeed before start() |
 | YamlSimulationConfig — speed parsing | simulation-config-core | Parses `speed:` from YAML, defaults to 1.0 |
 | TemporalDriverService — global speed API | event-simulation | setGlobalSpeed/globalSpeed via MCP |
 
@@ -366,6 +420,8 @@ Naming convention: `UPPER(capabilityName) + "_" + UPPER(methodName)`.
 | QN constants — flat + dotted | simulation-generator | Flat methods = UPPER(name), capability methods = CAPABILITY_METHOD |
 | Parameter entries for capability methods | simulation-generator | Dotted QN entries in simulation-parameters.properties |
 | Non-interface return type error | simulation-generator | Capability method returning non-interface → compilation error |
+| Inherited methods generated | simulation-generator | Capability interface extending another interface → all methods generated |
+| Throws clause preserved | simulation-generator | Inherited method with checked exception → throws clause in wrapper |
 
 ## Scope
 
