@@ -35,3 +35,52 @@
 **Exploration:** quick
 **Depends on:** D1
 **Status:** captured
+
+## D4: Adopt connectors#105 decisions D1, D5, D7 for platform generator enhancement
+
+**Choice:** Use connectors#105 design spec decisions as the authoritative design for platform#375: recursive wrapper generation (D1), explicit `capabilities` attribute (D5), `supports()` override (D7). These were validated through adversarial review (R1-01 through R1-07).
+**Alternatives:**
+- Fresh design from the generator perspective — risk contradicting the consumer-facing spec that defines the contract
+- Revisit specific decisions — no issues identified that warrant re-examination
+**Rationale:** The connectors spec was written specifically to define the platform prerequisite. D1 (recursive wrappers), D5 (explicit capability declaration vs heuristic auto-detection), and D7 (supports() semantic coherence) are well-reasoned. The platform implementation is the server side of a contract already defined by the consumer.
+**Trade-offs:** None significant — the spec already addressed generator complexity and backward compatibility.
+**Sources:** connectors specs/issue-105-simulation-eligible-calendar-chat/decisions.md (D1, D5, D7), connectors specs/issue-105-simulation-eligible-calendar-chat/2026-09-20-simulation-eligible-calendar-chat-design.md
+**Exploration:** quick
+**Status:** captured
+
+## D5: Capability wrappers as static inner classes
+
+**Choice:** Generate capability wrapper classes as static inner classes of the decorator class. `SimulatedChatPlatform.Messaging_Wrapper` as a static inner class inside `SimulatedChatPlatform`.
+**Alternatives:**
+- Separate top-level classes — more files, each smaller, easier to debug individually
+- Package-private top-level — cleaner for large SPIs but still more files
+**Rationale:** Matches the connectors spec description ("inner class, not CDI-managed"). Co-locates all generated code for one SPI in a single source file. Inner classes have natural access to the decorator's `simulation` and `currentPrincipal` fields (or receive them via constructor). One file per SPI is easier to review and debug.
+**Trade-offs:** Large SPIs with many capabilities produce a large source file. Acceptable for generated code — readability of generated code is secondary to correctness.
+**Sources:** connectors specs/issue-105 design spec (generated code structure section)
+**Exploration:** quick
+**Depends on:** D4
+**Status:** captured
+
+## D6: Inline if-chain for supports() override
+
+**Choice:** Generator emits an `if (cap == Messaging.class) return simulation.strategyFor("...").isPresent() || delegate.supports(cap)` chain. Direct, no data structures, zero allocation.
+**Alternatives:**
+- Static Map<Class, List<String>> — more structured but heavier for a fixed set of values known at generation time
+**Rationale:** The mapping from capability class to method QNs is fixed at generation time — it doesn't change at runtime. An if-chain is the most direct representation. The JIT will compile it to a tableswitch or series of comparisons. No allocation, no iteration, no map lookup overhead.
+**Trade-offs:** Verbose generated code for SPIs with many capabilities (9 for ChatPlatform). Acceptable — generated code verbosity is free.
+**Sources:** connectors specs/issue-105 design spec (supports() override section, D7)
+**Exploration:** quick
+**Depends on:** D4
+**Status:** captured
+
+## D7: CAPABILITY_METHOD flat naming for QN constants
+
+**Choice:** Uppercase capability + underscore + uppercase method name. `messaging.send` → `MESSAGING_SEND`. All constants in a single flat QN class per SPI.
+**Alternatives:**
+- Nested QN classes (ChatPlatformQN.Messaging.SEND) — more structured but deeper nesting for a constants class
+**Rationale:** Matches the connectors spec example. Flat namespace is simpler to import and use in tests and verification assertions. Existing flat method QNs (`LISTCALENDARS`, `ID`) coexist naturally with dotted capability QNs (`MESSAGING_SEND`).
+**Trade-offs:** Potential name collision if a flat method and a capability method produce the same constant name. Unlikely in practice — flat methods are direct SPI methods, capability methods are nested.
+**Sources:** connectors specs/issue-105 design spec (QN constants section)
+**Exploration:** quick
+**Depends on:** D4
+**Status:** captured
