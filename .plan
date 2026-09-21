@@ -13,3 +13,10 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#373 — Issue #373 ← active
+  - [ ] Batch 1: Global Speed Foundation
+    - [ ] Task 1: SimulationConfig.speed() + MapSimulationConfig
+    - [ ] Task 2: SimulationRuntime.globalSpeed() + driver composition
+    - [ ] Task 3: YamlSimulationConfig + schema + TemporalDriverService
+  - [ ] Batch 2: Capability Wrappers
+    - [ ] Task 4: @SimulationEligible.capabilities + test fixtures
+    - [ ] Task 5: SimulationDecoratorProcessor wrapper generation
