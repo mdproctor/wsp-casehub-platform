@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-387-drop-generated-prefix
-state: scaffolded
+state: active
 project-sha: bd3d333c3b7576c6c70b4998695e42cf2601bee4
 date: 2026-09-22
 issue-repo: casehubio/platform
@@ -13,8 +13,8 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#387 — Issue #387 ← active
-  - [ ] Batch 1: APT-changes
-    - [ ] Task 1: Add deriveOutputPackage and options
-    - [ ] Task 2: Wire derivation and update tests
-  - [ ] Batch 2: Spring-gen
-    - [ ] Task 3: Update graphql-spring-generator
+  - [x] Batch 1: APT-changes
+    - [x] Task 1: Add deriveOutputPackage and options
+    - [x] Task 2: Wire derivation and update tests
+  - [x] Batch 2: Spring-gen
+    - [x] Task 3: Update graphql-spring-generator
