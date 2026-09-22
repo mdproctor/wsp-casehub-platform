@@ -1,42 +1,37 @@
-# Handoff — Simulation DX (Slot 195)
+# Handoff — Spring Deployment Readiness (Slot 198)
 
-## What happened this session
+## What happened
 
-Implemented 7 of 9 platform issues for the simulation DX epic (#352). All XS/S scope, delivered with TDD, zero regressions across 152+ simulation-core tests.
+Epic #501 (Spring Boot deployment readiness) is closed and landed on main. 14 issues across 5 repos, all merged. Branch `issue-501-spring-deployment-readiness` is stamped and closed.
 
-| Issue | Title | What landed |
-|-------|-------|------------|
-| #353 | `Simulation.forTest()` fluent test harness | `Simulation` class + `Builder` with `stub()`/`seed()`/`resolve()`/`overlay()`/`verifier()`. 15 tests. |
-| #354 | `seed.applyTo(runtime, corpus)` | `SimulationRuntime.apply(CorpusSeed)` — adapted to preserve module boundary. 2 tests. |
-| #355 | `MapSimulationConfig.builder()` | Builder with `.strategy()`, `.capture()`, `.exhaustion()`, `.threshold()`. 5 tests. |
-| #356 | Strategy name aliases | `resolveAlias()` maps key/seq/rand/replay/nearest to canonical forms. 5 tests. |
-| #357 | `SimulationVerifier.on(overlay)` overload | Eliminates `.journal()` boilerplate. 1 test. |
-| #358 | `simulation-starter` aggregate dep | POM module pulling all simulation artifacts. No tests (POM only). |
-| #359 | Auto-detect identity key extractor | `requireExtractor()` falls back to `String.valueOf` identity. 2 new tests, 2 updated. |
-| #360 | Default tenancyId for YAML corpus | `YamlCorpusLoader(defaultTenancyId)` + `casehub.simulation.default-tenancy-id` config. 3 tests. |
+Work-end completed: code review (1 CRITICAL fixed), branch audit (4 dimensions clean), squash (61 → 12 commits), rebase onto main, push, issue closed.
 
-## Decisions
+## Before archiving this slot
 
-- **D354: API inversion** — issue said `seed.applyTo(runtime, corpus)` but CorpusSeed (simulation-api) can't depend on SimulationRuntime (simulation-core). Implemented as `runtime.apply(seed)` instead. One line, correct dependency direction.
-- **D359: Identity fallback** — removed the "requires KeyExtractor" error from `requireExtractor()`. Falls back to `String.valueOf(input)`. Multi-param SPIs that need custom keys get `SimulationKeyNotFoundException` as the signal.
+**Run the Spring deployment audit** — plan at `plans/2026-09-22-spring-deployment-audit.md`.
 
-## Queue state
+Eight dimensions:
+1. Completeness — SPI × core/quarkus/spring matrix
+2. Gaps — modules, config, endpoints missing Spring counterparts
+3. Hand-written inventory — why each can't be generated
+4. Drift risk — ranked by likelihood of silent divergence
+5. Drift detection — build-time enforcement proposal
+6. Complexity reduction — consolidation opportunities
+7. Code quality — test coverage, conditional correctness, config defaults
+8. Open-ended — Spring conventions, AOT, DevTools, consumer DX
 
-Position 8/10. Active issue: #361 (inline corpus entries in scenario YAML, M/Med).
-Items #353-#360 complete. #361 needs brainstorming — it touches YAML schema design and scenario engine integration.
-Remaining after #361: 2 pages-repo issues (casehub-pages#453, #454) — not implementable in this repo.
+Phase 1 (1-4) can run as parallel forks. Phase 2 (5-8) needs human input.
 
-## Next action
+## State
 
-Brainstorm #361 — inline corpus entries in scenario YAML. M/Med scope. Design the YAML schema for inline corpus blocks and how they integrate with the existing scenario parser. Then TDD.
+Platform on main. Slot 198 is landed but not archived — audit blocks archival. Slots 194, 195, 200 also landed-not-archived (separate concern).
 
 ## References
 
 | Artifact | Path |
 |----------|------|
-| Epic #352 | casehubio/platform#352 |
-| .plan | `wksp/.plan` (position 8/10, #361 active) |
-| Design spec (#353) | `wksp/specs/issue-352-simulation-dx/2026-09-19-fluent-test-harness-design.md` |
-| Decisions | `wksp/specs/issue-352-simulation-dx/decisions.md` |
-| Implementation plan (#353) | `wksp/plans/2026-09-19-fluent-test-harness.md` |
-| Simulation guide | `proj/docs/guides/simulation-guide.md` |
+| Audit plan | `plans/2026-09-22-spring-deployment-audit.md` |
+| Diary entry | `blog/2026-09-22-mdp01-spring-deployment-landed.md` |
+| Epic | casehubio/parent#501 (closed) |
+| Filed issue | casehubio/parent#513 (@PostConstruct initMethod) |
+| Garden entry | GE-20260922-34ceef (Flow.Subscription gotcha) |
