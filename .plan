@@ -13,3 +13,8 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#387 — Issue #387 ← active
+  - [ ] Batch 1: APT-changes
+    - [ ] Task 1: Add deriveOutputPackage and options
+    - [ ] Task 2: Wire derivation and update tests
+  - [ ] Batch 2: Spring-gen
+    - [ ] Task 3: Update graphql-spring-generator
