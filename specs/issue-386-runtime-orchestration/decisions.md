@@ -12,17 +12,17 @@
 **Exploration:** quick
 **Status:** captured
 
-## D2: Execution model — agnostic interfaces
+## D2: Execution model — virtual-thread-first blocking interfaces
 
-**Choice:** Coordination primitives are defined as execution-model-agnostic interfaces. Virtual thread implementations use j.u.c directly. Async/event-driven implementations can be provided separately.
+**Choice:** Coordination primitives use **virtual-thread-first blocking interfaces** — `acquire()`, `await()`, `receive()`, `lock()` all use `throws InterruptedException` and are designed for the virtual-thread execution model where blocking is cheap. Implementations use `java.util.concurrent` directly.
 **Alternatives:**
-- Virtual threads only — simpler, but locks out async consumers
-- Async only — more distributed-friendly, but more complex for simple in-process scenarios
-**Rationale:** We don't know what consumers will use. The interface contract (acquire/release, signal/await, send/receive) is the same regardless of execution model.
-**Trade-offs:** Interface design must be careful not to leak blocking semantics that don't work in async contexts.
-**Sources:** User requirement: "we don't know what we would be working on so would be both"
-**Exploration:** quick
-**Status:** captured
+- Execution-model-agnostic interfaces (original D2 wording) — impossible in practice, because the interface contract leaks the execution model: `throws InterruptedException` is blocking-only, and callback/CompletableFuture-based APIs are async-only. "Agnostic" means designing for the lowest common denominator, which serves neither model well.
+- Async-only (CompletableFuture/reactive) — more distributed-friendly, but adds complexity for in-process orchestration where virtual threads make blocking cheap and natural.
+**Rationale:** The platform runs on Java 21+ with virtual threads. In-process coordination (the scope of orchestration-core) benefits from blocking APIs: simpler code, debuggable stack traces, natural `try/finally` cleanup. Async adapters (e.g., `CompletableFuture.supplyAsync(() -> { latch.await(); return result; })`) can wrap blocking interfaces efficiently on virtual threads. The reverse (wrapping async in blocking) is inherently lossy.
+**Trade-offs:** Single-threaded event loop consumers (Vert.x, Netty) cannot use these interfaces directly. If async-native coordination is needed in the future, async counterparts can be added alongside — but the current design commits to virtual threads as the primary execution model.
+**Sources:** User requirement: "we don't know what we would be working on so would be both" — resolved toward virtual-thread-first after analysis showed that "agnostic" is a false economy for in-process coordination.
+**Exploration:** deep-analysis
+**Status:** captured (updated from original "agnostic" wording to match spec commitment)
 
 ## D3: Composition vs custom keywords — pattern consolidation
 
