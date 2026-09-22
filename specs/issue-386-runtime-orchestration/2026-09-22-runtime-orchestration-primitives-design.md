@@ -550,7 +550,7 @@ Single-expression transform for keeping simple data reshaping in YAML. Uses the 
 ```
 
 **Semantics:**
-- Simple form: when `transform` is a plain string, it is the expression with the default engine (jq). Operates on the step's input data (previous step result or step `data`).
+- Simple form: when `transform` is a plain string, it is the expression with the default engine (jq). Operates on the **action's output** — the transform receives the result of the step's action and reshapes it. This follows from the post-action position in the Decorator Evaluation Order (position 13, after the action at position 10).
 - Detailed form: `input` names the source, `expression` is the transform, `engine` selects the expression engine (default: jq). `engine` is always a sub-field of `transform`, never a step-level sibling.
 - **Scoping rule:** the expression must be a one-liner. If the transform needs conditional logic, multiple fields from different sources, or iteration — use a `@ScenarioAction` instead.
 - The result of the transform replaces the step's output (available as `${result.<step-name>}`).
@@ -561,6 +561,7 @@ transform_simpleExpression_reshapesData
 transform_withExplicitInput_usesNamedSource
 transform_jqEngine_evaluatesCorrectly
 transform_mvelEngine_evaluatesCorrectly
+transform_defaultInput_isActionOutput
 transform_resultAvailableAsStepResult
 transform_invalidExpression_throwsWithClearMessage
 ```
@@ -830,6 +831,8 @@ channel_unbounded_neverBlocksOnSend
 concurrent_producerConsumer_safeUnderContention
 concurrent_multipleProducers_allDataDelivered
 concurrent_multipleConsumers_eachItemDeliveredOnce
+channel_multiProducerWithCloseOnComplete_parseTimeError
+channel_sendOnClosedChannel_throwsChannelClosedException
 ```
 
 ---
@@ -994,6 +997,9 @@ runtimeSource_loopPrefix_resolvesIndexAndIteration
 runtimeSource_machinePrefix_resolvesCurrentState
 runtimeSource_signalPrefix_resolvesPayload
 runtimeSource_channelPrefix_resolvesValueAndClosed
+runtimeSource_channelPrefix_resolvesError
+runtimeSource_resultPrefix_resolvesError_nullOnSuccess
+runtimeSource_resultPrefix_resolvesError_exceptionOnFailure
 runtimeSource_unknownPrefix_throws
 runtimeSource_deferredPrefix_passesThrough
 runtimeSource_resultFromSequentialPredecessor_resolves
