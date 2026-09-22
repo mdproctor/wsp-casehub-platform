@@ -98,8 +98,9 @@ steps:
 ```
 
 **Semantics:**
-- Steps within a `parallel:` block execute concurrently. The block completes when all steps complete (implicit barrier).
-- `barrier`, `quorum`, and `race` compose with `parallel:` — they reference steps by name and provide explicit synchronization within or across parallel blocks.
+- Steps within a `parallel:` block execute concurrently. The block completes when all steps **terminate** (implicit barrier). Termination means success, failure, or cancellation — a cancelled step (e.g. via `race` or `quorum` cancellation) counts as terminated. The implicit barrier waits for termination, not success. This prevents deadlocks when coordination primitives cancel losing steps inside the block.
+- **Early-advance patterns:** `quorum` and `race` belong **inside** the `parallel:` block when early-advance semantics are needed. The coordination step launches alongside its referenced steps and waits for its condition (N-of-M for quorum, first-completion for race). When satisfied, it runs its action and optionally cancels remaining steps. The parallel block's implicit barrier then completes once all steps (including cancelled ones) have terminated.
+- **Post-facto check:** `quorum` or `barrier` placed **after** a `parallel:` block is a post-facto success check — all steps have already terminated, and the check verifies that enough succeeded.
 - `forEach: { parallel: true }` is the per-iteration parallelism mechanism (each iteration runs concurrently).
 - The `parallel:` block is a structural keyword, not a step decorator — it appears at the same level as steps in the step list.
 
@@ -384,7 +385,11 @@ onError_typedMatch_routesByExceptionType
 onError_typedMatch_firstMatchWins
 onError_otherwise_catchesAll
 onError_noMatch_propagatesException
-onError_doesNotCatchDecoratorErrors
+onError_catchesStepTimeoutException
+onError_catchesRetryExhaustedException_whenNoRetryFallback
+onError_catchesTriggerTimeoutException_whenNoTriggerFallback
+onError_doesNotSeeException_whenScopedFallbackHandlesIt
+onError_parseTimeErrors_failFast_bypassOnError
 ```
 
 ---
@@ -1149,7 +1154,7 @@ public void complexProcessing(ScenarioContext ctx) {
 
 ### 4.4 Coordination Showcase
 
-**Multi-agent consensus (parallel + quorum — proceed on 2 of 3):**
+**Multi-agent consensus — early advance (quorum inside parallel):**
 ```yaml
 scenario: strategy-consensus
 steps:
@@ -1163,16 +1168,35 @@ steps:
       - step: compliance-check
         action: check-compliance
         data: { portfolio: ${portfolio} }
+      - step: consensus
+        quorum:
+          required: 2
+          of: [momentum-eval, risk-eval, compliance-check]
+          timeout: 15s
+        action: aggregate-votes
+```
 
-  - step: consensus
+The `consensus` step is **inside** the `parallel:` block. It launches alongside the three evaluation steps and awaits any 2 completions. Once 2 of 3 finish, `aggregate-votes` runs immediately — the slowest evaluation may still be in progress. The `parallel:` block's implicit barrier then waits for all 4 steps to terminate (the remaining evaluation completes or is cancelled).
+
+**Post-facto success check (quorum after parallel):**
+```yaml
+steps:
+  - parallel:
+      - step: momentum-eval
+        action: evaluate-momentum
+      - step: risk-eval
+        action: evaluate-risk
+      - step: compliance-check
+        action: check-compliance
+
+  - step: verify-consensus
     quorum:
       required: 2
       of: [momentum-eval, risk-eval, compliance-check]
-      timeout: 15s
     action: aggregate-votes
 ```
 
-The `quorum` step proceeds as soon as any 2 of the 3 evaluations complete — it does not wait for all 3. This is the value proposition of `quorum` over `barrier`: the consensus step runs while the slowest evaluation may still be in progress. (If you need all 3, use `barrier: { await: [...] }` instead — or rely on the `parallel:` block's implicit barrier.)
+Here `quorum` is **after** the `parallel:` block — all three evaluations have already terminated (the implicit barrier waited for all). The quorum acts as a post-facto check: "did at least 2 succeed?" If fewer than 2 succeeded, `QuorumNotMetException` is thrown. No early-advance benefit — use this pattern when you want to verify sufficient success from a concurrent group.
 
 **Producer-consumer with backpressure (parallel + channel + loop + semaphore):**
 ```yaml
@@ -1279,10 +1303,10 @@ Tests follow the existing yaml-core test structure. Add to existing test classes
 | `ConcurrentSignalTest` (new) | orchestration-core | Multi-thread signal/await races |
 | `ConcurrentChannelTest` (new) | orchestration-core | Producer-consumer under contention |
 | `ConcurrentStateMachineTest` (new) | orchestration-core | Competing CAS transitions |
-| `ParallelExecutorTest` (new) | orchestration-core | Parallel step execution, implicit barrier on block completion |
-| `CompositionTest` (new) | orchestration-core | Two-primitive compositions (when+loop, trigger+timeout, forEach+retry, when+forEach per-iteration filter) |
-| `TippingPointTest` (new) | orchestration-core | Three-primitive compositions documenting the boundary |
-| `DecoratorOrderTest` (new) | orchestration-core | Verifies canonical decorator evaluation order (timeout wraps retry, on-error wraps timeout, etc.) |
+| `ParallelExecutorTest` (new) | consuming module | Parallel step execution, implicit barrier on block completion, termination semantics (success/failure/cancellation all count) |
+| `CompositionTest` (new) | consuming module | Two-primitive compositions (when+loop, trigger+timeout, forEach+retry, when+forEach per-iteration filter) |
+| `TippingPointTest` (new) | consuming module | Three-primitive compositions documenting the boundary |
+| `DecoratorOrderTest` (new) | consuming module | Verifies canonical decorator evaluation order (timeout wraps retry, on-error wraps timeout, etc.) |
 
 ---
 
