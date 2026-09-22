@@ -59,7 +59,7 @@ When multiple decorators are present on a single step, they form a nesting stack
 | 3 | `loop` | Repetition — creates per-iteration context; `when` evaluated once before loop | Structural |
 | 4 | `on-error` | Error handler — catches all runtime exceptions from layers below | Protection |
 | 5 | `timeout` | Deadline — wraps everything below including trigger wait | Protection |
-| 6 | `trigger` | Wait — blocks until precondition met | Pre-action |
+| 6 | `trigger`/`wait`/`subscribe` | Pre-action wait — blocks until condition met, signal received, or channel message available | Pre-action |
 | 7 | `retry` | Resilience — retries inner execution on failure | Protection |
 | 8 | `semaphore` | Concurrency control — acquired before action, released after (finally). `mutex:` is sugar for `semaphore: { permits: 1 }` | Protection |
 | 9 | `delay` | Pre-action pause | Pre-action |
@@ -68,11 +68,19 @@ When multiple decorators are present on a single step, they form a nesting stack
 | 12 | `transition` | Post-action state machine event | Post-action |
 | 13 | `transform` | Post-action data reshape | Post-action |
 
+**Position 6 variants (mutually exclusive):**
+- `trigger` — polls an endpoint, waits for simulated time, or subscribes to a CloudEvent (see §1.8)
+- `wait: <name>` — blocks until the named signal fires (see §2.3). The signal payload is accessible via `${signal.<name>.payload}` in the action's `data:`.
+- `subscribe: { channel: <name> }` — blocks until a message is available on the named channel (see §2.4). The received value is accessible via `${channel.<name>.value}` in the action's `data:`. Inside a `loop`, each iteration performs one `receive()`.
+
+A step uses at most one pre-action wait. If a step needs to wait for multiple conditions (e.g., a signal AND a data poll), compose as separate steps linked by `barrier` or `signal`.
+
 **Key semantics derived from this order:**
+- `timeout` wraps `trigger`/`wait`/`subscribe` — the deadline covers the blocking wait. A `wait` or `subscribe` that exceeds the timeout fires `StepTimeoutException`.
 - `timeout` wraps `retry` — the deadline covers the entire retry sequence, not individual attempts. For per-attempt timeouts, use `retry.timeout` (delegated to `PolicyEnforcer`).
 - `on-error` wraps `timeout` — timeout exceptions (`StepTimeoutException`) are catchable by `on-error`.
 - `semaphore` is inside `retry` — the permit is re-acquired on each retry attempt, not held across the retry sequence.
-- `trigger` is inside `timeout` — the trigger wait counts against the step's deadline.
+- `trigger`/`wait`/`subscribe` is inside `timeout` — the pre-action wait counts against the step's deadline.
 
 **Fallback precedence:** Scoped fallbacks (`trigger.fallback`, `retry.fallback`) handle their specific exception types before the exception propagates. If a scoped fallback is set, `on-error` does not see that exception. If no scoped fallback is set, the exception propagates to `on-error`. Precedence: `trigger.fallback` > `retry.fallback` > `on-error` (each for its own exception type).
 
@@ -146,6 +154,7 @@ Execute a step only if a condition is true at runtime.
   - `when` + `loop`: `when` evaluated **once** before the loop begins. If false, the entire loop is skipped.
   - `when` + `forEach`: `when` evaluated **per iteration**, within the forEach variable context. This matches the parse-time `ForEachExpander` semantics where `when` filters individual items — the guard can reference `${each.<as>}` variables.
   - `when` alone: evaluated once before the step action.
+- **⚠ Composition asymmetry:** `when` + `loop` and `when` + `forEach` have different evaluation semantics. With `loop`, `when` is evaluated once (guard the whole loop). With `forEach`, `when` is evaluated per item (filter items). This is intentional — `forEach` creates a per-item variable context (`${each.<as>}`) that `when` evaluates within, matching `ForEachExpander`'s parse-time semantics. `loop` does not change the variable context, so `when` has nothing new to evaluate per iteration. Developers who expect `when` to always behave the same regardless of structural context should be aware of this distinction.
 
 **Test cases:**
 ```
@@ -377,6 +386,11 @@ Route to an alternative step on failure.
 - `on-error` catches runtime exceptions from the entire step execution, including decorator-generated runtime exceptions: `StepTimeoutException` (from `timeout`), `RetryExhaustedException` (from `retry` when no `retry.fallback` is set), `TriggerTimeoutException` (from `trigger` when no `trigger.fallback` is set). See Decorator Evaluation Order — `on-error` wraps `timeout`, which wraps `trigger` and `retry`.
 - `on-error` does **not** catch `StepCancelledException` — cancellation from `race` or `quorum` is an external termination signal, not a step-level error. The runtime checks `if (exception instanceof StepCancelledException) rethrow` before invoking the on-error handler. This prevents `on-error` from defeating cancellation intent. `StepCancelledException` extends `java.util.concurrent.CancellationException` (JDK, not a custom hierarchy).
 - `on-error` does **not** catch configuration errors (malformed expressions, unknown variables, invalid step references) — these fail fast at parse time.
+- **Post-action decorator failures:** When the action succeeds but a post-action decorator (position 11-13: `signal`/`publish`, `transition`, `transform`) fails, `on-error` catches the exception. The action's side effects are already committed — `on-error` cannot undo them. Specific semantics:
+  - **Action succeeds, `transform` fails:** The step's result (`${result.<step>}`) is set to the action's raw output (not the failed transform's). The `TransformException` propagates to `on-error`. The fallback step receives the error context but cannot access the original action output (it was not transformed).
+  - **Action succeeds, `transition` fails (guard rejection without `on-guard-fail`):** `IllegalTransitionException` propagates to `on-error`. The state machine remains in its current state. The fallback step should be aware that the action already executed.
+  - **Action succeeds, `signal`/`publish` fails:** The action's work is committed. Dependent steps waiting on the signal/channel may deadlock or timeout. `on-error` handles the local failure; the fallback step should emit the same signal/publish if downstream coordination is required (the runtime does not auto-emit on behalf of a failed decorator).
+  - **Design principle:** `on-error` is a local error handler, not a distributed transaction coordinator. It routes the step to a fallback — it does not compensate for committed side effects. For scenarios requiring compensation (e.g., rollback an API call if a subsequent transition fails), use a `@ScenarioAction` that wraps both operations with explicit error handling.
 
 **Test cases:**
 ```
@@ -424,7 +438,10 @@ Retry a failed step with configurable backoff. Delegates to existing `PolicyEnfo
 
 **Semantics:**
 - `max` → `RetryPolicy.maxAttempts`. `delay` → `RetryPolicy.delayMs`. `backoff` → `BackoffStrategy` enum (fixed, exponential, exponential-with-jitter).
-- `circuit-breaker` is an optional sub-field (not a separate keyword). Maps to `CircuitBreakerPolicy`. **Prerequisite:** `DefaultPolicyEnforcer.execute()` currently reads `policy.retries()` and `policy.timeoutMs()` but does not read `policy.circuitBreaker()` — the `CircuitBreakerPolicy` record exists in `platform-api` but is functionally ignored by the enforcer. `DefaultPolicyEnforcer` must be extended to implement circuit breaker state tracking (failure counter, open/half-open/closed states, recovery window) before this YAML keyword is functional. See casehubio/platform#TBD.
+- `circuit-breaker` is an optional sub-field (not a separate keyword). Maps to `CircuitBreakerPolicy`. **Prerequisite:** `DefaultPolicyEnforcer.execute()` currently reads `policy.retries()` and `policy.timeoutMs()` but does not read `policy.circuitBreaker()` — the `CircuitBreakerPolicy` record exists in `platform-api` but is functionally ignored by the enforcer. `DefaultPolicyEnforcer` must be extended to implement circuit breaker state tracking before this YAML keyword is functional. See casehubio/platform#392 (or a new issue if #392 doesn't cover this — the implementation must be tracked by a real GitHub issue, not a TBD placeholder).
+  - **State scoping:** Circuit breaker state is **application-scoped** (not per-scenario). A `CircuitBreakerRegistry` (application-scoped, keyed by circuit breaker name) holds the failure counter, open/half-open/closed state, and recovery window timestamp for each named circuit breaker. This is the correct scope — if an external service is down, all scenarios should respect the breaker. `DefaultPolicyEnforcer` receives the registry via CDI injection and looks up the named CB state on each `execute()` call.
+  - **Name uniqueness:** Circuit breaker names are deployment-global. Two scenarios using `circuit-breaker: { name: payment-api }` share the same breaker state — intentional, as they call the same API. Different APIs need different names.
+  - **Composition with retry:** Circuit breaker is checked BEFORE each retry attempt. If the breaker is open, the attempt fails immediately with `CircuitBreakerOpenException` (no actual invocation). If the breaker is half-open, one probe attempt is allowed. The retry sequence respects the breaker — it won't burn all retry attempts against an open circuit.
 - `fallback` names a step to route to when retries are exhausted (equivalent to `on-error` but scoped to retry exhaustion).
 - `timeout` (optional sub-field of `retry`) — per-attempt timeout. When set, each retry attempt has this deadline. Maps to `ExecutionPolicy.timeoutMs`. This is distinct from step-level `timeout` which is the total step deadline (see Decorator Evaluation Order). Example: `retry: { max: 3, delay: 1s, timeout: 5s }` means each attempt gets 5s, retried up to 3 times.
 - **Composition with step-level `timeout`:** When both are present, two timeout layers are active. Step-level `timeout` is the outer deadline (covers trigger wait + entire retry sequence). `retry.timeout` is the per-attempt deadline (each individual attempt). The step decorator layer constructs a single `ExecutionPolicy(retryTimeoutMs, retryPolicy, circuitBreakerPolicy)` and passes it to one `PolicyEnforcer.execute()` call. The step-level timeout wraps this call externally. When step-level `timeout` is present but `retry.timeout` is not, `ExecutionPolicy` gets `timeoutMs = null` (no per-attempt timeout — only the outer step deadline applies).
@@ -576,9 +593,57 @@ All coordination primitives are interfaces in `orchestration-core`. Implementati
 
 All coordination primitives are scoped to a **single scenario execution**. The orchestration runtime owns a `ScenarioScope` that creates, tracks, and disposes all named primitive instances.
 
+**ScenarioScope interface** (in `orchestration-core`):
+
+```java
+public interface ScenarioScope extends AutoCloseable {
+    OrcSemaphore semaphore(String name, int permits);
+    OrcSemaphore semaphore(String name, int permits, Duration window);
+    OrcLatch latch(String name, int count);
+    OrcSignal signal(String name);
+    <T> OrcChannel<T> channel(String name);
+    <T> OrcChannel<T> channel(String name, int capacity);
+    <S extends Enum<S>> OrcStateMachine<S> stateMachine(String name, Class<S> stateType, S initialState);
+
+    <T> T primitive(String name, Class<T> type);
+
+    StepResultStore resultStore();
+
+    @Override
+    void close();
+}
+```
+
+**`StepResultStore`** (in `orchestration-core`) — manages step execution results and errors for `${result.<step>}` and `${result.<step>.error}` resolution:
+
+```java
+public interface StepResultStore {
+    void recordSuccess(String stepName, Map<String, Object> result);
+    void recordFailure(String stepName, StepError error);
+    Map<String, Object> result(String stepName);
+    StepError error(String stepName);
+    boolean hasCompleted(String stepName);
+}
+```
+
+```java
+public record StepError(String message, String exceptionClass, String stackTrace) {}
+```
+
+**Module placement:** `ScenarioScope` is an interface in `orchestration-core` (JDK-only — it references only the coordination primitive interfaces and `StepResultStore`). The consuming module provides the implementation that:
+- Walks the parsed scenario AST to determine which primitives to create eagerly
+- Registers runtime `VariableSource`/`ObjectVariableSource` implementations for `result`, `loop`, `machine`, `signal`, `channel` prefixes
+- Tracks step execution contexts for semaphore reentrancy detection
+- Delegates to `ScenarioScope.close()` on scenario completion or abort
+
+**Access mechanism:** The consuming module's step decorator evaluators receive the `ScenarioScope` via constructor injection at step construction time (not CDI — the scope is per-scenario-execution, not per-CDI-scope). The decorator evaluators use `scope.semaphore(name, permits)` to obtain shared primitive instances.
+
+**Thread safety:** `ScenarioScope` implementations must be thread-safe — parallel steps access the scope concurrently. The `primitive()` method uses a `ConcurrentHashMap` for name-to-instance mapping; factory methods (`semaphore()`, `latch()`, etc.) delegate to `computeIfAbsent()` for idempotent creation.
+
+**Lifecycle:**
 - **Creation:** Primitives are created eagerly at scenario load time, based on the parsed scenario definition. Latches, signals, channels, semaphores, and state machines referenced in the YAML are instantiated before step execution begins. This eliminates race conditions from lazy initialization.
-- **Normal completion:** When the scenario completes successfully, all primitives are disposed. Semaphore permits are released. Channels are closed. Latches are counted down to zero.
-- **Abnormal termination:** On timeout, unrecoverable error, or user cancellation, the `ScenarioScope` performs forced cleanup:
+- **Normal completion:** When the scenario completes successfully, `ScenarioScope.close()` disposes all primitives. Semaphore permits are released. Channels are closed. Latches are counted down to zero.
+- **Abnormal termination:** On timeout, unrecoverable error, or user cancellation, `ScenarioScope.close()` performs forced cleanup:
   - Semaphore permits released (finally semantics, same as on-error per step)
   - Channels closed with an error marker — consumers see `closed = true` and `error = true`
   - Latches counted down to zero (to unblock any waiting barrier/quorum steps)
@@ -988,7 +1053,27 @@ public interface ObjectVariableSource {
 }
 ```
 
-`VariableResolver` is extended to try `ObjectVariableSource` first for runtime-registered prefixes. String interpolation (inside `${}` in templates) still stringifies via `toString()`. But when the resolved value is consumed directly as `data:` for an action (not interpolated into a template string), the typed `Object` is passed through — preserving maps, lists, and primitive types. This keeps yaml-core J2CL-safe (no new heavy types) while allowing runtime sources to return typed objects.
+**VariableResolver integration — pass-through vs interpolation:**
+
+`VariableResolver` gains a new method `withObjectScope(String prefix, ObjectVariableSource source)` for registering typed sources alongside string sources. The resolution logic changes as follows:
+
+1. **Sole-reference detection:** When a value being resolved is exactly `${prefix.name}` with no surrounding text (the entire string is one variable reference), the resolver enters **typed resolution mode**. Detection: `value.startsWith("${") && value.endsWith("}") && value.indexOf('}') == value.length() - 1`.
+
+2. **Typed resolution:** In typed mode, the resolver tries `ObjectVariableSource.resolve(name)` first for the matched prefix. If non-null, returns the raw `Object` — preserving maps, lists, and typed values. If null, falls back to `VariableSource.resolve(name)` and returns the String.
+
+3. **Interpolation mode:** When the value contains `${...}` embedded in a larger string (e.g., `"prefix-${result.step.field}-suffix"`), the resolver uses `VariableSource.resolve(name)` → `toString()` and concatenates as before. `ObjectVariableSource` is NOT consulted in interpolation mode — the result must be a String.
+
+4. **Nested field access:** `${result.step.field}` — the resolver resolves the `result` prefix with `ObjectVariableSource`, gets the step result as a `Map<String, Object>`, then `drillFields()` navigates `step.field` through the Map hierarchy. This works because step results are stored as Maps (see below), and `drillFields()` already handles `Map` navigation.
+
+5. **`resolve(Object)` upgrade:** `VariableResolver.resolve(Object value)` currently always calls `resolveString()` for String values. The new logic: for String values containing `${`, check sole-reference first (typed pass-through), then fall back to `resolveString()` (interpolation).
+
+**Step result storage format:** Step results and errors are stored in `StepResultStore` (see §2 Lifecycle and Scope) as structured `Map<String, Object>`. The `result` prefix `ObjectVariableSource` resolves from this store:
+
+- **On success:** `StepResultStore.recordSuccess(stepName, actionOutput)` stores the action's output (already a `Map<String, Object>` from the action framework).
+- **On failure:** `StepResultStore.recordFailure(stepName, StepError(message, exceptionClass, stackTrace))` stores a `StepError` record.
+- **Resolution:** `${result.<step>}` → `ObjectVariableSource` returns the action output Map (typed pass-through) or `null` if the step failed. `${result.<step>.error}` → `ObjectVariableSource` returns a `StepError` record, which is converted to `Map<String, Object>` (`{ message, exceptionClass, stackTrace }`) for `drillFields()` navigation. `${result.<step>.error.message}` drills through the error Map to the message String. `${result.<step>.error} != null` in a `when` expression checks for failure using the Object (not a stringified comparison).
+
+This keeps yaml-core J2CL-safe (no new heavy types) while allowing runtime sources to return typed objects.
 
 **Test cases:**
 ```
@@ -1303,11 +1388,13 @@ Tests follow the existing yaml-core test structure. Add to existing test classes
 | `TruthinessTest` (extend) | yaml-core | `when` condition evaluation via Truthiness |
 | `VariableResolverTest` (extend) | yaml-core | Runtime variable sources (result, loop, machine, signal, channel prefixes) |
 | `ForEachExpanderTest` (extend) | yaml-core | Runtime forEach (dynamic collection resolution) |
+| `ObjectVariableSourceTest` (new) | yaml-core | Sole-reference pass-through, interpolation fallback to String, nested field drilling, error map resolution |
 | `ConditionEvaluatorTest` (new) | yaml-core | Expression-based condition evaluation, type coercion |
 | `LoopEvaluatorTest` (new) | consuming module | Count loops, exit-condition loops, max safety, delay |
 | `TriggerEvaluatorTest` (new) | consuming module | Data/time/event triggers, polling, timeout |
 | `TransformEvaluatorTest` (new) | consuming module | Expression-based transforms, engine selection |
 | `RetryDecoratorTest` (new) | consuming module | Retry with backoff, circuit breaker, PolicyEnforcer delegation |
+| `ScenarioScopeTest` (new) | orchestration-core | Primitive creation, idempotent name lookup, lifecycle (dispose unblocks waiters), thread-safe concurrent access |
 | `OrcSemaphoreTest` (new) | orchestration-core | Permits, blocking, time-windowed replenishment |
 | `OrcLatchTest` (new) | orchestration-core | Countdown, await, timeout |
 | `OrcSignalTest` (new) | orchestration-core | Signal/await, payload, one-shot vs repeatable |
