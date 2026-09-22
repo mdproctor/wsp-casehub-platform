@@ -13,3 +13,17 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#386 — Issue #386 ← active
+  - [ ] Batch 1: yaml-core-contracts
+    - [ ] Task 1: ObjectVariableSource + typed resolution
+    - [ ] Task 2: Condition ConditionEvaluator SpeedMultiplier RuntimeForEach
+  - [ ] Batch 2: orchestration-foundation
+    - [ ] Task 3: Module scaffold + DurationParser + StepResultStore + ScenarioScope
+  - [ ] Batch 3: semaphore-latch
+    - [ ] Task 4: OrcSemaphore
+    - [ ] Task 5: OrcLatch
+  - [ ] Batch 4: signal-channel
+    - [ ] Task 6: OrcSignal
+    - [ ] Task 7: OrcChannel
+  - [ ] Batch 5: statemachine-scope
+    - [ ] Task 8: OrcStateMachine
+    - [ ] Task 9: DefaultScenarioScope
