@@ -375,6 +375,7 @@ Route to an alternative step on failure.
 - Detailed form: `goto` names the target step, `log` emits a message.
 - Typed form: `match` checks the exception type (simple class name matching). `otherwise` is the catch-all. Evaluated top-to-bottom, first match wins.
 - `on-error` catches runtime exceptions from the entire step execution, including decorator-generated runtime exceptions: `StepTimeoutException` (from `timeout`), `RetryExhaustedException` (from `retry` when no `retry.fallback` is set), `TriggerTimeoutException` (from `trigger` when no `trigger.fallback` is set). See Decorator Evaluation Order — `on-error` wraps `timeout`, which wraps `trigger` and `retry`.
+- `on-error` does **not** catch `StepCancelledException` — cancellation from `race` or `quorum` is an external termination signal, not a step-level error. The runtime checks `if (exception instanceof StepCancelledException) rethrow` before invoking the on-error handler. This prevents `on-error` from defeating cancellation intent. `StepCancelledException` extends `java.util.concurrent.CancellationException` (JDK, not a custom hierarchy).
 - `on-error` does **not** catch configuration errors (malformed expressions, unknown variables, invalid step references) — these fail fast at parse time.
 
 **Test cases:**
@@ -390,6 +391,8 @@ onError_catchesRetryExhaustedException_whenNoRetryFallback
 onError_catchesTriggerTimeoutException_whenNoTriggerFallback
 onError_doesNotSeeException_whenScopedFallbackHandlesIt
 onError_parseTimeErrors_failFast_bypassOnError
+onError_stepCancelledException_bypassesOnError
+onError_raceCancellation_notCaughtByOtherwise
 ```
 
 ---
@@ -739,7 +742,7 @@ public interface OrcSignal {
 ```
 
 **Semantics:**
-- `race` creates a signal per named step. First signal wins — the race step proceeds with the winner's result. **Cancellation mechanism:** losing steps are cancelled via `Thread.interrupt()` on their virtual thread. The interrupted thread's current blocking operation (`await()`, `receive()`, `acquire()`, `sleep()`) throws `InterruptedException`. The orchestration runtime catches this and performs decorator cleanup:
+- `race` creates a signal per named step. First signal wins — the race step proceeds with the winner's result. **Cancellation mechanism:** losing steps are cancelled via `Thread.interrupt()` on their virtual thread. The orchestration runtime wraps the resulting `InterruptedException` in `StepCancelledException` (extends `java.util.concurrent.CancellationException`). `StepCancelledException` bypasses `on-error` handlers (see §1.6) — cancellation is an external termination signal, not a step failure. The runtime performs decorator cleanup:
   - `semaphore` — permit released (finally semantics)
   - `retry` — `DefaultPolicyEnforcer` already handles `InterruptedPolicyException` (breaks retry loop)
   - `publish` — partial publishes already in the channel are NOT rolled back (channel is ordered, rolling back would require coordination with consumers who may have already consumed earlier items)
@@ -780,6 +783,9 @@ public interface OrcChannel<T> {
     T receive(long timeout, TimeUnit unit) throws InterruptedException;
     boolean isEmpty();
     void close();
+    void close(Throwable cause);
+    boolean isErrorClosed();
+    Throwable closeError();
 }
 ```
 
@@ -808,6 +814,7 @@ public interface OrcChannel<T> {
 - `publish` sends to a channel. `subscribe` receives from a channel. Both block when the channel is full/empty (backpressure).
 - Bounded channels: `channel: { name: events, capacity: 100 }`. Default: unbounded. Unbounded is the correct default for an in-process orchestration primitive — scenarios run within a single JVM with bounded lifetimes, and capacity tuning is a performance concern, not a correctness concern. The runtime emits a **high-water-mark warning** (logged at WARN level) when an unbounded channel exceeds 10,000 queued items, indicating a likely producer-consumer imbalance that the scenario author should address with explicit capacity.
 - **Close semantics:** `close-on-complete: true` (default) closes the channel when the publishing step completes — both on success and on failure. On producer failure (exception), the channel is **error-closed**: `close(Throwable cause)` sets the channel to closed state with an error marker. Consumers draining remaining items proceed normally; when the buffer is exhausted, the next `receive()` throws `ChannelClosedException` wrapping the producer's exception (rather than returning `closed = true` silently). This prevents consumers from silently interpreting an incomplete data stream as complete. Explicit close: `close-channel: events` as a standalone action for multi-producer scenarios. `close()` (no-arg) signals normal completion — receivers see `closed = true` after draining remaining items.
+- **Multi-producer close detection:** The parser detects when multiple `publish` declarations target the same channel and any has `close-on-complete: true` (including the default). This is a **parse-time error** — the first producer to complete would close the channel, killing remaining producers. The error message directs the author to set `close-on-complete: false` on all producers and use explicit `close-channel:` for coordinated shutdown. `send()` on a closed channel throws `ChannelClosedException`.
 - Channels are typed at the Java interface level but untyped in YAML (everything is `Map<String, Object>`).
 
 **Test cases:**
@@ -956,8 +963,10 @@ ${loop.iteration}               — current loop iteration (1-based)
 ${each.<as>.<field>}            — current forEach item (already exists)
 ${machine.<name>.state}         — state machine current state
 ${signal.<name>.payload}        — signal payload
+${result.<step-name>.error}      — step error (null if succeeded, exception object if failed — for barrier result inspection)
 ${channel.<name>.value}         — last received channel value
 ${channel.<name>.closed}        — channel closed flag
+${channel.<name>.error}         — channel close error (null if normal close, Throwable if error-closed)
 ${env.<key>}                    — environment/config value
 ```
 
