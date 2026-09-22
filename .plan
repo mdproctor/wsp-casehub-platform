@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-385-spring-gen-manual-config
-state: scaffolded
+state: active
 project-sha: 821f399ffb7ceb53a702857b62087d5f0d1dad9b
 date: 2026-09-22
 issue-repo: casehubio/platform
@@ -13,10 +13,10 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#385 — Issue #385 ← active
-  - [ ] Batch 1: Type Fidelity
-    - [ ] Task 1: Add resolvedType and fix wildcards
-    - [ ] Task 2: Fix Optional wrapping
-  - [ ] Batch 2: Manual Bean Exclusion
-    - [ ] Task 3: Extract ManualBeanScanner and filter
-  - [ ] Batch 3: Full Build
-    - [ ] Task 4: Verify full platform build
+  - [x] Batch 1: Type Fidelity
+    - [x] Task 1: Add resolvedType and fix wildcards
+    - [x] Task 2: Fix Optional wrapping
+  - [x] Batch 2: Manual Bean Exclusion
+    - [x] Task 3: Extract ManualBeanScanner and filter
+  - [x] Batch 3: Full Build
+    - [x] Task 4: Verify full platform build
