@@ -61,7 +61,7 @@ When multiple decorators are present on a single step, they form a nesting stack
 | 5 | `timeout` | Deadline — wraps everything below including trigger wait | Protection |
 | 6 | `trigger` | Wait — blocks until precondition met | Pre-action |
 | 7 | `retry` | Resilience — retries inner execution on failure | Protection |
-| 8 | `semaphore`/`mutex` | Concurrency control — acquired before action, released after (finally) | Protection |
+| 8 | `semaphore` | Concurrency control — acquired before action, released after (finally). `mutex:` is sugar for `semaphore: { permits: 1 }` | Protection |
 | 9 | `delay` | Pre-action pause | Pre-action |
 | 10 | **action** | Step action executes | Execution |
 | 11 | `signal`/`publish` | Post-action notification/data send | Post-action |
@@ -71,7 +71,7 @@ When multiple decorators are present on a single step, they form a nesting stack
 **Key semantics derived from this order:**
 - `timeout` wraps `retry` — the deadline covers the entire retry sequence, not individual attempts. For per-attempt timeouts, use `retry.timeout` (delegated to `PolicyEnforcer`).
 - `on-error` wraps `timeout` — timeout exceptions (`StepTimeoutException`) are catchable by `on-error`.
-- `semaphore`/`mutex` is inside `retry` — the permit is re-acquired on each retry attempt, not held across the retry sequence.
+- `semaphore` is inside `retry` — the permit is re-acquired on each retry attempt, not held across the retry sequence.
 - `trigger` is inside `timeout` — the trigger wait counts against the step's deadline.
 
 **Fallback precedence:** Scoped fallbacks (`trigger.fallback`, `retry.fallback`) handle their specific exception types before the exception propagates. If a scoped fallback is set, `on-error` does not see that exception. If no scoped fallback is set, the exception propagates to `on-error`. Precedence: `trigger.fallback` > `retry.fallback` > `on-error` (each for its own exception type).
@@ -196,7 +196,7 @@ Repeat a step (or steps) with a count or exit condition.
 
 **Semantics:**
 - `count` and `until` are mutually exclusive. Providing both throws `InvalidLoopException`.
-- `max` is a safety limit for `until` loops. Default: 1000. Reaching `max` throws `LoopExhaustedException` unless `on-max: skip` is set.
+- `max` is a safety limit for `until` loops. Default: 1000. Reaching `max` throws `LoopExhaustedException` unless `on-max: skip` is set. When `until` is specified without an explicit `max`, the parser emits a **parse-time warning** indicating the implicit default of 1000 applies. This surfaces implicit loop bounds to scenario authors who may have assumed unbounded iteration.
 - `delay` respects the scenario speed multiplier via `SpeedMultiplier` SPI.
 - `until` is evaluated after each iteration (do-while semantics — the body always runs at least once).
 - The loop exposes `${loop.index}` (0-based) and `${loop.iteration}` (1-based) as variables within the body.
@@ -213,6 +213,7 @@ loopWithDelay_respectsSpeedMultiplier
 loopCountAndUntilBoth_throws
 loopWithMultiStepBody_executesAllStepsPerIteration
 loopWithWhen_guardEvaluatedOnceBeforeLoop
+loopUntil_noExplicitMax_emitsParseWarning
 ```
 
 ---
@@ -566,11 +567,10 @@ All coordination primitives are interfaces in `orchestration-core`. Implementati
 
 All coordination primitives are scoped to a **single scenario execution**. The orchestration runtime owns a `ScenarioScope` that creates, tracks, and disposes all named primitive instances.
 
-- **Creation:** Primitives are created eagerly at scenario load time, based on the parsed scenario definition. Latches, signals, channels, semaphores, mutexes, and state machines referenced in the YAML are instantiated before step execution begins. This eliminates race conditions from lazy initialization.
-- **Normal completion:** When the scenario completes successfully, all primitives are disposed. Semaphore permits are released. Mutexes are unlocked. Channels are closed. Latches are counted down to zero.
+- **Creation:** Primitives are created eagerly at scenario load time, based on the parsed scenario definition. Latches, signals, channels, semaphores, and state machines referenced in the YAML are instantiated before step execution begins. This eliminates race conditions from lazy initialization.
+- **Normal completion:** When the scenario completes successfully, all primitives are disposed. Semaphore permits are released. Channels are closed. Latches are counted down to zero.
 - **Abnormal termination:** On timeout, unrecoverable error, or user cancellation, the `ScenarioScope` performs forced cleanup:
   - Semaphore permits released (finally semantics, same as on-error per step)
-  - Mutexes unlocked
   - Channels closed with an error marker — consumers see `closed = true` and `error = true`
   - Latches counted down to zero (to unblock any waiting barrier/quorum steps)
   - Signals signalled with an error payload (to unblock any waiting steps)
@@ -736,7 +736,6 @@ public interface OrcSignal {
 **Semantics:**
 - `race` creates a signal per named step. First signal wins — the race step proceeds with the winner's result. **Cancellation mechanism:** losing steps are cancelled via `Thread.interrupt()` on their virtual thread. The interrupted thread's current blocking operation (`await()`, `receive()`, `acquire()`, `sleep()`) throws `InterruptedException`. The orchestration runtime catches this and performs decorator cleanup:
   - `semaphore` — permit released (finally semantics)
-  - `mutex` — lock released (finally semantics)
   - `retry` — `DefaultPolicyEnforcer` already handles `InterruptedPolicyException` (breaks retry loop)
   - `publish` — partial publishes already in the channel are NOT rolled back (channel is ordered, rolling back would require coordination with consumers who may have already consumed earlier items)
   - In-progress HTTP requests (`trigger: { type: data }`) — the `Future` is cancelled; whether the underlying HTTP call aborts depends on the HTTP client implementation
@@ -961,6 +960,7 @@ ${env.<key>}                    — environment/config value
 - Runtime sources are registered as `VariableSource` implementations, scoped to the execution context.
 - The resolver tries prefixes in registration order. Runtime prefixes (`result`, `loop`, `machine`, `signal`, `channel`) are registered by the orchestration runtime, not by the YAML author.
 - Deferred prefix handling (already in `VariableResolver`) allows parse-time validation to flag unknown prefixes while deferring runtime-only prefixes.
+- **`${result.<step>}` resolution scope:** `${result.<step>}` is valid when the named step has completed and the referencing step can observe its result. For sequential steps, this means the named step must precede the referencing step in declaration order. For concurrent steps (inside `parallel:` blocks or concurrent step groups), results from sibling concurrent steps are not available via `${result}` — use `barrier`, `signal`, or `channel` for cross-step data flow in concurrent contexts. Referencing a step that has not yet completed throws `UnresolvedVariableException` at runtime. The parser emits a warning when `${result.<step>}` references a step that is not a sequential predecessor (best-effort static analysis — not all concurrent patterns are detectable at parse time).
 
 **Type widening for runtime sources:** The existing `VariableSource` returns `String resolve(String name)`, which is correct for parse-time resolution where all values are interpolated into strings. Runtime sources need to pass complex objects (step results as maps, signal payloads, channel values). yaml-core introduces `ObjectVariableSource`:
 
@@ -982,6 +982,9 @@ runtimeSource_signalPrefix_resolvesPayload
 runtimeSource_channelPrefix_resolvesValueAndClosed
 runtimeSource_unknownPrefix_throws
 runtimeSource_deferredPrefix_passesThrough
+runtimeSource_resultFromSequentialPredecessor_resolves
+runtimeSource_resultFromConcurrentSibling_throwsUnresolved
+runtimeSource_resultFromUnrunStep_throwsUnresolved
 ```
 
 ---
@@ -1270,7 +1273,6 @@ Tests follow the existing yaml-core test structure. Add to existing test classes
 | `OrcLatchTest` (new) | orchestration-core | Countdown, await, timeout |
 | `OrcSignalTest` (new) | orchestration-core | Signal/await, payload, one-shot vs repeatable |
 | `OrcChannelTest` (new) | orchestration-core | Send/receive, bounded backpressure, close semantics |
-| `OrcMutexTest` (new) | orchestration-core | Lock/unlock, finally semantics, reentrancy detection |
 | `OrcStateMachineTest` (new) | orchestration-core | Transitions, guards, terminal states, handlers |
 | `ConcurrentSemaphoreTest` (new) | orchestration-core | Multi-thread contention on semaphore |
 | `ConcurrentLatchTest` (new) | orchestration-core | Multi-thread countdown/await races |
