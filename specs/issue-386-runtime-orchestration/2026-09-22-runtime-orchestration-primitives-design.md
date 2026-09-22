@@ -33,6 +33,20 @@ Signs you've crossed the line:
 
 The language allows this (regular and recursive grammar), but documentation and showcase examples guide developers toward flat patterns and timely delegation to code.
 
+### Type Safety — The Ansible Differentiator
+
+Ansible started as declarative configuration and accumulated `when`, `loop`, `until`, `block/rescue`, `register` — each individually reasonable, but together forming a Turing-complete language that's worse at being a language than Python and worse at being declarative than Terraform. The root cause: Ansible is not type-safe. Everything is Jinja2 string templating. Errors surface at runtime, deep into playbook runs.
+
+Our primitives avoid this trap through typed Java interfaces:
+- `ExpressionEngine.compile(expr, contextType, resultType)` — expressions type-checked at compile time
+- `VariableResolver` with scoped prefixes — unknown prefixes fail at parse time, not runtime
+- Step names in `barrier`, `race`, `quorum` — validated against the scenario definition at parse time
+- `StateMachine` transitions — invalid transitions rejected before execution
+- `OrcChannel<T>` — typed data passing, not string blobs
+- `@ScenarioAction` escape hatch — when logic exceeds YAML's comfort zone, developers move to full Java with IDE support, debuggers, and type safety. Ansible has no equivalent native escape.
+
+This type safety is not optional. Every new primitive must be parse-time-validatable. If a construct can only report errors at runtime, it doesn't belong in the YAML surface — it belongs in Java code.
+
 ---
 
 ## Part 1: Step Decorators
