@@ -14,12 +14,13 @@ Runtime orchestration requires evaluation against live state during execution �
 
 | Module | Contents | Dependencies |
 |--------|----------|-------------|
-| `yaml-core` | Runtime evaluation interfaces: `Condition`, `RuntimeForEach`, runtime `VariableSource` extensions | Zero (existing) |
-| `orchestration-core` (new) | Coordination primitives: `Semaphore`, `Latch`, `Signal`, `Channel`, `Mutex`, `StateMachine`. Thread-safe via `java.util.concurrent` | JDK only |
+| `yaml-core` | Runtime evaluation contracts: `Condition`, `RuntimeForEach`, `ObjectVariableSource`, `SpeedMultiplier` SPI, `ConditionEvaluator` | Zero (existing) |
+| `orchestration-core` (new) | Coordination primitives: `Semaphore`, `Latch`, `Signal`, `Channel`, `StateMachine`. Own `DurationParser` (same syntax as simulation-config-core, extended with `h`). Thread-safe via `java.util.concurrent` | JDK only |
+| Consuming module (e.g. scenario-runtime) | Step decorator evaluators: `LoopEvaluator`, `TriggerEvaluator`, `TransformEvaluator`, `RetryDecorator`, `TimeoutDecorator`, `DelayEvaluator` | yaml-core, orchestration-core, platform-api, governance-core, simulation-core |
 
-**Why two modules:** yaml-core is J2CL-transpilable (targets JavaScript, single-threaded). Coordination primitives need `j.u.c` for thread safety. Clean separation: contracts in yaml-core, concurrent implementations in orchestration-core.
+**Why three tiers:** yaml-core is J2CL-transpilable — it defines pure contracts with zero dependencies. Coordination primitives need `j.u.c` for thread safety but have no platform dependencies — `orchestration-core` is genuinely JDK-only. Step decorator evaluators compose platform services (`ExpressionEngine` from platform-api, `PolicyEnforcer` from governance-core, `SimulationRuntime.globalSpeed()` from simulation-core) with coordination primitives — they cannot be JDK-only and belong in the consuming module.
 
-Consumers (scenario-runtime in pages, agentic patterns in blocks) depend on both and compose step-level YAML keywords from these primitives.
+`ConditionEvaluator` is stateless and pure — it evaluates `when` expressions via `Truthiness` and delegates complex expressions to `ExpressionEngine` through a functional SPI (`java.util.function.Function<String, Boolean>`). It lives in yaml-core because its core logic is string truthiness evaluation; the expression engine binding happens at the consuming layer.
 
 ## Design Philosophy
 
@@ -43,9 +44,82 @@ Our primitives avoid this trap through typed Java interfaces:
 - Step names in `barrier`, `race`, `quorum` — validated against the scenario definition at parse time
 - `StateMachine` transitions — invalid transitions rejected before execution
 - `OrcChannel<T>` — typed data passing, not string blobs
-- `@ScenarioAction` escape hatch — when logic exceeds YAML's comfort zone, developers move to full Java with IDE support, debuggers, and type safety. Ansible has no equivalent native escape.
+- `@ScenarioAction` escape hatch — when logic exceeds YAML's comfort zone, developers move to full Java with IDE support, debuggers, and type safety. Ansible has no equivalent native escape. **Prerequisite:** `@ScenarioAction` is defined in the scenario format spec (casehubio/platform#409). It does not exist in the codebase yet. The tipping-point guidance in §4.3 targets this mechanism — until #409 lands, "extract to code" means implementing the action as a regular Java method registered with the scenario engine.
 
 This type safety is not optional. Every new primitive must be parse-time-validatable. If a construct can only report errors at runtime, it doesn't belong in the YAML surface — it belongs in Java code.
+
+### Decorator Evaluation Order
+
+When multiple decorators are present on a single step, they form a nesting stack — each decorator wraps the layer inside it. The canonical evaluation order, from outermost to innermost:
+
+| Order | Decorator | Role | Phase |
+|-------|-----------|------|-------|
+| 1 | `when` | Guard — if false, skip entire step | Pre-execution |
+| 2 | `forEach` | Iteration — creates per-item context; `when` re-evaluated per iteration | Structural |
+| 3 | `loop` | Repetition — creates per-iteration context; `when` evaluated once before loop | Structural |
+| 4 | `on-error` | Error handler — catches all runtime exceptions from layers below | Protection |
+| 5 | `timeout` | Deadline — wraps everything below including trigger wait | Protection |
+| 6 | `trigger` | Wait — blocks until precondition met | Pre-action |
+| 7 | `retry` | Resilience — retries inner execution on failure | Protection |
+| 8 | `semaphore`/`mutex` | Concurrency control — acquired before action, released after (finally) | Protection |
+| 9 | `delay` | Pre-action pause | Pre-action |
+| 10 | **action** | Step action executes | Execution |
+| 11 | `signal`/`publish` | Post-action notification/data send | Post-action |
+| 12 | `transition` | Post-action state machine event | Post-action |
+| 13 | `transform` | Post-action data reshape | Post-action |
+
+**Key semantics derived from this order:**
+- `timeout` wraps `retry` — the deadline covers the entire retry sequence, not individual attempts. For per-attempt timeouts, use `retry.timeout` (delegated to `PolicyEnforcer`).
+- `on-error` wraps `timeout` — timeout exceptions (`StepTimeoutException`) are catchable by `on-error`.
+- `semaphore`/`mutex` is inside `retry` — the permit is re-acquired on each retry attempt, not held across the retry sequence.
+- `trigger` is inside `timeout` — the trigger wait counts against the step's deadline.
+
+**Fallback precedence:** Scoped fallbacks (`trigger.fallback`, `retry.fallback`) handle their specific exception types before the exception propagates. If a scoped fallback is set, `on-error` does not see that exception. If no scoped fallback is set, the exception propagates to `on-error`. Precedence: `trigger.fallback` > `retry.fallback` > `on-error` (each for its own exception type).
+
+### Parallel Execution
+
+Steps execute **sequentially** by default — the order in the YAML file determines execution order. Parallel execution is opt-in via the `parallel:` structural keyword:
+
+```yaml
+steps:
+  - step: setup
+    action: initialize
+
+  - parallel:
+      - step: momentum-eval
+        action: evaluate-momentum
+      - step: risk-eval
+        action: evaluate-risk
+      - step: compliance-check
+        action: check-compliance
+
+  - step: aggregate
+    action: aggregate-results
+```
+
+**Semantics:**
+- Steps within a `parallel:` block execute concurrently. The block completes when all steps complete (implicit barrier).
+- `barrier`, `quorum`, and `race` compose with `parallel:` — they reference steps by name and provide explicit synchronization within or across parallel blocks.
+- `forEach: { parallel: true }` is the per-iteration parallelism mechanism (each iteration runs concurrently).
+- The `parallel:` block is a structural keyword, not a step decorator — it appears at the same level as steps in the step list.
+
+### Branching Patterns
+
+D3 dropped `if/else` and `branches`. Simple conditional branching uses `when`-pair — two or more steps with mutually exclusive conditions:
+
+```yaml
+- step: handle-high
+  when: ${risk-level} == 'HIGH'
+  action: escalate
+
+- step: handle-low
+  when: ${risk-level} != 'HIGH'
+  action: proceed
+```
+
+For 3+ branches, use a `StateMachine` (§2.6) with guarded transitions, or extract to a `@ScenarioAction` where Java's `switch`/`if-else` is clearer and more maintainable.
+
+**Limitations of when-pairs:** Manually maintaining mutually exclusive conditions is error-prone for 3+ branches. This is intentional — it creates pressure toward `StateMachine` or `@ScenarioAction` at exactly the point where YAML branching becomes harder to read than code.
 
 ---
 
@@ -67,7 +141,10 @@ Execute a step only if a condition is true at runtime.
 **Semantics:**
 - `when` evaluates to a boolean. Non-boolean results throw `ConditionEvaluationException`.
 - A false `when` skips the step entirely — no action invoked, no side effects.
-- `when` composes with all other decorators: evaluated first, before `loop`, `forEach`, `trigger`, etc.
+- `when` is the outermost decorator (see Decorator Evaluation Order). Composition with structural decorators:
+  - `when` + `loop`: `when` evaluated **once** before the loop begins. If false, the entire loop is skipped.
+  - `when` + `forEach`: `when` evaluated **per iteration**, within the forEach variable context. This matches the parse-time `ForEachExpander` semantics where `when` filters individual items — the guard can reference `${each.<as>}` variables.
+  - `when` alone: evaluated once before the step action.
 
 **Test cases:**
 ```
@@ -77,6 +154,7 @@ whenWithVariableInterpolation_resolvesBeforeEval
 whenWithComplexExpression_usesMvel
 whenNonBooleanResult_throwsException
 whenComposedWithLoop_evaluatedOnceBeforeLoop
+whenComposedWithForEach_evaluatedPerIteration
 ```
 
 ---
@@ -119,7 +197,7 @@ Repeat a step (or steps) with a count or exit condition.
 **Semantics:**
 - `count` and `until` are mutually exclusive. Providing both throws `InvalidLoopException`.
 - `max` is a safety limit for `until` loops. Default: 1000. Reaching `max` throws `LoopExhaustedException` unless `on-max: skip` is set.
-- `delay` respects the scenario speed multiplier via `TemporalDriverService`.
+- `delay` respects the scenario speed multiplier via `SpeedMultiplier` SPI.
 - `until` is evaluated after each iteration (do-while semantics — the body always runs at least once).
 - The loop exposes `${loop.index}` (0-based) and `${loop.iteration}` (1-based) as variables within the body.
 
@@ -172,6 +250,11 @@ Iterate a step over a runtime-resolved collection.
 - `${each.index}` (0-based) is always available.
 - The runtime `forEach` extends the existing `ForEachExpander` pattern but resolves the collection from a live `VariableSource`, not from static YAML.
 - Parallel iteration is opt-in: `parallel: true` runs iterations concurrently (default: sequential).
+- **Parallel failure semantics:** When `parallel: true` and an iteration fails:
+  - All other in-flight iterations continue to completion (no fail-fast). This matches the platform's stance that partial results are more useful than aborted work.
+  - Failures are collected into a `ForEachCompositeException` containing each failed iteration's index, item, and exception.
+  - The `on-error` handler fires once for the entire `forEach` step (not per iteration), receiving the composite exception. The handler can inspect individual failures via `${error.failures}`.
+  - `retry` retries the entire `forEach` step (all iterations), not individual failed iterations. Per-iteration retry is a deliberate non-goal — iteration bodies are arbitrary step sequences, and partial retry of a parallel fan-out creates ambiguous result-set semantics.
 
 **Test cases:**
 ```
@@ -183,6 +266,10 @@ forEach_nonIterableSource_throws
 forEach_withWhen_filtersPerIteration
 forEach_parallel_executesConcurrently
 forEach_parallel_collectsAllResults
+forEach_parallel_failureInOneIteration_othersComplete
+forEach_parallel_compositeException_containsAllFailures
+forEach_parallel_onError_firesOnceWithComposite
+forEach_parallel_retry_retriesAllIterations
 forEach_withMultiStepBody_executesAllStepsPerItem
 ```
 
@@ -198,8 +285,8 @@ Wait a fixed duration, respecting the speed multiplier.
 ```
 
 **Semantics:**
-- Duration parsing: `ms`, `s`, `m`, `h` suffixes (reuse `DurationParser` from simulation-config-core).
-- Respects `TemporalDriverService` speed multiplier: at speed 2x, a 5s delay waits 2.5s real time.
+- Duration parsing: `ms`, `s`, `m`, `h` suffixes. orchestration-core provides its own `DurationParser` (same syntax as simulation-config-core's, extended with `h` for hours). No dependency on simulation-config-core.
+- Respects `SpeedMultiplier` SPI (defined in yaml-core, implemented by the runtime — e.g. backed by `TemporalDriverService` in event-simulation): at speed 2x, a 5s delay waits 2.5s real time.
 - `delay` on a step waits before executing the action. Use `delay` inside `loop` for inter-iteration pauses.
 
 **Test cases:**
@@ -234,10 +321,11 @@ Set a deadline on any step. Composes with `on-error` for fallback routing.
 ```
 
 **Semantics:**
-- `timeout` wraps the step execution (including any trigger wait) with a deadline.
+- `timeout` wraps the step execution (including any trigger wait) with a deadline (see Decorator Evaluation Order — timeout is outside trigger).
 - On timeout, fires `StepTimeoutException`. If `on-error` is present, routes to the named step/action. If absent, the exception propagates.
-- Respects the speed multiplier.
+- Respects the speed multiplier via `SpeedMultiplier` SPI.
 - Delegates to `PolicyEnforcer` internally for consistent timeout handling.
+- **Interaction with `trigger.timeout`:** Both can be active simultaneously. `trigger.timeout` applies only to the trigger wait phase and fires `TriggerTimeoutException`. Step-level `timeout` applies to the entire execution (including trigger wait) and fires `StepTimeoutException`. Whichever fires first wins. Example: `trigger.timeout: 60s` + step `timeout: 20s` → step timeout fires at 20s, pre-empting the trigger timeout. Different exception types enable typed `on-error` matching.
 
 **Test cases:**
 ```
@@ -284,7 +372,8 @@ Route to an alternative step on failure.
 - Simple form: any exception routes to the named step.
 - Detailed form: `goto` names the target step, `log` emits a message.
 - Typed form: `match` checks the exception type (simple class name matching). `otherwise` is the catch-all. Evaluated top-to-bottom, first match wins.
-- `on-error` catches exceptions from the step's action, not from decorators (a `when` evaluation failure is a configuration error, not a runtime error).
+- `on-error` catches runtime exceptions from the entire step execution, including decorator-generated runtime exceptions: `StepTimeoutException` (from `timeout`), `RetryExhaustedException` (from `retry` when no `retry.fallback` is set), `TriggerTimeoutException` (from `trigger` when no `trigger.fallback` is set). See Decorator Evaluation Order — `on-error` wraps `timeout`, which wraps `trigger` and `retry`.
+- `on-error` does **not** catch configuration errors (malformed expressions, unknown variables, invalid step references) — these fail fast at parse time.
 
 **Test cases:**
 ```
@@ -326,9 +415,11 @@ Retry a failed step with configurable backoff. Delegates to existing `PolicyEnfo
 
 **Semantics:**
 - `max` → `RetryPolicy.maxAttempts`. `delay` → `RetryPolicy.delayMs`. `backoff` → `BackoffStrategy` enum (fixed, exponential, exponential-with-jitter).
-- `circuit-breaker` is an optional sub-field (not a separate keyword). Maps to `CircuitBreakerPolicy`.
+- `circuit-breaker` is an optional sub-field (not a separate keyword). Maps to `CircuitBreakerPolicy`. **Prerequisite:** `DefaultPolicyEnforcer.execute()` currently reads `policy.retries()` and `policy.timeoutMs()` but does not read `policy.circuitBreaker()` — the `CircuitBreakerPolicy` record exists in `platform-api` but is functionally ignored by the enforcer. `DefaultPolicyEnforcer` must be extended to implement circuit breaker state tracking (failure counter, open/half-open/closed states, recovery window) before this YAML keyword is functional. See casehubio/platform#TBD.
 - `fallback` names a step to route to when retries are exhausted (equivalent to `on-error` but scoped to retry exhaustion).
-- Delegates to `PolicyEnforcer.execute(policy, callable)` — no reimplementation.
+- `timeout` (optional sub-field of `retry`) — per-attempt timeout. When set, each retry attempt has this deadline. Maps to `ExecutionPolicy.timeoutMs`. This is distinct from step-level `timeout` which is the total step deadline (see Decorator Evaluation Order). Example: `retry: { max: 3, delay: 1s, timeout: 5s }` means each attempt gets 5s, retried up to 3 times.
+- **Composition with step-level `timeout`:** When both are present, two timeout layers are active. Step-level `timeout` is the outer deadline (covers trigger wait + entire retry sequence). `retry.timeout` is the per-attempt deadline (each individual attempt). The step decorator layer constructs a single `ExecutionPolicy(retryTimeoutMs, retryPolicy, circuitBreakerPolicy)` and passes it to one `PolicyEnforcer.execute()` call. The step-level timeout wraps this call externally. When step-level `timeout` is present but `retry.timeout` is not, `ExecutionPolicy` gets `timeoutMs = null` (no per-attempt timeout — only the outer step deadline applies).
+- Delegates to `PolicyEnforcer.execute(policy, action)` — where `action` is `Supplier<T>` (not `Callable<T>` — `Supplier.get()` does not throw checked exceptions; step actions that throw checked exceptions must be wrapped as unchecked). No reimplementation.
 
 **Test cases:**
 ```
@@ -398,8 +489,8 @@ Wait for a condition to become true. Unifies data triggers, time triggers, and e
 
 **Semantics:**
 - `type: data` — polls the endpoint at `poll` interval, checks `match` against response. `match` is a map of field→value checks (equality). For complex matching, use `filter` with an expression.
-- `type: time` — `at` accepts relative (`T+30s`, `T+5m`) or absolute (`"16:00"`, `"2026-09-22T08:30:00"`). Respects speed multiplier. Integrates with `TemporalDriverService`.
-- `type: event` — subscribes to CloudEvents matching `eventType` (and optionally `source`). `filter` applies an expression to the event data. Uses existing DataSource/subscription infrastructure.
+- `type: time` — `at` accepts relative (`T+30s`, `T+5m`) or absolute (`"16:00"`, `"2026-09-22T08:30:00"`). Respects speed multiplier via `SpeedMultiplier` SPI.
+- `type: event` — subscribes to CloudEvents matching `eventType` (and optionally `source`). `filter` applies an expression to the event data. **Integration point:** the trigger registers a CDI `@ObservesAsync CloudEvent` observer qualified with `@CloudEventType(eventType)` (see `platform-api/.../CloudEventType.java`). `CloudEventTypeDispatcher` (in `platform` module) dispatches incoming CloudEvents to type-qualified observers. The trigger observer blocks on an internal `OrcSignal` until a matching event arrives (or timeout). For `source` and `filter` matching, the observer receives all events of the given type and applies source/filter checks before signalling. **Subscription lifecycle:** the CDI observer is registered when the trigger step begins execution (not at scenario load time). Events fired before the step reaches the trigger decorator are missed — this is correct behaviour, not a bug. The trigger is "wait for the next event," not "check if any event ever happened." Each scenario execution gets its own independent observer instance; concurrent scenario executions do not interfere. The observer is unregistered when the step completes (or the scenario is disposed).
 - `timeout` and `fallback` compose naturally: timeout fires `TriggerTimeoutException`, `fallback` names the alternative step (or use `on-error` at the step level).
 - A trigger without `timeout` waits indefinitely — this must be flagged with a warning at parse time.
 
@@ -426,13 +517,21 @@ triggerNoTimeout_emitsWarningAtParseTime
 
 Single-expression transform for keeping simple data reshaping in YAML. Uses the configured `ExpressionEngine`.
 
+**Simple form (default engine):**
 ```yaml
 - step: enrich
   transform: "{ symbol: $.instrument, price: $.last_trade }"
-  engine: jq
 ```
 
-**With explicit input:**
+**Simple form with explicit engine:**
+```yaml
+- step: enrich
+  transform:
+    expression: "{ symbol: $.instrument, price: $.last_trade }"
+    engine: mvel
+```
+
+**Detailed form with explicit input:**
 ```yaml
 - step: reshape
   transform:
@@ -442,8 +541,8 @@ Single-expression transform for keeping simple data reshaping in YAML. Uses the 
 ```
 
 **Semantics:**
-- Simple form: expression operates on the step's input data (previous step result or step `data`).
-- Detailed form: `input` names the source, `expression` is the transform, `engine` selects the expression engine (default: jq).
+- Simple form: when `transform` is a plain string, it is the expression with the default engine (jq). Operates on the step's input data (previous step result or step `data`).
+- Detailed form: `input` names the source, `expression` is the transform, `engine` selects the expression engine (default: jq). `engine` is always a sub-field of `transform`, never a step-level sibling.
 - **Scoping rule:** the expression must be a one-liner. If the transform needs conditional logic, multiple fields from different sources, or iteration — use a `@ScenarioAction` instead.
 - The result of the transform replaces the step's output (available as `${result.<step-name>}`).
 
@@ -461,7 +560,22 @@ transform_invalidExpression_throwsWithClearMessage
 
 ## Part 2: Coordination Primitives
 
-All coordination primitives are interfaces in `orchestration-core`. Implementations are thread-safe via `java.util.concurrent`. Each primitive is designed to be execution-model-agnostic — the interface contract works for both virtual-thread and async-event implementations.
+All coordination primitives are interfaces in `orchestration-core`. Implementations are thread-safe via `java.util.concurrent`. These are **virtual-thread-first** interfaces — blocking methods (`acquire()`, `await()`, `receive()`, `lock()`) use `throws InterruptedException` and are designed for the virtual-thread execution model where blocking is cheap. An async/event-driven consumer would need to wrap these in async adapters (e.g., `CompletableFuture.supplyAsync(() -> { latch.await(); return result; })`), which is efficient on virtual threads but incompatible with single-threaded event loops (Vert.x, Netty). If async-native coordination is needed in the future, async counterparts can be added alongside these interfaces — but the current design commits to virtual threads as the primary execution model.
+
+### Lifecycle and Scope
+
+All coordination primitives are scoped to a **single scenario execution**. The orchestration runtime owns a `ScenarioScope` that creates, tracks, and disposes all named primitive instances.
+
+- **Creation:** Primitives are created eagerly at scenario load time, based on the parsed scenario definition. Latches, signals, channels, semaphores, mutexes, and state machines referenced in the YAML are instantiated before step execution begins. This eliminates race conditions from lazy initialization.
+- **Normal completion:** When the scenario completes successfully, all primitives are disposed. Semaphore permits are released. Mutexes are unlocked. Channels are closed. Latches are counted down to zero.
+- **Abnormal termination:** On timeout, unrecoverable error, or user cancellation, the `ScenarioScope` performs forced cleanup:
+  - Semaphore permits released (finally semantics, same as on-error per step)
+  - Mutexes unlocked
+  - Channels closed with an error marker — consumers see `closed = true` and `error = true`
+  - Latches counted down to zero (to unblock any waiting barrier/quorum steps)
+  - Signals signalled with an error payload (to unblock any waiting steps)
+  - State machines left in current state (no auto-transition on abort)
+- **Reuse:** Primitives are NOT reused across scenario runs. Each execution gets fresh instances. No state leaks between runs.
 
 ### 2.1 `Semaphore` — Concurrency Control
 
@@ -495,11 +609,21 @@ public interface OrcSemaphore {
   action: emit-price-tick
 ```
 
+**YAML usage (mutex sugar — exclusive access):**
+```yaml
+- step: update-portfolio
+  mutex: portfolio-state
+  action: recalculate-positions
+```
+
+`mutex: <name>` is syntactic sugar for `semaphore: { name: <name>, permits: 1 }`. It communicates exclusive-access intent more clearly than a semaphore with permits=1. The sugar produces the same `OrcSemaphore` instance — there is no separate `OrcMutex` interface.
+
 **Semantics:**
 - Named semaphores are shared across all steps in a scenario. Same name = same semaphore instance.
 - `permits` is the max concurrent acquisitions. Default: 1 (mutex behavior).
 - `per` adds a time window — permits are replenished at the specified rate (subsumes `rateLimit` from issue).
 - Acquisition blocks until a permit is available (or timeout from step-level `timeout`).
+- **Reentrancy detection:** When `permits: 1` (including via `mutex:` sugar), the semaphore detects reentrancy — if a step attempts to acquire a semaphore it already holds, `SemaphoreReentrancyException` is thrown instead of deadlocking. This detection is only meaningful for single-permit semaphores; multi-permit semaphores do not track ownership. Ownership is tracked by **step execution context** (the step's logical ID within the scenario), not by `Thread.currentThread()`. Virtual threads may be scheduled on different carrier threads across suspension points, so thread identity is unreliable for ownership tracking. The step execution context is stable for the lifetime of a step's execution regardless of thread migration.
 
 **Test cases:**
 ```
@@ -510,6 +634,8 @@ semaphore_namedSharing_sameNameSameInstance
 semaphore_differentNames_independent
 semaphore_withTimeWindow_replenishesPermits
 semaphore_tryAcquireTimeout_returnsFalse
+semaphore_mutexSugar_equivalentToPermitsOne
+semaphore_singlePermit_reentrancy_throws
 concurrent_multipleThreadsRespectPermitLimit
 concurrent_noDeadlockUnderContention
 ```
@@ -550,7 +676,10 @@ public interface OrcLatch {
 - `barrier` creates a latch with count = number of awaited steps. Each named step's completion calls `countDown()`. The barrier step blocks on `await()`.
 - `quorum` creates a latch with count = `required`. Same countdown mechanics, but proceeds before all steps complete.
 - Steps named in `await` or `of` must exist in the scenario. Missing step names throw `UnknownStepException` at parse time.
-- The latch is created when the first awaited step starts (lazy init, not at scenario load).
+- The latch is created eagerly at scenario load time (see Lifecycle and Scope). Step names are validated at parse time; the latch count is known from the declaration. Eager init eliminates race conditions between barrier waiters and awaited steps.
+- **Step failure handling:**
+  - **Barrier:** Step failure (exception) DOES call `countDown()` — the step completed, just with an error. The barrier unblocks and the consuming action receives a result set containing both successful and failed step outcomes. The consuming action can inspect `${result.<step>.error}` to distinguish.
+  - **Quorum:** Step failure does NOT count toward the `required` threshold — only successful completions count. If the number of surviving (non-failed) steps drops below `required`, the quorum throws `QuorumUnreachableException` (or routes to fallback) rather than waiting indefinitely.
 
 **Test cases:**
 ```
@@ -605,10 +734,17 @@ public interface OrcSignal {
 ```
 
 **Semantics:**
-- `race` creates a signal per named step. First signal wins — the race step proceeds with the winner's result, other steps receive a cancellation signal.
+- `race` creates a signal per named step. First signal wins — the race step proceeds with the winner's result. **Cancellation mechanism:** losing steps are cancelled via `Thread.interrupt()` on their virtual thread. The interrupted thread's current blocking operation (`await()`, `receive()`, `acquire()`, `sleep()`) throws `InterruptedException`. The orchestration runtime catches this and performs decorator cleanup:
+  - `semaphore` — permit released (finally semantics)
+  - `mutex` — lock released (finally semantics)
+  - `retry` — `DefaultPolicyEnforcer` already handles `InterruptedPolicyException` (breaks retry loop)
+  - `publish` — partial publishes already in the channel are NOT rolled back (channel is ordered, rolling back would require coordination with consumers who may have already consumed earlier items)
+  - In-progress HTTP requests (`trigger: { type: data }`) — the `Future` is cancelled; whether the underlying HTTP call aborts depends on the HTTP client implementation
 - `signal: <name>` emits a named signal on step completion. `wait: <name>` blocks until the signal is received.
-- Signals can carry a payload, accessible via `${signal.<name>.payload}`.
-- One-shot signals (default) can only be signalled once. Repeatable signals (for pub/sub patterns) are opt-in: `signal: { name: tick, repeatable: true }`.
+- **Payload retention:** Signals retain their payload after being signalled. `isSignalled()` returns `true` permanently. `await()` returns immediately if the signal was already fired before the waiter arrived. The payload remains accessible via `${signal.<name>.payload}`.
+- **Multi-waiter semantics:** When a signal fires, ALL waiting steps are unblocked (broadcast, not point-to-point). This matches `CountDownLatch.countDown()` semantics — the signal is a fact about the world, not a message to a specific consumer.
+- One-shot signals (default) can only be signalled once. Subsequent `signal()` calls are ignored.
+- **Repeatable signals** use latest-value semantics, not queued delivery. Each `signal(payload)` overwrites the previous payload. Waiters see the latest payload at the time they wake up. If queued delivery is needed, use `Channel` instead. This avoids overlap between repeatable signals and channels.
 
 **Test cases:**
 ```
@@ -628,7 +764,9 @@ concurrent_signalAndAwait_safeUnderContention
 
 ### 2.4 `Channel<T>` — Typed Data Passing
 
-Pass data between concurrent steps. Bounded or unbounded.
+Pass data between concurrent steps within a single scenario execution. Bounded or unbounded.
+
+**Distinction from qhorus channels:** `OrcChannel<T>` is an in-process, ephemeral coordination primitive — analogous to Go channels or CSP. It exists for the lifetime of a scenario execution and is garbage-collected when the scenario completes. Qhorus channels (APPEND, COLLECT, BARRIER, EPHEMERAL, LAST_WRITE) are distributed, persistent messaging infrastructure for cross-process communication. These serve fundamentally different purposes: `OrcChannel` coordinates concurrent steps within a single execution; qhorus channels coordinate distributed actors across processes and time. The issue's "NOT in YAML" guidance refers to distributed channel infrastructure, not in-process coordination.
 
 ```java
 public interface OrcChannel<T> {
@@ -650,6 +788,7 @@ public interface OrcChannel<T> {
   publish:
     channel: events
     data: ${result}
+    close-on-complete: true
 
 - step: consumer
   loop:
@@ -663,8 +802,8 @@ public interface OrcChannel<T> {
 **Semantics:**
 - Named channels are shared across steps. Same name = same channel instance.
 - `publish` sends to a channel. `subscribe` receives from a channel. Both block when the channel is full/empty (backpressure).
-- Bounded channels: `channel: { name: events, capacity: 100 }`. Default: unbounded.
-- `close()` signals no more data — receivers see `closed = true` after draining.
+- Bounded channels: `channel: { name: events, capacity: 100 }`. Default: unbounded. Unbounded is the correct default for an in-process orchestration primitive — scenarios run within a single JVM with bounded lifetimes, and capacity tuning is a performance concern, not a correctness concern. The runtime emits a **high-water-mark warning** (logged at WARN level) when an unbounded channel exceeds 10,000 queued items, indicating a likely producer-consumer imbalance that the scenario author should address with explicit capacity.
+- **Close semantics:** `close-on-complete: true` (default) closes the channel when the publishing step completes — both on success and on failure. On producer failure (exception), the channel is **error-closed**: `close(Throwable cause)` sets the channel to closed state with an error marker. Consumers draining remaining items proceed normally; when the buffer is exhausted, the next `receive()` throws `ChannelClosedException` wrapping the producer's exception (rather than returning `closed = true` silently). This prevents consumers from silently interpreting an incomplete data stream as complete. Explicit close: `close-channel: events` as a standalone action for multi-producer scenarios. `close()` (no-arg) signals normal completion — receivers see `closed = true` after draining remaining items.
 - Channels are typed at the Java interface level but untyped in YAML (everything is `Map<String, Object>`).
 
 **Test cases:**
@@ -673,6 +812,8 @@ channel_sendAndReceive_basic
 channel_blocksOnFullBounded
 channel_blocksOnEmptyReceive
 channel_close_drainThenClosed
+channel_errorClose_producerFailure_consumersGetException
+channel_errorClose_drainsRemainingBeforeError
 channel_namedSharing_sameNameSameInstance
 channel_unbounded_neverBlocksOnSend
 concurrent_producerConsumer_safeUnderContention
@@ -682,46 +823,7 @@ concurrent_multipleConsumers_eachItemDeliveredOnce
 
 ---
 
-### 2.5 `Mutex` — Exclusive Section
-
-Exclusive access to a named resource.
-
-```java
-public interface OrcMutex {
-    void lock() throws InterruptedException;
-    boolean tryLock(long timeout, TimeUnit unit) throws InterruptedException;
-    void unlock();
-    boolean isLocked();
-}
-```
-
-**YAML usage:**
-```yaml
-- step: update-portfolio
-  mutex: portfolio-state
-  action: recalculate-positions
-```
-
-**Semantics:**
-- Named mutexes are shared across steps. Same name = same mutex instance.
-- The mutex is acquired before the step action and released after (even on error — finally semantics).
-- Not reentrant by default. A step that holds a mutex and attempts to acquire it again deadlocks (this is detectable and throws `MutexReentrancyException`).
-- Use when multiple concurrent steps must not modify the same state simultaneously.
-
-**Test cases:**
-```
-mutex_lockAndUnlock_basic
-mutex_blocksWhenAlreadyLocked
-mutex_releasedOnError (finally semantics)
-mutex_reentrancy_throws
-mutex_namedSharing_sameNameSameInstance
-concurrent_exclusiveAccess_noRaceConditions
-concurrent_tryLockTimeout_returnsFalse
-```
-
----
-
-### 2.6 `StateMachine` — State Transitions
+### 2.5 `StateMachine` — State Transitions
 
 Declare states, transitions, and guards. Atomic transitions via CAS.
 
@@ -777,6 +879,7 @@ stateMachine:
 - `on` is the event name that triggers the transition. Steps fire events via the `transition` decorator.
 - `terminal` states are declared explicitly. Attempting to transition from a terminal state throws.
 - State transitions are atomic (CAS on `AtomicReference<State>`). No intermediate states are visible to observers.
+- **Guard-CAS atomicity (TOCTOU):** Guard evaluation and CAS are separate operations. The guard is evaluated against current variable state, then the CAS attempts the transition. Between guard evaluation and CAS, the guard's input data could theoretically change (e.g., `risk-score` changes from 0.5 to 0.9 between guard check and CAS). The CAS ensures **state consistency** (exactly one transition from a given state wins), but does not guarantee **guard-state consistency** (the guard condition still holds at CAS time). This TOCTOU window is microseconds in-process and acceptable for scenario orchestration. For transitions requiring strong guard-state consistency (e.g., financial compliance gates), implement the guard+transition in a `@ScenarioAction` that holds an explicit lock on the guarded data.
 - Transition handlers (`onTransition`, `onEnter`, `onExit`) fire after the CAS succeeds — they observe the committed state.
 - State is queryable: `${machine.order-lifecycle.state}` resolves to the current state name.
 
@@ -801,6 +904,42 @@ concurrent_observersSeeCOmmittedStateOnly
 
 ## Part 3: Extended Existing Primitives
 
+### 3.0 yaml-core Runtime Contracts
+
+The following interfaces are added to yaml-core. They are pure contracts — zero dependencies, J2CL-safe. Implementations live in the consuming module.
+
+**`Condition` — Runtime boolean evaluation:**
+```java
+@FunctionalInterface
+public interface Condition {
+    boolean evaluate();
+}
+```
+
+Used by the `when` decorator. The consuming layer binds a `Condition` from a `VariableResolver` + `ExpressionEngine` pair at step construction time. yaml-core's `ConditionEvaluator` handles the common case (simple equality via `Truthiness`) and delegates complex expressions through a `Function<String, Boolean>` SPI.
+
+**`RuntimeForEach` — Runtime collection resolution:**
+```java
+@FunctionalInterface
+public interface RuntimeForEach {
+    java.util.List<?> resolve();
+}
+```
+
+Used by the `forEach` decorator when `in` references a runtime variable (e.g., `${instruments}`). The consuming layer binds a `RuntimeForEach` from a `VariableResolver` + `ObjectVariableSource` pair at step construction time. Resolves the collection from live state, not from static YAML. Returns a `List<?>` — each element becomes an iteration context accessible via `${each.<as>}`.
+
+**`SpeedMultiplier` — Simulation speed SPI:**
+```java
+@FunctionalInterface
+public interface SpeedMultiplier {
+    double currentSpeed();
+}
+```
+
+Used by `delay`, `timeout`, and `trigger` decorators to adjust durations for simulation speed. Default implementation returns 1.0 (real-time). The consuming layer provides an implementation backed by `SimulationRuntime.globalSpeed()` from simulation-core.
+
+---
+
 ### 3.1 Runtime `VariableSource` — Live State Resolution
 
 Extend `VariableResolver` with runtime sources that resolve from live state, not static YAML.
@@ -823,6 +962,17 @@ ${env.<key>}                    — environment/config value
 - The resolver tries prefixes in registration order. Runtime prefixes (`result`, `loop`, `machine`, `signal`, `channel`) are registered by the orchestration runtime, not by the YAML author.
 - Deferred prefix handling (already in `VariableResolver`) allows parse-time validation to flag unknown prefixes while deferring runtime-only prefixes.
 
+**Type widening for runtime sources:** The existing `VariableSource` returns `String resolve(String name)`, which is correct for parse-time resolution where all values are interpolated into strings. Runtime sources need to pass complex objects (step results as maps, signal payloads, channel values). yaml-core introduces `ObjectVariableSource`:
+
+```java
+@FunctionalInterface
+public interface ObjectVariableSource {
+    Object resolve(String name);
+}
+```
+
+`VariableResolver` is extended to try `ObjectVariableSource` first for runtime-registered prefixes. String interpolation (inside `${}` in templates) still stringifies via `toString()`. But when the resolved value is consumed directly as `data:` for an action (not interpolated into a template string), the typed `Object` is passed through — preserving maps, lists, and primitive types. This keeps yaml-core J2CL-safe (no new heavy types) while allowing runtime sources to return typed objects.
+
 **Test cases:**
 ```
 runtimeSource_resultPrefix_resolvesFromStepResult
@@ -832,6 +982,51 @@ runtimeSource_signalPrefix_resolvesPayload
 runtimeSource_channelPrefix_resolvesValueAndClosed
 runtimeSource_unknownPrefix_throws
 runtimeSource_deferredPrefix_passesThrough
+```
+
+---
+
+## Issue Part 2 Pattern Mapping
+
+The issue's Part 2 proposes coordination patterns. This section maps each to the spec's primitives:
+
+| Part 2 Pattern | Mapping | Status |
+|---|---|---|
+| `correlate` — match response by key | `trigger: { type: event, filter: ${event.data.orderId} == ${orderId} }` — event trigger with key-matching filter expression | Covered by composition |
+| `scatter-gather` — fan out, collect | `parallel:` block + `barrier: { await: [...] }` for all-responses; `quorum: { required: N }` for min-response policy | Covered by composition |
+| `deadline propagation` — scope-level deadline | Step-level `timeout:` on a parent step, or `timeout:` on each step in a `parallel:` block. Scenario-level deadline can be expressed as a top-level step with `timeout:` wrapping all others | Covered by `timeout` |
+| `discriminator` — advance on first, keep collecting | `race: [...]` advances on first completion. Race cancels remaining steps. Discriminator (advance but continue collecting) is a distinct pattern — deferred | Deferred: casehubio/platform#392 |
+
+**`correlate` composition example:**
+```yaml
+- step: submit-order
+  action: send-order
+  signal: order-submitted
+
+- step: await-confirmation
+  trigger:
+    type: event
+    eventType: io.casehub.order.confirmed
+    filter: ${event.data.orderId} == ${result.submit-order.orderId}
+    timeout: 10s
+    fallback: order-timeout
+```
+
+**`scatter-gather` composition example:**
+```yaml
+- parallel:
+    - step: momentum-eval
+      action: evaluate-momentum
+    - step: risk-eval
+      action: evaluate-risk
+    - step: compliance-eval
+      action: evaluate-compliance
+- step: gather-results
+  quorum:
+    required: 2
+    of: [momentum-eval, risk-eval, compliance-eval]
+    timeout: 10s
+  action: aggregate-assessments
 ```
 
 ---
@@ -951,26 +1146,20 @@ public void complexProcessing(ScenarioContext ctx) {
 
 ### 4.4 Coordination Showcase
 
-**Multi-agent consensus (barrier + quorum + race):**
+**Multi-agent consensus (parallel + quorum — proceed on 2 of 3):**
 ```yaml
 scenario: strategy-consensus
 steps:
-  - step: momentum-eval
-    action: evaluate-momentum
-    data: { portfolio: ${portfolio} }
-
-  - step: risk-eval
-    action: evaluate-risk
-    data: { portfolio: ${portfolio} }
-
-  - step: compliance-check
-    action: check-compliance
-    data: { portfolio: ${portfolio} }
-
-  - step: await-all
-    barrier:
-      await: [momentum-eval, risk-eval, compliance-check]
-      timeout: 30s
+  - parallel:
+      - step: momentum-eval
+        action: evaluate-momentum
+        data: { portfolio: ${portfolio} }
+      - step: risk-eval
+        action: evaluate-risk
+        data: { portfolio: ${portfolio} }
+      - step: compliance-check
+        action: check-compliance
+        data: { portfolio: ${portfolio} }
 
   - step: consensus
     quorum:
@@ -980,31 +1169,33 @@ steps:
     action: aggregate-votes
 ```
 
-**Producer-consumer with backpressure (channel + loop + semaphore):**
+The `quorum` step proceeds as soon as any 2 of the 3 evaluations complete — it does not wait for all 3. This is the value proposition of `quorum` over `barrier`: the consensus step runs while the slowest evaluation may still be in progress. (If you need all 3, use `barrier: { await: [...] }` instead — or rely on the `parallel:` block's implicit barrier.)
+
+**Producer-consumer with backpressure (parallel + channel + loop + semaphore):**
 ```yaml
 scenario: event-pipeline
 steps:
-  - step: producer
-    loop:
-      count: 100
-    action: generate-event
-    publish:
-      channel: events
-    semaphore:
-      name: event-rate
-      permits: 10
-      per: 1s
+  - parallel:
+      - step: producer
+        loop:
+          count: 100
+        action: generate-event
+        publish:
+          channel: events
+          close-on-complete: true
+        semaphore:
+          name: event-rate
+          permits: 10
+          per: 1s
 
-  - step: consumer
-    loop:
-      until: ${channel.events.closed}
-    subscribe:
-      channel: events
-    action: process-event
+      - step: consumer
+        loop:
+          until: ${channel.events.closed}
+        subscribe:
+          channel: events
+        action: process-event
 
   - step: finalise
-    barrier:
-      await: [consumer]
     action: generate-report
 ```
 
@@ -1071,10 +1262,10 @@ Tests follow the existing yaml-core test structure. Add to existing test classes
 | `VariableResolverTest` (extend) | yaml-core | Runtime variable sources (result, loop, machine, signal, channel prefixes) |
 | `ForEachExpanderTest` (extend) | yaml-core | Runtime forEach (dynamic collection resolution) |
 | `ConditionEvaluatorTest` (new) | yaml-core | Expression-based condition evaluation, type coercion |
-| `LoopEvaluatorTest` (new) | orchestration-core | Count loops, exit-condition loops, max safety, delay |
-| `TriggerEvaluatorTest` (new) | orchestration-core | Data/time/event triggers, polling, timeout |
-| `TransformEvaluatorTest` (new) | orchestration-core | Expression-based transforms, engine selection |
-| `RetryDecoratorTest` (new) | orchestration-core | Retry with backoff, circuit breaker, PolicyEnforcer delegation |
+| `LoopEvaluatorTest` (new) | consuming module | Count loops, exit-condition loops, max safety, delay |
+| `TriggerEvaluatorTest` (new) | consuming module | Data/time/event triggers, polling, timeout |
+| `TransformEvaluatorTest` (new) | consuming module | Expression-based transforms, engine selection |
+| `RetryDecoratorTest` (new) | consuming module | Retry with backoff, circuit breaker, PolicyEnforcer delegation |
 | `OrcSemaphoreTest` (new) | orchestration-core | Permits, blocking, time-windowed replenishment |
 | `OrcLatchTest` (new) | orchestration-core | Countdown, await, timeout |
 | `OrcSignalTest` (new) | orchestration-core | Signal/await, payload, one-shot vs repeatable |
@@ -1086,8 +1277,10 @@ Tests follow the existing yaml-core test structure. Add to existing test classes
 | `ConcurrentSignalTest` (new) | orchestration-core | Multi-thread signal/await races |
 | `ConcurrentChannelTest` (new) | orchestration-core | Producer-consumer under contention |
 | `ConcurrentStateMachineTest` (new) | orchestration-core | Competing CAS transitions |
-| `CompositionTest` (new) | orchestration-core | Two-primitive compositions (when+loop, trigger+timeout, forEach+retry) |
+| `ParallelExecutorTest` (new) | orchestration-core | Parallel step execution, implicit barrier on block completion |
+| `CompositionTest` (new) | orchestration-core | Two-primitive compositions (when+loop, trigger+timeout, forEach+retry, when+forEach per-iteration filter) |
 | `TippingPointTest` (new) | orchestration-core | Three-primitive compositions documenting the boundary |
+| `DecoratorOrderTest` (new) | orchestration-core | Verifies canonical decorator evaluation order (timeout wraps retry, on-error wraps timeout, etc.) |
 
 ---
 
@@ -1099,7 +1292,7 @@ Tests follow the existing yaml-core test structure. Add to existing test classes
 - `platform-api/src/main/java/io/casehub/platform/api/expression/ExpressionEngine.java` — expression compilation SPI
 - `platform-api/src/main/java/io/casehub/platform/api/governance/ExecutionPolicy.java` — retry/timeout/circuit-breaker records
 - `governance-core/src/main/java/io/casehub/platform/governance/PolicyEnforcer.java` — policy enforcement SPI
-- `simulation-core` — `TemporalDriverService` for speed-multiplied time
+- `event-simulation/src/main/java/io/casehub/platform/simulation/event/quarkus/TemporalDriverService.java` — `@ApplicationScoped` Quarkus CDI bean for speed-multiplied temporal simulation drivers. Runtime orchestration does not depend on this directly — instead, yaml-core defines a `SpeedMultiplier` SPI that orchestration-core consumes, and the runtime bridges to `TemporalDriverService` (or any other speed source) at the integration layer
 - casehubio/platform#386 — original issue with 21 proposed patterns
 - casehubio/casehub-pages#461 — scenario model parsing (AfterTrigger wired, others parsed but unevaluated)
 - D1–D6 in `decisions.md` — design decisions for this spec
