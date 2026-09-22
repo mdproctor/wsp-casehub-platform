@@ -49,10 +49,12 @@
 - `Mutex` — exclusive section
 - `StateMachine` — state + transitions + guards (replaces if/else/branches for complex routing)
 
+**Keep but scope tightly:**
+- `transform` — single-expression only (one-liner that fits on one line and reads naturally). Multi-field restructuring → @ScenarioAction. Uses existing ExpressionEngine (JQ/MVEL). The 90%-YAML scenario shouldn't force a context switch to Java for a simple data reshape.
+
 **Drop:**
 - `if/else` + `branches` — `when` + `goto` for simple, `StateMachine` for complex
 - `accumulator` — marginal DX, use Channel or code
-- `transform` — poor DX, use @ScenarioAction code
 - `circuitBreaker` — subsumed into retry policy configuration
 - `rateLimit` — subsumed into Semaphore with time window
 - `schedule` — subsumed into trigger type: time
@@ -83,7 +85,12 @@
 
 ## D5: DX tipping-point rule
 
-**Choice:** Every YAML keyword must pass the test: "would a developer rather write this in YAML or in a @ScenarioAction method?" If the YAML reads as intent, keep it. If it reads as instructions, push it to code. Nesting beyond 2 levels is the documented tipping point — discourage in docs, demonstrate the boundary in showcase examples.
+**Choice:** Every YAML keyword must pass the test: "would a developer rather write this in YAML or in a @ScenarioAction method?" Three zones on the spectrum:
+1. **Pure intent** (when, barrier, delay) — always YAML, no question
+2. **Simple expression** (one-liner transforms, basic filters) — keep in YAML because context-switching to Java for one line in a 20-step scenario is worse than the embedded expression
+3. **Complex logic** (multi-field restructuring, conditional mapping, deep nesting) — delegate to @ScenarioAction code
+
+Nesting beyond 2 levels is the documented tipping point — discourage in docs, demonstrate the boundary in showcase examples. The tension between "keep it all in YAML" and "this is now programming in YAML" is real and unavoidable — the DX test is "can I read this in 5 seconds?"
 **Alternatives:**
 - No nesting limit — leads to YAML that's harder to read than Java
 - Hard enforcement (reject >2 levels at parse time) — too restrictive for edge cases
