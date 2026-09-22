@@ -85,18 +85,29 @@
 
 ## D5: DX tipping-point rule
 
-**Choice:** Every YAML keyword must pass the test: "would a developer rather write this in YAML or in a @ScenarioAction method?" Three zones on the spectrum:
-1. **Pure intent** (when, barrier, delay) — always YAML, no question
-2. **Simple expression** (one-liner transforms, basic filters) — keep in YAML because context-switching to Java for one line in a 20-step scenario is worse than the embedded expression
-3. **Complex logic** (multi-field restructuring, conditional mapping, deep nesting) — delegate to @ScenarioAction code
+**Choice:** The tipping point is not about individual constructs — each one in isolation is fine in YAML. The problem is emergent: complexity accumulates through composition. A `when` is readable. A `loop` is readable. A step with both plus a `forEach`, a `trigger`, a `retry`, and a `transform` inside a `barrier` is a program written in YAML.
 
-Nesting beyond 2 levels is the documented tipping point — discourage in docs, demonstrate the boundary in showcase examples. The tension between "keep it all in YAML" and "this is now programming in YAML" is real and unavoidable — the DX test is "can I read this in 5 seconds?"
+This cannot be solved by language design. The grammar is regular and recursive on purpose — restricting composition would make the language frustrating for cases where 2-3 decorators genuinely belong together. The solution is education, not enforcement.
+
+Three zones on the expression spectrum:
+1. **Pure intent** (when, barrier, delay) — always YAML
+2. **Simple expression** (one-liner transforms, basic filters) — keep in YAML because context-switching to Java for one line in a 20-step scenario is worse than the embedded expression
+3. **Complex logic** (multi-field restructuring, conditional mapping) — delegate to @ScenarioAction
+
+The spec documents this as design philosophy with concrete signals:
+- A single step has 4+ decorators → extract
+- Nesting beyond 2 levels → extract
+- Tracing data flow through 3+ interpolations → extract
+- Expressions that need their own unit tests → extract
+
+Showcase gallery demonstrates both the golden path and the boundary.
+
 **Alternatives:**
-- No nesting limit — leads to YAML that's harder to read than Java
-- Hard enforcement (reject >2 levels at parse time) — too restrictive for edge cases
-**Rationale:** The value of YAML-declared orchestration is declarative readability. The moment it becomes a pseudo-programming language embedded in YAML, Java is better.
-**Trade-offs:** Soft limit means developers can still write deeply nested YAML. Documentation and examples must clearly show where to delegate to code.
-**Sources:** Issue #386 nesting policy, user requirement: "doesn't tip over to the point that java is easier and better"
+- Hard enforcement (reject >2 levels at parse time) — too restrictive, frustrates legitimate composition
+- No guidance at all — developers discover the tipping point through pain
+**Rationale:** The value of YAML orchestration is declarative readability. Best practice documentation is the only honest answer to "when is YAML too much?" — the language can't know, the developer can.
+**Trade-offs:** Soft guidance means some developers will write deeply nested YAML. But telling them "if you're debugging YAML instead of reading it, extract to code" is more useful than a hard limit they'll work around.
+**Sources:** Issue #386 nesting policy, user insight: "it's not the individual constructs but how it's used in larger context — comes down to best practice and documentation to educate users"
 **Exploration:** quick
 **Status:** captured
 
