@@ -1,6 +1,0 @@
-{"ts": "2026-09-23T17:54:22.024889+00:00", "mode": "wrap", "action": "user_input", "step": "epic_hygiene", "steps_executed": ["loose_ends"], "error": ""}
-{"ts": "2026-09-23T17:54:27.171604+00:00", "mode": "wrap", "action": "wrap_sweep_config", "step": "", "steps_executed": [], "error": ""}
-{"ts": "2026-09-23T17:54:36.162425+00:00", "mode": "wrap", "action": "user_input", "step": "arc42_scan_wrap", "steps_executed": [], "error": ""}
-{"ts": "2026-09-23T17:54:41.398047+00:00", "mode": "wrap", "action": "user_input", "step": "garden_feedback", "steps_executed": [], "error": ""}
-{"ts": "2026-09-23T17:54:46.435461+00:00", "mode": "wrap", "action": "user_input", "step": "notes", "steps_executed": [], "error": ""}
-{"ts": "2026-09-23T17:54:51.873701+00:00", "mode": "wrap", "action": "user_input", "step": "handoff_write", "steps_executed": [], "error": ""}
