@@ -23,7 +23,7 @@ Branch `issue-213-spring-boot-deployment` active in 3 repos: platform, wsp-caseh
 | work | Complete | — |
 | qhorus | Complete | — |
 | neocortex | Complete | — |
-| **ledger** | **In progress** — Task 1/16, Batch 1/7 | casehubio/ledger#213 |
+| **ledger** | **In progress** — Task 1 done, next Task 2/16, Batch 1/7 | casehubio/ledger#213 |
 | casehub-worker | Not started | casehubio/casehub-worker#16 |
 | blocks | 3 modules exist, gaps | casehubio/blocks#297 |
 | workers | Not started (blocked by casehub-worker) | casehubio/workers#24 |

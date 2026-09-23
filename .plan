@@ -14,7 +14,7 @@ flyway-next-v: none
 ## Queue
 - [ ] casehubio/ledger#213 — Issue #213 ← active
   - [ ] Batch 1: Foundation
-    - [ ] Task 1: Repo SPI relocation
+    - [x] Task 1: Repo SPI relocation (3 repo moves deferred to Task 2)
     - [ ] Task 2: jpa-common module
   - [ ] Batch 2: Config
     - [ ] Task 3: LedgerProperties records
