@@ -265,3 +265,33 @@ update:
 **Surfaced by:** R2-07 (three-tier version), evolved to four-tier via brainstorm discussion.
 **Exploration:** deep-analysis
 **Status:** captured
+
+## D15: Interpreted dispatch + TypeScript/browser parity constraint
+
+**Choice:** YAML scenarios execute via interpreted dispatch with compiled expressions. Parsed once into AST, expressions compiled into CompiledExpression (cached), step dispatch is dynamic at runtime. Not code-generated.
+
+**TypeScript/browser parity:** yaml-core is J2CL-transpilable. All orchestration primitives must have browser-equivalent implementations:
+- `spawn()` → `new Worker()` (actual Web Workers)
+- `OrcChannel` → `MessagePort` (structured cloning)
+- `OrcCounter/OrcGauge/OrcFlag` → `SharedArrayBuffer` + `Atomics`
+- `BlockingOrcStateMachine.awaitState()` → `Atomics.wait()` in Worker / async `await` on main thread
+- `OrcMap` → shared-state Worker emulation (owns map, handles operations via messages)
+- `scope.close()` → `worker.terminate()`
+
+**Key constraint:** TypeScript scenario runner must be async (`await channel.receive()` vs blocking `channel.receive()`). No primitive API can depend on JVM-specific blocking semantics that can't be emulated with Web Workers + SharedArrayBuffer + Atomics.
+
+**Execution model rationale:** Interpreted dispatch (not code-gen) because:
+- Dynamic behavior (speed changes, pause/resume, breakpoints) requires runtime control
+- `invoke:` calls CDI beans dynamically
+- MCP debugging requires live state introspection
+- No regeneration on YAML changes
+- Expression evaluation (the hot path) is compiled at parse time — dispatch is I/O-bound
+
+**Alternatives:**
+- Code generation (Maven plugin → Java classes) — loses runtime dynamism, can't support MCP debugging or dynamic invoke
+- Pure interpretation (no expression compilation) — expressions re-parsed on every evaluation, unnecessary overhead
+**Trade-offs:** Interpreted dispatch has per-step overhead vs native code. Acceptable — steps are I/O-bound (channel waits, delays, Java method calls), not CPU-bound. The compiled expression cache eliminates the only CPU-hot path.
+**Design constraint:** Same YAML, two runtimes. A scenario YAML must produce identical results on JVM (virtual threads) and browser (Web Workers). The primitive interfaces must be implementable on both without semantic divergence.
+**Sources:** yaml-core J2CL-transpilable constraint, Web Workers API, SharedArrayBuffer/Atomics, Ansible interpreted dispatch model
+**Exploration:** quick
+**Status:** captured
