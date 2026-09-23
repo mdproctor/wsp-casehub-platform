@@ -1,42 +1,35 @@
-# Handoff — Simulation DX (Slot 195)
+# Handoff — Runtime Orchestration Primitives (#386)
 
 ## What happened this session
 
-Implemented 7 of 9 platform issues for the simulation DX epic (#352). All XS/S scope, delivered with TDD, zero regressions across 152+ simulation-core tests.
+Designed and implemented runtime orchestration primitives for yaml-core. Full lifecycle: brainstorming → adversarial design review (76 issues, $175) → TDD implementation → code review → merge to main.
 
-| Issue | Title | What landed |
-|-------|-------|------------|
-| #353 | `Simulation.forTest()` fluent test harness | `Simulation` class + `Builder` with `stub()`/`seed()`/`resolve()`/`overlay()`/`verifier()`. 15 tests. |
-| #354 | `seed.applyTo(runtime, corpus)` | `SimulationRuntime.apply(CorpusSeed)` — adapted to preserve module boundary. 2 tests. |
-| #355 | `MapSimulationConfig.builder()` | Builder with `.strategy()`, `.capture()`, `.exhaustion()`, `.threshold()`. 5 tests. |
-| #356 | Strategy name aliases | `resolveAlias()` maps key/seq/rand/replay/nearest to canonical forms. 5 tests. |
-| #357 | `SimulationVerifier.on(overlay)` overload | Eliminates `.journal()` boilerplate. 1 test. |
-| #358 | `simulation-starter` aggregate dep | POM module pulling all simulation artifacts. No tests (POM only). |
-| #359 | Auto-detect identity key extractor | `requireExtractor()` falls back to `String.valueOf` identity. 2 new tests, 2 updated. |
-| #360 | Default tenancyId for YAML corpus | `YamlCorpusLoader(defaultTenancyId)` + `casehub.simulation.default-tenancy-id` config. 3 tests. |
+| Deliverable | Detail |
+|-------------|--------|
+| Runtime contracts | Condition, ConditionEvaluator, RuntimeForEach, SpeedMultiplier, ObjectVariableSource |
+| Coordination primitives | OrcSemaphore, OrcLatch, OrcSignal, OrcChannel, OrcStateMachine |
+| Lifecycle | ScenarioScope, DefaultScenarioScope, StepResultStore, DurationParser |
+| Tests | 395 total — unit, concurrent contention, 4 showcase scenarios |
+| Module | Merged into yaml-core (`io.casehub.yaml.core.orchestration`) — no separate module |
 
-## Decisions
+## Key decisions
 
-- **D354: API inversion** — issue said `seed.applyTo(runtime, corpus)` but CorpusSeed (simulation-api) can't depend on SimulationRuntime (simulation-core). Implemented as `runtime.apply(seed)` instead. One line, correct dependency direction.
-- **D359: Identity fallback** — removed the "requires KeyExtractor" error from `requireExtractor()`. Falls back to `String.valueOf(input)`. Multi-param SPIs that need custom keys get `SimulationKeyNotFoundException` as the signal.
+- **D2: Virtual-thread-first** — blocking j.u.c interfaces, not execution-model-agnostic. Async adapters can wrap.
+- **D3: 14 YAML keywords** covering all 21 original patterns + coordination layer. `if/else` dropped (use `when` + `StateMachine`). `circuitBreaker`/`rateLimit` subsumed.
+- **D5: DX tipping point** — emergent from composition, not per-construct. Education over enforcement. Three tiers: one-liner → JQ block → Java code.
+- **Type safety** — every primitive must be parse-time-validatable. The Ansible differentiator.
+- **Module merge** — orchestration-core merged into yaml-core (pages does direct TS port, J2CL not used).
+- **Expression defaults** — MVEL for conditions, JQ for data transforms (#391).
 
-## Queue state
+## Follow-up issues created
 
-Position 8/10. Active issue: #361 (inline corpus entries in scenario YAML, M/Med).
-Items #353-#360 complete. #361 needs brainstorming — it touches YAML schema design and scenario engine integration.
-Remaining after #361: 2 pages-repo issues (casehub-pages#453, #454) — not implementable in this repo.
+| Issue | Scale | Complexity | Notes |
+|-------|-------|-----------|-------|
+| #391 — DX refinements (shorthands, default prefix, expression defaults) | M | Med | **Next work — user requested** |
+| #405 — Simulation + orchestration integration | M | Med | **Next work — user requested** |
+| #402 — Error reporting model for YAML orchestration | M | Med | Clean error mapping for YAML users |
+| pages#462 — TS port parity | L | Med | Full gap documented, 23 types |
 
 ## Next action
 
-Brainstorm #361 — inline corpus entries in scenario YAML. M/Med scope. Design the YAML schema for inline corpus blocks and how they integrate with the existing scenario parser. Then TDD.
-
-## References
-
-| Artifact | Path |
-|----------|------|
-| Epic #352 | casehubio/platform#352 |
-| .plan | `wksp/.plan` (position 8/10, #361 active) |
-| Design spec (#353) | `wksp/specs/issue-352-simulation-dx/2026-09-19-fluent-test-harness-design.md` |
-| Decisions | `wksp/specs/issue-352-simulation-dx/decisions.md` |
-| Implementation plan (#353) | `wksp/plans/2026-09-19-fluent-test-harness.md` |
-| Simulation guide | `proj/docs/guides/simulation-guide.md` |
+`work start #391, #405` — user explicitly requested both for next session.
