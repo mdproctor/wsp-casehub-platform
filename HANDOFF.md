@@ -1,37 +1,47 @@
-# Handoff — Spring Deployment Readiness (Slot 198)
+# HANDOFF — Slot 198
 
-## What happened
+## Last Session
 
-Epic #501 (Spring Boot deployment readiness) is closed and landed on main. 14 issues across 5 repos, all merged. Branch `issue-501-spring-deployment-readiness` is stamped and closed.
+Completed #398 (platform observability — 3 new modules) and #399 (spring-testing + consumer guide). Closed all 8 issues in the Spring deployment audit queue (#384). Branch `issue-384-spring-deployment-audit` squashed, merged, pushed. All 5 original repos verified: on main, synced with origin, all branches stamped.
 
-Work-end completed: code review (1 CRITICAL fixed), branch audit (4 dimensions clean), squash (61 → 12 commits), rebase onto main, push, issue closed.
+Post-close: stamped 5 merged-but-unstamped branches across repos. Landed 2 unmerged branches (work#494, qhorus#495 — Spring REST controllers). Stamped platform's stale `issue-489-dx-audit` as superseded (content already on main via `rebase-489`).
 
-## Before archiving this slot
+Rebased and pushed casehubio/platform PR #349 (fix CI — `ManualBeanScanner` static→instance). Merged casehubio/aml PR #125 and casehubio/drafthouse PR #123. Platform PR #349 CI re-running after fix.
 
-**Run the Spring deployment audit** — plan at `plans/2026-09-22-spring-deployment-audit.md`.
+Added 4 new repos to slot for Spring migration: ledger, casehub-worker, blocks, workers.
 
-Eight dimensions:
-1. Completeness — SPI × core/quarkus/spring matrix
-2. Gaps — modules, config, endpoints missing Spring counterparts
-3. Hand-written inventory — why each can't be generated
-4. Drift risk — ranked by likelihood of silent divergence
-5. Drift detection — build-time enforcement proposal
-6. Complexity reduction — consolidation opportunities
-7. Code quality — test coverage, conditional correctness, config defaults
-8. Open-ended — Spring conventions, AOT, DevTools, consumer DX
+## Slot State
 
-Phase 1 (1-4) can run as parallel forks. Phase 2 (5-8) needs human input.
+9 repos, all on main, all synced with origin:
 
-## State
+| Repo | Spring Status | Next Issue |
+|------|--------------|------------|
+| platform | Complete | — |
+| engine | Complete | — |
+| work | Complete | — |
+| qhorus | Complete | — |
+| neocortex | Complete | — |
+| **ledger** | Not started | casehubio/ledger#213 |
+| **casehub-worker** | Not started | casehubio/casehub-worker#16 |
+| **blocks** | 3 modules exist, gaps | casehubio/blocks#297 |
+| **workers** | Not started (blocked by casehub-worker) | casehubio/workers#24 |
 
-Platform on main. Slot 198 is landed but not archived — audit blocks archival. Slots 194, 195, 200 also landed-not-archived (separate concern).
+## Immediate Next Step
+
+Start with ledger#213. Scale M, complexity Med. Follow the platform approach: audit CDI beans → core extraction → Spring auto-config → Spring Data JPA → integration test. Use `work start casehubio/ledger#213` from the ledger repo.
+
+Recommended order: ledger → casehub-worker → blocks → workers.
+
+## Open PR
+
+casehubio/platform#349 — rebased, CI re-running. Merge when green (`gh pr merge 349 --repo casehubio/platform --rebase`).
 
 ## References
 
 | Artifact | Path |
 |----------|------|
-| Audit plan | `plans/2026-09-22-spring-deployment-audit.md` |
-| Diary entry | `blog/2026-09-22-mdp01-spring-deployment-landed.md` |
-| Epic | casehubio/parent#501 (closed) |
-| Filed issue | casehubio/parent#513 (@PostConstruct initMethod) |
-| Garden entry | GE-20260922-34ceef (Flow.Subscription gotcha) |
+| Platform audit report | `wsp-casehub-platform/audit/REPORT.md` |
+| Observability design spec | `wsp-casehub-platform/specs/issue-384-spring-deployment-audit/2026-09-23-platform-observability-design.md` |
+| Decisions (D1-D15) | `wsp-casehub-platform/specs/issue-384-spring-deployment-audit/decisions.md` |
+| Platform implementation plan | `wsp-casehub-platform/plans/2026-09-23-platform-observability.md` |
+| Queue (completed) | `wsp-casehub-platform/.plan` |
