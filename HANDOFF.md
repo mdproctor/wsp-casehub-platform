@@ -2,11 +2,13 @@
 
 ## Last Session
 
-Started ledger#213 (Spring Boot deployment). Designed, reviewed, and planned the full migration. Wrote 614-line spec with 6 decisions, ran 3-dimension standard design review ($41.59, 50 issues found, spec updated by reviewers across 9 commits). Produced 1076-line implementation plan (7 batches, 16 tasks). Began execution of Task 1: moved 4 repository SPIs from runtime to api, created ActorTrustScoreBase and TrustScoreSnapshotBase with orm.xml mapped-superclass entries, renamed alpha/beta fields. Hit import cascade from blanket text replacement — WIP committed at ~70% of Task 1.
+Continued ledger#213 (Spring Boot deployment). Completed Task 1 (Repo SPI relocation) — fixed 19 stale ActorTrustScoreRepository imports, widened all return types from entity to api-level base types across 15 production files and 19 test files, added findAllDetached() and countByActorId() SPI methods with implementations, moved 3 NoOp repos to ledger-core with CDI producers in LedgerCoreProducer. Fixed pre-existing ScimAgentLookup/WebDIDResolver constructor breaks. Fixed SubjectSequenceStats FQN in named query. Tests running for verification.
+
+3 remaining repo moves (ErasureReceipt, ActorIdentityBinding, KeyRotation) deferred to Task 2 — their SPIs reference JPA entity types (extends JpaLedgerEntry) that can't be widened without breaking JOINED inheritance. When jpa-common is created, these entities move there and the SPIs can reference jpa-common types.
 
 ## Immediate Next Step
 
-Fix remaining stale imports in JPA/InMemory implementations and ~20 test files (`io.casehub.ledger.runtime.repository.ActorTrustScoreRepository` → `io.casehub.ledger.api.spi.ActorTrustScoreRepository`). Then complete Task 1 Steps 3-5 (findAllDetached SPI, countByActorId SPI, NoOp repo moves to core). Use `work continue` from slot 198.
+Verify all runtime tests pass. Then begin Task 2 (jpa-common module). Use `work continue` from slot 198.
 
 ## Slot State
 
