@@ -252,6 +252,23 @@ public boolean awaitState(S target, Duration timeout) throws InterruptedExceptio
 }
 ```
 
+Updated `awaitTransition()`:
+
+```java
+@Override
+public void awaitTransition(S from, S to) throws InterruptedException {
+    lock.lock();
+    try {
+        while (!(lastFrom == from && lastTo == to)) {
+            if (released) throw new InterruptedException("state machine released");
+            stateChanged.await();
+        }
+    } finally {
+        lock.unlock();
+    }
+}
+```
+
 ### awaitAnyState (D5)
 
 Add to `BlockingOrcStateMachine`:
@@ -415,7 +432,7 @@ public ScenarioScope childScope(String name) {
 }
 ```
 
-The child scope no longer copies parent primitives (`putAll` removed). Instead, `getOrCreate` walks the scope chain:
+The child scope no longer copies parent primitives (`putAll` removed). Instead, all read paths walk the scope chain via `findPrimitive()`:
 
 ```java
 @SuppressWarnings("unchecked")
@@ -423,6 +440,19 @@ private <T> T getOrCreate(String name, Class<T> type, java.util.function.Supplie
     Object existing = findPrimitive(name);
     if (existing != null) return (T) existing;
     return (T) primitives.computeIfAbsent(name, k -> factory.get());
+}
+
+@Override
+@SuppressWarnings("unchecked")
+public <T> T primitive(String name, Class<T> type) {
+    Object p = findPrimitive(name);
+    if (p == null) return null;
+    if (!type.isInstance(p)) {
+        throw new IllegalArgumentException(
+            "Primitive '" + name + "' is " + p.getClass().getSimpleName()
+            + ", not " + type.getSimpleName());
+    }
+    return (T) p;
 }
 
 Object findPrimitive(String name) {
@@ -493,8 +523,11 @@ private void startDeadlineWatcher(Duration scenarioDeadline, Runnable onDeadline
 
         if (!closed) {
             deadlineExpired = true;
-            if (onDeadline != null) onDeadline.run();
-            close();
+            try {
+                if (onDeadline != null) onDeadline.run();
+            } finally {
+                close();
+            }
         }
     });
 }
@@ -540,7 +573,9 @@ deadline_primitivesCleaned_viaOrcPrimitive
 deadline_blockedAwait_interruptedOnExpiry
 deadline_spawnedThreads_interruptedOnExpiry
 deadline_watcherThread_interruptedOnExternalClose
+deadline_withHandler_handlerThrows_scopeStillCloses
 childScope_parentPrimitivesAccessibleViaChain
+childScope_primitive_directLookup_walksChain
 childScope_localPrimitiveCreation_notVisibleToParent
 childScope_close_doesNotReleaseParentPrimitives
 childScope_parentPrimitivesCreatedAfterChild_visible
@@ -735,6 +770,7 @@ private static BlockingOrcStateMachine<State> createLifecycle(SpeedMultiplier sp
 ```java
 lifecycle.onTransition(IDLE, RUNNING, payload -> {
     TemporalProfile<E> profile = (TemporalProfile<E>) payload;
+    activeProfile = profile;
     driverThread = Thread.ofVirtual()
         .name("temporal-driver-" + profile.name())
         .start(() -> runLoop(profile));
@@ -749,10 +785,8 @@ lifecycle.onTransition(IDLE, RUNNING, payload -> {
 
 ```java
 public void start(TemporalProfile<E> profile) {
-    activeProfile = profile;
     localSpeedOverride = null;
     if (!lifecycle.transition(IDLE, RUNNING, profile)) {
-        activeProfile = null;
         throw new IllegalStateException("Driver is " + lifecycle.currentState() + ", expected IDLE");
     }
 }
