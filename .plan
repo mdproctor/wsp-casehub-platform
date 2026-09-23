@@ -13,3 +13,26 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/ledger#213 — Issue #213 ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: Repo SPI relocation
+    - [ ] Task 2: jpa-common module
+  - [ ] Batch 2: Config
+    - [ ] Task 3: LedgerProperties records
+    - [ ] Task 4: LedgerConfigAdapter + events
+  - [ ] Batch 3: Core-extraction
+    - [ ] Task 5: Enricher pipeline
+    - [ ] Task 6: Trust scoring services
+    - [ ] Task 7: Health + compliance + remaining
+    - [ ] Task 8: Identity + enricher POJOs
+  - [ ] Batch 4: API-extraction
+    - [ ] Task 9: McpDomain impls + GraphQL DTOs
+  - [ ] Batch 5: Spring-modules
+    - [ ] Task 10: ledger-spring
+    - [ ] Task 11: ledger-spring-jpa
+  - [ ] Batch 6: Signing
+    - [ ] Task 12: Core extraction
+    - [ ] Task 13: signing-spring module
+  - [ ] Batch 7: Integration
+    - [ ] Task 14: Spring integration test
+    - [ ] Task 15: Consumer guide
+    - [ ] Task 16: Final verification
