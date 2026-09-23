@@ -2,17 +2,15 @@
 
 ## Last Session
 
-Completed #398 (platform observability — 3 new modules) and #399 (spring-testing + consumer guide). Closed all 8 issues in the Spring deployment audit queue (#384). Branch `issue-384-spring-deployment-audit` squashed, merged, pushed. All 5 original repos verified: on main, synced with origin, all branches stamped.
+Started ledger#213 (Spring Boot deployment). Designed, reviewed, and planned the full migration. Wrote 614-line spec with 6 decisions, ran 3-dimension standard design review ($41.59, 50 issues found, spec updated by reviewers across 9 commits). Produced 1076-line implementation plan (7 batches, 16 tasks). Began execution of Task 1: moved 4 repository SPIs from runtime to api, created ActorTrustScoreBase and TrustScoreSnapshotBase with orm.xml mapped-superclass entries, renamed alpha/beta fields. Hit import cascade from blanket text replacement — WIP committed at ~70% of Task 1.
 
-Post-close: stamped 5 merged-but-unstamped branches across repos. Landed 2 unmerged branches (work#494, qhorus#495 — Spring REST controllers). Stamped platform's stale `issue-489-dx-audit` as superseded (content already on main via `rebase-489`).
+## Immediate Next Step
 
-Rebased and pushed casehubio/platform PR #349 (fix CI — `ManualBeanScanner` static→instance). Merged casehubio/aml PR #125 and casehubio/drafthouse PR #123. Platform PR #349 CI re-running after fix.
-
-Added 4 new repos to slot for Spring migration: ledger, casehub-worker, blocks, workers.
+Fix remaining stale imports in JPA/InMemory implementations and ~20 test files (`io.casehub.ledger.runtime.repository.ActorTrustScoreRepository` → `io.casehub.ledger.api.spi.ActorTrustScoreRepository`). Then complete Task 1 Steps 3-5 (findAllDetached SPI, countByActorId SPI, NoOp repo moves to core). Use `work continue` from slot 198.
 
 ## Slot State
 
-9 repos, all on main, all synced with origin:
+Branch `issue-213-spring-boot-deployment` active in 3 repos: platform, wsp-casehub-platform, ledger.
 
 | Repo | Spring Status | Next Issue |
 |------|--------------|------------|
@@ -21,27 +19,17 @@ Added 4 new repos to slot for Spring migration: ledger, casehub-worker, blocks, 
 | work | Complete | — |
 | qhorus | Complete | — |
 | neocortex | Complete | — |
-| **ledger** | Not started | casehubio/ledger#213 |
-| **casehub-worker** | Not started | casehubio/casehub-worker#16 |
-| **blocks** | 3 modules exist, gaps | casehubio/blocks#297 |
-| **workers** | Not started (blocked by casehub-worker) | casehubio/workers#24 |
-
-## Immediate Next Step
-
-Start with ledger#213. Scale M, complexity Med. Follow the platform approach: audit CDI beans → core extraction → Spring auto-config → Spring Data JPA → integration test. Use `work start casehubio/ledger#213` from the ledger repo.
-
-Recommended order: ledger → casehub-worker → blocks → workers.
-
-## Open PR
-
-casehubio/platform#349 — rebased, CI re-running. Merge when green (`gh pr merge 349 --repo casehubio/platform --rebase`).
+| **ledger** | **In progress** — Task 1/16, Batch 1/7 | casehubio/ledger#213 |
+| casehub-worker | Not started | casehubio/casehub-worker#16 |
+| blocks | 3 modules exist, gaps | casehubio/blocks#297 |
+| workers | Not started (blocked by casehub-worker) | casehubio/workers#24 |
 
 ## References
 
 | Artifact | Path |
 |----------|------|
-| Platform audit report | `wsp-casehub-platform/audit/REPORT.md` |
-| Observability design spec | `wsp-casehub-platform/specs/issue-384-spring-deployment-audit/2026-09-23-platform-observability-design.md` |
-| Decisions (D1-D15) | `wsp-casehub-platform/specs/issue-384-spring-deployment-audit/decisions.md` |
-| Platform implementation plan | `wsp-casehub-platform/plans/2026-09-23-platform-observability.md` |
-| Queue (completed) | `wsp-casehub-platform/.plan` |
+| Design spec | `wsp-casehub-platform/specs/issue-213-spring-boot-deployment/2026-09-23-ledger-spring-deployment-design.md` |
+| Decisions (D1-D6) | `wsp-casehub-platform/specs/issue-213-spring-boot-deployment/decisions.md` |
+| Implementation plan | `wsp-casehub-platform/plans/2026-09-23-ledger-spring-deployment.md` |
+| Journal | `wsp-casehub-platform/JOURNAL.md` |
+| Garden entries | GE-20260923-e81faa (orm.xml technique), GE-20260923-1d03d4 (ide_replace gotcha), GE-20260923-9393de (generics invariance) |
