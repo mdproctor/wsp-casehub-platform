@@ -13,6 +13,19 @@ Platform#386 added runtime orchestration primitives to yaml-core: OrcStateMachin
 1. **DX refinements (#391):** reduce verbosity for common orchestration patterns without changing the underlying model
 2. **Simulation–orchestration integration (#405):** connect the simulation infrastructure (TemporalSimulationDriver, TimedSequence, SimulationRuntime) with the orchestration primitives, enabling YAML-driven simulation scenarios
 
+**#405 scope:** Issue #405 defines four integration directions. This spec addresses directions 1 and 2:
+
+| Direction | Status | Where addressed |
+|-----------|--------|----------------|
+| 1. Simulation consumes orchestration | ✅ Addressed | D5 (BlockingOrcStateMachine), D8 (feed→channel) |
+| 2. Orchestration consumes simulation | ✅ Addressed | D6 (SpeedMultiplier wiring), D7 (CorpusVariableSource) |
+| 3. @SimulationEligible orchestration primitives | ⏳ Deferred | Tracked as #414 |
+| 4. Convergence with agentic patterns (TerminationSpec) | ⏳ Deferred | Tracked as #415 |
+
+Direction 3 (decorator generation for orchestration primitives to inject pre-recorded messages, force state sequences, adjust semaphore permits) overlaps with `SimulatedPrimitiveFactory` (D9) but is broader — D9 is factory-level substitution; direction 3 envisions annotation-driven decorator generation via the existing `SimulationDecoratorProcessor`. This is deferred because the decorator generator needs primitives to be stable first.
+
+Direction 4 (TerminationSpec delegating to yaml-core orchestration primitives) requires #410 (deadline propagation, condition combinators) as a prerequisite — deferring until #410 lands.
+
 ## Strategic Position
 
 The combination of these two issues creates a YAML orchestration language with capabilities no existing playbook language provides:
@@ -26,7 +39,7 @@ The combination of these two issues creates a YAML orchestration language with c
 | Thread-safe shared state | no | no | no | counter, gauge, flag, accumulator, map |
 | Expression power | Jinja2 | Go templates | JSONPath | JQ + MVEL + CDI bean invoke |
 | Deadline propagation | no | timeouts only | timeouts only | cascading scope deadlines |
-| Scenario debugging | no | logs | logs | MCP-based pause/inspect/step/modify |
+| Scenario debugging | no | logs | logs | Journal + step tracing (MCP debugger: future) |
 
 The closest comparable is Temporal.io — but Temporal's position is "you need a programming language, YAML isn't expressive enough." This design proves that wrong via the four-tier escape model.
 
@@ -72,7 +85,21 @@ data:                                    data:
   symbol: ${instrument.symbol}             symbol: ${each.instrument.symbol}
 ```
 
-VariableResolver is unchanged — bare references remain a hard error. The rewrite is visible in the parsed AST (debuggable, not magical). Scoped prefixes (`result.`, `each.`, `machine.`, `signal.`, `channel.`) are recognized and never rewritten.
+VariableResolver is unchanged — bare references remain a hard error. The rewrite is visible in the parsed AST (debuggable, not magical).
+
+**Rewriter mechanics:** VariablePrefixRewriter is YAML-aware, not a blind text transform. It receives:
+1. The `defaultPrefix` value (e.g., `var`)
+2. The set of forEach `as:` variable names extracted from the document's forEach declarations
+3. The set of registered scoped prefixes from VariableResolver's prefix sources
+
+**Rewrite rules (priority order):**
+1. If the bare reference matches a registered scoped prefix — never rewrite (recognized prefixes)
+2. If the bare reference matches a forEach `as:` variable — rewrite to `each.` prefix
+3. Otherwise — rewrite to the declared `defaultPrefix`
+
+**Collision rule:** If both a `var.instrument` scope and a `forEach: ${instruments} as instrument` exist, the forEach binding wins (rule 2 before rule 3). This is intentional — forEach creates a more specific scope.
+
+**Recognized prefix list:** Derived from VariableResolver's registered prefix sources (`prefixSources.keySet()` + `objectPrefixSources.keySet()`), not hardcoded. Adding a new scoped prefix (e.g., `corpus.`, `shared.`) via `withScope()` or `withObjectScope()` automatically adds it to the recognized set. No rewriter code change needed.
 
 ### 1.3 Compute Blocks (D3)
 
@@ -139,7 +166,15 @@ Two implementations:
 
 ScenarioScope factory returns blocking variant by default (coordination is ScenarioScope's purpose).
 
-**Unlocks:** TemporalSimulationDriver lifecycle becomes declarative (define states, transitions, handlers, `awaitState(RUNNING)` for pause/resume). Scenario step coordination. Deadline cancellation (#410).
+ScenarioScope factory method return type changes to `BlockingOrcStateMachine<S>`:
+
+```java
+<S extends Enum<S>> BlockingOrcStateMachine<S> stateMachine(String name, Class<S> stateType, S initialState);
+```
+
+This is a breaking API change — justified because #386 is fresh with no external consumers. Callers typed to `OrcStateMachine<S>` still compile (covariant return), and callers that need blocking gain direct access without casting.
+
+**Consolidates:** TemporalSimulationDriver lifecycle can use the same state-machine interface as all other platform state machines (uniform monitoring, debugging, YAML binding). The driver already manages lifecycle correctly with ReentrantLock + Condition — the value is API consolidation, not new capability. Scenario step coordination. Deadline cancellation (#410).
 
 ### 2.2 SpeedMultiplier Wiring (D6)
 
@@ -180,11 +215,61 @@ temporal-profiles:
 
 Two-phase wiring:
 1. **Startup:** simulation-config creates `FeedBinding` records (feedName, channelName, profileRef, eventType)
-2. **Scenario start:** `feedBinding.activate(scope)` creates TemporalEventSink capturing the scope: `event -> scope.channel(channelName, eventType).send(event)`
+2. **Scenario start:** `feedBinding.activate(scope)` creates a TemporalEventSink adapter:
 
-Type-validated channels: `channel(String name, Class<T> type)` overload validates `type.isInstance(value)` on `send()`.
+```java
+TemporalEventSink<E> sink = (qualifiedName, label, event) ->
+    scope.channel(channelName, eventType).send(event);
+```
 
-### 2.5 Pluggable PrimitiveFactory (D9)
+The adapter receives all three TemporalEventSink parameters (`qualifiedName`, `label`, `event`). Only `event` is forwarded to the channel — `qualifiedName` and `label` are available for logging/tracing but are not part of the channel payload.
+
+**Type-validated channels:** New ScenarioScope method:
+
+```java
+<T> OrcChannel<T> channel(String name, Class<T> type);
+```
+
+The `type` parameter validates `type.isInstance(value)` on every `send()`. For non-generic concrete types (e.g., `Trade.class`), this provides strong runtime type safety. For generic types like `Map<String, Object>`, the erasure check (`Map.class.isInstance(...)`) validates the container type but not the generic parameters — this is a known limitation of Java's type erasure, not a design gap.
+
+### 2.5 OrcPrimitive Lifecycle Interface (D9a)
+
+All orchestration primitives implement a common lifecycle interface:
+
+```java
+public interface OrcPrimitive {
+    default void releaseForClose() {}
+}
+```
+
+Each primitive interface (`OrcChannel`, `OrcSignal`, `OrcLatch`, `OrcSemaphore`, `OrcStateMachine`, `OrcCounter`, `OrcGauge`, `OrcFlag`, `OrcAccumulator`, `OrcMap`) extends `OrcPrimitive`. Primitive implementations override `releaseForClose()` when they hold blocking resources:
+
+| Primitive | releaseForClose() behavior |
+|-----------|---------------------------|
+| `OrcChannel` | closes the channel (releases blocked receivers) |
+| `OrcLatch` | counts down to zero (releases blocked waiters) |
+| `OrcSignal` | signals if unsignalled (releases blocked waiters) |
+| `OrcSemaphore` | shuts down (releases blocked acquirers) |
+| `OrcStateMachine` | no-op (non-blocking CAS) |
+| `OrcCounter` | no-op (lock-free accumulation) |
+| `OrcGauge` | no-op (atomic reference) |
+| `OrcFlag` | no-op (atomic boolean) |
+| `OrcAccumulator` | resets to identity value |
+| `OrcMap` | no-op (data container) |
+
+`DefaultScenarioScope.close()` becomes:
+
+```java
+for (Object p : primitives.values()) {
+    if (p instanceof OrcPrimitive orc) {
+        orc.releaseForClose();
+    }
+}
+```
+
+No instanceof chains, no coupling to concrete types, and `SimulatedPrimitiveFactory` implementations automatically participate in lifecycle cleanup.
+
+### 2.5b Pluggable PrimitiveFactory (D9)
 
 Extract `PrimitiveFactory` strategy from ScenarioScope's factory methods:
 
@@ -204,7 +289,7 @@ public interface PrimitiveFactory {
 }
 ```
 
-ScenarioScope caches via `ConcurrentHashMap.computeIfAbsent` — same-name-same-instance contract. PrimitiveFactory is stateless (no thread-safety requirements).
+All `create*` methods return types that extend `OrcPrimitive` — the lifecycle contract is implicit in the type hierarchy. ScenarioScope caches via `ConcurrentHashMap.computeIfAbsent` — same-name-same-instance contract. PrimitiveFactory is stateless (no thread-safety requirements).
 
 `SimulatedPrimitiveFactory` returns pre-loaded/scripted primitives for deterministic testing.
 
@@ -222,11 +307,13 @@ ScenarioScope childScope(String name);
 **Cancellation contract:**
 1. `close()` calls `Thread.interrupt()` on all spawned virtual threads
 2. All orchestration primitives throw `InterruptedException` — spawned tasks are interrupt-responsive
-3. After interrupting, `close()` joins with timeout (5s default, SpeedMultiplier-aware)
+3. After interrupting, `close()` joins with timeout (5s default per task, SpeedMultiplier-aware)
 4. Stuck tasks are logged — best-effort cleanup
 
+**Total close budget:** The root scope enforces a total close budget of 30s (SpeedMultiplier-aware). All child scope close operations and join timeouts share this budget. When the budget is exhausted, remaining stuck tasks are logged at WARN level and abandoned. This prevents unbounded timeout accumulation in deep scope hierarchies — a 3-level hierarchy with 5 children each won't accumulate 75s of join timeouts.
+
 **Lifecycle:**
-- `childScope()` creates nested scope — closing parent closes all children
+- `childScope()` creates nested scope — closing parent closes all children (depth-first)
 - Deadlines propagate downward
 - SpeedMultiplier propagates through scope hierarchy
 
@@ -269,7 +356,11 @@ shared:
   events-fired: counter
   market-state: gauge
   is-ready: flag
-  total-volume: accumulator
+  total-volume: accumulator                          # defaults: op=sum, identity=0.0
+  max-price:
+    type: accumulator
+    op: max                                          # DoubleBinaryOperator: sum, max, min
+    identity: -Infinity                              # initial value
   positions: map
 
 # Reading
@@ -289,16 +380,29 @@ update:
   shared.positions[${symbol}] ?= { quantity: 0 }   # putIfAbsent
 ```
 
+**Accumulator defaults:** The scalar form `total-volume: accumulator` defaults to `op=sum` (`Double::sum`) with `identity=0.0`. Custom operators use the object form. Three built-in operators: `sum` (Double::sum, identity 0.0), `max` (Double::max, identity -Infinity), `min` (Double::min, identity +Infinity). Custom `DoubleBinaryOperator` requires Java (Tier 3/4).
+
+**Update: block parsing model:** The `update:` block is parsed as raw YAML key-value pairs into AST nodes — no type context needed at parse time. At runtime, the step executor resolves each key's primitive type from the `shared:` declarations and interprets the value accordingly. Syntax disambiguation is purely lexical:
+
+| Syntax pattern | Operation | Applicable types |
+|---------------|-----------|-----------------|
+| `+N` or `-N` | increment/decrement by N | counter |
+| `+= expr` | accumulate expression value | accumulator |
+| `true` / `false` | set/clear | flag |
+| map with `default:`/`merge:` keys | computeIfAbsent/merge | map |
+| `key ?= value` | putIfAbsent | map |
+| anything else | set | gauge |
+
+A type mismatch (e.g., `+1` on a gauge) is a runtime validation error with a clear message referencing the `shared:` declaration.
+
 ### 2.8 ScenarioScope as Lifecycle Manager (D12)
 
 ScenarioScope owns primitives, threads, and nested scopes. Its `close()` releases all owned resources:
-- Closes channels
-- Counts down latches, signals unsignalled signals
-- Shuts down semaphores
+- Calls `releaseForClose()` on every `OrcPrimitive` in the scope (D9a — no instanceof chains)
 - Interrupts spawned threads (D10 cancellation contract)
-- Recursively closes child scopes
+- Recursively closes child scopes (depth-first, within the total close budget)
 
-This is the same lifecycle model extended to new resource types — not a role change from the current AutoCloseable implementation.
+The `OrcPrimitive.releaseForClose()` interface (D9a) replaces the current concrete-type instanceof chain. Each primitive's cleanup semantics are encoded in its own implementation, not in DefaultScenarioScope. This also means `SimulatedPrimitiveFactory` implementations participate in lifecycle cleanup automatically — custom implementations that don't extend the `Default*` classes are no longer invisible to close().
 
 ---
 
@@ -314,6 +418,14 @@ This is the same lifecycle model extended to new resource types — not a role c
 | 4. @ScenarioAction | `action: name` | Stateful, scope-aware | IntelliJ full step-through |
 
 ### 3.2 Bean Invoke Syntax
+
+**Module boundary:** yaml-core parses `invoke:` into an `InvokeDirective` AST node that captures the bean/method reference as strings — no CDI dependency. CDI bean resolution happens at runtime in the consumer module (simulation-config or orchestration-runtime). This follows the same pattern as `ComputeBlock` — yaml-core creates the AST, the runtime evaluates it.
+
+| Concern | Module | Responsibility |
+|---------|--------|---------------|
+| Parsing `invoke: Bean::method` → `InvokeDirective` | yaml-core | String capture only — no CDI types |
+| CDI bean lookup, method resolution, invocation | consumer module | Full CDI container access |
+| Method parameter binding from `input:` | consumer module | Reflection + `-parameters` flag |
 
 **CDI bean method call:**
 ```yaml
@@ -351,13 +463,9 @@ Each input element can be a variable reference, literal, expression, or compute 
 |-----|----------|--------|
 | Type-safe events | yaml-codegen JSON Schema validation at parse time + type-validated channels (D8) | Equivalent or better — schema constraints are stricter than Java constructors |
 | Java operations | Tier 3 `invoke:` — CDI bean call, full application stack | Full — no operation lost |
-| Debugging | MCP scenario debugger + IntelliJ for invoke'd methods | Equivalent — different mechanism |
+| Debugging | IntelliJ breakpoints on `invoke:` methods + step tracing journal | Partial — Tier 3/4 methods get full IntelliJ debugging; Tier 1/2 rely on journal + step tracing |
 
-**MCP scenario debugging:**
-- `breakpoint(scenario, step)` — pause before step
-- `inspect(scope)` — full state tree
-- `step(scope)` — execute one step, stay paused
-- `modify(scope, construct, value)` — set gauge, send to channel
+**Future: MCP scenario debugging.** An MCP-based debugger for YAML scenarios (`breakpoint`, `inspect`, `step`, `modify`) is a natural extension of the interpreted execution model (§5.1) but is NOT part of this design. It will be designed separately and should NOT be cited as evidence for current fidelity parity.
 
 ---
 
@@ -367,7 +475,7 @@ Each input element can be a variable reference, literal, expression, or compute 
 
 All orchestration primitives MUST use `java.util.concurrent` locks or lock-free primitives. NEVER `synchronized`. This is a design rule — `synchronized` pins virtual threads to carrier threads.
 
-Current implementations verified compliant: DefaultOrcStateMachine (CAS), DefaultOrcChannel (ReentrantLock via LinkedBlockingQueue), DefaultOrcSemaphore (j.u.c.Semaphore), DefaultOrcLatch (CountDownLatch), DefaultOrcSignal (volatile).
+Current implementations verified compliant: DefaultOrcStateMachine (AtomicReference CAS), DefaultOrcChannel (ReentrantLock via LinkedBlockingQueue), DefaultOrcSemaphore (j.u.c.Semaphore), DefaultOrcLatch (CountDownLatch), DefaultOrcSignal (ReentrantLock + Condition for repeatable mode, CompletableFuture for one-shot mode, volatile signalled flag).
 
 ### 4.2 Concurrency Model — Non-Goals
 
@@ -387,6 +495,8 @@ Simulation's execution model should eventually be expressible as orchestration Y
 
 yaml-core remains zero-dependency (pure Java + java.util.concurrent). New primitives (OrcCounter, OrcGauge, OrcFlag, OrcAccumulator, OrcMap, BlockingOrcStateMachine, PrimitiveFactory, SpawnedTask) live in yaml-core's orchestration package. Bridges to simulation and CDI live in simulation-config and consumer modules.
 
+**J2CL transpilability boundary:** The J2CL transpilability claim in the pom.xml description applies to yaml-core's **declaration primitives** (VariableResolver, ForEachExpander, Truthiness, CsvParser, ConditionalInclude, shorthand parsing) — the original zero-dependency YAML processing layer. The **orchestration package** (added in #386) is NOT J2CL-transpilable — it uses `java.util.concurrent` types (ReentrantLock, CountDownLatch, Semaphore, CompletableFuture, LinkedBlockingQueue, AtomicReference, LongAdder, DoubleAccumulator, ConcurrentHashMap) that are absent from J2CL's JRE emulation. Browser parity for orchestration is achieved through a parallel TypeScript implementation (§5.2), not J2CL transpilation. The pom.xml description should be updated to: "Pure Java YAML declaration primitives — variable resolution, forEach expansion, conditional inclusion, CSV data sources, iteration groups, orchestration coordination. Zero dependencies. Declaration layer is J2CL-transpilable; orchestration has parallel TypeScript implementation."
+
 ---
 
 ## Part 5: Execution Model + Browser Parity (D15)
@@ -402,7 +512,7 @@ Interpreted because: dynamic behavior (speed changes, pause/resume, breakpoints)
 
 ### 5.2 TypeScript/Browser Parity
 
-yaml-core is J2CL-transpilable. The same YAML scenario must produce identical results on JVM and in the browser.
+yaml-core's declaration primitives are J2CL-transpilable. The orchestration package uses a parallel TypeScript implementation (not J2CL transpilation — see §4.4). The same YAML scenario must produce identical results on JVM and in the browser.
 
 | Java (JVM) | TypeScript (Browser) |
 |-----------|---------------------|
@@ -414,6 +524,8 @@ yaml-core is J2CL-transpilable. The same YAML scenario must produce identical re
 | `scope.close()` → `Thread.interrupt()` | `worker.terminate()` |
 
 **Key constraint:** No primitive API can depend on JVM-specific blocking semantics that can't be emulated with Web Workers + SharedArrayBuffer + Atomics. The TypeScript scenario runner is async — `await channel.receive()` instead of blocking.
+
+**OrcMap browser parity caveat:** On the JVM, `ConcurrentHashMap` provides linearizable compound operations (`computeIfAbsent`, `merge`, `putIfAbsent`) with concurrent access. On the browser, the shared-state Worker serializes all map operations through a single message queue. This provides identical correctness guarantees — serial execution through the Worker is linearizable by construction. However, the browser implementation is effectively single-threaded for map access. This is a known performance fidelity reduction, not a correctness gap. "Identical results" means: given the same operations in the same logical order, both runtimes produce the same final state. It does NOT mean: both runtimes exhibit the same concurrency throughput characteristics.
 
 ---
 
