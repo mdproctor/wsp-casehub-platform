@@ -13,3 +13,7 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#391 — Issue #391 ← active
+- [ ] casehubio/platform#405 — simulation-orchestration-integration
+- [ ] casehubio/platform#411 — four-tier-escape-model
+- [ ] casehubio/platform#412 — interpreted-yaml-browser-parity
+- [ ] casehubio/platform#413 — virtual-thread-safety-design-rules

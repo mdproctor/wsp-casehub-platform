@@ -1,6 +1,6 @@
 # Orchestration DX Refinements + Simulation Integration
 
-**Issues:** casehubio/platform#391, casehubio/platform#405
+**Issues:** #391 (DX refinements), #405 (simulation-orchestration), #411 (four-tier escape), #412 (execution model + browser parity), #413 (design rules)
 **Branch:** issue-391-orch-dx-sim-integration
 **Date:** 2026-09-23
 **Depends on:** #386 (runtime orchestration primitives — landed)
