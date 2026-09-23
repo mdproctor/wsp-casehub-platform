@@ -338,6 +338,18 @@ public interface LedgerEventPublisher {
 }
 ```
 
+**Event payload type placement:** All routing event/payload records move from `runtime.service.routing` to `ledger-core`:
+
+| Record | Current location | Target | Notes |
+|--------|-----------------|--------|-------|
+| `TrustScoreComputedAt` | `runtime.service.routing` | `core.event` | Pure record: `Instant computedAt, int count` |
+| `TrustScoreDelta` | `runtime.service.routing` | `core.event` | Pure record: primitive fields only |
+| `TrustScoreDeltaPayload` | `runtime.service.routing` | `core.event` | Wraps `List<TrustScoreDelta>` — no JPA dependency |
+| `TrustScoreFullPayload` | `runtime.service.routing` | `core.event` | Currently wraps `List<ActorTrustScore>` (JPA entity). After Step 0 creates api-level base POJOs, change to `List<api.model.ActorTrustScore>` — core must not reference JPA entities |
+| `AgentKeyRotatedEvent` | new | `core.event` | Published by `KeyRotationServiceCore` |
+| `TrustScoreActorUpdatedEvent` | new | `core.event` | Published by `IncrementalTrustUpdater` |
+| `AttestationRecordedEvent` | new | `core.event` | Published by `LedgerAppenderCore` |
+
 The `needsDeltaPayload()` method replaces `BeanManager.resolveObserverMethods()` — each framework implementation answers based on its own observer detection:
 - **CDI:** `BeanManager.resolveObserverMethods()` at `@PostConstruct`
 - **Spring:** `ApplicationContext.getBeansOfType(TrustScoreDeltaPayload.class)` or `@EventListener` method count inspection
@@ -370,7 +382,26 @@ Extract the 4 REST @McpDomain implementations to core POJOs:
 
 The Quarkus rest module keeps @McpDomain on thin delegation shells. The graphql-spring-generator produces Spring controllers from the @McpDomain annotations. Both inject the core POJO.
 
-GraphQL module (LedgerQueryResolver, LedgerMutationResolver) — same extraction pattern. The @GraphQLApi annotation stays on the thin Quarkus shell.
+**GraphQL module** (LedgerQueryResolver, LedgerMutationResolver) — same extraction pattern. The @GraphQLApi annotation stays on the thin Quarkus shell.
+
+**GraphQL DTO placement:** The graphql module contains 10 DTO records in `io.casehub.ledger.graphql.dto` used as GraphQL type representations:
+
+| DTO Record | Purpose |
+|-----------|---------|
+| `LedgerEntryType` | GraphQL output type for ledger entries |
+| `LedgerEntryPage` | Paginated entry response |
+| `LedgerEntryFilterInput` | Query filter input |
+| `LedgerAttestationType` | GraphQL output type for attestations |
+| `CreateAttestationInput` | Mutation input for attestation creation |
+| `AppendLedgerEntryInput` | Mutation input for entry creation |
+| `TrustScoreType` | GraphQL output type for trust scores |
+| `TrustCapabilityScoreType` | GraphQL output type for capability-scoped scores |
+| `MerkleVerificationType` | GraphQL output type for Merkle verification results |
+| `TrustRoutingProfileType` | GraphQL output type for trust routing config |
+
+These DTOs move to `ledger-core` (package `core.graphql.dto`). They are pure records with no framework dependencies — only api-level type references. Both the Quarkus graphql module's thin shells and the Spring controllers produced by `graphql-spring-generator` reference these types. If they remain in the Quarkus-specific graphql module, the Spring controllers cannot compile.
+
+This differs from the REST module, where DTOs (`LedgerEntryView`, `AppendEntryRequest`, etc.) are already in `api` — no relocation needed for REST.
 
 ### Step 4: Create ledger-spring module
 
@@ -454,7 +485,7 @@ The generator produces 4 separate `@AutoConfiguration` classes — one per sourc
 `ledger-spring-integration-test`:
 - `@SpringBootTest` verifying all auto-configs compose
 - PostgreSQL via Testcontainers (`@Testcontainers` + `@Container PostgreSQLContainer`) — matching the existing Quarkus test approach. H2 rejected due to known dialect divergences: `HAVING` with aggregate arithmetic, `INSERT ON CONFLICT DO UPDATE` rejection (see `LedgerSequenceAllocator.Dialect` three-way detection), and `@NamedQuery` syntax edge cases.
-- Flyway migrations shared from `runtime/src/main/resources/db/ledger/migration/` — validates that Spring deployment uses the same schema as Quarkus. Hibernate DDL generation is NOT used; all schema comes from Flyway.
+- Flyway migrations shared from `jpa-common/src/main/resources/db/ledger/migration/` (on classpath via `ledger-spring-jpa` → `jpa-common` dependency) — validates that Spring deployment uses the same schema as Quarkus. Hibernate DDL generation is NOT used; all schema comes from Flyway.
 - `LedgerSequenceAllocator` dialect detection exercised against real PostgreSQL
 - Health endpoint returns UP
 - Core service beans are injectable
