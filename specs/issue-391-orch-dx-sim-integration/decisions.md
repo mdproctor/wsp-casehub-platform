@@ -112,7 +112,16 @@
 **Exploration:** quick
 **Status:** captured
 
-## D10: Concurrent simulation phases — hierarchical phase model (PENDING)
+## D10: Concurrent sub-scenarios — spawn + childScope on ScenarioScope
 
-**Choice:** TBD — under discussion. Phases (sequential) containing groups of profiles (concurrent). OrcLatch for phase gating, OrcChannel for data delivery. Two-level hierarchy.
-**Status:** discussing
+**Choice:** Add `spawn(String name, Runnable task)` and `childScope(String name)` to ScenarioScope. `spawn` starts a virtual thread owned by the scope. `childScope` creates a nested scope — closing a parent closes all children (cancels spawned tasks). Deadlines propagate downward. SpeedMultiplier-aware timeouts on spawned tasks.
+**Alternatives:**
+- Adopt simulation drivers into scope — couples ScenarioScope to simulation API; too specific
+- Phase model (sequential phases containing concurrent groups) — over-structured for the use case
+- No concurrency primitive (leave to consumers) — every consumer reimplements fork/join on virtual threads
+**Rationale:** `spawn` is the minimal primitive for "run this concurrently." `childScope` is the minimal primitive for "group things with shared lifecycle." Together they give structured concurrency without framework coupling. A spawned task can be a temporal simulation feed, a YAML sub-scenario, or any Runnable — the scope doesn't care what it runs, only that it owns the lifecycle.
+**Trade-offs:** ScenarioScope grows from a pure factory into a lifecycle manager. Acceptable — it already owns close() and primitive cleanup. Spawn adds thread ownership, which is a natural extension.
+**Design direction:** This is the first step toward convergence — simulation's execution model eventually expressible as orchestration YAML rather than programmatic API. The spawn primitive is designed to support both Java Runnables (backward compat) and YAML sub-scenario execution (future).
+**Sources:** TemporalSimulationDriver (virtual thread execution), ScenarioScope.close(), Java structured concurrency patterns, issue #405 Direction 1
+**Exploration:** quick
+**Status:** captured
