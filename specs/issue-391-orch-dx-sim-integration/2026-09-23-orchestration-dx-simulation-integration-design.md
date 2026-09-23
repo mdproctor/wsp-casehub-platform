@@ -275,6 +275,7 @@ Extract `PrimitiveFactory` strategy from ScenarioScope's factory methods:
 
 ```java
 public interface PrimitiveFactory {
+    <T> OrcChannel<T> createChannel(String name);
     <T> OrcChannel<T> createChannel(String name, int capacity);
     OrcSignal createSignal(String name);
     <S extends Enum<S>> BlockingOrcStateMachine<S> createStateMachine(
@@ -370,30 +371,33 @@ data: { pos: ${shared.positions[AAPL]} }
 
 # Writing (step-level update: block)
 update:
-  shared.events-fired: +1                         # counter increment
-  shared.total-volume: += ${trade.quantity}        # accumulator add
-  shared.market-state: ${new-state}                # gauge set
-  shared.is-ready: true                            # flag set
+  shared.events-fired: 1                          # counter add(1) — type-directed
+  shared.total-volume: += ${trade.quantity}        # accumulator add — lexically distinctive
+  shared.market-state: ${new-state}                # gauge set — type-directed
+  shared.is-ready: true                            # flag set — YAML boolean
   shared.positions[${symbol}]:                     # map operations
     default: { quantity: 0, avg_price: 0.0 }       # computeIfAbsent
     merge: ".quantity + $new.quantity"              # merge (JQ)
-  shared.positions[${symbol}] ?= { quantity: 0 }   # putIfAbsent
+    putIfAbsent: { quantity: 0 }                   # putIfAbsent
 ```
 
 **Accumulator defaults:** The scalar form `total-volume: accumulator` defaults to `op=sum` (`Double::sum`) with `identity=0.0`. Custom operators use the object form. Three built-in operators: `sum` (Double::sum, identity 0.0), `max` (Double::max, identity -Infinity), `min` (Double::min, identity +Infinity). Custom `DoubleBinaryOperator` requires Java (Tier 3/4).
 
-**Update: block parsing model:** The `update:` block is parsed as raw YAML key-value pairs into AST nodes — no type context needed at parse time. At runtime, the step executor resolves each key's primitive type from the `shared:` declarations and interprets the value accordingly. Syntax disambiguation is purely lexical:
+**Update: block parsing model:** The `update:` block is parsed as raw YAML key-value pairs into AST nodes — no type context needed at parse time. At runtime, the step executor resolves each key's primitive type from the `shared:` declarations and interprets the value accordingly.
 
-| Syntax pattern | Operation | Applicable types |
-|---------------|-----------|-----------------|
-| `+N` or `-N` | increment/decrement by N | counter |
-| `+= expr` | accumulate expression value | accumulator |
-| `true` / `false` | set/clear | flag |
-| map with `default:`/`merge:` keys | computeIfAbsent/merge | map |
-| `key ?= value` | putIfAbsent | map |
-| anything else | set | gauge |
+Disambiguation combines lexical pattern matching for syntactically distinctive forms with type-directed dispatch for ambiguous values:
 
-A type mismatch (e.g., `+1` on a gauge) is a runtime validation error with a clear message referencing the `shared:` declaration.
+| Value after YAML parsing | Disambiguation | Operation |
+|-------------------------|----------------|-----------|
+| String starting with `+=` | Lexical — `+=` prefix is distinctive | accumulator `accumulate()` |
+| YAML boolean (`true`/`false`) | Lexical — YAML native boolean type | flag `set()`/`clear()` |
+| Map with `default:`/`merge:`/`putIfAbsent:` keys | Lexical — nested map structure | map compound operations |
+| Integer or numeric value | **Type-directed** — dispatched by declared primitive type | counter → `add(N)`, gauge → `set(N)` |
+| String (variable ref, expression) | **Type-directed** — dispatched by declared primitive type | gauge → `set(resolved)` |
+
+**Why type-directed dispatch is necessary:** YAML parses `+1` as integer `1`, identical to bare `1`. The `+` sign is consumed by YAML's integer parser and is not recoverable at runtime. Therefore, an integer value on a counter means `add(N)` and the same integer value on a gauge means `set(N)` — the primitive type determines the operation, not the syntax. This is not "type-dependent parsing" (the AST is the same regardless of type) — it's type-dependent runtime interpretation, which is the standard execution model.
+
+A type mismatch (e.g., a YAML boolean on a counter, or `+=` on a flag) is a runtime validation error with a clear message referencing the `shared:` declaration.
 
 ### 2.8 ScenarioScope as Lifecycle Manager (D12)
 
@@ -533,7 +537,7 @@ yaml-core's declaration primitives are J2CL-transpilable. The orchestration pack
 
 | Module | Changes |
 |--------|---------|
-| `yaml-core` | D1 (shorthand sealed types), D2 (VariablePrefixRewriter), D3 (ComputeBlock record), D5 (BlockingOrcStateMachine interface + impl), D9 (PrimitiveFactory interface), D10 (spawn/childScope on ScenarioScope, SpawnedTask), D11 (OrcCounter, OrcGauge, OrcFlag, OrcAccumulator, OrcMap), D12 (lifecycle close extensions) |
+| `yaml-core` | D1 (shorthand sealed types), D2 (VariablePrefixRewriter), D3 (ComputeBlock record), D5 (BlockingOrcStateMachine interface + impl), D9a (OrcPrimitive lifecycle interface), D9 (PrimitiveFactory interface), D10 (spawn/childScope on ScenarioScope, SpawnedTask), D11 (OrcCounter, OrcGauge, OrcFlag, OrcAccumulator, OrcMap), D12 (lifecycle close extensions) |
 | `platform-api` | D4 (ExpressionContext enum, ExpressionEngineRegistry defaults) |
 | `expression` | D4 (register MVEL/JQ defaults at startup) |
 | `simulation-config` | D6 (SpeedMultiplier producer), D7 (CorpusVariableSource), D8 (FeedBinding + feed: config) |
