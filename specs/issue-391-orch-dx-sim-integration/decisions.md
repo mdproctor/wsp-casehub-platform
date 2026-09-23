@@ -48,3 +48,71 @@
 **Sources:** ExpressionEngineRegistry SPI, MvelExpressionEngine, JQExpressionEngine, issue #391 proposal
 **Exploration:** quick
 **Status:** captured
+
+## D5: OrcStateMachine two-tier — simple + blocking concurrent variant
+
+**Choice:** Keep `OrcStateMachine<S>` interface unchanged. Two implementations: `DefaultOrcStateMachine<S>` (current — AtomicReference CAS, handlers, no blocking) for synchronous use, and `BlockingOrcStateMachine<S>` (layers ReentrantLock + Condition, adds `awaitState(S)`, `awaitState(S, Duration)`, `awaitTransition(S from, S to)`, SpeedMultiplier-aware timeouts via constructor injection with identity default). ScenarioScope factory returns blocking variant by default.
+**Alternatives:**
+- Single implementation with optional blocking — flag-based behavior is fragile
+- OrcStateMachine without blocking wait — leaves TemporalSimulationDriver unable to use it (needs pause/resume coordination)
+**Rationale:** Two-tier lets each consumer pick the right tool. Blocking variant unlocks TemporalSimulationDriver lifecycle, scenario step coordination, and deadline cancellation (#410). SpeedMultiplier is already in yaml-core, no new dependency.
+**Trade-offs:** Two implementations to maintain. Acceptable — the blocking variant is thin (wraps base with lock + condition).
+**Sources:** DefaultOrcStateMachine, TemporalSimulationDriver (volatile + ReentrantLock), SpeedMultiplier SPI, issue #410 deadline propagation
+**Exploration:** quick
+**Status:** captured
+
+## D6: SpeedMultiplier wiring — CDI producer in simulation-config
+
+**Choice:** Single CDI `@Produces` method in simulation-config: `SpeedMultiplier speedMultiplier(SimulationRuntime runtime) { return runtime::globalSpeed; }`. ScenarioScope passes it to BlockingOrcStateMachine instances. Orchestration primitives consume via CDI.
+**Alternatives:**
+- Direct SimulationRuntime references in orchestration — couples orchestration to simulation instead of using the SPI
+- Configuration-driven speed — loses runtime dynamism (speed changes during simulation)
+**Rationale:** Method reference is the thinnest possible bridge. SpeedMultiplier SPI already exists in yaml-core for exactly this purpose. One line of code.
+**Trade-offs:** Requires simulation-config on the classpath for speed-aware orchestration. Without it, SpeedMultiplier.identity() default applies — graceful degradation.
+**Depends on:** D5 (BlockingOrcStateMachine consumes SpeedMultiplier)
+**Sources:** SpeedMultiplier SPI, SimulationRuntime.globalSpeed(), yaml-core zero-dep constraint
+**Exploration:** quick
+**Status:** captured
+
+## D7: SimulationCorpus as VariableSource — corpus prefix scope for forEach
+
+**Choice:** New `CorpusVariableSource implements ObjectVariableSource` in simulation-config. Prefix `corpus` — `${corpus.trades}` resolves to the list of input objects from the named corpus. Drill-down via ObjectVariableSource: `${corpus.trades[0].symbol}`. Registered on VariableResolver via `withObjectScope("corpus", corpusSource)`.
+**Alternatives:**
+- Corpus integration in yaml-core — violates zero-dep (simulation-api dependency)
+- Manual Java bridge per consumer — duplicated, no YAML-level reuse
+**Rationale:** Bridge lives in simulation-config where both dependencies (yaml-core VariableResolver, simulation-api SimulationCorpus) are available. ForEachExpander already accepts any collection — no yaml-core changes needed.
+**Trade-offs:** Corpus entries must be keyed by qualified name. InvocationRecord<I,O>.input() is the iterated value — consumers need corpus entries with meaningful input types.
+**Depends on:** D2 (default prefix may apply when corpus scope is not explicitly prefixed)
+**Sources:** SimulationCorpus SPI, ObjectVariableSource, ForEachExpander, VariableResolver.withObjectScope
+**Exploration:** quick
+**Status:** captured
+
+## D8: Temporal profile → OrcChannel feed — declarative event-to-channel wiring
+
+**Choice:** New `feed:` property in simulation config YAML on temporal profiles. simulation-config wires at startup: creates a TemporalEventSink<E> that calls `scope.channel(feedName).send(event)`. Declarative end-to-end simulation: temporal profile drives events, orchestration scenario consumes them.
+**Alternatives:**
+- Java-only wiring — works but requires consumer code for every scenario
+- Document as pattern only — misses the opportunity for declarative scenario testing
+**Rationale:** Implementation is small (config parsing + sink wiring). Capability is significant: declarative simulation-driven scenario testing without Java bridge code. Temporal profiles already have YAML config — `feed:` is a natural extension.
+**Trade-offs:** Tight coupling between temporal profile naming and channel naming. Mitigated by making `feed:` optional — profiles without it work as before.
+**Sources:** TemporalEventSink<E>, OrcChannel<T>, simulation config YAML, TemporalProfileConfig
+**Exploration:** quick
+**Status:** captured
+
+## D9: ScenarioScope simulation — pluggable PrimitiveFactory strategy
+
+**Choice:** Extract `PrimitiveFactory` strategy interface from ScenarioScope's factory methods. ScenarioScope delegates channel(), signal(), stateMachine() etc. to its PrimitiveFactory. Default factory creates real primitives. `SimulatedPrimitiveFactory` returns pre-loaded/scripted primitives (channels with queued messages, pre-fired signals, state machines on specific states). Constructor injection, no CDI required.
+**Alternatives:**
+- @SimulationEligible + @Decorator on ScenarioScope — requires CDI interception; ScenarioScope isn't always CDI-managed
+- @SimulationEligible on individual primitives (OrcChannel, OrcSignal) — primitives are factory-created, @Decorator can't intercept
+- Simulation-aware ScenarioScope subclass — hard to compose with other ScenarioScope behaviors
+**Rationale:** Strategy pattern keeps ScenarioScope's zero-dep constraint. PrimitiveFactory is a clean extension point that works regardless of DI framework. SimulatedPrimitiveFactory can be configured from simulation YAML corpus data.
+**Trade-offs:** Adds a new interface (PrimitiveFactory) and changes ScenarioScope's internal structure. Acceptable — the factory methods already exist, this just names the abstraction.
+**Sources:** ScenarioScope factory methods, @SimulationEligible generator, simulation-core patterns
+**Exploration:** quick
+**Status:** captured
+
+## D10: Concurrent simulation phases — hierarchical phase model (PENDING)
+
+**Choice:** TBD — under discussion. Phases (sequential) containing groups of profiles (concurrent). OrcLatch for phase gating, OrcChannel for data delivery. Two-level hierarchy.
+**Status:** discussing
