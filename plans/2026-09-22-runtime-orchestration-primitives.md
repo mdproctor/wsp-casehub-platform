@@ -297,13 +297,13 @@ git commit -m "feat(#386): add Condition, ConditionEvaluator, RuntimeForEach, Sp
 **Files:**
 - Create: `orchestration-core/pom.xml`
 - Modify: `pom.xml` (parent — add `<module>orchestration-core</module>`)
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/DurationParser.java`
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/StepResultStore.java`
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/StepError.java`
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/ScenarioScope.java`
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/DefaultStepResultStore.java`
-- Test: `orchestration-core/src/test/java/io/casehub/orchestration/DurationParserTest.java`
-- Test: `orchestration-core/src/test/java/io/casehub/orchestration/DefaultStepResultStoreTest.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/DurationParser.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/StepResultStore.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/StepError.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/ScenarioScope.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/DefaultStepResultStore.java`
+- Test: `../../yaml-core/src/test/java/io/casehub/yaml/core/orchestration/DurationParserTest.java`
+- Test: `../../yaml-core/src/test/java/io/casehub/yaml/core/orchestration/DefaultStepResultStoreTest.java`
 
 **Interfaces:**
 - Produces: `DurationParser.parse(String) → Duration`, `StepResultStore` (interface), `StepError` (record), `ScenarioScope` (interface), `DefaultStepResultStore` (ConcurrentHashMap-backed)
@@ -474,11 +474,11 @@ git commit -m "feat(#386): scaffold orchestration-core module — DurationParser
 ### Task 4: OrcSemaphore
 
 **Files:**
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/OrcSemaphore.java`
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/DefaultOrcSemaphore.java`
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/SemaphoreReentrancyException.java`
-- Test: `orchestration-core/src/test/java/io/casehub/orchestration/OrcSemaphoreTest.java`
-- Test: `orchestration-core/src/test/java/io/casehub/orchestration/ConcurrentSemaphoreTest.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/OrcSemaphore.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/DefaultOrcSemaphore.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/SemaphoreReentrancyException.java`
+- Test: `../../yaml-core/src/test/java/io/casehub/yaml/core/orchestration/OrcSemaphoreTest.java`
+- Test: `../../yaml-core/src/test/java/io/casehub/yaml/core/orchestration/ConcurrentSemaphoreTest.java`
 
 **Interfaces:**
 - Produces: `OrcSemaphore` (acquire/tryAcquire/release/availablePermits), `DefaultOrcSemaphore` (j.u.c.Semaphore-backed, time-windowed permit replenishment, single-permit reentrancy detection via step context ID)
@@ -555,10 +555,10 @@ git commit -m "feat(#386): add OrcSemaphore — permits, time-window, reentrancy
 ### Task 5: OrcLatch
 
 **Files:**
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/OrcLatch.java`
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/DefaultOrcLatch.java`
-- Test: `orchestration-core/src/test/java/io/casehub/orchestration/OrcLatchTest.java`
-- Test: `orchestration-core/src/test/java/io/casehub/orchestration/ConcurrentLatchTest.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/OrcLatch.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/DefaultOrcLatch.java`
+- Test: `../../yaml-core/src/test/java/io/casehub/yaml/core/orchestration/OrcLatchTest.java`
+- Test: `../../yaml-core/src/test/java/io/casehub/yaml/core/orchestration/ConcurrentLatchTest.java`
 
 **Interfaces:**
 - Produces: `OrcLatch` (countDown/await/getCount), `DefaultOrcLatch` (CountDownLatch-backed)
@@ -610,10 +610,10 @@ git commit -m "feat(#386): add OrcLatch — countdown synchronization with concu
 ### Task 6: OrcSignal
 
 **Files:**
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/OrcSignal.java`
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/DefaultOrcSignal.java`
-- Test: `orchestration-core/src/test/java/io/casehub/orchestration/OrcSignalTest.java`
-- Test: `orchestration-core/src/test/java/io/casehub/orchestration/ConcurrentSignalTest.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/OrcSignal.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/DefaultOrcSignal.java`
+- Test: `../../yaml-core/src/test/java/io/casehub/yaml/core/orchestration/OrcSignalTest.java`
+- Test: `../../yaml-core/src/test/java/io/casehub/yaml/core/orchestration/ConcurrentSignalTest.java`
 
 **Interfaces:**
 - Produces: `OrcSignal` (signal/await/payload/isSignalled), `DefaultOrcSignal` (CompletableFuture-backed for one-shot, AtomicReference for repeatable)
@@ -666,11 +666,11 @@ git commit -m "feat(#386): add OrcSignal — one-shot, repeatable, payload, broa
 ### Task 7: OrcChannel
 
 **Files:**
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/OrcChannel.java`
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/DefaultOrcChannel.java`
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/ChannelClosedException.java`
-- Test: `orchestration-core/src/test/java/io/casehub/orchestration/OrcChannelTest.java`
-- Test: `orchestration-core/src/test/java/io/casehub/orchestration/ConcurrentChannelTest.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/OrcChannel.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/DefaultOrcChannel.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/ChannelClosedException.java`
+- Test: `../../yaml-core/src/test/java/io/casehub/yaml/core/orchestration/OrcChannelTest.java`
+- Test: `../../yaml-core/src/test/java/io/casehub/yaml/core/orchestration/ConcurrentChannelTest.java`
 
 **Interfaces:**
 - Produces: `OrcChannel<T>` (send/receive/close/isErrorClosed), `DefaultOrcChannel` (LinkedBlockingQueue unbounded, ArrayBlockingQueue bounded), `ChannelClosedException`
@@ -728,13 +728,13 @@ git commit -m "feat(#386): add OrcChannel — bounded/unbounded, close/error-clo
 ### Task 8: OrcStateMachine
 
 **Files:**
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/OrcStateMachine.java`
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/DefaultOrcStateMachine.java`
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/TransitionHandler.java`
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/StateHandler.java`
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/IllegalTransitionException.java`
-- Test: `orchestration-core/src/test/java/io/casehub/orchestration/OrcStateMachineTest.java`
-- Test: `orchestration-core/src/test/java/io/casehub/orchestration/ConcurrentStateMachineTest.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/OrcStateMachine.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/DefaultOrcStateMachine.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/TransitionHandler.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/StateHandler.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/IllegalTransitionException.java`
+- Test: `../../yaml-core/src/test/java/io/casehub/yaml/core/orchestration/OrcStateMachineTest.java`
+- Test: `../../yaml-core/src/test/java/io/casehub/yaml/core/orchestration/ConcurrentStateMachineTest.java`
 
 **Interfaces:**
 - Produces: `OrcStateMachine<S extends Enum<S>>` (currentState/transition/onTransition/onEnter/onExit), `DefaultOrcStateMachine` (AtomicReference CAS), `TransitionHandler`, `StateHandler`
@@ -797,8 +797,8 @@ git commit -m "feat(#386): add OrcStateMachine — CAS transitions, guards, hand
 ### Task 9: DefaultScenarioScope
 
 **Files:**
-- Create: `orchestration-core/src/main/java/io/casehub/orchestration/DefaultScenarioScope.java`
-- Test: `orchestration-core/src/test/java/io/casehub/orchestration/ScenarioScopeTest.java`
+- Create: `../../yaml-core/src/main/java/io/casehub/yaml/core/orchestration/DefaultScenarioScope.java`
+- Test: `../../yaml-core/src/test/java/io/casehub/yaml/core/orchestration/ScenarioScopeTest.java`
 
 **Interfaces:**
 - Consumes: `OrcSemaphore`, `OrcLatch`, `OrcSignal`, `OrcChannel`, `OrcStateMachine`, `StepResultStore` (all from Tasks 4-8)

@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-386-runtime-orchestration
-state: scaffolded
+state: active
 project-sha: 27deeda9496afc170aa9f2203158138e43e6eddb
 date: 2026-09-22
 issue-repo: casehubio/platform
@@ -13,17 +13,17 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#386 — Issue #386 ← active
-  - [ ] Batch 1: yaml-core-contracts
-    - [ ] Task 1: ObjectVariableSource + typed resolution
-    - [ ] Task 2: Condition ConditionEvaluator SpeedMultiplier RuntimeForEach
-  - [ ] Batch 2: orchestration-foundation
-    - [ ] Task 3: Module scaffold + DurationParser + StepResultStore + ScenarioScope
-  - [ ] Batch 3: semaphore-latch
-    - [ ] Task 4: OrcSemaphore
-    - [ ] Task 5: OrcLatch
-  - [ ] Batch 4: signal-channel
-    - [ ] Task 6: OrcSignal
-    - [ ] Task 7: OrcChannel
-  - [ ] Batch 5: statemachine-scope
-    - [ ] Task 8: OrcStateMachine
-    - [ ] Task 9: DefaultScenarioScope
+  - [x] Batch 1: yaml-core-contracts
+    - [x] Task 1: ObjectVariableSource + typed resolution
+    - [x] Task 2: Condition ConditionEvaluator SpeedMultiplier RuntimeForEach
+  - [x] Batch 2: orchestration-foundation
+    - [x] Task 3: Module scaffold + DurationParser + StepResultStore + ScenarioScope
+  - [x] Batch 3: semaphore-latch
+    - [x] Task 4: OrcSemaphore
+    - [x] Task 5: OrcLatch
+  - [x] Batch 4: signal-channel
+    - [x] Task 6: OrcSignal
+    - [x] Task 7: OrcChannel
+  - [x] Batch 5: statemachine-scope
+    - [x] Task 8: OrcStateMachine
+    - [x] Task 9: DefaultScenarioScope
