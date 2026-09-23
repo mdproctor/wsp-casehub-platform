@@ -13,14 +13,5 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#410 — Issue #410 ← active
-  - [x] Batch 1: Foundation
-    - [x] Task 1: OrcPrimitive lifecycle interface
-    - [x] Task 2: Condition combinators
-  - [x] Batch 2: BlockingSM
-    - [x] Task 3: awaitAnyState + releaseForClose + return type
-  - [x] Batch 3: Deadline
-    - [x] Task 4: Scope chain refactor + deadline API
-  - [x] Batch 4: EventRouter
-    - [x] Task 5: EventRouter + Builder .on()
-  - [x] Batch 5: Migration
-    - [x] Task 6: TemporalSimulationDriver migration
+  - [x] Batch 1: Tests
+    - [x] Task 1: Tutorial-quality tests for all capabilities
