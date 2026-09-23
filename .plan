@@ -13,6 +13,21 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#391 — Issue #391 ← active
+  - [ ] Batch 1: Expression-DX-Foundation
+    - [ ] Task 1: ExpressionContext-enum-registry-defaults
+    - [ ] Task 2: Shorthand-directive-types
+    - [ ] Task 3: VariablePrefixRewriter
+    - [ ] Task 4: ComputeBlock-record
+  - [ ] Batch 2: Orchestration-Primitives
+    - [ ] Task 5: BlockingOrcStateMachine
+    - [ ] Task 6: Shared-state-primitives
+  - [ ] Batch 3: ScenarioScope-Architecture
+    - [ ] Task 7: PrimitiveFactory-lifecycle
+    - [ ] Task 8: spawn-childScope-SpawnedTask
+  - [ ] Batch 4: Simulation-Bridges
+    - [ ] Task 9: SpeedMultiplier-CDI-producer
+    - [ ] Task 10: CorpusVariableSource
+    - [ ] Task 11: FeedBinding-feed-config
 - [ ] casehubio/platform#405 — simulation-orchestration-integration
 - [ ] casehubio/platform#411 — four-tier-escape-model
 - [ ] casehubio/platform#412 — interpreted-yaml-browser-parity
