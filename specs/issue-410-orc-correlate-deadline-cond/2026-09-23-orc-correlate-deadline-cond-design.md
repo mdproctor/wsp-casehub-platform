@@ -481,14 +481,17 @@ public ScenarioScope withDeadline(Duration deadline, Runnable onDeadline) {
 }
 
 @Override
-public boolean isDeadlineExpired() { return deadlineExpired; }
+public boolean isDeadlineExpired() {
+    if (deadlineExpired) return true;
+    return parent != null && parent.isDeadlineExpired();
+}
 
 @Override
 public Optional<Duration> remainingTime() {
     if (deadlineExpired) return Optional.of(Duration.ZERO);
     long remaining = deadlineRemainingNanos;
-    if (remaining <= 0) return Optional.empty();
-    return Optional.of(Duration.ofNanos(remaining));
+    if (remaining > 0) return Optional.of(Duration.ofNanos(remaining));
+    return parent != null ? parent.remainingTime() : Optional.empty();
 }
 ```
 
@@ -574,6 +577,9 @@ deadline_blockedAwait_interruptedOnExpiry
 deadline_spawnedThreads_interruptedOnExpiry
 deadline_watcherThread_interruptedOnExternalClose
 deadline_withHandler_handlerThrows_scopeStillCloses
+deadline_isDeadlineExpired_childScope_reportsParentDeadline
+deadline_remainingTime_childScope_reportsParentRemainingTime
+deadline_nestedDeadlines_childReportsOwnDeadline
 childScope_parentPrimitivesAccessibleViaChain
 childScope_primitive_directLookup_walksChain
 childScope_localPrimitiveCreation_notVisibleToParent
