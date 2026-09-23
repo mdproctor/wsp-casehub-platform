@@ -141,21 +141,59 @@
 **Revised from:** R1-22 — acknowledged Java 21 constraint as explicit trade-off. R1-23 — spawn now returns SpawnedTask handle for error propagation. R1-24 — documented explicit cancellation contract.
 **Status:** revised
 
-## D11: Explicit shared-state visibility — OrcCounter, OrcGauge, declared sharing
+## D11: Shared-state primitives — full thread-safe construct set with declared visibility
 
-**Choice:** Add `OrcCounter` (thread-safe increment/get) and `OrcGauge<T>` (thread-safe set/get latest value) as ScenarioScope primitives. When spawning a fork, explicitly declare which constructs cross the boundary via a builder: `.sharing(counter).sharing(gauge).feeding(channel)`. Nothing is implicitly shared — if a construct isn't declared, the fork can't see it. Parent creates constructs; forks read/update them.
+**Choice:** Five new ScenarioScope primitives covering the full spectrum of thread-safe shared state:
+
+| Primitive | Java backing | API |
+|-----------|-------------|-----|
+| `OrcCounter` | `LongAdder` | `increment()`, `decrement()`, `add(long)`, `get()`, `reset()` |
+| `OrcGauge<T>` | `AtomicReference<T>` | `set(T)`, `get()`, `compareAndSet(T expect, T update)` |
+| `OrcFlag` | `AtomicBoolean` | `set()`, `clear()`, `toggle()`, `get()` |
+| `OrcAccumulator` | `DoubleAccumulator` | `accumulate(double)`, `get()`, `reset()`, constructor takes `DoubleBinaryOperator` + identity |
+| `OrcMap<K,V>` | `ConcurrentHashMap<K,V>` | `get(K)`, `put(K,V)`, `putIfAbsent(K,V)`, `computeIfAbsent(K, Function)`, `merge(K,V, BiFunction)`, `remove(K)`, `containsKey(K)`, `size()` |
+
+When spawning a fork, explicitly declare which constructs cross the boundary: `.sharing(counter).sharing(gauge).feeding(channel)`. Nothing implicitly shared. Parent creates constructs; forks read/update.
+
+**YAML declaration and usage (non-verbose):**
+```yaml
+# Declaration
+shared:
+  events-fired: counter
+  market-state: gauge
+  is-ready: flag
+  total-volume: accumulator
+  positions: map
+
+# Reading (via VariableResolver ${shared.X} prefix)
+when: ${shared.events-fired} > 1000
+when: ${shared.is-ready}
+data: { state: ${shared.market-state}, pos: ${shared.positions[AAPL]} }
+
+# Writing (step-level update: block with shorthand)
+update:
+  shared.events-fired: +1                        # counter increment
+  shared.total-volume: += ${trade.quantity}       # accumulator add
+  shared.market-state: ${new-state}               # gauge set
+  shared.is-ready: true                           # flag set
+  shared.positions[${symbol}]:                    # map operations
+    default: { quantity: 0, avg_price: 0.0 }      # computeIfAbsent
+    merge: ".quantity + $new.quantity"             # merge expression (JQ)
+  shared.positions[${symbol}] ?= { quantity: 0 }  # putIfAbsent one-liner
+```
+
 **Alternatives:**
 - Raw ConcurrentMap on ScenarioScope — loses type safety, users can put non-thread-safe objects in it
 - Implicit visibility (fork sees all parent primitives) — breaks isolation, hard to reason about data flow
-- No shared state at all (channels only) — forces message-passing overhead for simple observable state like counters
-**Rationale:** Web Worker model — explicit data crossing the boundary, thread-safe by construction. Counters and gauges cover the common cases (progress tracking, event counts, observable state) without exposing raw concurrent data structures. Declared sharing documents the interface between parent and fork.
-**Trade-offs:** Two new primitive types (OrcCounter, OrcGauge). The sharing declaration adds verbosity to spawn. Acceptable — explicitness prevents subtle concurrency bugs.
-**Depends on:** D10 (spawn/childScope provides the fork model this builds on)
+- Counter + Gauge only (original choice) — too limited for trading simulation use cases (accumulators for P&L, maps for per-instrument tracking, flags for market state)
+**Rationale:** Web Worker model — explicit data crossing the boundary, thread-safe by construction. Each construct has clear semantics and is thread-safe by its type — users can't break safety. The full set covers trading simulation patterns: counters for event tracking, gauges for latest price/state, flags for market open/close, accumulators for running P&L, maps for per-instrument positions. `update:` block with shorthand operators (`+1`, `+=`, `?=`, `default:`/`merge:`) keeps YAML non-verbose.
+**Trade-offs:** Five new primitive types. Acceptable — each is thin (wraps a j.u.c atomic/concurrent type), and the set covers the full spectrum. OrcMap's `computeIfAbsent`/`merge` need expression bridge for YAML (uses D3 ComputeBlock + D4 expression defaults).
+**Depends on:** D10 (spawn/childScope provides the fork model), D3/D4 (expression bridge for OrcMap merge/compute operations), D13 (virtual-thread safety — all constructs use j.u.c, never synchronized)
 **Design constraints:**
 - No complex concurrency patterns (actors, CSP, dataflow). No data sharing/passing frameworks.
 - Concurrency model is Web Worker-style: spawn + channels + declared shared constructs + lifecycle.
 - YAML simulation expression must be capability-equivalent to the programmatic API. The three-tier escape model ensures this — YAML tier must cover the 80% case without escape.
-**Sources:** Web Worker postMessage/SharedArrayBuffer model, ConcurrentMap/AtomicLong/AtomicReference patterns
+**Sources:** Web Worker model, java.util.concurrent.atomic (LongAdder, AtomicReference, AtomicBoolean, DoubleAccumulator), ConcurrentHashMap, trading simulation use cases
 **Exploration:** quick
 **Status:** captured
 
