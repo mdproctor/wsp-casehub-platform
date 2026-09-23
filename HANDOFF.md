@@ -2,13 +2,15 @@
 
 ## Last Session
 
-Continued ledger#213 (Spring Boot deployment). Completed Task 1 (Repo SPI relocation) — fixed 19 stale ActorTrustScoreRepository imports, widened all return types from entity to api-level base types across 15 production files and 19 test files, added findAllDetached() and countByActorId() SPI methods with implementations, moved 3 NoOp repos to ledger-core with CDI producers in LedgerCoreProducer. Fixed pre-existing ScimAgentLookup/WebDIDResolver constructor breaks. Fixed SubjectSequenceStats FQN in named query. Tests running for verification.
+Continued ledger#213 (Spring Boot deployment). Completed Task 1 (Repo SPI relocation) — fixed 19 stale ActorTrustScoreRepository imports, widened all return types from entity to api-level base types across 15 production files and 19 test files, added findAllDetached() and countByActorId() SPI methods with implementations, moved 3 NoOp repos to ledger-core with CDI producers in LedgerCoreProducer. Fixed pre-existing ScimAgentLookup/WebDIDResolver constructor breaks. Fixed SubjectSequenceStats FQN in named query. All runtime tests pass (BUILD SUCCESS, 1:58min, 114 test classes). 9 WIP commits on branch.
 
 3 remaining repo moves (ErasureReceipt, ActorIdentityBinding, KeyRotation) deferred to Task 2 — their SPIs reference JPA entity types (extends JpaLedgerEntry) that can't be widened without breaking JOINED inheritance. When jpa-common is created, these entities move there and the SPIs can reference jpa-common types.
 
+Also fixed 2 pre-existing test breaks (ScimAgentLookup/WebDIDResolver constructor changes from platform core-extraction).
+
 ## Immediate Next Step
 
-Verify all runtime tests pass. Then begin Task 2 (jpa-common module). Use `work continue` from slot 198.
+Begin Task 2 (jpa-common module). Use `work continue` from slot 198.
 
 ## Slot State
 
