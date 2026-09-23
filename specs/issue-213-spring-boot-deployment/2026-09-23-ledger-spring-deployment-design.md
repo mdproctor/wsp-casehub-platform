@@ -260,7 +260,7 @@ The `persistence-memory` module contains 8 in-memory repository implementations 
 | `InMemoryKeyRotationRepository` | `KeyRotationRepository` |
 | `InMemoryLedgerMerkleFrontierRepository` | `LedgerMerkleFrontierRepository` |
 | `InMemoryTrustScoreSnapshotRepository` | `TrustScoreSnapshotRepository` |
-| `InMemoryAgentSigner` | `AgentEntrySigner` |
+| `InMemoryAgentSigner` | `AgentSigner` |
 
 These are `@Alternative @Priority(1)` — they override both `@DefaultBean` NoOp fallbacks and JPA implementations when on the classpath. Each needs core extraction (convert field injection to constructor injection) so the spring-generator can produce `@AutoConfiguration` equivalents. In Spring, activation is via `@AutoConfiguration` + `@ConditionalOnClass` + `@Primary` — following the established pattern from the core extraction spec (parent#469). A separate `ledger-spring-memory` auto-configuration module is NOT needed — the spring-generator scans `persistence-memory` Jandex and produces the auto-config classes directly into the `persistence-memory` module.
 
@@ -352,7 +352,7 @@ public interface LedgerEventPublisher {
 
 The `needsDeltaPayload()` method replaces `BeanManager.resolveObserverMethods()` — each framework implementation answers based on its own observer detection:
 - **CDI:** `BeanManager.resolveObserverMethods()` at `@PostConstruct`
-- **Spring:** `ApplicationContext.getBeansOfType(TrustScoreDeltaPayload.class)` or `@EventListener` method count inspection
+- **Spring:** At `@PostConstruct`, scan for `@EventListener`-annotated methods accepting `TrustScoreDeltaPayload` as a parameter type. Cache the result as a boolean field.
 
 #### Enricher Pipeline Ordering
 
@@ -457,28 +457,108 @@ Spring Data JPA repositories implementing all 8 ledger repository SPI interfaces
 
 One `ledger-signing-spring` module replaces 4 individual signing-spring modules, following the platform consolidation pattern established in the spring-module-merge spec (parent#394: 10 `agent-*-spring` → 1 `agent-spring`, 4 `streams-*-spring` → 1 `streams-spring`).
 
-**spring-generator configuration:**
+**Why hand-written, not generated:** The Quarkus signing CDI beans (`VaultTransitAgentSigner`, `AwsKmsAgentSigner`, etc.) are NOT thin producers wrapping core POJOs — they ARE the `AgentSigner` implementation. Each takes a Quarkus `@ConfigMapping` interface in its constructor, uses `@Scheduled` from `io.quarkus.scheduler`, and observes CDI events via `@Observes`. The spring-generator cannot produce working auto-config from these because: (1) the `@ConditionalOnClass` anchors would reference Quarkus-module classes absent from Spring runtime classpath, and (2) the generated `@Bean` methods would try to instantiate Quarkus CDI beans that require Quarkus config infrastructure.
 
-```xml
-<quarkusModules>
-    <quarkusModule>${project.basedir}/../signing/vault-transit-quarkus</quarkusModule>
-    <quarkusModule>${project.basedir}/../signing/aws-kms-quarkus</quarkusModule>
-    <quarkusModule>${project.basedir}/../signing/gcp-kms-quarkus</quarkusModule>
-    <quarkusModule>${project.basedir}/../signing/azure-keyvault-quarkus</quarkusModule>
-</quarkusModules>
+**Signing core extraction prerequisite:** Before building the Spring module, extract signing implementation logic from each Quarkus CDI bean into the corresponding core signing module. Each signing backend already has a two-layer structure:
+
+| Core module | Core signing client | Quarkus module | Quarkus CDI bean |
+|-------------|-------------------|----------------|------------------|
+| `signing/vault-transit` | `VaultTransitSigningClient` | `signing/vault-transit-quarkus` | `VaultTransitAgentSigner` |
+| `signing/aws-kms` | `AwsKmsSigningClient` | `signing/aws-kms-quarkus` | `AwsKmsAgentSigner` |
+| `signing/gcp-kms` | `GcpKmsSigningClient` | `signing/gcp-kms-quarkus` | `GcpKmsAgentSigner` |
+| `signing/azure-keyvault` | `AzureKeyVaultSigningClient` | `signing/azure-keyvault-quarkus` | `AzureKeyVaultAgentSigner` |
+
+The core modules already contain the signing clients (pure Java, no framework annotations) and config records (plain Java records). `AbstractCachingAgentSigner<C>`, `AgentSigner`, `AgentSignature`, and `AgentKeyRotatedEvent` are all already in `ledger-core`.
+
+For each signing backend, extract the `AgentSigner` implementation (the `loadContext`, `performSign`, `contextPublicKey` methods plus auth routing logic) from the Quarkus CDI bean to a new core class:
+
+```java
+// In signing/vault-transit (core module)
+public class VaultTransitAgentSignerCore extends AbstractCachingAgentSigner<VaultTransitContext> {
+    // Constructor takes VaultTransitSigningConfig + VaultTransitAuthConfig (core records)
+    // Contains loadContext(), performSign(), contextPublicKey()
+    // Auth method routing (TOKEN/APPROLE/KUBERNETES/JWT → VaultTokenSource) — pure Java
+    // 403-retry logic — pure Java
+    // Exposes invalidateAll() (inherited) and onKeyRotated() for framework lifecycle
+}
 ```
 
-The generator produces 4 separate `@AutoConfiguration` classes — one per source module, each with its own `@ConditionalOnClass` guard:
+Auth config extracted to core record (replaces Quarkus `@ConfigMapping` nested interface):
 
-| Generated AutoConfiguration | `@ConditionalOnClass` anchor | Source |
-|-----------------------------|------------------------------|--------|
-| `VaultTransitAutoConfiguration` | `VaultTransitAgentSigner.class` | `vault-transit-quarkus` Jandex |
-| `AwsKmsAutoConfiguration` | `AwsKmsAgentSigner.class` | `aws-kms-quarkus` Jandex |
-| `GcpKmsAutoConfiguration` | `GcpKmsAgentSigner.class` | `gcp-kms-quarkus` Jandex |
-| `AzureKeyVaultAutoConfiguration` | `AzureKeyVaultAgentSigner.class` | `azure-keyvault-quarkus` Jandex |
+```java
+// In signing/vault-transit (core module)
+public record VaultTransitAuthConfig(
+    AuthMethod method,
+    Optional<String> token,
+    Optional<String> roleId,
+    Optional<String> secretId,
+    Optional<String> role,
+    Optional<String> jwtPath,
+    Optional<String> jwt,
+    Optional<String> mountPath
+) {
+    public enum AuthMethod { TOKEN, APPROLE, KUBERNETES, JWT }
+}
+```
 
-**Dependencies (compile):** all 4 signing-core modules, `spring-boot-autoconfigure`.
-**Dependencies (provided):** all 4 signing-quarkus modules (for Jandex scanning).
+After extraction, the Quarkus CDI bean becomes a thin lifecycle shell:
+
+```java
+// In signing/vault-transit-quarkus — thin CDI shell
+@ApplicationScoped @Alternative @Priority(1)
+public class VaultTransitAgentSigner extends VaultTransitAgentSignerCore {
+    @Inject
+    VaultTransitAgentSigner(VaultTransitConfig config) {
+        super(new VaultTransitSigningConfig(config.address(), config.keyMapping()),
+              mapAuthConfig(config.auth()));
+    }
+    @Scheduled(every = "${casehub.ledger.vault-transit.refresh-interval:5m}")
+    void refreshCache() { invalidateAll(); }
+    public void onKeyRotated(@Observes AgentKeyRotatedEvent event) { super.onKeyRotated(event); }
+}
+```
+
+**Hand-written Spring auto-configuration (4 classes):**
+
+| AutoConfiguration | `@ConditionalOnClass` anchor | Spring `AgentSigner` |
+|-------------------|------------------------------|----------------------|
+| `VaultTransitAutoConfiguration` | `VaultTransitSigningClient.class` | `VaultTransitSpringAgentSigner` |
+| `AwsKmsAutoConfiguration` | `AwsKmsSigningClient.class` | `AwsKmsSpringAgentSigner` |
+| `GcpKmsAutoConfiguration` | `GcpKmsSigningClient.class` | `GcpKmsSpringAgentSigner` |
+| `AzureKeyVaultAutoConfiguration` | `AzureKeyVaultSigningClient.class` | `AzureKeyVaultSpringAgentSigner` |
+
+Each Spring `AgentSigner` is a thin lifecycle shell extending the core class:
+
+```java
+// In ledger-signing-spring
+public class VaultTransitSpringAgentSigner extends VaultTransitAgentSignerCore {
+    VaultTransitSpringAgentSigner(VaultTransitSigningConfig config, VaultTransitAuthConfig authConfig) {
+        super(config, authConfig);
+    }
+    @Scheduled(fixedRateString = "${casehub.ledger.vault-transit.refresh-interval-ms:300000}")
+    void refreshCache() { invalidateAll(); }
+    @EventListener
+    void onKeyRotated(AgentKeyRotatedEvent event) { super.onKeyRotated(event); }
+}
+```
+
+Each `@AutoConfiguration` class creates the Spring signer from `@ConfigurationProperties`:
+
+```java
+@AutoConfiguration
+@ConditionalOnClass(VaultTransitSigningClient.class)
+@EnableConfigurationProperties(VaultTransitSpringProperties.class)
+public class VaultTransitAutoConfiguration {
+    @Bean
+    @ConditionalOnProperty(prefix = "casehub.ledger.vault-transit", name = "address")
+    AgentSigner vaultTransitAgentSigner(VaultTransitSpringProperties props) {
+        return new VaultTransitSpringAgentSigner(props.toSigningConfig(), props.toAuthConfig());
+    }
+}
+```
+
+**Dependencies (compile):** all 4 signing-core modules, `casehub-ledger-core` (for `AbstractCachingAgentSigner`), `spring-boot-autoconfigure`.
+**No dependency on signing-quarkus modules** — Spring auto-config references only core classes.
 
 ### Step 7: Integration test
 
@@ -497,7 +577,8 @@ The generator produces 4 separate `@AutoConfiguration` classes — one per sourc
 - **Entity extraction (Step 1):** Existing runtime tests must pass after entity move. `mvn test` on runtime.
 - **Config records (Step 2):** Unit tests for LedgerProperties construction + adapter mapping.
 - **Service extraction (Step 3):** Existing tests stay with runtime (CDI wiring tests). New unit tests for core POJOs in ledger-core (pure Java, no container).
-- **Spring modules (Steps 4-6):** `mvn install` with spring-generator verifies generation. Verify goals catch drift.
+- **Spring modules (Steps 4-5):** `mvn install` with spring-generator verifies generation. Verify goals catch drift.
+- **Signing core extraction (Step 6):** Unit tests for each `*AgentSignerCore` in signing core modules. Existing Quarkus integration tests must pass after Quarkus shell refactoring. Spring signing auto-config tested in Step 7.
 - **Integration test (Step 7):** `@SpringBootTest` with PostgreSQL Testcontainers + Flyway validates full composition, dialect-specific code paths, and migration correctness.
 
 ## References
@@ -510,4 +591,6 @@ The generator produces 4 separate `@AutoConfiguration` classes — one per sourc
 - LedgerConfig.java — 25 sub-interfaces (15 top-level + 10 nested), ~55 config keys
 - DefaultLedgerEntryApi.java — Pattern 2 @McpDomain impl
 - LedgerEnricherPipeline.java — Arc InjectableInstance (heaviest CDI coupling)
-- signing/vault-transit/ — representative signing module structure
+- signing/vault-transit/ — core signing module: `VaultTransitSigningClient` (pure Java), `VaultTransitSigningConfig` (plain record)
+- signing/vault-transit-quarkus/ — Quarkus CDI adapter: `VaultTransitAgentSigner` extends `AbstractCachingAgentSigner`, takes `VaultTransitConfig` (`@ConfigMapping`), uses `@Scheduled` + `@Observes`
+- AbstractCachingAgentSigner.java — in `core.signing`, generic cache + signing template, already framework-neutral
