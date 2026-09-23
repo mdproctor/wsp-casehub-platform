@@ -134,14 +134,14 @@
 - No concurrency primitive (leave to consumers) — every consumer reimplements fork/join on virtual threads
 - spawn(Runnable) without handle (original choice) — spawned task failures invisible, no error propagation path
 **Rationale:** `spawn` is the minimal primitive for "run this concurrently." `childScope` is the minimal primitive for "group things with shared lifecycle." Together they give structured concurrency without framework coupling. A spawned task can be a temporal simulation feed, a YAML sub-scenario, or any Runnable — the scope doesn't care what it runs, only that it owns the lifecycle. SpawnedTask handle enables failure detection and structured error propagation.
-**Trade-offs:** ScenarioScope grows from a pure factory into a lifecycle manager. Acceptable — it already owns close() and primitive cleanup. Spawn adds thread ownership, which is a natural extension (see D12).
+**Trade-offs:** ScenarioScope grows from a pure factory into a lifecycle manager. Acceptable — it already owns close() and primitive cleanup. Spawn adds thread ownership, which is a natural extension of the same lifecycle model.
 **Design direction:** This is the first step toward convergence — simulation's execution model eventually expressible as orchestration YAML rather than programmatic API. The spawn primitive is designed to support both Java Runnables (backward compat) and YAML sub-scenario execution (future).
 **Sources:** TemporalSimulationDriver (virtual thread execution), ScenarioScope.close(), Java structured concurrency patterns, issue #405 Direction 1
 **Exploration:** quick
 **Revised from:** R1-22 — acknowledged Java 21 constraint as explicit trade-off. R1-23 — spawn now returns SpawnedTask handle for error propagation. R1-24 — documented explicit cancellation contract.
 **Status:** revised
 
-## D11: Shared-state primitives — full thread-safe construct set with declared visibility
+## D11: Shared-state primitives — OrcCounter, OrcGauge, OrcFlag, OrcAccumulator, OrcMap
 
 **Choice:** Five new ScenarioScope primitives covering the full spectrum of thread-safe shared state:
 
@@ -153,9 +153,9 @@
 | `OrcAccumulator` | `DoubleAccumulator` | `accumulate(double)`, `get()`, `reset()`, constructor takes `DoubleBinaryOperator` + identity |
 | `OrcMap<K,V>` | `ConcurrentHashMap<K,V>` | `get(K)`, `put(K,V)`, `putIfAbsent(K,V)`, `computeIfAbsent(K, Function)`, `merge(K,V, BiFunction)`, `remove(K)`, `containsKey(K)`, `size()` |
 
-When spawning a fork, explicitly declare which constructs cross the boundary: `.sharing(counter).sharing(gauge).feeding(channel)`. Nothing implicitly shared. Parent creates constructs; forks read/update.
+Child scopes inherit the parent's primitive namespace by default. All primitives are thread-safe by construction (D13) — there is nothing unsafe to share. Spawned tasks access primitives through the inherited namespace.
 
-**YAML declaration and usage (non-verbose):**
+**YAML declaration and usage:**
 ```yaml
 # Declaration
 shared:
@@ -184,18 +184,17 @@ update:
 
 **Alternatives:**
 - Raw ConcurrentMap on ScenarioScope — loses type safety, users can put non-thread-safe objects in it
-- Implicit visibility (fork sees all parent primitives) — breaks isolation, hard to reason about data flow
-- Counter + Gauge only (original choice) — too limited for trading simulation use cases (accumulators for P&L, maps for per-instrument tracking, flags for market state)
-**Rationale:** Web Worker model — explicit data crossing the boundary, thread-safe by construction. Each construct has clear semantics and is thread-safe by its type — users can't break safety. The full set covers trading simulation patterns: counters for event tracking, gauges for latest price/state, flags for market open/close, accumulators for running P&L, maps for per-instrument positions. `update:` block with shorthand operators (`+1`, `+=`, `?=`, `default:`/`merge:`) keeps YAML non-verbose.
+- Explicit sharing declarations on spawn (original choice) — unenforceable in Java (closures bypass visibility restrictions), adds ceremony to the 80% case (temporal feeds always need channels), and unnecessary given D13 (all primitives are thread-safe)
+- Counter + Gauge only — too limited for trading simulation use cases (accumulators for P&L, maps for per-instrument tracking, flags for market state)
+**Rationale:** Each construct has clear semantics and is thread-safe by its type — users can't break safety. The full set covers trading simulation patterns: counters for event tracking, gauges for latest price/state, flags for market open/close, accumulators for running P&L, maps for per-instrument positions. `update:` block with shorthand operators (`+1`, `+=`, `?=`, `default:`/`merge:`) keeps YAML non-verbose. Namespace inheritance (rather than explicit sharing) is the right default because D13 guarantees all primitives are thread-safe, making the sharing boundary a documentation concern — and the YAML/Java source code already documents what each fork accesses. For YAML forks, scope is fully enforced at parse time (YAML can only reference declared constructs by name).
 **Trade-offs:** Five new primitive types. Acceptable — each is thin (wraps a j.u.c atomic/concurrent type), and the set covers the full spectrum. OrcMap's `computeIfAbsent`/`merge` need expression bridge for YAML (uses D3 ComputeBlock + D4 expression defaults).
-**Depends on:** D10 (spawn/childScope provides the fork model), D3/D4 (expression bridge for OrcMap merge/compute operations), D13 (virtual-thread safety — all constructs use j.u.c, never synchronized)
+**Depends on:** D10 (spawn/childScope provides the fork model), D3/D4 (expression bridge for OrcMap merge/compute operations), D13 (virtual-thread safety — all constructs use j.u.c, never synchronized), D14 (YAML capability equivalence guides primitive design)
 **Design constraints:**
-- No complex concurrency patterns (actors, CSP, dataflow). No data sharing/passing frameworks.
-- Concurrency model is Web Worker-style: spawn + channels + declared shared constructs + lifecycle.
-- YAML simulation expression must be capability-equivalent to the programmatic API. The three-tier escape model ensures this — YAML tier must cover the 80% case without escape.
-**Sources:** Web Worker model, java.util.concurrent.atomic (LongAdder, AtomicReference, AtomicBoolean, DoubleAccumulator), ConcurrentHashMap, trading simulation use cases
+- No actor frameworks, no dataflow graph engines, no coordination middleware. The concurrency model is: spawn + channels + shared constructs + lifecycle.
+**Sources:** java.util.concurrent.atomic (LongAdder, AtomicReference, AtomicBoolean, DoubleAccumulator), ConcurrentHashMap, trading simulation use cases
 **Exploration:** quick
-**Status:** captured
+**Revised from:** R2-03, R2-04 — removed explicit sharing model (unenforceable in Java, unnecessary given D13's thread-safety guarantee). R2-05 — reworded concurrency constraint (OrcChannel IS CSP; the constraint targets actor frameworks and middleware, not channels). R2-06 — eliminated sharing ceremony; child scopes inherit parent namespace by default. R2-07 — extracted YAML capability equivalence to D14.
+**Status:** revised
 
 ## D12: ScenarioScope as lifecycle manager — explicit architectural role
 
@@ -221,5 +220,19 @@ update:
 **Trade-offs:** Developers must be aware of the constraint when adding new primitives. Acceptable — the constraint is simple and the rationale is clear.
 **Sources:** JEP 444 (Virtual Threads, JDK 21), DefaultOrcChannel (LinkedBlockingQueue internals), DefaultOrcStateMachine (AtomicReference), D10 (virtual thread spawn)
 **Surfaced by:** R1-28 — reviewer correctly identified this as an implicit constraint that should be explicit.
+**Exploration:** quick
+**Status:** captured
+
+## D14: YAML capability equivalence for simulation scenarios
+
+**Choice:** The programmatic orchestration API (ScenarioScope primitives, spawn, channels, shared constructs) must be expressible in YAML for the 80% case. The three-tier escape model covers the rest: (1) one-liner YAML shorthand, (2) multi-line YAML blocks, (3) Java escape for complex logic. The YAML tier covers common simulation scenarios (temporal feeds, step coordination, shared-state tracking) without requiring Java escape code.
+**Alternatives:**
+- Full YAML parity — every Java primitive has a YAML equivalent, zero escape to Java. Too ambitious; some patterns (custom guards, complex merge logic) are inherently programmatic.
+- YAML for orchestration only, simulation always in Java — simplest but abandons the convergence goal (#405 Direction 1: simulation's execution model expressible as orchestration YAML).
+- No YAML constraint — design the Java API without regard for YAML expressibility. Risks creating an API that's YAML-hostile, requiring a second API layer for YAML consumers.
+**Rationale:** Issue #405 Direction 1 already commits to convergence: "simulation's execution model eventually expressible as orchestration YAML rather than programmatic API." This decision makes that commitment explicit and scopes it: 80% case in YAML, Java escape for the rest. The three-tier escape model prevents the YAML from becoming a second programming language while ensuring declarative testing covers the common scenarios. This constraint guides the design of D10 (spawn), D11 (shared-state primitives), and future primitives — they must have YAML-friendly APIs (named constructs, string keys, declarative configuration).
+**Trade-offs:** YAML schema complexity increases as primitives grow. The three-tier escape model must accommodate fork semantics, shared-state declarations, and update expressions. Acceptable — the YAML syntax design comes in a future spec; this spec establishes the programmatic API that YAML must be capable of expressing.
+**Sources:** Issue #405 Direction 1, D10 (spawn API), D11 (shared-state primitives YAML syntax), D3/D4 (expression bridge for YAML computations)
+**Surfaced by:** R2-07 — reviewer correctly identified this as a platform-level commitment buried inside D11's design constraints.
 **Exploration:** quick
 **Status:** captured
