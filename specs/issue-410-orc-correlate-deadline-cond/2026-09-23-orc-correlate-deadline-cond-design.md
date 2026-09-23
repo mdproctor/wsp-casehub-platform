@@ -25,6 +25,8 @@ Platform #386 and #391 established the orchestration primitive set: ScenarioScop
 - #420 Phases 2-4 — scenario runner, MCP migration, documentation
 - Extracting orchestration-core module — future module-boundary cleanup
 
+**Partial closure of #410:** This branch resolves correlation at the primitive layer (D1: composition over trigger+filter — no new primitive). The lifecycle concern — timeout on missing response, cleanup of stale correlations, observability of pending correlations — is deferred to a `CorrelationScope` consuming-layer utility. Follow-up issue to be filed for CorrelationScope (wrapping channel+filter+timeout+auto-deregister). #410 is not fully closed by this branch; the remaining work is at the consuming layer, not yaml-core.
+
 ---
 
 ## Part 1: OrcPrimitive Lifecycle Interface (D3)
@@ -49,7 +51,8 @@ All 10 primitive interfaces extend OrcPrimitive:
 | OrcLatch | yes | count down to zero — releases blocked waiters |
 | OrcSignal | yes | signal if unsignalled — releases blocked waiters |
 | OrcSemaphore | yes | shutdown() — releases blocked acquirers |
-| OrcStateMachine\<S\> | yes | no-op (non-blocking CAS) |
+| OrcStateMachine\<S\> | yes | no-op (non-blocking CAS) — base interface default |
+| BlockingOrcStateMachine\<S\> | (via OrcStateMachine) | released flag + signalAll — wakes blocked awaitState/awaitAnyState/awaitTransition |
 | OrcCounter | yes | no-op (lock-free LongAdder) |
 | OrcGauge\<T\> | yes | no-op (AtomicReference) |
 | OrcFlag | yes | no-op (AtomicBoolean) |
@@ -69,6 +72,30 @@ else if (p instanceof DefaultOrcSemaphore sem) { sem.shutdown(); }
 
 // After: single polymorphic dispatch
 if (p instanceof OrcPrimitive orc) { orc.releaseForClose(); }
+```
+
+**Deadline thread interrupt on close:**
+
+```java
+@Override
+public void close() {
+    if (closed) return;
+    closed = true;
+
+    // Interrupt deadline watcher first — ensures prompt cleanup
+    if (deadlineThread != null) deadlineThread.interrupt();
+
+    for (DefaultScenarioScope child : children) { child.close(); }
+    children.clear();
+
+    for (DefaultSpawnedTask task : spawnedTasks) { task.interrupt(); }
+    // ... join + clear ...
+
+    for (Object p : primitives.values()) {
+        if (p instanceof OrcPrimitive orc) { orc.releaseForClose(); }
+    }
+    primitives.clear();
+}
 ```
 
 ### Test Cases
@@ -165,6 +192,66 @@ condition_never_or_x_isX
 
 ## Part 3: BlockingOrcStateMachine Extensions (D5, D6)
 
+### releaseForClose() Override
+
+`DefaultBlockingOrcStateMachine` overrides `releaseForClose()` to wake all blocked threads:
+
+```java
+private volatile boolean released = false;
+
+@Override
+public void releaseForClose() {
+    released = true;
+    lock.lock();
+    try {
+        stateChanged.signalAll();
+    } finally {
+        lock.unlock();
+    }
+}
+```
+
+All await methods check the `released` flag after waking:
+- `awaitState(S)` and `awaitTransition(S, S)` — throw `InterruptedException` (target was never reached, analogous to thread interruption)
+- `awaitState(S, Duration)` — return `false` (consistent with timeout: target not reached)
+- `awaitAnyState(Set<S>)` — throw `InterruptedException`
+- `awaitAnyState(Set<S>, Duration)` — return current state (consistent with timeout behavior)
+
+Updated `awaitState()`:
+
+```java
+@Override
+public void awaitState(S target) throws InterruptedException {
+    lock.lock();
+    try {
+        while (currentState() != target) {
+            if (released) throw new InterruptedException("state machine released");
+            stateChanged.await();
+        }
+    } finally {
+        lock.unlock();
+    }
+}
+
+@Override
+public boolean awaitState(S target, Duration timeout) throws InterruptedException {
+    long adjustedNanos = adjustForSpeed(timeout);
+    long deadline = System.nanoTime() + adjustedNanos;
+    lock.lock();
+    try {
+        while (currentState() != target) {
+            if (released) return false;
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) return false;
+            stateChanged.await(remaining, TimeUnit.NANOSECONDS);
+        }
+        return true;
+    } finally {
+        lock.unlock();
+    }
+}
+```
+
 ### awaitAnyState (D5)
 
 Add to `BlockingOrcStateMachine`:
@@ -182,6 +269,7 @@ public S awaitAnyState(Set<S> targets) throws InterruptedException {
     lock.lock();
     try {
         while (!targets.contains(currentState())) {
+            if (released) throw new InterruptedException("state machine released");
             stateChanged.await();
         }
         return currentState();
@@ -197,6 +285,7 @@ public S awaitAnyState(Set<S> targets, Duration timeout) throws InterruptedExcep
     lock.lock();
     try {
         while (!targets.contains(currentState())) {
+            if (released) return currentState();
             long remaining = deadline - System.nanoTime();
             if (remaining <= 0) return currentState();
             stateChanged.await(remaining, TimeUnit.NANOSECONDS);
@@ -207,6 +296,8 @@ public S awaitAnyState(Set<S> targets, Duration timeout) throws InterruptedExcep
     }
 }
 ```
+
+**`awaitAnyState` timeout return contract:** Returns the current state in all cases — target reached OR timed out OR released. The caller dispatches on the returned state (e.g., `if (s != RUNNING) break;`). This is intentionally different from `awaitState(S, Duration)` which returns `boolean` — with a single known target, boolean suffices; with multiple targets, the caller needs the state for dispatch. The caller checks `targets.contains(result)` to distinguish timeout from success when that distinction matters.
 
 **Why Set\<S\> over Predicate\<S\>:** `Set<S>` is more constrained (no arbitrary predicates) and `EnumSet` provides O(1) contains. The caller enumerates valid exit states, making intent explicit.
 
@@ -235,6 +326,12 @@ awaitAnyState_timeout_returnsCurrentStateOnExpiry
 awaitAnyState_timeout_returnsTargetIfReachedInTime
 awaitAnyState_timeout_respectsSpeedMultiplier
 awaitAnyState_stateTransitionsToNonTarget_continuesWaiting
+releaseForClose_signalsAllBlockedThreads
+releaseForClose_awaitState_throwsInterruptedException
+releaseForClose_awaitStateTimeout_returnsFalse
+releaseForClose_awaitAnyState_throwsInterruptedException
+releaseForClose_awaitAnyStateTimeout_returnsCurrentState
+releaseForClose_awaitTransition_throwsInterruptedException
 scenarioScope_stateMachine_returnsBlockingVariant
 ```
 
@@ -275,13 +372,71 @@ public class DeadlineExceededException extends RuntimeException {
 
 ### Implementation
 
-`DefaultScenarioScope` gains:
+`DefaultScenarioScope` gains new fields and constructor changes:
+
+**Constructor changes (SpeedMultiplier + parent reference):**
 
 ```java
+private final SpeedMultiplier     speedMultiplier;
+private final DefaultScenarioScope parent;  // null for root scope
 private volatile boolean deadlineExpired = false;
 private volatile long    deadlineRemainingNanos;
 private volatile Thread  deadlineThread;
 
+public DefaultScenarioScope(PrimitiveFactory factory, SpeedMultiplier speedMultiplier) {
+    this(factory, speedMultiplier, null);
+}
+
+DefaultScenarioScope(PrimitiveFactory factory, SpeedMultiplier speedMultiplier,
+                     DefaultScenarioScope parent) {
+    this.factory = factory;
+    this.speedMultiplier = speedMultiplier;
+    this.parent = parent;
+}
+
+public DefaultScenarioScope(PrimitiveFactory factory) {
+    this(factory, SpeedMultiplier.identity());
+}
+
+public DefaultScenarioScope() {
+    this(new DefaultPrimitiveFactory());
+}
+```
+
+**childScope() — parent reference instead of putAll:**
+
+```java
+@Override
+public ScenarioScope childScope(String name) {
+    if (closed) throw new IllegalStateException("Cannot create child scope on a closed scope");
+    var child = new DefaultScenarioScope(factory, speedMultiplier, this);
+    children.add(child);
+    return child;
+}
+```
+
+The child scope no longer copies parent primitives (`putAll` removed). Instead, `getOrCreate` walks the scope chain:
+
+```java
+@SuppressWarnings("unchecked")
+private <T> T getOrCreate(String name, Class<T> type, java.util.function.Supplier<T> factory) {
+    Object existing = findPrimitive(name);
+    if (existing != null) return (T) existing;
+    return (T) primitives.computeIfAbsent(name, k -> factory.get());
+}
+
+Object findPrimitive(String name) {
+    Object p = primitives.get(name);
+    if (p != null) return p;
+    return parent != null ? parent.findPrimitive(name) : null;
+}
+```
+
+This ensures that `close()` only calls `releaseForClose()` on primitives created **by this scope** — parent primitives are not affected by child scope closure. When a deadline fires and closes the child, the parent's channels, latches, and state machines remain operational.
+
+**Deadline API:**
+
+```java
 @Override
 public ScenarioScope withDeadline(Duration deadline) {
     return withDeadline(deadline, null);
@@ -311,7 +466,6 @@ public Optional<Duration> remainingTime() {
 
 ```java
 private void startDeadlineWatcher(Duration scenarioDeadline, Runnable onDeadline) {
-    // speedMultiplier is a field on DefaultScenarioScope, passed via constructor
     SpeedMultiplier speed = this.speedMultiplier;
 
     deadlineRemainingNanos = scenarioDeadline.toNanos();
@@ -385,6 +539,11 @@ deadline_scopeClosedExternally_watcherExits
 deadline_primitivesCleaned_viaOrcPrimitive
 deadline_blockedAwait_interruptedOnExpiry
 deadline_spawnedThreads_interruptedOnExpiry
+deadline_watcherThread_interruptedOnExternalClose
+childScope_parentPrimitivesAccessibleViaChain
+childScope_localPrimitiveCreation_notVisibleToParent
+childScope_close_doesNotReleaseParentPrimitives
+childScope_parentPrimitivesCreatedAfterChild_visible
 ```
 
 ---
@@ -441,11 +600,16 @@ public class EventRouter<S extends Enum<S>> {
 
 **fire() semantics:** resolves event name → candidate transitions for current state → first matching guard wins → delegates to `target.transition()`. Returns false if no candidate matches (stale event / wrong state — passive, caller decides).
 
+**Concurrency trade-off:** `fire()` reads `currentState()` and then calls `transition()` — a TOCTOU gap exists. If the state changes between read and CAS, the CAS fails and `fire()` returns false. It does NOT retry against the new state. This is a deliberate design choice: `fire()` semantics are "fire at the state observed when the event arrived." A retry loop would change semantics to "fire at whatever state exists now," which could apply events to states they weren't intended for. Callers who need retry semantics can loop explicitly.
+
 ### Builder Extension
 
-Add `.on()` to `DefaultOrcStateMachine.Builder`:
+Add `eventMappings` field and `.on()` methods to `DefaultOrcStateMachine.Builder`:
 
 ```java
+// New field on Builder (alongside existing transitions and terminalStates)
+private final Map<String, List<EventRouter.EventMapping<S>>> eventMappings = new HashMap<>();
+
 public Builder<S> on(String event, S from, S to) {
     transition(from, to); // register in transition table
     eventMappings.computeIfAbsent(event, k -> new ArrayList<>())
@@ -543,7 +707,7 @@ private final BlockingOrcStateMachine<State> lifecycle;
 
 // pause: 1 line — lifecycle.transition(RUNNING, PAUSED)
 // resume: 1 line — lifecycle.transition(PAUSED, RUNNING)
-// stop: 2 lines — transition + interrupt
+// stop: CAS retry loop — handles concurrent state changes atomically
 // checkPauseOrStop: 1 line — lifecycle.awaitAnyState(NON_PAUSED)
 ```
 
@@ -585,8 +749,10 @@ lifecycle.onTransition(IDLE, RUNNING, payload -> {
 
 ```java
 public void start(TemporalProfile<E> profile) {
+    activeProfile = profile;
     localSpeedOverride = null;
     if (!lifecycle.transition(IDLE, RUNNING, profile)) {
+        activeProfile = null;
         throw new IllegalStateException("Driver is " + lifecycle.currentState() + ", expected IDLE");
     }
 }
@@ -600,10 +766,13 @@ public void resume() {
 }
 
 public void stop() {
-    State current = lifecycle.currentState();
-    if (current == RUNNING || current == PAUSED) {
-        lifecycle.transition(current, STOPPED);
-        if (driverThread != null) driverThread.interrupt();
+    while (true) {
+        State current = lifecycle.currentState();
+        if (current != RUNNING && current != PAUSED) return;
+        if (lifecycle.transition(current, STOPPED)) {
+            if (driverThread != null) driverThread.interrupt();
+            return;
+        }
     }
 }
 ```
