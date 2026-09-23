@@ -57,13 +57,15 @@ ledger-spring-jpa/      Spring Data JPA repos
 ### Dependency Graph
 
 ```
-                      api
-                    ↗     ↖
-           ledger-core    ledger-jpa-common
-            ↗      ↖         ↗         ↖
-  ledger-spring    runtime              ledger-spring-jpa
-                    ↗
-           ledger-jpa-common
+                          api
+                       ↗   ↑   ↖
+              ledger-core  |   ledger-jpa-common
+               ↗   ↑  ↖   |       ↗         ↖
+  ledger-spring    |  runtime              ledger-spring-jpa
+                   |
+          signing/*-core
+            ↗          ↖
+  signing/*-quarkus    ledger-signing-spring
 ```
 
 Read as: arrow points from dependent to dependency. Key relationships:
@@ -72,8 +74,13 @@ Read as: arrow points from dependent to dependency. Key relationships:
 - `runtime → ledger-core, ledger-jpa-common, api` (CDI shells delegate to core, use entities)
 - `ledger-spring → ledger-core, api` (auto-config wraps core POJOs)
 - `ledger-spring-jpa → ledger-jpa-common, api` (Spring Data repos use entities, implement api SPIs)
+- `signing/*-core → ledger-core` (signing backends extend `AbstractCachingAgentSigner` from core)
+- `signing/*-quarkus → signing/*-core` (CDI wiring for signing backends)
+- `ledger-signing-spring → signing/*-core` (consolidated Spring auto-config for all signing backends)
 
-**Prerequisite:** 7 repository SPI interfaces currently in `runtime.repository` must move to `api.spi` before Step 5 (see Step 0). `ledger-spring-jpa` reaches them via transitive dependency on `api` through `ledger-jpa-common`.
+**Prerequisites:**
+- 7 repository SPI interfaces currently in `runtime.repository` must move to `api.spi` before Step 5 (see Step 0). `ledger-spring-jpa` reaches them via transitive dependency on `api` through `ledger-jpa-common`.
+- Signing-quarkus modules have stale imports referencing `runtime.service` — must be updated to `core.signing`/`core.model` before Step 6 (see Step 6 prerequisites).
 
 ## Execution Plan (Bottom-Up)
 
@@ -213,7 +220,7 @@ Extract ALL business logic from runtime services to constructor-injected POJOs i
 | `LedgerVerificationService` | `VerificationServiceCore` | @ApplicationScoped, @Inject |
 | `KeyRotationService` | `KeyRotationServiceCore` | @ApplicationScoped, @Transactional |
 | `AgentSignatureVerificationService` | `SignatureVerificationCore` | @ApplicationScoped, @Inject |
-| `ConfiguredAgentSigner` | `PemFileAgentSigner` — extract to `core.signing`, accept `AgentSigningProperties` instead of `LedgerConfig` | @DefaultBean, @ApplicationScoped, @Inject LedgerConfig, @PostConstruct key loading. Runtime keeps thin CDI `@DefaultBean` producer; Spring gets `@ConditionalOnMissingBean` in `ledger-spring`. Already extends `AbstractCachingAgentSigner` in core — clean extraction. |
+| `ConfiguredAgentSigner` | `PemFileAgentSigner` — extract to `core.signing`, accept `AgentSigningProperties` instead of `LedgerConfig` | @DefaultBean, @ApplicationScoped, @Inject LedgerConfig, @PostConstruct key loading. Runtime keeps thin CDI `@DefaultBean` producer; Spring gets `@ConditionalOnMissingBean` in `ledger-spring`. Directly `implements AgentSigner` (does NOT extend `AbstractCachingAgentSigner`) — manages its own `ConcurrentHashMap<String, KeyPair>` cache. Extract key-loading logic to constructor-based init in `PemFileAgentSigner`. |
 | `LedgerErasureService` | `ErasureServiceCore` | @ApplicationScoped, @Inject EM — requires `CrossTenantLedgerEntryRepository.countByActorId()` SPI addition; uses existing `ActorIdentityProvider.tokeniseForQuery()` to replace direct EM query |
 | `OutcomeRecordSaveService` | `OutcomeRecordSaveCore` | @ApplicationScoped, @Inject |
 | `EigenTrustStartupValidator` | `EigenTrustValidator` (pure validation logic) | @Observes StartupEvent |
@@ -399,9 +406,9 @@ The Quarkus rest module keeps @McpDomain on thin delegation shells. The graphql-
 | `MerkleVerificationType` | GraphQL output type for Merkle verification results |
 | `TrustRoutingProfileType` | GraphQL output type for trust routing config |
 
-These DTOs move to `ledger-core` (package `core.graphql.dto`). They are pure records with no framework dependencies — only api-level type references. Both the Quarkus graphql module's thin shells and the Spring controllers produced by `graphql-spring-generator` reference these types. If they remain in the Quarkus-specific graphql module, the Spring controllers cannot compile.
+These DTOs move to `api` (package `api.graphql.dto`). They are pure records with no framework dependencies — only api-level type references. Both the Quarkus graphql module's thin shells and the Spring controllers produced by `graphql-spring-generator` reference these types. If they remain in the Quarkus-specific graphql module, the Spring controllers cannot compile.
 
-This differs from the REST module, where DTOs (`LedgerEntryView`, `AppendEntryRequest`, etc.) are already in `api` — no relocation needed for REST.
+Placement follows the REST DTO precedent: REST DTOs (`LedgerEntryView`, `AppendEntryRequest`, etc.) are already in `api` because they are shared view contracts referencing only api types. GraphQL DTOs have the same characteristics. Placing view/presentation DTOs in `core` would mean all `ledger-core` consumers get GraphQL-specific records on their classpath that they don't need — `api` is the correct layer for shared type contracts.
 
 ### Step 4: Create ledger-spring module
 
@@ -469,6 +476,16 @@ One `ledger-signing-spring` module replaces 4 individual signing-spring modules,
 | `signing/azure-keyvault` | `AzureKeyVaultSigningClient` | `signing/azure-keyvault-quarkus` | `AzureKeyVaultAgentSigner` |
 
 The core modules already contain the signing clients (pure Java, no framework annotations) and config records (plain Java records). `AbstractCachingAgentSigner<C>`, `AgentSigner`, `AgentSignature`, and `AgentKeyRotatedEvent` are all already in `ledger-core`.
+
+**Stale import migration:** The signing-quarkus modules currently have stale imports referencing `runtime.service` instead of their canonical `ledger-core` locations. These must be updated as part of the core extraction:
+
+| Stale import | Canonical location |
+|-------------|-------------------|
+| `io.casehub.ledger.runtime.service.AbstractCachingAgentSigner` | `io.casehub.ledger.core.signing.AbstractCachingAgentSigner` |
+| `io.casehub.ledger.runtime.service.AgentKeyRotatedEvent` | `io.casehub.ledger.core.model.AgentKeyRotatedEvent` |
+| `io.casehub.ledger.runtime.service.AgentSignature` | `io.casehub.ledger.core.signing.AgentSignature` |
+
+All 4 signing-quarkus modules (`vault-transit-quarkus`, `aws-kms-quarkus`, `gcp-kms-quarkus`, `azure-keyvault-quarkus`) are affected. After the core extraction rewrites these beans to extend the new core classes (e.g. `VaultTransitAgentSignerCore`), the imports resolve naturally to core packages.
 
 For each signing backend, extract the `AgentSigner` implementation (the `loadContext`, `performSign`, `contextPublicKey` methods plus auth routing logic) from the Quarkus CDI bean to a new core class:
 
