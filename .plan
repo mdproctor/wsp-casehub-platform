@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-391-orch-dx-sim-integration
-state: scaffolded
+state: active
 project-sha: 8080562780afd15f560939df2ae1aadfb5d2be92
 date: 2026-09-23
 issue-repo: casehubio/platform
@@ -13,22 +13,23 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#391 — Issue #391 ← active
-  - [ ] Batch 1: Expression-DX-Foundation
-    - [ ] Task 1: ExpressionContext-enum-registry-defaults
-    - [ ] Task 2: Shorthand-directive-types
-    - [ ] Task 3: VariablePrefixRewriter
-    - [ ] Task 4: ComputeBlock-record
-  - [ ] Batch 2: Orchestration-Primitives
-    - [ ] Task 5: BlockingOrcStateMachine
-    - [ ] Task 6: Shared-state-primitives
-  - [ ] Batch 3: ScenarioScope-Architecture
-    - [ ] Task 7: PrimitiveFactory-lifecycle
-    - [ ] Task 8: spawn-childScope-SpawnedTask
-  - [ ] Batch 4: Simulation-Bridges
-    - [ ] Task 9: SpeedMultiplier-CDI-producer
-    - [ ] Task 10: CorpusVariableSource
-    - [ ] Task 11: FeedBinding-feed-config
+  - [x] Batch 1: Expression-DX-Foundation
+    - [x] Task 1: ExpressionContext-enum-registry-defaults
+    - [x] Task 2: Shorthand-directive-types
+    - [x] Task 3: VariablePrefixRewriter
+    - [x] Task 4: ComputeBlock-record
+  - [x] Batch 2: Orchestration-Primitives
+    - [x] Task 5: BlockingOrcStateMachine
+    - [x] Task 6: Shared-state-primitives
+  - [x] Batch 3: ScenarioScope-Architecture
+    - [x] Task 7: PrimitiveFactory-lifecycle
+    - [x] Task 8: spawn-childScope-SpawnedTask
+  - [x] Batch 4: Simulation-Bridges
+    - [x] Task 9: SpeedMultiplier-CDI-producer
+    - [x] Task 10: CorpusVariableSource
+    - [x] Task 11: FeedBinding-feed-config
 - [ ] casehubio/platform#405 — simulation-orchestration-integration
 - [ ] casehubio/platform#411 — four-tier-escape-model
 - [ ] casehubio/platform#412 — interpreted-yaml-browser-parity
 - [ ] casehubio/platform#413 — virtual-thread-safety-design-rules
+- [ ] casehubio/platform#419 — variable-resolver-object-source-fallthrough
