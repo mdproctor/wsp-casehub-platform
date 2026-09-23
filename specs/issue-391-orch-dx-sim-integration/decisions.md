@@ -223,16 +223,45 @@ update:
 **Exploration:** quick
 **Status:** captured
 
-## D14: YAML capability equivalence for simulation scenarios
+## D14: YAML capability equivalence — four-tier escape model, no fidelity loss
 
-**Choice:** The programmatic orchestration API (ScenarioScope primitives, spawn, channels, shared constructs) must be expressible in YAML for the 80% case. The three-tier escape model covers the rest: (1) one-liner YAML shorthand, (2) multi-line YAML blocks, (3) Java escape for complex logic. The YAML tier covers common simulation scenarios (temporal feeds, step coordination, shared-state tracking) without requiring Java escape code.
+**Choice:** YAML simulation scenarios must be capability-equivalent to the programmatic Java API. No reduced fidelity — different mechanisms, same guarantees. Four-tier escape model:
+
+| Tier | Syntax | Power | Debugging |
+|------|--------|-------|-----------|
+| 1. Expression | `transform: ".price * 1.1"` | JQ/MVEL data transforms | Journal + step tracing |
+| 2. Compute block | `compute: \| ...` | Multi-line expressions | Journal + step tracing |
+| 3. Bean invoke | `invoke: Bean::method` | Full CDI stack — any managed bean, any method | IntelliJ breakpoint on method |
+| 4. @ScenarioAction | `action: name` | Stateful, scope-aware, multi-step | IntelliJ full step-through |
+
+**Bean invoke (tier 3):** `invoke: io.casehub.trading.AlertRepository::save` resolves `AlertRepository` as a CDI bean, gets the managed instance (injected dependencies, transactions, interceptors), calls `save(input)`. Any existing CDI bean method is callable from YAML — no adapter, no annotation, no ceremony. This makes tier 4 (@ScenarioAction) a niche tool for multi-step stateful logic only.
+
+**Fidelity safeguards — closing all three gaps:**
+
+| Gap | Solution | Fidelity |
+|-----|----------|----------|
+| Type-safe event construction | yaml-codegen JSON Schema validation at parse time + type-validated channels (D8). Schema constraints can be stricter than Java constructors. | Equivalent or better |
+| Arbitrary Java operations | Tier 3 `invoke:` — CDI bean method call. Full application stack (database, HTTP, messaging, caching) via existing beans. | Full — no operation lost |
+| Debugging | MCP-based scenario debugger (pause/inspect/step/modify via MCP tools) + IntelliJ breakpoints on invoke'd Java methods. | Equivalent — different mechanism |
+
+**MCP scenario debugging primitives:**
+- `breakpoint(scenario, step)` — pause before step execution
+- `inspect(scope)` — return full state tree (channels, shared constructs, step results, variables)
+- `step(scope)` — execute one step, return result, stay paused
+- `modify(scope, construct, value)` — set gauge, send to channel, set counter
+
+**Fidelity constraint:** If a common simulation pattern requires Java escape (tier 3/4), that is a YAML gap to fix — not a feature. The YAML tier must cover the 80% case without escape. Escape to Java is a clean bridge, not a crutch.
+
 **Alternatives:**
-- Full YAML parity — every Java primitive has a YAML equivalent, zero escape to Java. Too ambitious; some patterns (custom guards, complex merge logic) are inherently programmatic.
-- YAML for orchestration only, simulation always in Java — simplest but abandons the convergence goal (#405 Direction 1: simulation's execution model expressible as orchestration YAML).
-- No YAML constraint — design the Java API without regard for YAML expressibility. Risks creating an API that's YAML-hostile, requiring a second API layer for YAML consumers.
-**Rationale:** Issue #405 Direction 1 already commits to convergence: "simulation's execution model eventually expressible as orchestration YAML rather than programmatic API." This decision makes that commitment explicit and scopes it: 80% case in YAML, Java escape for the rest. The three-tier escape model prevents the YAML from becoming a second programming language while ensuring declarative testing covers the common scenarios. This constraint guides the design of D10 (spawn), D11 (shared-state primitives), and future primitives — they must have YAML-friendly APIs (named constructs, string keys, declarative configuration).
-**Trade-offs:** YAML schema complexity increases as primitives grow. The three-tier escape model must accommodate fork semantics, shared-state declarations, and update expressions. Acceptable — the YAML syntax design comes in a future spec; this spec establishes the programmatic API that YAML must be capable of expressing.
-**Sources:** Issue #405 Direction 1, D10 (spawn API), D11 (shared-state primitives YAML syntax), D3/D4 (expression bridge for YAML computations)
-**Surfaced by:** R2-07 — reviewer correctly identified this as a platform-level commitment buried inside D11's design constraints.
-**Exploration:** quick
+- Three-tier model without `invoke:` (original) — forces @ScenarioAction for any Java integration, adding ceremony for simple method calls
+- Full YAML parity (zero Java escape) — too ambitious; some patterns (custom guards, complex merge logic) are inherently programmatic
+- No fidelity constraint — risks creating a toy YAML layer that always falls back to Java
+**Rationale:** The four-tier model closes all fidelity gaps. Tiers 1-2 are YAML-native. Tier 3 (`invoke:`) gives YAML full access to the CDI application stack with zero ceremony — any bean, any method, fully managed instance. Tier 4 (@ScenarioAction) handles the remaining niche of stateful scope-aware logic. MCP-based debugging provides equivalent (and in some ways superior — remote, AI-assistable) debugging capability.
+**Trade-offs:** YAML schema complexity increases with four tiers. The `invoke:` tier requires CDI bean resolution at runtime — class not found or method not found errors surface at execution time, not parse time. Acceptable — the same is true for @ScenarioAction references.
+**Depends on:** D3/D4 (expression tiers), D8 (type-validated channels), D11 (shared-state YAML syntax)
+**Design constraint:** YAML simulation expression must be capability-equivalent to the programmatic API. The four-tier escape model ensures this. If a common simulation pattern requires Java escape, that's a YAML gap to fix, not a feature.
+**Strategic context:** This is the differentiator from Ansible playbooks. Ansible has sequential tasks + parallel forks + Jinja2 templates. casehub YAML has temporal execution + concurrent data feeds + typed channels + speed-multiplied time + four-tier expression power + MCP debugging. No playbook language does this.
+**Sources:** Issue #405 Direction 1, CDI bean resolution, MCP tool model, TemporalDriverService (existing pause/resume), StepResultStore (existing state), four-tier escape model
+**Surfaced by:** R2-07 (three-tier version), evolved to four-tier via brainstorm discussion.
+**Exploration:** deep-analysis
 **Status:** captured
