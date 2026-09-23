@@ -12,30 +12,34 @@
 **Exploration:** quick
 **Status:** captured
 
-## D2: Default variable prefix — withDefaultPrefix(String) on VariableResolver
+## D2: Default variable prefix — parse-time prefix rewriting via VariablePrefixRewriter
 
-**Choice:** Add `withDefaultPrefix(String)` to VariableResolver. Bare references (`${regime}`) try the default prefix as fallback. Scoped prefixes always win.
+**Choice:** Add `VariablePrefixRewriter` utility to yaml-core. Consumers declare a default prefix (in YAML document metadata or programmatically) and call the rewriter as an explicit pre-processing step before variable resolution. Bare references (`${regime}`) are rewritten to `${var.regime}` at parse time. VariableResolver is unchanged — bare references remain a hard error.
 **Alternatives:**
-- Constructor parameter / builder config — heavier API change for something that's a runtime concern
+- `withDefaultPrefix(String)` on VariableResolver (original choice) — silently converts errors into fallback resolution; makes YAML documents context-dependent when different consumers set different defaults
+- Constructor parameter / builder config — heavier API change for something that's a parse-time concern
 - Automatic prefix inference from registered scopes — unpredictable when multiple scopes exist
-**Rationale:** Immutable copy via withDefaultPrefix() matches existing VariableResolver API style (withScope, withChainedScope, etc.). Resolution order is clear: exact match → default prefix → deferred/exception.
-**Trade-offs:** Adds one more concept to VariableResolver. Bare references become ambiguous if the default prefix changes between contexts — callers must be explicit about which prefix is the default.
+**Rationale:** Parse-time rewriting preserves VariableResolver's error semantics (bare references = error). The rewrite is visible in the parsed AST — debuggable, not magical. YAML documents are self-describing: the `defaultPrefix:` declaration is in the document, not buried in the caller's Java code. Shared YAML snippets behave identically regardless of which consumer loads them.
+**Trade-offs:** Requires a pre-processing step before variable resolution. Consumers that don't declare a default prefix see no change — bare references still error.
 **Sources:** VariableResolver API (withScope, withChainedScope, withObjectScope patterns), issue #391 proposal
 **Exploration:** quick
-**Status:** captured
+**Revised from:** R1-02, R1-03 — reviewer correctly identified that `withDefaultPrefix()` silently converts errors into fallback resolution and makes YAML documents context-dependent.
+**Status:** revised
 
 ## D3: Compute blocks — yaml-core data model + platform compilation
 
-**Choice:** Add `ComputeBlock` record to yaml-core (engine key + expression text, engine optional). Compilation happens at consumer level via ExpressionEngineRegistry. The `compute:` YAML key and step-decorator semantics are a pages binding concern.
+**Choice:** Add `ComputeBlock` record to yaml-core (engine key + expression text, engine non-optional). The YAML parser resolves the engine default from ExpressionContext (via D4) at parse time when the author omits `engine:`, baking the resolved engine into the record. Compilation happens at consumer level via ExpressionEngineRegistry. The `compute:` YAML key and step-decorator semantics are a consumer-level binding concern (application-tier YAML scenario runner).
 **Alternatives:**
 - Full compute infrastructure in yaml-core — violates zero-dep (would need ExpressionEngine dependency)
-- Compute blocks entirely in pages — loses reusability for other consumers
-**Rationale:** Clean separation: yaml-core owns the data model (what), platform-api owns the compilation (how), pages owns the step binding (where). Each layer stays within its dependency budget.
+- Compute blocks entirely in consumer modules — loses reusability for other consumers
+- Engine optional on ComputeBlock with context-aware defaults at evaluation time (original choice) — same ComputeBlock crossing contexts (refactoring, shared snippets) silently changes engine
+**Rationale:** Clean separation: yaml-core owns the data model (what), platform-api owns the compilation (how), consumer modules own the step binding (where). Each layer stays within its dependency budget. Non-optional engine makes ComputeBlock self-contained and context-independent — the record carries its engine everywhere.
 **Trade-offs:** Consumers must wire ComputeBlock to ExpressionEngineRegistry themselves — no automatic compilation. Acceptable since compilation is inherently a runtime/CDI concern.
-**Depends on:** D4 (expression defaults determine which engine is used when ComputeBlock.engine is null)
+**Depends on:** D4 (expression defaults determine which engine to bake into ComputeBlock at parse time)
 **Sources:** yaml-core zero-dep constraint, ExpressionEngine/ExpressionEngineRegistry in platform-api
 **Exploration:** quick
-**Status:** captured
+**Revised from:** R1-05 — reviewer correctly identified that nullable engine creates context-dependent ambiguity. R1-06 — clarified "pages" → consumer-level binding.
+**Status:** revised
 
 ## D4: Expression engine defaults — ExpressionContext enum + registry defaults
 
@@ -51,15 +55,17 @@
 
 ## D5: OrcStateMachine two-tier — simple + blocking concurrent variant
 
-**Choice:** Keep `OrcStateMachine<S>` interface unchanged. Two implementations: `DefaultOrcStateMachine<S>` (current — AtomicReference CAS, handlers, no blocking) for synchronous use, and `BlockingOrcStateMachine<S>` (layers ReentrantLock + Condition, adds `awaitState(S)`, `awaitState(S, Duration)`, `awaitTransition(S from, S to)`, SpeedMultiplier-aware timeouts via constructor injection with identity default). ScenarioScope factory returns blocking variant by default.
+**Choice:** Keep `OrcStateMachine<S>` interface unchanged. `BlockingOrcStateMachine<S>` is an extension interface (following the `GraphCaseMemoryStore extends CaseMemoryStore` pattern) that adds `awaitState(S)`, `awaitState(S, Duration)`, `awaitTransition(S from, S to)`. Two implementations: `DefaultOrcStateMachine<S>` (current — AtomicReference CAS, handlers, no blocking) for synchronous use, and `DefaultBlockingOrcStateMachine<S>` implementing `BlockingOrcStateMachine<S>` (layers ReentrantLock + Condition, SpeedMultiplier-aware timeouts via constructor injection with `SpeedMultiplier.identity()` default). ScenarioScope factory returns blocking variant by default — ScenarioScope's primary use case is step coordination, which requires blocking wait. `SpeedMultiplier.identity()` is a new static factory method on the existing `@FunctionalInterface`: `static SpeedMultiplier identity() { return () -> 1.0; }`, establishing the contract that 1.0 = real-time (1:1 wall-clock mapping).
 **Alternatives:**
 - Single implementation with optional blocking — flag-based behavior is fragile
 - OrcStateMachine without blocking wait — leaves TemporalSimulationDriver unable to use it (needs pause/resume coordination)
-**Rationale:** Two-tier lets each consumer pick the right tool. Blocking variant unlocks TemporalSimulationDriver lifecycle, scenario step coordination, and deadline cancellation (#410). SpeedMultiplier is already in yaml-core, no new dependency.
+- Default methods throwing UnsupportedOperationException on OrcStateMachine — Liskov violation; the GraphCaseMemoryStore pattern uses extension interfaces, not default-throw methods
+**Rationale:** Two-tier lets each consumer pick the right tool. Extension interface pattern (not default-throw on base interface) preserves Liskov substitution. Blocking variant unlocks TemporalSimulationDriver lifecycle, scenario step coordination, and deadline cancellation (#410). SpeedMultiplier is already in yaml-core, no new dependency. Blocking as ScenarioScope default is correct because ScenarioScope's purpose IS coordination — consumers not needing blocking use DefaultOrcStateMachine directly.
 **Trade-offs:** Two implementations to maintain. Acceptable — the blocking variant is thin (wraps base with lock + condition).
-**Sources:** DefaultOrcStateMachine, TemporalSimulationDriver (volatile + ReentrantLock), SpeedMultiplier SPI, issue #410 deadline propagation
+**Sources:** DefaultOrcStateMachine, TemporalSimulationDriver (volatile + ReentrantLock), SpeedMultiplier SPI, GraphCaseMemoryStore extension interface pattern, issue #410 deadline propagation
 **Exploration:** quick
-**Status:** captured
+**Revised from:** R1-11 — clarified that BlockingOrcStateMachine is an extension interface, not a concrete-only class. R1-13 — added SpeedMultiplier.identity() as explicit SPI contract.
+**Status:** revised
 
 ## D6: SpeedMultiplier wiring — CDI producer in simulation-config
 
@@ -82,22 +88,24 @@
 - Manual Java bridge per consumer — duplicated, no YAML-level reuse
 **Rationale:** Bridge lives in simulation-config where both dependencies (yaml-core VariableResolver, simulation-api SimulationCorpus) are available. ForEachExpander already accepts any collection — no yaml-core changes needed.
 **Trade-offs:** Corpus entries must be keyed by qualified name. InvocationRecord<I,O>.input() is the iterated value — consumers need corpus entries with meaningful input types.
-**Depends on:** D2 (default prefix may apply when corpus scope is not explicitly prefixed)
 **Sources:** SimulationCorpus SPI, ObjectVariableSource, ForEachExpander, VariableResolver.withObjectScope
 **Exploration:** quick
-**Status:** captured
+**Revised from:** R1-15 — removed spurious D2 dependency. `${corpus.trades}` uses an explicit `corpus` prefix; D2's default prefix mechanism is irrelevant.
+**Status:** revised
 
 ## D8: Temporal profile → OrcChannel feed — declarative event-to-channel wiring
 
-**Choice:** New `feed:` property in simulation config YAML on temporal profiles. simulation-config wires at startup: creates a TemporalEventSink<E> that calls `scope.channel(feedName).send(event)`. Declarative end-to-end simulation: temporal profile drives events, orchestration scenario consumes them.
+**Choice:** New `feed:` property in simulation config YAML on temporal profiles. Two-phase wiring: (1) at startup, simulation-config reads YAML and creates `FeedBinding` records (`feedName`, `channelName`, `profileRef`, `eventType`); (2) at scenario start, the scenario runner calls `feedBinding.activate(scope)` which creates the TemporalEventSink<E> capturing the scope: `event -> scope.channel(channelName, eventType).send(event)`. Declarative end-to-end simulation: temporal profile drives events, orchestration scenario consumes them.
+**Type validation:** `FeedBinding` records the expected event type (`Class<E>`) from the temporal profile's generic parameter. `OrcChannel` gains an optional type-token overload: `channel(String name, Class<T> type)`. When a type token is provided, `send()` validates `type.isInstance(value)` before enqueuing, surfacing type mismatches at wiring/delivery time with a descriptive error instead of a raw `ClassCastException`.
 **Alternatives:**
 - Java-only wiring — works but requires consumer code for every scenario
 - Document as pattern only — misses the opportunity for declarative scenario testing
-**Rationale:** Implementation is small (config parsing + sink wiring). Capability is significant: declarative simulation-driven scenario testing without Java bridge code. Temporal profiles already have YAML config — `feed:` is a natural extension.
-**Trade-offs:** Tight coupling between temporal profile naming and channel naming. Mitigated by making `feed:` optional — profiles without it work as before.
+**Rationale:** Implementation is small (config parsing + sink wiring). Capability is significant: declarative simulation-driven scenario testing without Java bridge code. Temporal profiles already have YAML config — `feed:` is a natural extension. Two-phase wiring solves the lifecycle mismatch: CDI beans initialize at startup, ScenarioScope is per-scenario-execution.
+**Trade-offs:** Tight coupling between temporal profile naming and channel naming. Mitigated by making `feed:` optional — profiles without it work as before. Type validation is best-effort (YAML can't enforce generic types).
 **Sources:** TemporalEventSink<E>, OrcChannel<T>, simulation config YAML, TemporalProfileConfig
 **Exploration:** quick
-**Status:** captured
+**Revised from:** R1-17 — clarified two-phase wiring lifecycle (startup config → scenario-start activation). R1-18 — added type validation via channel type-token overload.
+**Status:** revised
 
 ## D9: ScenarioScope simulation — pluggable PrimitiveFactory strategy
 
@@ -107,24 +115,31 @@
 - @SimulationEligible on individual primitives (OrcChannel, OrcSignal) — primitives are factory-created, @Decorator can't intercept
 - Simulation-aware ScenarioScope subclass — hard to compose with other ScenarioScope behaviors
 **Rationale:** Strategy pattern keeps ScenarioScope's zero-dep constraint. PrimitiveFactory is a clean extension point that works regardless of DI framework. SimulatedPrimitiveFactory can be configured from simulation YAML corpus data.
+**Instance contract:** PrimitiveFactory is stateless — it creates new instances only. ScenarioScope handles caching via `ConcurrentHashMap.computeIfAbsent(name, k -> factory.createX(name))`. The `computeIfAbsent` call guarantees: (a) the factory is called at most once per name, (b) all callers see the same instance (same-name-same-instance contract). PrimitiveFactory implementations have no thread-safety requirements and no instance tracking responsibilities.
 **Trade-offs:** Adds a new interface (PrimitiveFactory) and changes ScenarioScope's internal structure. Acceptable — the factory methods already exist, this just names the abstraction.
 **Sources:** ScenarioScope factory methods, @SimulationEligible generator, simulation-core patterns
 **Exploration:** quick
-**Status:** captured
+**Revised from:** R1-20 — documented the same-name-same-instance contract (stateless factory, ScenarioScope handles caching).
+**Status:** revised
 
 ## D10: Concurrent sub-scenarios — spawn + childScope on ScenarioScope
 
-**Choice:** Add `spawn(String name, Runnable task)` and `childScope(String name)` to ScenarioScope. `spawn` starts a virtual thread owned by the scope. `childScope` creates a nested scope — closing a parent closes all children (cancels spawned tasks). Deadlines propagate downward. SpeedMultiplier-aware timeouts on spawned tasks.
+**Choice:** Add `SpawnedTask spawn(String name, Runnable task)` and `ScenarioScope childScope(String name)` to ScenarioScope. `spawn` starts a virtual thread owned by the scope and returns a `SpawnedTask` handle. `childScope` creates a nested scope — closing a parent closes all children (cancels spawned tasks). Deadlines propagate downward. SpeedMultiplier-aware timeouts on spawned tasks.
+**SpawnedTask handle:** Exposes `isDone()`, `isFailed()`, `exception()`, `join()`, `join(Duration timeout)` (SpeedMultiplier-aware). On scope `close()`, all spawned tasks are checked for failures — if any spawned task failed with an uncaught exception, the first failure is reported (subsequent failures suppressed).
+**Cancellation contract:** (1) `close()` calls `Thread.interrupt()` on all spawned virtual threads. (2) Spawned tasks are expected to be interrupt-responsive — all orchestration primitives (OrcChannel.send/receive, OrcLatch.await, OrcSemaphore.acquire, BlockingOrcStateMachine.awaitState) throw InterruptedException. (3) After interrupting, `close()` joins each spawned task with a timeout (default: 5s, SpeedMultiplier-aware). (4) Tasks that haven't terminated after timeout are logged as stuck — best-effort cleanup. Virtual threads cannot be forcibly killed. (5) CPU-bound tasks that don't check Thread.interrupted() will delay cleanup but not prevent it.
 **Alternatives:**
+- Java StructuredTaskScope (JEP 505, Java 25) — not available at Java 21 language level (platform constraint: `--release 21` on Java 26 JVM). Additionally, StructuredTaskScope is one-shot fork-join; spawn is for long-running tasks that live for the scope's lifetime.
 - Adopt simulation drivers into scope — couples ScenarioScope to simulation API; too specific
 - Phase model (sequential phases containing concurrent groups) — over-structured for the use case
 - No concurrency primitive (leave to consumers) — every consumer reimplements fork/join on virtual threads
-**Rationale:** `spawn` is the minimal primitive for "run this concurrently." `childScope` is the minimal primitive for "group things with shared lifecycle." Together they give structured concurrency without framework coupling. A spawned task can be a temporal simulation feed, a YAML sub-scenario, or any Runnable — the scope doesn't care what it runs, only that it owns the lifecycle.
-**Trade-offs:** ScenarioScope grows from a pure factory into a lifecycle manager. Acceptable — it already owns close() and primitive cleanup. Spawn adds thread ownership, which is a natural extension.
+- spawn(Runnable) without handle (original choice) — spawned task failures invisible, no error propagation path
+**Rationale:** `spawn` is the minimal primitive for "run this concurrently." `childScope` is the minimal primitive for "group things with shared lifecycle." Together they give structured concurrency without framework coupling. A spawned task can be a temporal simulation feed, a YAML sub-scenario, or any Runnable — the scope doesn't care what it runs, only that it owns the lifecycle. SpawnedTask handle enables failure detection and structured error propagation.
+**Trade-offs:** ScenarioScope grows from a pure factory into a lifecycle manager. Acceptable — it already owns close() and primitive cleanup. Spawn adds thread ownership, which is a natural extension (see D12).
 **Design direction:** This is the first step toward convergence — simulation's execution model eventually expressible as orchestration YAML rather than programmatic API. The spawn primitive is designed to support both Java Runnables (backward compat) and YAML sub-scenario execution (future).
 **Sources:** TemporalSimulationDriver (virtual thread execution), ScenarioScope.close(), Java structured concurrency patterns, issue #405 Direction 1
 **Exploration:** quick
-**Status:** captured
+**Revised from:** R1-22 — acknowledged Java 21 constraint as explicit trade-off. R1-23 — spawn now returns SpawnedTask handle for error propagation. R1-24 — documented explicit cancellation contract.
+**Status:** revised
 
 ## D11: Explicit shared-state visibility — OrcCounter, OrcGauge, declared sharing
 
@@ -141,5 +156,32 @@
 - Concurrency model is Web Worker-style: spawn + channels + declared shared constructs + lifecycle.
 - YAML simulation expression must be capability-equivalent to the programmatic API. The three-tier escape model ensures this — YAML tier must cover the 80% case without escape.
 **Sources:** Web Worker postMessage/SharedArrayBuffer model, ConcurrentMap/AtomicLong/AtomicReference patterns
+**Exploration:** quick
+**Status:** captured
+
+## D12: ScenarioScope as lifecycle manager — explicit architectural role
+
+**Choice:** ScenarioScope is the lifecycle manager for orchestration scenarios, owning primitives, threads, and nested scopes. Its `close()` releases all owned resources: closes channels, counts down latches, signals unsignalled signals, shuts down semaphores, interrupts spawned threads, and recursively closes child scopes. This is the same lifecycle model extended to new resource types, not a role change.
+**Alternatives:**
+- Separate `ExecutionContext` composing a ScenarioScope — adds a new type for no architectural benefit; two closely-related objects that must be passed together
+- `ScenarioRunner` that owns lifecycle while ScenarioScope stays a factory — the runner would need access to all factory methods (spawned tasks create primitives), artificially separating things that belong together
+- ScenarioScope stays a primitive factory only; lifecycle managed externally — breaks encapsulation; callers must know which primitives to clean up
+**Rationale:** ScenarioScope already implements `AutoCloseable` and its `close()` already performs lifecycle management for all primitive types. Adding thread ownership (D10 spawn) and nested scope hierarchy (D10 childScope) extends the same model to new resource types. `close()` for resource cleanup and `close()` for structured concurrency teardown are the same operation: release everything this scope owns.
+**Trade-offs:** ScenarioScope's API surface grows. Acceptable — the alternative (separate lifecycle manager) adds complexity without architectural benefit.
+**Sources:** DefaultScenarioScope.close() (current implementation), AutoCloseable contract, D9 (PrimitiveFactory), D10 (spawn/childScope)
+**Surfaced by:** R1-26 — reviewer correctly identified this as an implicit decision that should be explicit.
+**Exploration:** quick
+**Status:** captured
+
+## D13: Virtual-thread safety constraint on orchestration primitives
+
+**Choice:** All orchestration primitives (OrcChannel, OrcStateMachine, OrcSemaphore, OrcLatch, OrcSignal, OrcCounter, OrcGauge) MUST use `java.util.concurrent` locks (`ReentrantLock`, `Semaphore`, `CountDownLatch`, `AbstractQueuedSynchronizer`) or lock-free primitives (`AtomicReference`, `volatile`). NEVER use `synchronized` blocks or methods. This is a design rule, not a recommendation.
+**Rationale:** D10 spawns virtual threads. `synchronized` blocks pin virtual threads to carrier threads, creating a throughput bottleneck proportional to the number of carrier threads (typically CPU count). `java.util.concurrent` locks are virtual-thread-aware since JDK 21 — virtual threads park and unmount from the carrier when they can't acquire the lock. Current implementations are already compliant (verified): DefaultOrcStateMachine (CAS), DefaultOrcChannel (LinkedBlockingQueue/ArrayBlockingQueue with ReentrantLock), DefaultOrcSemaphore (java.util.concurrent.Semaphore), DefaultOrcLatch (CountDownLatch), DefaultOrcSignal (volatile). The constraint prevents future regressions.
+**Alternatives:**
+- No explicit constraint (status quo) — current implementations happen to be safe, but future primitives could introduce `synchronized` without anyone noticing
+- Document as a guideline rather than a rule — guidelines get ignored under time pressure
+**Trade-offs:** Developers must be aware of the constraint when adding new primitives. Acceptable — the constraint is simple and the rationale is clear.
+**Sources:** JEP 444 (Virtual Threads, JDK 21), DefaultOrcChannel (LinkedBlockingQueue internals), DefaultOrcStateMachine (AtomicReference), D10 (virtual thread spawn)
+**Surfaced by:** R1-28 — reviewer correctly identified this as an implicit constraint that should be explicit.
 **Exploration:** quick
 **Status:** captured
