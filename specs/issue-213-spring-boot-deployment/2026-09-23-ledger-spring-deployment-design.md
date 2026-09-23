@@ -24,7 +24,7 @@ Complete Spring Boot deployment for casehub-ledger: aggressive core extraction o
 | runtime | Partial | ✅ | ❌ | ❌ | Needs aggressive extraction → ledger-spring |
 | rest | ❌ | N/A | ❌ | ❌ | Needs core extraction → graphql-spring-generator |
 | graphql | ❌ | N/A | ❌ | ❌ | Needs core extraction → graphql-spring-generator |
-| persistence-memory | ❌ | N/A | ❌ | ❌ | Needs spring-generator |
+| persistence-memory | ❌ | N/A | ❌ | ❌ | Needs core extraction → spring-generator |
 | signing/* | ✅ (core exists) | N/A | ❌ | ❌ | 4 Spring modules needed |
 
 ## Architecture
@@ -162,6 +162,20 @@ Extract ALL business logic from runtime services to constructor-injected POJOs i
 | `ComputedTrustScoreSource` | `ComputedTrustSourceCore` | @ApplicationScoped |
 | `MaterializedTrustScoreSource` | `MaterializedTrustSourceCore` | @Alternative @Priority |
 | `OtelTraceIdProvider` | stays in runtime (OTel API is framework-neutral but optional) | @ApplicationScoped |
+| `LedgerTraceListener` | `TraceIdEnricherCore` | Pure enricher logic |
+| `TraceIdEnricher` | `TraceIdEnricherCore` (merge with above) | @ApplicationScoped |
+
+**Federation services (runtime/service/federation/):**
+
+| Current | Core POJO | Notes |
+|---------|-----------|-------|
+| `TrustBootstrapService` | `TrustBootstrapServiceCore` | @ApplicationScoped, @Inject |
+| `TrustExportService` | `TrustExportServiceCore` | @ApplicationScoped, @Inject |
+| `JpaTrustImportService` | stays in runtime/jpa-common (JPA-specific) | @ApplicationScoped, EntityManager |
+
+**Persistence-memory module:**
+
+The `persistence-memory` module contains in-memory store implementations (@Alternative @Priority). These need core extraction (convert field injection to constructor injection) so the spring-generator can produce @AutoConfiguration equivalents. In Spring, activation is via `@ConditionalOnMissingBean` (replaces @Alternative).
 
 **Identity services (runtime/service/identity/):**
 
@@ -222,6 +236,10 @@ GraphQL module (LedgerQueryResolver, LedgerMutationResolver) — same extraction
 - Scans rest module Jandex for `@McpDomain` Pattern 2 classes
 - Generates Spring GraphQL `@Controller` + Spring MVC `@RestController` per domain
 - Delegates to core POJOs
+
+**Generated content (rest-spring-generator plugin):**
+- Scans rest module Jandex for `@Provider` classes (LedgerExceptionMapper)
+- Generates Spring `@ControllerAdvice` equivalents
 
 **Hand-written content:**
 - `LedgerConfigurationProperties` — `@ConfigurationProperties(prefix = "casehub.ledger")` → `LedgerProperties`
