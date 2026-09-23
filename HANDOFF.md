@@ -1,35 +1,36 @@
-# Handoff — Runtime Orchestration Primitives (#386)
+# Handoff — Orchestration Primitives: Correlate, Deadline, Condition Combinators (#410, #420)
 
 ## What happened this session
 
-Designed and implemented runtime orchestration primitives for yaml-core. Full lifecycle: brainstorming → adversarial design review (76 issues, $175) → TDD implementation → code review → merge to main.
+Designed and implemented three yaml-core extensions (#410) plus TemporalSimulationDriver lifecycle migration (#420 Phase 1). Full lifecycle: brainstorming with first-principles analysis → design review (3 rounds) → TDD implementation → code review → merge to main.
 
 | Deliverable | Detail |
 |-------------|--------|
-| Runtime contracts | Condition, ConditionEvaluator, RuntimeForEach, SpeedMultiplier, ObjectVariableSource |
-| Coordination primitives | OrcSemaphore, OrcLatch, OrcSignal, OrcChannel, OrcStateMachine |
-| Lifecycle | ScenarioScope, DefaultScenarioScope, StepResultStore, DurationParser |
-| Tests | 395 total — unit, concurrent contention, 4 showcase scenarios |
-| Module | Merged into yaml-core (`io.casehub.yaml.core.orchestration`) — no separate module |
+| OrcPrimitive | Lifecycle interface for polymorphic scope cleanup — replaces instanceof chain |
+| Condition combinators | and/or/not/xor/always/never — full boolean algebra |
+| awaitAnyState | Multi-target await on BlockingOrcStateMachine + releaseForClose |
+| Deadline propagation | ScenarioScope.withDeadline — virtual-thread watcher, scope-chain, SpeedMultiplier-aware |
+| EventRouter | Three-layer state machine architecture — string event dispatch, Builder .on() |
+| Driver migration | TemporalSimulationDriver lifecycle → BlockingOrcStateMachine, simulation-core gains yaml-core dep |
+| Tests | 70 tutorial-quality tests covering all capabilities and composition patterns |
 
 ## Key decisions
 
-- **D2: Virtual-thread-first** — blocking j.u.c interfaces, not execution-model-agnostic. Async adapters can wrap.
-- **D3: 14 YAML keywords** covering all 21 original patterns + coordination layer. `if/else` dropped (use `when` + `StateMachine`). `circuitBreaker`/`rateLimit` subsumed.
-- **D5: DX tipping point** — emergent from composition, not per-construct. Education over enforcement. Three tiers: one-liner → JQ block → Java code.
-- **Type safety** — every primitive must be parse-time-validatable. The Ansible differentiator.
-- **Module merge** — orchestration-core merged into yaml-core (pages does direct TS port, J2CL not used).
-- **Expression defaults** — MVEL for conditions, JQ for data transforms (#391).
+- **D1: Correlation = composition** — no new primitive. trigger+filter covers it. CorrelationScope utility deferred (#423).
+- **D2: Scope-level deadlines** — withDeadline returns child scope. Parent-child cascading by construction (close cascade). DeadlineExceededException catchable by on-error.
+- **D5: awaitAnyState** — genuine API gap (awaitState blocks forever on non-target states). Set<S> over Predicate<S>.
+- **D7: Driver migration** — internal replacement, lifecycle() accessor exposed. COMPLETED is terminal (stop() from COMPLETED removed).
+- **D8: Three-layer state machine** — Layer 1 (OrcStateMachine, unchanged), Layer 2 (EventRouter, this branch), Layer 3 (generated typed dispatch, future #424).
 
-## Follow-up issues created
+## Follow-up issues queued
 
-| Issue | Scale | Complexity | Notes |
-|-------|-------|-----------|-------|
-| #391 — DX refinements (shorthands, default prefix, expression defaults) | M | Med | **Next work — user requested** |
-| #405 — Simulation + orchestration integration | M | Med | **Next work — user requested** |
-| #402 — Error reporting model for YAML orchestration | M | Med | Clean error mapping for YAML users |
-| pages#462 — TS port parity | L | Med | Full gap documented, 23 types |
+| Issue | Scale | Notes |
+|-------|-------|-------|
+| #420 — YAML-driven orchestration (Phases 2-4) | L | Scenario runner, MCP migration, docs |
+| #423 — CorrelationScope utility | S | Consuming-layer request/response lifecycle |
+| #424 — Generated typed dispatch (Layer 3) | M | Java pattern matching on sealed event types |
+| #425 — Extract orchestration-core module | S | Module boundary cleanup |
 
 ## Next action
 
-`work start #391, #405` — user explicitly requested both for next session.
+`work next` — picks up #420 (Phases 2-4) from the queue.
