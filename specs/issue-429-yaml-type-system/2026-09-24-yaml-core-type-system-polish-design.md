@@ -149,7 +149,13 @@ public final class TypedVariables {
         for (var entry : rawVariables.entrySet()) {
             TypedName tn = TypedName.parse(entry.getKey());
             schema.put(tn.name(), tn.type());
-            values.put(tn.name(), tn.type().parse(String.valueOf(entry.getValue())));
+            try {
+                values.put(tn.name(), tn.type().parse(String.valueOf(entry.getValue())));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException(
+                    "Variable '" + tn.name() + "' (" + tn.type()
+                    + "): invalid value '" + entry.getValue() + "'", e);
+            }
         }
         return new TypedMap(Map.copyOf(schema), Map.copyOf(values));
     }
@@ -327,7 +333,8 @@ Findings become follow-up issues, not scope on this branch.
 | `yaml-core/data/CsvDataSource.java` | Updated — implements TypedSchema, add typeOf(), schema() |
 | `yaml-core/module/ParameterType.java` | Updated — add scalarType() mapping |
 | `yaml-core/resolver/ObjectVariableSource.java` | Updated — add allowContainerReturn(), drillOnly() |
-| `yaml-core/resolver/VariableResolver.java` | Updated — resolveTyped source-controlled container check |
+| `yaml-core/resolver/VariableSource.java` | Updated — drillFields extracted to FieldDriller |
+| `yaml-core/resolver/VariableResolver.java` | Updated — resolveTyped source-controlled container check, drillFields extracted to FieldDriller |
 | `yaml-core/resolver/FieldDriller.java` | New utility — shared drillFields extracted from VariableSource/VariableResolver |
 | `yaml-core/foreach/ForEachExpander.java` | Updated — withObjectScope (drillOnly) for CSV rows |
 | `yaml-core/data/CsvParserTest.java` | Updated — fix type assertions |
