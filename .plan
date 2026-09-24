@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-151-orchestration-scope-bridge
-state: scaffolded
+state: active
 project-sha: 62724fee7ce660834f72ffe00afb4643084c9706
 date: 2026-09-24
 issue-repo: casehubio/casehub-desiredstate
@@ -13,10 +13,10 @@ flyway-next-v: unknown
 
 ## Queue
 - [ ] casehubio/casehub-desiredstate#151 — Issue #151 ← active
-  - [ ] Batch 1: API Foundation
-    - [ ] Task 1: yaml-plugin-api module
-  - [ ] Batch 2: APT Processor
-    - [ ] Task 2: APT skeleton and validation
-    - [ ] Task 3: Schema binder and registry generation
-  - [ ] Batch 3: Proof Case
-    - [ ] Task 4: Assert plugin end-to-end
+  - [x] Batch 1: API Foundation
+    - [x] Task 1: yaml-plugin-api module
+  - [x] Batch 2: APT Processor
+    - [x] Task 2: APT skeleton and validation
+    - [x] Task 3: Schema binder and registry generation
+  - [x] Batch 3: Proof Case
+    - [x] Task 4: Assert plugin end-to-end
