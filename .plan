@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-151-orchestration-scope-bridge
-state: active
+state: closing:promoted
 project-sha: 62724fee7ce660834f72ffe00afb4643084c9706
 date: 2026-09-24
 issue-repo: casehubio/casehub-desiredstate
@@ -11,6 +11,7 @@ design-repo: workspace
 design-section-hashes: 
 flyway-next-v: unknown
 
+evidence-era: true
 ## Queue
 - [ ] casehubio/casehub-desiredstate#151 — Issue #151 ← active
   - [x] Batch 1: API Foundation
