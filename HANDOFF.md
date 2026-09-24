@@ -2,15 +2,11 @@
 
 ## Last Session
 
-Continued ledger#213 (Spring Boot deployment). Completed Task 1 (Repo SPI relocation) — fixed 19 stale ActorTrustScoreRepository imports, widened all return types from entity to api-level base types across 15 production files and 19 test files, added findAllDetached() and countByActorId() SPI methods with implementations, moved 3 NoOp repos to ledger-core with CDI producers in LedgerCoreProducer. Fixed pre-existing ScimAgentLookup/WebDIDResolver constructor breaks. Fixed SubjectSequenceStats FQN in named query. All runtime tests pass (BUILD SUCCESS, 1:58min, 114 test classes). 9 WIP commits on branch.
-
-3 remaining repo moves (ErasureReceipt, ActorIdentityBinding, KeyRotation) deferred to Task 2 — their SPIs reference JPA entity types (extends JpaLedgerEntry) that can't be widened without breaking JOINED inheritance. When jpa-common is created, these entities move there and the SPIs can reference jpa-common types.
-
-Also fixed 2 pre-existing test breaks (ScimAgentLookup/WebDIDResolver constructor changes from platform core-extraction).
+Completed Tasks 2-4 of ledger#213 (Spring Boot deployment). Task 2: created `ledger-jpa-common` module — extracted 15 JPA entities, Flyway migrations, `LedgerSequenceAllocator` (constructor-injected POJO), `LedgerPersistenceUnit` qualifier. Solved two Quarkus issues: entity discovery from external JARs requires `AdditionalJpaModelBuildItem` in the deployment processor; orm.xml `<entity>` elements silently override annotation metadata — use `<persistence-unit-metadata><persistence-unit-defaults>` for entity listeners instead. Task 3: created 15 `LedgerProperties` config records with `defaults()` factories. Task 4: created `LedgerConfigAdapter` (Quarkus→records bridge), moved 5 trust score event payloads to `core.event`, created `TrustScoreEventPublisher` and `LedgerEventPublisher` interfaces. All tests pass (962+ across 8 modules). 6 WIP commits on branch.
 
 ## Immediate Next Step
 
-Begin Task 2 (jpa-common module). Use `work continue` from slot 198.
+Begin Task 5 (Batch 3: enricher pipeline core extraction). Use `work continue` from slot 198.
 
 ## Slot State
 
@@ -23,7 +19,7 @@ Branch `issue-213-spring-boot-deployment` active in 3 repos: platform, wsp-caseh
 | work | Complete | — |
 | qhorus | Complete | — |
 | neocortex | Complete | — |
-| **ledger** | **In progress** — Task 1 done, next Task 2/16, Batch 1/7 | casehubio/ledger#213 |
+| **ledger** | **In progress** — Tasks 1-4 done, next Task 5/16, Batch 3/7 | casehubio/ledger#213 |
 | casehub-worker | Not started | casehubio/casehub-worker#16 |
 | blocks | 3 modules exist, gaps | casehubio/blocks#297 |
 | workers | Not started (blocked by casehub-worker) | casehubio/workers#24 |
@@ -36,4 +32,4 @@ Branch `issue-213-spring-boot-deployment` active in 3 repos: platform, wsp-caseh
 | Decisions (D1-D6) | `wsp-casehub-platform/specs/issue-213-spring-boot-deployment/decisions.md` |
 | Implementation plan | `wsp-casehub-platform/plans/2026-09-23-ledger-spring-deployment.md` |
 | Journal | `wsp-casehub-platform/JOURNAL.md` |
-| Garden entries | GE-20260923-e81faa (orm.xml technique), GE-20260923-1d03d4 (ide_replace gotcha), GE-20260923-9393de (generics invariance) |
+| Garden entries | GE-20260923-e81faa (orm.xml technique), GE-20260923-1d03d4 (ide_replace gotcha), GE-20260923-9393de (generics invariance), GE-20260924-bb5f55 (orm.xml entity override gotcha) |
