@@ -1,0 +1,25 @@
+# Work Plan — issue-429-yaml-type-system
+
+## State
+branch: issue-429-yaml-type-system
+state: scaffolded
+project-sha: 957beec56e72359befbeb862f5d180c37e22e7e1
+date: 2026-09-24
+issue-repo: casehubio/platform
+covers: 429
+design-repo: project
+design-section-hashes: 4d2cc5ab:## §1 Introduction and Goals|4f6b26ef:## §2 Constraints|39b76cb9:## §3 Context and Scope|74aa736f:## §4 Solution Strategy|9ca8de62:## §5 Building Block View|f1938c56:## §6 Runtime View|65807a21:## §7 Deployment View|a03d508f:## §8 Crosscutting Concepts|b2e1b57c:## §9 Journeys and Chapters|598f3a04:## §10 Architectural Decisions|1f604475:## §11 Quality Requirements|af5f260f:## §12 Risks and Technical Debt|42d51385:## §13 Glossary
+flyway-next-v: none
+
+## Queue
+- [ ] casehubio/platform#429 — Issue #429 ← active
+  - [ ] Batch 1: Type vocabulary + CSV
+    - [ ] Task 1: ValueType TypedName TypedSchema
+    - [ ] Task 2: CSV migration to ValueType + schema API
+  - [ ] Batch 2: Typed resolution
+    - [ ] Task 3: FieldDriller + allowContainerReturn + resolveTyped
+    - [ ] Task 4: ForEachExpander withObjectScope
+  - [ ] Batch 3: Variables + audit
+    - [ ] Task 5: TypedMap TypedVariables ParameterType.scalarType
+    - [ ] Task 6: Conformance audit
+- [ ] casehubio/platform#432 — Block-level forEach/loop on YamlImport
