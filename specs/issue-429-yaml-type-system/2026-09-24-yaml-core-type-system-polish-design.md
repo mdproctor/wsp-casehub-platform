@@ -37,7 +37,7 @@ public enum ValueType {
     public Object parse(String value) {
         return switch (this) {
             case STRING  -> value;
-            case INTEGER -> Long.parseLong(value);
+            case INTEGER -> Integer.parseInt(value);
             case BOOLEAN -> Truthiness.isTruthy(value);
             case NUMBER  -> Double.parseDouble(value);
         };
