@@ -1,0 +1,15 @@
+# Work Plan — issue-151-orchestration-scope-bridge
+
+## State
+branch: issue-151-orchestration-scope-bridge
+state: scaffolded
+project-sha: 62724fee7ce660834f72ffe00afb4643084c9706
+date: 2026-09-24
+issue-repo: casehubio/casehub-desiredstate
+covers: 151
+design-repo: workspace
+design-section-hashes: 
+flyway-next-v: unknown
+
+## Queue
+- [ ] casehubio/casehub-desiredstate#151 — Issue #151 ← active
