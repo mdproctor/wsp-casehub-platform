@@ -13,8 +13,5 @@ flyway-next-v: none
 
 ## Queue
 - [x] casehubio/platform#429 — Issue #429
-- [ ] casehubio/platform#432 — Block-level forEach/loop on YamlImport ← active
-  - [x] Batch 1: Import iteration
-    - [x] Task 1: YamlImport forEach and loop fields
-    - [x] Task 2: ImportExpander Phase 1 pre-expansion
-- [ ] casehubio/platform#433 — Dynamic step catalog — schema-validated YAML step definitions
+- [x] casehubio/platform#432 — Block-level forEach/loop on YamlImport
+- [ ] casehubio/platform#433 — Dynamic step catalog — schema-validated YAML step definitions ← active
