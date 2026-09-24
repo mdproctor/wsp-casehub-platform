@@ -38,6 +38,8 @@ public interface OrchestrationScope extends AutoCloseable {
     OrchestrationAccumulator accumulator(String name, DoubleBinaryOperator op, double identity);
     <K, V> OrchestrationMap<K, V> map(String name);
 
+    <T> T primitive(String name, Class<T> type);
+
     OrchestrationTask spawn(String name, Runnable task);
 
     OrchestrationScope childScope(String name);
