@@ -360,5 +360,4 @@ Desiredstate (casehubio/desiredstate — separate repo, separate PRs):
 **Issues:**
 - GitHub issue #429 — typed variable declarations
 - GitHub issue #428 — YAML parsing standardisation (parser inference mitigation)
-- GitHub issue #431 — block-level forEach/loop on YamlImport
-- GitHub issue #432 — block-level iteration: forEach and loop on YamlImport (extracted from this spec)
+- GitHub issue #432 — block-level iteration: forEach and loop on YamlImport (extracted from this spec; #431 closed as duplicate)
