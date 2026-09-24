@@ -1,7 +1,7 @@
 # yaml-core Step Action Plugin API — Design Spec
 
 **Date:** 2026-09-24
-**Status:** Draft (Revised — Round 2)
+**Status:** Draft (Revised — Round 3)
 
 ## Problem
 
@@ -46,8 +46,13 @@ public record ProcessExecuteSpec(
     @Optional List<String> args,
     @Optional String workingDir,
     @Optional Duration timeout,
-    @Optional boolean mergeStderr
+    @Optional Boolean mergeStderr
 ) {
+    public ProcessExecuteSpec {
+        if (args == null) args = List.of();
+        if (mergeStderr == null) mergeStderr = false;
+    }
+
     @Execute
     public StepResult run(ProcessExecutor executor) {
         ProcessResult result = executor.execute(
@@ -56,6 +61,25 @@ public record ProcessExecuteSpec(
             "exitCode", result.exitCode(),
             "stdout", result.stdout()));
     }
+}
+```
+
+**`@Optional` field conventions:**
+
+- `@Optional` fields MUST use reference types (`Integer`, `Boolean`, `Long`) not primitives (`int`, `boolean`, `long`). The binder passes `null` for absent optional fields — primitives cannot represent absent. The APT enforces this at compile time.
+- Plugin authors apply meaningful defaults in the **compact constructor**. The compact constructor is the runtime source of truth for default values. In the example above, `args` defaults to `List.of()` and `mergeStderr` defaults to `false`.
+- For JSON Schema documentation, `@Optional` accepts an optional `defaultValue` string: `@Optional(defaultValue = "25") Integer pageSize`. The APT writes this to the schema's `default` keyword for IDE autocomplete and documentation. The compact constructor remains the runtime source of truth — the schema `default` is documentation only.
+
+```java
+@StepPlugin("paginate")
+public record PaginateSpec(
+    @Required String endpoint,
+    @Optional(defaultValue = "25") Integer pageSize
+) {
+    public PaginateSpec {
+        if (pageSize == null) pageSize = 25;
+    }
+    // ...
 }
 ```
 
@@ -148,9 +172,13 @@ Generates per plugin:
 2. **Typed binder** — generated class that reads from a validated tree (Map) and constructs the record. No Jackson ObjectMapper. Full control over error messages: `"process-execute: 'command' is required (line 42)"`
 3. **Registry entry** — plugin name → binder + schema + metadata. Written to `META-INF/yaml-plugins/<name>.json`
 4. **Compile-time validation:**
+   - `@StepPlugin` must annotate a Java record (`ElementKind.RECORD`). Classes, enums, and interfaces are rejected: `"ERROR: @StepPlugin 'my-step': must be a Java record, found class"`
+   - Plugin name must be kebab-case (`[a-z][a-z0-9-]*`). Empty, whitespace, or non-kebab names are rejected: `"ERROR: @StepPlugin 'My Step!': name must be kebab-case (lowercase letters, digits, hyphens)"`
    - Plugin class has exactly one `@Execute` method
+   - `@Execute` method must be `public`
    - `@Execute` return type is `StepResult`
-   - Field types are schema-representable (String, int, long, boolean, Duration, List, Map, enums, nested records)
+   - `@Optional` fields must use reference types, not primitives (`Integer` not `int`, `Boolean` not `boolean`). Primitives cannot represent absent: `"ERROR: @StepPlugin 'my-step': @Optional field 'count' must use Integer, not int"`
+   - Field types are schema-representable (String, Integer, Long, Boolean, Duration, List, Map, enums, nested records)
    - Service parameters on `@Execute` must be interface types resolvable on the plugin's compilation classpath (the processor verifies the type element is an interface — not a class, enum, or annotation; resolution failure is a compile error from the plugin project's dependency graph, not from the processor)
 
 ### StepResult — new type
