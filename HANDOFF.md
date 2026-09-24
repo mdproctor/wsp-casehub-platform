@@ -2,11 +2,11 @@
 
 ## Last Session
 
-Completed Task 10 (Batch 5: ledger-spring module) and started Task 11 (ledger-spring-jpa) of ledger#213. Task 10: created `ledger-spring` module — `LedgerConfigurationProperties` (@ConfigurationProperties mapping 17 sub-groups to `LedgerProperties`), `LedgerManualConfig` (core service beans, enricher pipeline, NoOp defaults, DecayFunction — 14 @Bean methods), `LedgerEventConfig` (TrustScoreEventPublisher + LedgerEventPublisher via ApplicationEventPublisher), `LedgerTrustConfig` (8 trust computation beans, conditional on `trust-score.enabled`), `LedgerSchedulingConfig` (@Scheduled for trust/health/retention). graphql-spring-generator produced 4 GraphQL + 4 REST controllers from @McpDomain. spring-generator skipped due to bug (platform#430). Task 11 in progress.
+Completed Tasks 10-11 (Batch 5: Spring modules) of ledger#213. Task 10: created `ledger-spring` module — `LedgerConfigurationProperties` (@ConfigurationProperties mapping 17 sub-groups to `LedgerProperties`), `LedgerManualConfig` (core service beans, enricher pipeline, NoOp defaults, DecayFunction — 14 @Bean methods), `LedgerEventConfig` (TrustScoreEventPublisher + LedgerEventPublisher via ApplicationEventPublisher), `LedgerTrustConfig` (8 trust computation beans, conditional on `trust-score.enabled`), `LedgerSchedulingConfig` (@Scheduled for trust/health/retention). graphql-spring-generator produced 4 GraphQL + 4 REST controllers from @McpDomain. spring-generator skipped due to bug (platform#430). Task 11: created `ledger-spring-jpa` module — 5 Spring JPA repository implementations (LedgerEntry, CrossTenant, ActorTrustScore, TrustScoreSnapshot, MerkleFrontier) with full save pipeline, supplement loading, Merkle frontier updates. 3 repos deferred (ErasureReceipt, KeyRotation, ActorIdentityBinding — SPI interfaces not yet in api.spi). 853 runtime + 21 core tests green.
 
 ## Immediate Next Step
 
-Complete Task 11 (ledger-spring-jpa), then Task 12 (signing core extraction). Use `work continue` from slot 198.
+Begin Task 12 (Batch 6: signing core extraction for 4 backends). Use `work continue` from slot 198.
 
 ## Slot State
 
@@ -19,7 +19,7 @@ Branch `issue-213-spring-boot-deployment` active in 3 repos: platform, wsp-caseh
 | work | Complete | — |
 | qhorus | Complete | — |
 | neocortex | Complete | — |
-| **ledger** | **In progress** — Tasks 1-10 done, Task 11 in progress, next Task 12/16, Batch 5→6 | casehubio/ledger#213 |
+| **ledger** | **In progress** — Tasks 1-11 done, next Task 12/16, Batch 6 | casehubio/ledger#213 |
 | casehub-worker | Not started | casehubio/casehub-worker#16 |
 | blocks | 3 modules exist, gaps | casehubio/blocks#297 |
 | workers | Not started (blocked by casehub-worker) | casehubio/workers#24 |
