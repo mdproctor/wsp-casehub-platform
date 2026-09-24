@@ -2,11 +2,11 @@
 
 ## Last Session
 
-Completed Tasks 2-4 of ledger#213 (Spring Boot deployment). Task 2: created `ledger-jpa-common` module — extracted 15 JPA entities, Flyway migrations, `LedgerSequenceAllocator` (constructor-injected POJO), `LedgerPersistenceUnit` qualifier. Solved two Quarkus issues: entity discovery from external JARs requires `AdditionalJpaModelBuildItem` in the deployment processor; orm.xml `<entity>` elements silently override annotation metadata — use `<persistence-unit-metadata><persistence-unit-defaults>` for entity listeners instead. Task 3: created 15 `LedgerProperties` config records with `defaults()` factories. Task 4: created `LedgerConfigAdapter` (Quarkus→records bridge), moved 5 trust score event payloads to `core.event`, created `TrustScoreEventPublisher` and `LedgerEventPublisher` interfaces. All tests pass (962+ across 8 modules). 6 WIP commits on branch.
+Completed Tasks 5-8 (Batch 3: core extraction) of ledger#213. Task 5: created `EnricherPipelineCore` (priority-sorted, error-isolated, constructor-injected POJO); added `default int priority()` to `LedgerEntryEnricher` SPI. Task 6: extracted 7 trust scoring core POJOs (`PerActorTrustComputerCore`, `TrustScoreComputationService`, `TrustScorePublisherCore`, `ComputedTrustSourceCore`, `MaterializedTrustSourceCore`, `TrustBootstrapServiceCore`, `TrustExportServiceCore`); `TrustScoreRoutingPublisher` now implements `TrustScoreEventPublisher`; fixed `JpaTrustScoreSnapshotRepository.save()` to map `TrustScoreSnapshotBase` → JPA entity. Task 7: extracted 8 service core POJOs (`VerificationServiceCore`, `ComplianceReportServiceCore`, `ProvExportServiceCore`, `MerklePublisherCore`, `LedgerAppenderCore`, `OutcomeRecordSaveCore`, `OutcomeRecorderCore`, `SignatureVerificationCore`). Task 8: extracted 3 identity enricher core POJOs (`TraceIdEnricherCore`, `ActorDIDEnricherCore`, `IdentityValidationEnricherCore`) with explicit `priority()` values (10/40/50). All tests pass (21 core + 853 runtime).
 
 ## Immediate Next Step
 
-Begin Task 5 (Batch 3: enricher pipeline core extraction). Use `work continue` from slot 198.
+Begin Task 9 (Batch 4: @McpDomain API impl extraction). Use `work continue` from slot 198.
 
 ## Slot State
 
