@@ -1,32 +1,43 @@
-# yaml-core Plugin API — Design Spec
+# yaml-core Step Action Plugin API — Design Spec
 
 **Date:** 2026-09-24
-**Status:** Draft
+**Status:** Draft (Revised — Round 1)
 
 ## Problem
 
-yaml-core's YAML-addressable constructs (steps, loops, retries, conditions) are hand-coded with manual parameter extraction, no schema validation, and no extensibility story. Adding a new construct requires deep yaml-core knowledge. Community contributions are impractical.
+yaml-core's step actions (what a step DOES: rest-call, process-execute, compute, assert) have no extensibility story. Adding a new action type requires deep yaml-core knowledge. There is no JSON Schema for YAML validation of action parameters — errors surface at runtime, not at parse time with source locations. Community contributions of new action types are impractical.
 
-Current pain points:
-- Every primitive does manual `params.getString("url")` with null checks — boilerplate, error-prone, no type safety
-- No JSON Schema for YAML validation — errors surface at runtime as NPEs, not at parse time with source locations
-- Adding a new step type requires implementing `StepPrimitive`, manual `PrimitiveRegistry.register()`, hand-writing schema
-- Loop/retry/forEach are sealed data types interpreted by the executor — not extensible
+Step actions are an open set — new actions can be added freely without changing the YAML language grammar. This is structurally different from orchestration constructs (loop, retry, forEach, when, timeout, etc.), which are a closed set with fixed composition semantics defined by the decorator evaluation order (issue-386).
+
+**Current state:**
+- Action types are not yet implemented as a uniform abstraction — they are planned as part of the orchestration work
+- No JSON Schema for action parameter validation
+- Structural constructs (`LoopDirective`, `RetryDirective`, `ForEachExpander`, `Condition`, `ComputeBlock`) are correctly modeled as sealed data types and parse-time utilities — not actions
 
 ## Goal
 
-Make the entire yaml-core YAML language expressible as a series of plugins. yaml-core becomes a thin generic runtime engine that loads plugins and dispatches. Plugin authors write an annotated Java record and the framework handles schema generation, YAML registration, typed binding, and invocation.
+Make yaml-core step actions extensible via a plugin model. Plugin authors write an annotated Java record and the framework handles schema generation, YAML registration, typed binding, and invocation.
+
+Structural constructs (decorators) remain the runtime engine's fixed vocabulary — they are not candidates for pluggability. The 13-position decorator evaluation order (issue-386 §Decorator Evaluation Order) is load-bearing for correctness: `timeout` wraps `retry`, `on-error` wraps `timeout`, `semaphore` is inside `retry`, etc. These composition semantics cannot be expressed through a generic plugin execution model.
 
 **Hard constraints:**
-1. No performance regression vs current hard-coded constructs
+1. No performance regression vs hand-coded action dispatch
 2. The resulting YAML schema must remain clean and usable — no complexity increase for YAML authors
 3. Type safety at every level: plugin author (compile-time), YAML author (parse-time), runtime (binding)
 
 ## Design
 
-### Plugin types
+### Scope boundary — actions vs decorators
 
-Three annotations, each with a clear contract:
+| Concern | Model | Extensible? | Example |
+|---|---|---|---|
+| Step actions (what a step DOES) | `@StepPlugin` | Open set — plugin model | rest-call, process-execute, assert, compute |
+| Structural decorators (how steps compose) | Fixed engine vocabulary | Closed set — issue-386 | loop, retry, forEach, when, timeout, delay, on-error, trigger, transform, signal, publish, transition, parallel, semaphore, barrier, quorum, race |
+| Conditions (boolean predicates) | `Condition` functional interface + `ConditionEvaluator` + `ExpressionEngine` | Extensible via expression engines (MVEL, JQ) — not via plugins | `when: ${regime} == 'MEAN_REVERTING'` |
+
+Step action plugins execute at **position 10** (the "action" position) in the decorator evaluation order. The plugin receives typed parameters and returns `StepResult`. It has no awareness of the decorator chain wrapping it — decorators are the runtime engine's concern.
+
+### Plugin annotation
 
 ```java
 @StepPlugin("process-execute")
@@ -48,45 +59,9 @@ public record ProcessExecuteSpec(
 }
 ```
 
-```java
-@FlowPlugin("retry")
-public record RetrySpec(
-    @Optional int maxAttempts,
-    @Optional Duration backoff,
-    List<PluginInvocation> body
-) {
-    @Execute
-    public StepResult run(PluginExecutor executor) {
-        for (int i = 0; i <= maxAttempts; i++) {
-            StepResult result = executor.executeAll(body);
-            if (result.isSuccess()) return result;
-            if (i < maxAttempts) Thread.sleep(backoff.toMillis());
-        }
-        return StepResult.failed("exhausted retries after " + maxAttempts + " attempts");
-    }
-}
-```
-
-```java
-@ConditionPlugin("and")
-public record AndCondition(
-    List<PluginInvocation> conditions
-) {
-    @Execute
-    public boolean evaluate(PluginExecutor executor) {
-        for (PluginInvocation cond : conditions) {
-            if (!executor.evaluateCondition(cond)) return false;
-        }
-        return true;
-    }
-}
-```
-
-| Annotation | Return type | Has children | Use case |
-|---|---|---|---|
-| `@StepPlugin("name")` | `StepResult` | No | Leaf actions: rest-call, assert, process-execute |
-| `@FlowPlugin("name")` | `StepResult` | Yes (`List<PluginInvocation> body`) | Control flow: loop, retry, forEach, parallel |
-| `@ConditionPlugin("name")` | `boolean` | Optional (`List<PluginInvocation>`) | Predicates: and, or, not, xor, always, never |
+| Annotation | Return type | Use case |
+|---|---|---|
+| `@StepPlugin("name")` | `StepResult` | Leaf actions: rest-call, assert, process-execute, compute |
 
 ### Module structure
 
@@ -95,15 +70,11 @@ public record AndCondition(
 ```
 io.casehub.yaml.plugin.api
   @StepPlugin          — name, description
-  @FlowPlugin          — name, description
-  @ConditionPlugin     — name, description
   @Execute             — marks the execution method
   @Required            — field is required in YAML
   @Optional            — field is optional (has default)
-  StepResult           — execution result (exists today, moves here or stays)
-  PluginInvocation     — represents a child construct reference in YAML
-  PluginExecutor       — runs child constructs (injected into flow/condition execute methods)
-  ServiceRegistry      — framework-neutral service lookup (used by generated binders)
+  StepResult           — execution result (NEW type — see below)
+  ServiceRegistry      — framework-neutral service lookup (interface)
 ```
 
 Plugin authors depend only on this module. No yaml-core, no schema-generator, no CDI, no Spring.
@@ -118,10 +89,39 @@ Generates per plugin:
 3. **Registry entry** — plugin name → binder + schema + metadata. Written to `META-INF/yaml-plugins/<name>.json`
 4. **Compile-time validation:**
    - Plugin class has exactly one `@Execute` method
-   - `@Execute` return type matches annotation type (StepResult for Step/Flow, boolean for Condition)
-   - `@FlowPlugin` class has a `List<PluginInvocation>` field
+   - `@Execute` return type is `StepResult`
    - Field types are schema-representable (String, int, long, boolean, Duration, List, Map, enums, nested records)
    - Service parameters on `@Execute` are known SPI types
+
+### StepResult — new type
+
+`StepResult` is a new sealed interface in `yaml-plugin-api` that provides a typed return value for step action execution. It integrates with the existing `StepResultStore` (which stores results as `Map<String, Object>` via `recordSuccess`/`recordFailure`).
+
+```java
+public sealed interface StepResult permits StepResult.Success, StepResult.Failure {
+
+    boolean isSuccess();
+    Map<String, Object> output();
+
+    record Success(Map<String, Object> output) implements StepResult {
+        public boolean isSuccess() { return true; }
+    }
+
+    record Failure(String message) implements StepResult {
+        public boolean isSuccess() { return false; }
+        public Map<String, Object> output() { return Map.of(); }
+    }
+
+    static StepResult of(Map<String, Object> output) { return new Success(output); }
+    static StepResult failed(String message) { return new Failure(message); }
+}
+```
+
+**Integration with StepResultStore:**
+- `StepResult.Success` → `StepResultStore.recordSuccess(stepName, result.output())`
+- `StepResult.Failure` → `StepResultStore.recordFailure(stepName, new StepError(result.message(), ...))`
+
+This preserves the existing `Map<String, Object>` result model while giving plugin authors a typed API.
 
 ### Service injection
 
@@ -147,32 +147,57 @@ public StepResult invoke(Map<String, Object> validatedParams, ServiceRegistry se
 }
 ```
 
-Plugin classes stay framework-neutral. The host runtime (Quarkus, Spring, or standalone) populates the `ServiceRegistry` from its DI container.
+**ServiceRegistry — framework-neutral by design:**
+
+`ServiceRegistry` is an interface in `yaml-plugin-api`. It is NOT a replacement for CDI — it is a bridge that decouples plugin authors from framework choices. This follows the same pattern as yaml-core's other SPIs (`VariableSource`, `SpeedMultiplier`, `ForEachAdapter`) — interfaces defined at the zero-dep tier, implemented at the integration layer.
+
+```java
+public interface ServiceRegistry {
+    <T> T lookup(Class<T> serviceType);
+}
+```
+
+Implementations at the integration layer:
+- **Quarkus:** `CdiServiceRegistry` backed by `BeanManager.getReference()` — leverages existing `@DefaultBean` displacement, `@Alternative @Priority(N)` ladder
+- **Spring:** `SpringServiceRegistry` backed by `ApplicationContext.getBean()`
+- **Standalone/testing:** `MapServiceRegistry` with manual registration
+
+Plugin classes stay framework-neutral. The existing CDI patterns (`@DefaultBean` displacement, `@Alternative @Priority` ladder, test overrides at `@Priority(10+)`) operate at the service implementation level, not at the plugin level.
+
+**What services are available vs engine-internal:**
+
+Step action plugins can request services that are platform SPIs (e.g., `ProcessExecutor`, `CredentialResolver`, `ExpressionEngine`). The following are **engine-internal** and NOT exposed to plugins:
+- `ScenarioScope` — orchestration coordination primitives
+- `VariableResolver` — variable resolution (the engine resolves `${var}` in YAML parameters BEFORE passing them to the plugin)
+- `StepResultStore` — result recording (the engine records results AFTER the plugin returns)
+- Decorator evaluation context — the plugin doesn't know its position in the decorator stack
+
+This separation is intentional: the plugin receives resolved, typed parameters and returns a result. The engine handles everything else.
 
 ### Runtime dispatch
 
-**yaml-core's runtime engine** loads plugins at startup:
+**yaml-core's runtime engine** loads step action plugins at startup:
 
 1. Scan `META-INF/yaml-plugins/*.json` from classpath
-2. Build plugin registry: name → (schema, binder, type)
-3. Compose JSON Schema from all registered plugins → the full YAML language schema
-4. On YAML parse:
-   a. Parse YAML text → tree (Jackson YAML parser)
-   b. Validate tree against composed schema (source-located errors)
-   c. Walk tree, dispatch each construct to its plugin's generated binder
-   d. Binder constructs typed record, resolves services, calls `@Execute`
+2. Build plugin registry: name → (schema, binder, metadata)
+3. Compose JSON Schema from all registered plugins → the step action schema
+4. On step execution (position 10 in decorator evaluation order):
+   a. Look up action name in plugin registry (`HashMap.get()`)
+   b. Binder constructs typed record from resolved YAML parameters
+   c. Binder resolves services from ServiceRegistry
+   d. Binder calls `@Execute` method → `StepResult`
+   e. Engine records result in `StepResultStore`
 
 Plugin lookup is a `HashMap.get()`. Binder invocation is a direct method call on generated code. No reflection at runtime.
 
 ### Schema composition
 
-The full YAML language schema is composed from individual plugin schemas at startup:
+Step action plugin schemas compose into the full YAML language schema:
 
-- Each step plugin contributes a `properties` entry under the `steps` array items
-- Each flow plugin contributes similarly, with its `body` field generating a recursive `steps` reference
-- Each condition plugin contributes under `conditions`
+- Each step plugin contributes a `properties` entry under the `action` discriminator
+- The schema includes parameter validation with types, required/optional, and ShorthandModule patterns
 
-The composed schema is identical in structure to what a hand-written schema would look like. YAML authors see the same autocomplete, the same validation. The difference is invisible — the schema is assembled from plugins rather than hand-maintained.
+The structural portion of the YAML schema (decorators: `loop`, `retry`, `when`, `forEach`, `timeout`, etc.) is hand-written in yaml-core as it is today — these are the engine's fixed vocabulary. The composed schema combines hand-written structural schema + generated action plugin schemas.
 
 ShorthandModule handles scalar-or-object patterns:
 ```yaml
@@ -189,16 +214,16 @@ timeout:
 
 ```
 ERROR: @StepPlugin 'process-execute': @Execute method must return StepResult, found void
-ERROR: @FlowPlugin 'retry': missing required List<PluginInvocation> field
 ERROR: @StepPlugin 'my-step': field type Thread is not schema-representable
+ERROR: @StepPlugin 'my-step': no @Execute method found
 ```
 
 **Runtime — parse time** (YAML author mistakes):
 
 ```
 process-execute (line 42, col 5): 'command' is required
-retry (line 58, col 3): 'maxAttempts' must be a positive integer, got 'abc'
-loop (line 71, col 3): unknown property 'cound' — did you mean 'count'?
+process-execute (line 43, col 7): 'timeout' must be a duration, got 'abc'
+unknown-action (line 50, col 3): unknown action type — registered actions: rest-call, assert, process-execute, compute
 ```
 
 **Runtime — execution time** (plugin failures):
@@ -207,56 +232,136 @@ loop (line 71, col 3): unknown property 'cound' — did you mean 'count'?
 process-execute (line 42): command 'deploy.sh' failed with exit code 1
   stdout: [captured output]
   stderr: [captured error]
-retry (line 58): exhausted retries after 3 attempts
-  last failure: rest-call (line 60): HTTP 503 Service Unavailable
 ```
+
+### Relationship to orchestration decorators (issue-386)
+
+The runtime orchestration spec (issue-386) defines structural constructs as **step decorators** with a strict 13-position evaluation order. These decorators wrap step actions in a fixed nesting stack. Key semantics:
+
+- `timeout` wraps `retry` — the deadline covers the entire retry sequence
+- `on-error` wraps `timeout` — timeout exceptions are catchable
+- `semaphore` is inside `retry` — permits re-acquired per attempt
+- `retry` delegates to `PolicyEnforcer.execute(policy, action)` — existing governance infrastructure
+
+The plugin model does NOT replace or extend this decorator stack. Step action plugins execute at position 10 (the "action" position) within the decorator chain. The plugin receives resolved parameters and returns `StepResult`. It has no awareness of or interaction with the decorator evaluation order.
+
+`LoopDirective`, `RetryDirective`, and `ForEachExpander` remain as they are:
+- `LoopDirective` — sealed interface (configuration record parsed from YAML, evaluated by `LoopEvaluator`)
+- `RetryDirective` — sealed interface (configuration record parsed from YAML, evaluated by `RetryDecorator` via `PolicyEnforcer`)
+- `ForEachExpander` — parse-time utility for collection expansion
+- `Condition` — `@FunctionalInterface` with combinator default methods (`and`, `or`, `not`, `xor`), evaluated by `ConditionEvaluator`
+- `ComputeBlock` — record with engine + expression, evaluated by the runtime
+
+### Relationship to @ScenarioAction
+
+`@ScenarioAction` (issue-386 §4.3) is the escape hatch for when YAML complexity exceeds the language's comfort zone. It is complementary to `@StepPlugin`, not competing:
+
+| Aspect | `@StepPlugin` | `@ScenarioAction` |
+|---|---|---|
+| YAML-addressable | Yes — schema generated, parameters from YAML | No — opaque Java method |
+| Parameters | Typed fields on record, bound from YAML | `ScenarioContext` — full access to variables, scope, results |
+| Schema | Generated JSON Schema for validation + autocomplete | None — action name is just a string key |
+| Reusability | High — packaged as library, used across scenarios | Low — typically scenario-specific |
+| Use case | Reusable actions: rest-call, process-execute, assert | Complex logic: multi-step orchestration, conditional branching, loops with business logic |
+
+Both execute at position 10 in the decorator evaluation order. The runtime engine treats them identically — the difference is in how they are authored and parameterized.
+
+**Note:** `@ScenarioAction` is not yet implemented. It is a concept defined in issue-386's design philosophy. A tracking issue should be filed for its implementation.
+
+### J2CL compatibility
+
+yaml-core is constrained to be J2CL-compatible (issue-247):
+- No `java.lang.reflect`
+- No `ConcurrentHashMap`
+- No `Thread`, `Lock`, `synchronized`
+- No CDI annotations
+- No Jackson
+
+`yaml-plugin-api` is a zero-dep module at the same tier as yaml-core. Its types are J2CL-safe:
+- `@StepPlugin`, `@Execute`, `@Required`, `@Optional` — annotations (J2CL-safe)
+- `StepResult` — sealed interface with records (J2CL-safe)
+- `ServiceRegistry` — interface with no implementation (J2CL-safe)
+
+The `yaml-plugin-processor` (APT) is build-time only and does not need to be J2CL-compatible.
+
+The `ServiceRegistry` implementation lives at the integration layer (not in yaml-plugin-api):
+- Quarkus: `CdiServiceRegistry` in a Quarkus-specific module (uses CDI `BeanManager`)
+- Standalone: `MapServiceRegistry` using `HashMap` (J2CL-safe)
+
+### Module system interaction
+
+yaml-core has a module system (`YamlModule`, `ModuleExpander`, `ModuleBridge`) that provides structural composition of YAML files. Modules are orthogonal to step action plugins:
+
+- The plugin registry is **global** — all registered step action plugins are available to all modules
+- A module can reference any registered action type in its steps
+- Module-level schema composition uses `$ref` to include plugin-contributed action schemas
+- Modules do NOT define their own plugins — plugins are classpath-global, modules are structural composition
+
+Schema validation: when a module `$ref`s a step that uses a plugin-provided action, the composed schema includes the plugin's parameter schema. Unknown action types are caught at schema validation time.
 
 ### Migration path
 
-Existing constructs migrate incrementally:
+Step action plugins are a new capability. There is no existing uniform action abstraction to migrate FROM — this is greenfield development within an existing framework.
 
-| Current | Plugin form | Priority |
+**New step action plugins (this spec):**
+
+| Plugin | Priority | Notes |
 |---|---|---|
-| RestCallPrimitive | `@StepPlugin("rest-call")` | P1 — proof case |
-| AssertPrimitive | `@StepPlugin("assert")` | P1 |
-| ProcessExecutor | `@StepPlugin("process-execute")` | P1 — new |
-| JsonExtractPrimitive | `@StepPlugin("json-extract")` | P2 |
-| CompareStatePrimitive | `@StepPlugin("compare-state")` | P2 |
-| LoopDirective | `@FlowPlugin("loop")` | P2 |
-| RetryDirective | `@FlowPlugin("retry")` | P2 |
-| ForEachExpander | `@FlowPlugin("for-each")` | P3 |
-| CompoundStepDef | `@FlowPlugin("compound")` | P3 |
-| Condition.and/or/not/xor | `@ConditionPlugin("and/or/not/xor")` | P3 |
-| ComputeBlock | `@StepPlugin("compute")` | P3 |
+| `@StepPlugin("rest-call")` | P1 — proof case | New plugin, REST endpoint invocation |
+| `@StepPlugin("assert")` | P1 | New plugin, assertion evaluation |
+| `@StepPlugin("process-execute")` | P1 | New plugin, subprocess execution. Requires `ProcessExecutor` SPI (not yet defined — see Out of scope) |
+| `@StepPlugin("compute")` | P2 | Subsumes `ComputeBlock` (engine + expression). `ComputeBlock` can be kept as an internal model or migrated to a plugin |
+| `@StepPlugin("json-extract")` | P2 | New plugin, JSON path extraction |
 
-The old `StepPrimitive` interface and `PrimitiveRegistry` remain as a compatibility layer during migration. The plugin registry can wrap legacy primitives as plugins (adapter pattern). Once all constructs are migrated, the old interfaces are removed.
+**Existing types that stay as engine vocabulary (NOT plugins):**
+
+| Type | Role | Why not a plugin |
+|---|---|---|
+| `LoopDirective` | Sealed config record for loop decorator | Structural — position 3 in decorator stack |
+| `RetryDirective` | Sealed config record for retry decorator | Structural — position 7, delegates to PolicyEnforcer |
+| `ForEachExpander` | Parse-time collection expansion | Parse-time utility, not a runtime action |
+| `Condition` | Functional interface with combinators | Evaluated by ConditionEvaluator, extensible via ExpressionEngine |
+| `ComputeBlock` | Record with engine + expression | May migrate to `@StepPlugin("compute")` in P2 |
 
 ### What stays hand-written in yaml-core
 
 These are runtime infrastructure that plugins USE, not YAML-addressable constructs:
 
-- **Variable resolution** — VariableResolver, VariableSource (plugins reference `${var}`)
-- **Orchestration primitives** — ScenarioScope, OrcSemaphore, OrcChannel, etc. (runtime coordination)
+- **Decorator evaluation order** — the 13-position nesting stack (issue-386)
+- **Variable resolution** — VariableResolver, VariableSource, ObjectVariableSource (plugins reference `${var}` — resolved BEFORE plugin invocation)
+- **Condition evaluation** — Condition, ConditionEvaluator, Truthiness (extended by ExpressionEngine)
+- **Orchestration primitives** — ScenarioScope, OrcSemaphore, OrcChannel, OrcSignal, OrcLatch, OrcStateMachine, OrcCounter, OrcGauge, OrcFlag, OrcMap (runtime coordination)
+- **Structural constructs** — LoopDirective, RetryDirective, ForEachExpander, ComputeBlock (sealed config types)
 - **Module system** — YamlModule, ModuleExpander, ModuleBridge (structural composition)
 - **Plugin dispatch engine** — registry, schema compositor, tree walker
 - **EventRouter, SpeedMultiplier, DurationParser** — utilities
 
 ## Out of scope
 
-- Specific plugin implementations (those are the migration tasks)
+- Specific plugin implementations (those are the development tasks after the framework lands)
 - Quarkus/Spring integration for ServiceRegistry population (CDI bridge, Spring autoconfiguration)
 - IDE plugin for YAML schema autocomplete (uses the composed schema, but IDE tooling is separate)
-- ProcessExecutor SPI design (already landed in platform-api)
+- ProcessExecutor SPI design (new SPI to be defined in platform-api — not yet started)
+- `@ScenarioAction` mechanism (issue-386 concept, needs its own tracking issue and spec)
+- Module system schema composition details (plugin schemas integrate via `$ref`)
 
 ## References
 
 - `yaml-core/.../orchestration/ScenarioScope.java` — orchestration primitives (stays hand-written)
-- `yaml-core/.../orchestration/LoopDirective.java` — example migration candidate
-- `yaml-core/.../orchestration/RetryDirective.java` — example migration candidate
+- `yaml-core/.../orchestration/LoopDirective.java` — sealed config type (stays as engine vocabulary)
+- `yaml-core/.../orchestration/RetryDirective.java` — sealed config type (stays as engine vocabulary)
+- `yaml-core/.../orchestration/ComputeBlock.java` — potential P2 migration candidate
+- `yaml-core/.../runtime/Condition.java` — functional interface with combinators (stays as-is)
+- `yaml-core/.../orchestration/StepResultStore.java` — step result storage (integration point for StepResult)
+- `yaml-core/.../orchestration/DefaultScenarioScope.java` — scope implementation (engine-internal)
+- `yaml-core/.../resolver/VariableResolver.java` — variable resolution (engine resolves before plugin invocation)
+- `yaml-core/.../resolver/ObjectVariableSource.java` — typed variable resolution
+- `yaml-core/.../condition/ConditionEvaluator.java` — condition evaluation (engine-internal)
 - `desiredstate/plugin/` — prior art for YAML plugin model (heavier, reconciliation-focused)
 - `desiredstate/annotations/` — prior art for APT + deployment split
 - `platform/schema-generator/` — PlatformSchemaGenerator, ShorthandModule (reused for schema generation)
 - `platform/yaml-codegen/` — MappingConfig patterns (prior art for schema customisation)
 - `platform/graphql-generator/` — APT prior art in platform
 - `platform/simulation-generator/` — APT prior art for @SimulationEligible annotation processing
-- `platform/platform-api/.../process/ProcessExecutor.java` — first consumer (proof case)
+- `docs/specs/issue-386-runtime-orchestration/2026-09-22-runtime-orchestration-primitives-design.md` — decorator evaluation order, step execution model
+- `docs/specs/issue-247-shared-yaml-core/2026-08-29-shared-yaml-core-design.md` — J2CL compatibility constraints
