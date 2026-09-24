@@ -1,7 +1,7 @@
 # yaml-core Step Action Plugin API — Design Spec
 
 **Date:** 2026-09-24
-**Status:** Draft (Revised — Round 1)
+**Status:** Draft (Revised — Round 2)
 
 ## Problem
 
@@ -63,6 +63,66 @@ public record ProcessExecuteSpec(
 |---|---|---|
 | `@StepPlugin("name")` | `StepResult` | Leaf actions: rest-call, assert, process-execute, compute |
 
+### YAML surface syntax
+
+Step action plugins integrate with issue-386's step syntax. The `action:` field names the plugin, `data:` contains the plugin's parameters:
+
+```yaml
+- step: run-deployment
+  action: process-execute
+  data:
+    command: deploy.sh
+    args: [--env, production]
+    workingDir: /app
+    timeout: 30s
+    mergeStderr: true
+```
+
+The `data:` map keys correspond 1:1 to the record fields in `ProcessExecuteSpec`:
+
+| YAML key | Record field | Type | Annotation |
+|---|---|---|---|
+| `command` | `String command` | String | `@Required` |
+| `args` | `List<String> args` | List | `@Optional` |
+| `workingDir` | `String workingDir` | String | `@Optional` |
+| `timeout` | `Duration timeout` | Duration | `@Optional` |
+| `mergeStderr` | `boolean mergeStderr` | boolean | `@Optional` |
+
+**Variable resolution in `data:` fields:**
+
+The engine resolves `${var}` references in `data:` values via `VariableResolver` BEFORE passing them to the plugin binder. The plugin receives already-resolved values:
+
+```yaml
+- step: run-deployment
+  action: process-execute
+  data:
+    command: ${config.deploy-script}
+    args: [--env, ${env.name}]
+    workingDir: ${config.app-dir}
+```
+
+Resolution: `${config.deploy-script}` → `"deploy.sh"`, `${env.name}` → `"production"`, `${config.app-dir}` → `"/app"`. The binder then constructs `ProcessExecuteSpec("deploy.sh", List.of("--env", "production"), "/app", null, false)`.
+
+**Composition with decorators:**
+
+Plugin parameters live in `data:`. Decorators are step-level siblings — they do not conflict:
+
+```yaml
+- step: resilient-deploy
+  action: process-execute
+  data:
+    command: deploy.sh
+    args: [--env, production]
+  retry:
+    max: 3
+    backoff: exponential
+    delay: 5s
+  timeout: 120s
+  on-error: rollback-step
+```
+
+The YAML author's experience is unchanged from issue-386 — `action:` names the action, `data:` provides parameters, decorators wrap the execution. The only difference is that `action: process-execute` is now resolved from a plugin registry rather than hard-coded.
+
 ### Module structure
 
 **`yaml-plugin-api`** — zero-dep annotation + SPI module
@@ -91,7 +151,7 @@ Generates per plugin:
    - Plugin class has exactly one `@Execute` method
    - `@Execute` return type is `StepResult`
    - Field types are schema-representable (String, int, long, boolean, Duration, List, Map, enums, nested records)
-   - Service parameters on `@Execute` are known SPI types
+   - Service parameters on `@Execute` must be interface types resolvable on the plugin's compilation classpath (the processor verifies the type element is an interface — not a class, enum, or annotation; resolution failure is a compile error from the plugin project's dependency graph, not from the processor)
 
 ### StepResult — new type
 
@@ -122,6 +182,22 @@ public sealed interface StepResult permits StepResult.Success, StepResult.Failur
 - `StepResult.Failure` → `StepResultStore.recordFailure(stepName, new StepError(result.message(), ...))`
 
 This preserves the existing `Map<String, Object>` result model while giving plugin authors a typed API.
+
+### Plugin exception handling
+
+Two failure paths exist from `@Execute`:
+
+**Path 1 — `StepResult.failed(msg)`:** The plugin signals a controlled failure. The engine converts to an exception internally so it flows through the decorator chain:
+- `StepResultStore.recordFailure(stepName, new StepError(msg, "StepActionFailure", null))`
+- The engine wraps as `StepActionException(msg)` and throws — the retry decorator at position 7 catches it and retries if attempts remain
+
+**Path 2 — `@Execute` throws `RuntimeException`:** The plugin throws an unchecked exception. The engine catches it at the dispatch boundary:
+- `StepResultStore.recordFailure(stepName, new StepError(ex.getMessage(), ex.getClass().getName(), stackTrace))`
+- The exception propagates through the decorator chain — the retry decorator catches it and retries if attempts remain
+
+Both paths produce correct decorator interaction. The decorator chain wraps position 10 (action). Whether the action returns a failure result or throws, the engine presents it as an exception to the decorator stack. `retry` (position 7) retries. `on-error` (position 4) routes to fallback. `timeout` (position 5) races against the action.
+
+**Plugin author recommendation:** Use `StepResult.failed()` for expected, business-logic failures (validation errors, empty results, precondition failures). Let exceptions propagate for unexpected, infrastructure failures (I/O errors, network timeouts, null pointers). This aligns with Java conventions — known error conditions return typed results, unexpected failures throw. The distinction is visible in `StepError`: controlled failures have `exceptionClass: "StepActionFailure"` and no stack trace; thrown exceptions carry the real class name and stack trace for debugging.
 
 ### Service injection
 
@@ -188,7 +264,9 @@ This separation is intentional: the plugin receives resolved, typed parameters a
    d. Binder calls `@Execute` method → `StepResult`
    e. Engine records result in `StepResultStore`
 
-Plugin lookup is a `HashMap.get()`. Binder invocation is a direct method call on generated code. No reflection at runtime.
+Plugin lookup is a `HashMap.get()`. Binder invocation is a direct method call on generated code — no `Method.invoke()`, no reflective method dispatch. Plugin discovery at startup uses standard class loading from `META-INF` registry entries (`Class.forName()` for the generated binder class), which is the same mechanism used by `ServiceLoader` and Jandex-based discovery elsewhere in the platform.
+
+**Name collision:** If two jars on the classpath both register a plugin with the same name (e.g., two `META-INF/yaml-plugins/rest-call.json` entries), the registry fails at startup with an error identifying both sources: `"Duplicate @StepPlugin name 'rest-call': provided by com.example.RestCallPlugin (jar:a.jar) and io.other.MyRestCall (jar:b.jar)"`. No first-wins or last-wins semantics — duplicate names are always an error.
 
 ### Schema composition
 
