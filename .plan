@@ -13,3 +13,10 @@ flyway-next-v: unknown
 
 ## Queue
 - [ ] casehubio/casehub-desiredstate#151 — Issue #151 ← active
+  - [ ] Batch 1: API Foundation
+    - [ ] Task 1: yaml-plugin-api module
+  - [ ] Batch 2: APT Processor
+    - [ ] Task 2: APT skeleton and validation
+    - [ ] Task 3: Schema binder and registry generation
+  - [ ] Batch 3: Proof Case
+    - [ ] Task 4: Assert plugin end-to-end
