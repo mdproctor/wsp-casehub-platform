@@ -1,22 +1,18 @@
-# Handoff — Four-Tier Expression Escape Model (#411)
+# HANDOFF — casehub-platform
 
-## What happened this session
+## Last Session
 
-Closed #425 (orchestration-core extraction — decided against, keep in yaml-core). Implemented #411 (four-tier expression escape model): brainstorming → design spec → 7 decisions (with light decision review) → implementation plan → 7 tasks across 3 batches → code review → squash → merge to main. 9 commits, 31 tests.
+Designed and implemented the yaml-core Step Action Plugin API. Started with OrchestrationScope bridge concept (casehubio/casehub-desiredstate#151), pivoted when the other session dropped the mirror requirement. The plugin API makes step actions extensible via `@StepPlugin` annotation on Java records — APT generates JSON Schema, typed binder (StepAction implementation), and registry manifest. Design review narrowed scope: only actions are plugins (open set), structural decorators (loop/retry/forEach) stay as the engine's fixed vocabulary per issue-386's 13-position evaluation order.
 
-## Key decisions
+Two new modules: yaml-plugin-api (zero-dep, J2CL-safe annotations + SPI) and yaml-plugin-processor (APT). 20 tests green. Two proof-case plugins (assert, compare-state) verified end-to-end.
 
-- **D3 revised**: BeanInvoker SPI takes primitive params (String, Object...) — no yaml-core types cross into platform-api. Decision review caught the boundary violation.
-- **D4 revised**: ActionRegistry + ActionHandle live in yaml-core (not platform-api) — ActionHandle.invoke(ScenarioScope) requires yaml-core type. Self-review caught this.
-- **D5 dropped**: ComputeBlock compile bridge unnecessary — callers use `registry.compile(block.engine(), block.expression(), ...)` directly.
-- **Security model**: InvocationPolicy SPI with fail-closed AllowListInvocationPolicy. First explicit invocation restriction in the expression layer.
+## Immediate Next Step
 
-## Pre-existing build failures
+Plugin framework built but not yet integrated with step execution pipeline. Two follow-ups: (1) `yaml-plugin-builtins` module for production plugin records (can't live in yaml-plugin-api due to build order), (2) kebab-to-camel naming convention in binder generation.
 
-Two modules fail on main (pre-existing, not from #411):
-- `platform-spring`: rest-spring-generator generates `DeliveryEngagementController` with type mismatch (`Map<String,String>` vs `Map<String,List<String>>`)
-- `mcp`: `McpModelComprehensionIT` integration test fails (end-of-input JSON parse)
+## References
 
-## Next action
-
-Fix all failing tests — `work start` with a test-fix issue.
+- `specs/issue-151-orchestration-scope-bridge/2026-09-24-yaml-plugin-api-design.md` — revised spec
+- `specs/issue-151-orchestration-scope-bridge/decisions.md` — 8 design decisions
+- `plans/2026-09-24-yaml-plugin-api.md` — implementation plan (all tasks complete)
+- `JOURNAL.md` — session narrative with design pivot details
