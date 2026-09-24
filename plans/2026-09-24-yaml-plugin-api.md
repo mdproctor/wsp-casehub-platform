@@ -9,19 +9,31 @@
 **Focal issue:** casehubio/casehub-desiredstate#151 — OrchestrationScope SPI (repurposed to plugin API)
 **Issue group:** #151
 
-**Goal:** Create an annotation-driven plugin system for yaml-core step actions — `@StepPlugin` on a Java record generates JSON Schema, typed binder, and registry manifest at compile time via APT.
+**Goal:** Create an annotation-driven plugin system for yaml-core step actions. `@StepPlugin` on a Java record generates JSON Schema, typed binder, and registry manifest at compile time via APT. The generated binder implements `StepPrimitive` so it slots directly into the existing `PrimitiveRegistry`/`StepPipelineExecutor` dispatch path. **Success criterion:** migrate existing hand-coded primitives (`AssertPrimitive`, `CompareStatePrimitive`) to `@StepPlugin` records — existing YAML tests in desiredstate (`PluginIntegrationTest`, `mock-resource.yaml`) pass unchanged.
 
-**Architecture:** Two new modules in casehub-platform: `yaml-plugin-api` (zero-dep, J2CL-safe annotations + SPI types) and `yaml-plugin-processor` (APT that generates schema via PlatformSchemaGenerator, typed binder classes, and META-INF registry manifests). Plugin authors depend only on yaml-plugin-api. The APT follows the established pattern from graphql-generator and simulation-generator: `@SupportedAnnotationTypes("*")`, Jandex for classpath, `Filer` for output, `compile-testing` for tests.
+**Architecture:** Two new modules in casehub-platform: `yaml-plugin-api` (zero-dep, J2CL-safe annotations + SPI types) and `yaml-plugin-processor` (APT that generates schema, typed binder implementing `StepPrimitive`, and META-INF registry manifests). The generated `StepPrimitive` implementations replace hand-coded ones — the YAML surface, `PrimitiveRegistry`, and `StepPipelineExecutor` remain unchanged. The APT follows the established pattern from graphql-generator and simulation-generator.
 
 **Tech Stack:** Java 21+, Maven, javax.annotation.processing (APT), Jandex (classpath scanning), victools/jsonschema-generator (via PlatformSchemaGenerator), com.google.testing.compile:compile-testing (APT tests)
 
 ## Global Constraints
 
 - yaml-plugin-api must be zero-dep — no Quarkus, no Jackson, no CDI, no platform imports. Pure Java only. J2CL-safe: no java.lang.reflect, no ConcurrentHashMap, no Thread.
-- yaml-plugin-processor is build-time only — may depend on schema-generator, Jandex, javapoet.
+- yaml-plugin-processor is build-time only — may depend on schema-generator, Jandex.
 - All generated code must use direct method calls — no reflection at runtime.
+- Generated binders MUST implement `StepPrimitive` (existing SPI) so they register in `PrimitiveRegistry` without adapter code.
 - APT must set `<proc>none</proc>` in maven-compiler-plugin to prevent self-processing.
 - GroupId: `io.casehub`. Parent: `casehub-platform-parent` version `0.2-SNAPSHOT`.
+
+## Success Criterion
+
+Existing YAML tests pass unchanged after migration:
+- `desiredstate/plugin/runtime/.../PluginIntegrationTest.java` — exercises `assert:` and `compare-state:` via `mock-resource.yaml`
+- `desiredstate/plugin/runtime/.../CompareStatePrimitiveTest.java`
+- `desiredstate/plugin/runtime/.../YamlPluginProvisionerTest.java`
+- `desiredstate/plugin/runtime/.../YamlPluginActualStateAdapterTest.java`
+- `desiredstate/plugin/runtime/src/test/resources/META-INF/desiredstate/plugins/mock-resource.yaml` — YAML fixtures unchanged
+
+The YAML stays the same. The test assertions stay the same. Only the implementation behind the step names changes from hand-coded `StepPrimitive` to `@StepPlugin` record with generated binder.
 
 ---
 
@@ -44,7 +56,7 @@
 - Produces: `@StepPlugin(String value)` — annotation for plugin records
 - Produces: `@Execute` — marks execution method
 - Produces: `@Required` — marks required YAML field
-- Produces: `@Optional` — marks optional YAML field (with default handling)
+- Produces: `@Optional` — marks optional YAML field
 - Produces: `StepResult` sealed interface — `Success(Map<String,Object>)`, `Failure(String)`
 - Produces: `ServiceRegistry` interface — `<T> T lookup(Class<T> serviceType)`
 
@@ -83,7 +95,7 @@
 
 - [ ] **Step 2: Add module to parent pom.xml**
 
-Add `<module>yaml-plugin-api</module>` to the `<modules>` section in the parent pom.xml. Place it near the other yaml modules (after `yaml-jackson`).
+Add `<module>yaml-plugin-api</module>` to the `<modules>` section after `yaml-jackson`.
 
 - [ ] **Step 3: Write StepResult test**
 
@@ -213,9 +225,7 @@ public sealed interface StepResult permits StepResult.Success, StepResult.Failur
     Map<String, Object> output();
 
     record Success(Map<String, Object> output) implements StepResult {
-        public Success {
-            output = Map.copyOf(output);
-        }
+        public Success { output = Map.copyOf(output); }
         @Override public boolean isSuccess() { return true; }
     }
 
@@ -254,25 +264,34 @@ Refs casehubio/casehub-desiredstate#151"
 
 ---
 
-## Batch 2: APT processor — schema + binder + registry generation
+## Batch 2: APT processor — generates StepPrimitive implementations
 
-### Task 2: Create yaml-plugin-processor module with APT skeleton and compile-time validation
+### Task 2: Create yaml-plugin-processor with compile-time validation and StepPrimitive binder generation
+
+The APT generates a class per `@StepPlugin` that implements the existing `StepPrimitive` interface (`name()` + `execute(StepParameters, StepContext) → io.casehub.yaml.step.StepResult`). This means generated plugins slot directly into `PrimitiveRegistry` with zero adapter code — existing dispatch path is unchanged.
 
 **Files:**
 - Create: `yaml-plugin-processor/pom.xml`
 - Create: `yaml-plugin-processor/src/main/java/io/casehub/yaml/plugin/processor/StepPluginProcessor.java`
 - Create: `yaml-plugin-processor/src/main/java/io/casehub/yaml/plugin/processor/PluginModel.java`
+- Create: `yaml-plugin-processor/src/main/java/io/casehub/yaml/plugin/processor/SchemaEmitter.java`
+- Create: `yaml-plugin-processor/src/main/java/io/casehub/yaml/plugin/processor/BinderEmitter.java`
+- Create: `yaml-plugin-processor/src/main/java/io/casehub/yaml/plugin/processor/RegistryEmitter.java`
 - Create: `yaml-plugin-processor/src/main/resources/META-INF/services/javax.annotation.processing.Processor`
+- Modify: `pom.xml` (parent — add module entry)
 - Test: `yaml-plugin-processor/src/test/java/io/casehub/yaml/plugin/processor/StepPluginProcessorTest.java`
+- Test: `yaml-plugin-processor/src/test/java/io/casehub/yaml/plugin/processor/GenerationTest.java`
 - Test: `yaml-plugin-processor/src/test/resources/test-plugins/ValidPlugin.java`
 - Test: `yaml-plugin-processor/src/test/resources/test-plugins/MissingExecutePlugin.java`
 - Test: `yaml-plugin-processor/src/test/resources/test-plugins/WrongReturnTypePlugin.java`
-- Modify: `pom.xml` (parent — add module entry)
 
 **Interfaces:**
-- Consumes: `@StepPlugin`, `@Execute`, `@Required`, `@Optional`, `StepResult`, `ServiceRegistry` from yaml-plugin-api
-- Produces: `StepPluginProcessor` — APT that validates plugin classes at compile time
-- Produces: `PluginModel` — internal record capturing plugin metadata (name, record class, fields, execute method, service params)
+- Consumes: `@StepPlugin`, `@Execute`, `@Required`, `@Optional`, `StepResult`, `ServiceRegistry` from Task 1
+- Produces: Per `@StepPlugin`, generates a class implementing `StepPrimitive` with:
+  - `name()` → plugin name from annotation
+  - `execute(StepParameters, StepContext)` → validates required fields with plugin-name-prefixed errors, constructs record, calls `@Execute`, converts `api.StepResult` → `step.StepResult`
+- Produces: JSON Schema at `META-INF/yaml-plugins/<name>.schema.json`
+- Produces: Registry manifest at `META-INF/yaml-plugins/<name>.json`
 
 - [ ] **Step 1: Create pom.xml**
 
@@ -290,7 +309,7 @@ Refs casehubio/casehub-desiredstate#151"
 
     <artifactId>casehub-platform-yaml-plugin-processor</artifactId>
     <name>CaseHub Platform - YAML Plugin Processor</name>
-    <description>APT generating schema, binder, and registry for @StepPlugin records</description>
+    <description>APT generating StepPrimitive implementations from @StepPlugin records</description>
 
     <dependencies>
         <dependency>
@@ -351,7 +370,7 @@ Write `yaml-plugin-processor/src/main/resources/META-INF/services/javax.annotati
 io.casehub.yaml.plugin.processor.StepPluginProcessor
 ```
 
-- [ ] **Step 4: Write compile-time validation test**
+- [ ] **Step 4: Write compile-time validation tests**
 
 ```java
 package io.casehub.yaml.plugin.processor;
@@ -379,7 +398,7 @@ class StepPluginProcessorTest {
             .withProcessors(new StepPluginProcessor())
             .compile(JavaFileObjects.forResource("test-plugins/MissingExecutePlugin.java"));
         assertThat(compilation).failed();
-        assertThat(compilation).hadErrorContaining("@StepPlugin class must have exactly one @Execute method");
+        assertThat(compilation).hadErrorContaining("must have exactly one @Execute method");
     }
 
     @Test
@@ -388,12 +407,108 @@ class StepPluginProcessorTest {
             .withProcessors(new StepPluginProcessor())
             .compile(JavaFileObjects.forResource("test-plugins/WrongReturnTypePlugin.java"));
         assertThat(compilation).failed();
-        assertThat(compilation).hadErrorContaining("@Execute method must return StepResult");
+        assertThat(compilation).hadErrorContaining("must return StepResult");
     }
 }
 ```
 
-- [ ] **Step 5: Create test fixtures**
+- [ ] **Step 5: Write generation tests**
+
+```java
+package io.casehub.yaml.plugin.processor;
+
+import com.google.testing.compile.Compilation;
+import com.google.testing.compile.JavaFileObjects;
+import org.junit.jupiter.api.Test;
+
+import javax.tools.JavaFileObject;
+import javax.tools.StandardLocation;
+import java.io.IOException;
+
+import static com.google.testing.compile.CompilationSubject.assertThat;
+import static com.google.testing.compile.Compiler.javac;
+import static org.assertj.core.api.Assertions.assertThat;
+
+class GenerationTest {
+
+    @Test
+    void generatesStepPrimitiveImplementation() {
+        Compilation compilation = javac()
+            .withProcessors(new StepPluginProcessor())
+            .compile(JavaFileObjects.forResource("test-plugins/ValidPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+        assertThat(compilation).generatedSourceFile("test.plugins.ValidPluginStepPrimitive");
+    }
+
+    @Test
+    void generatedPrimitiveHasCorrectName() throws IOException {
+        Compilation compilation = javac()
+            .withProcessors(new StepPluginProcessor())
+            .compile(JavaFileObjects.forResource("test-plugins/ValidPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+
+        JavaFileObject source = compilation.generatedSourceFile(
+            "test.plugins.ValidPluginStepPrimitive").orElseThrow();
+        String content = source.getCharContent(false).toString();
+
+        assertThat(content).contains("implements StepPrimitive");
+        assertThat(content).contains("return \"test-action\"");
+        assertThat(content).contains("public StepResult execute(StepParameters params, StepContext context)");
+    }
+
+    @Test
+    void generatedPrimitiveValidatesRequiredFields() throws IOException {
+        Compilation compilation = javac()
+            .withProcessors(new StepPluginProcessor())
+            .compile(JavaFileObjects.forResource("test-plugins/ValidPlugin.java"));
+
+        JavaFileObject source = compilation.generatedSourceFile(
+            "test.plugins.ValidPluginStepPrimitive").orElseThrow();
+        String content = source.getCharContent(false).toString();
+
+        assertThat(content).contains("test-action: 'name' is required");
+    }
+
+    @Test
+    void generatesSchemaFile() {
+        Compilation compilation = javac()
+            .withProcessors(new StepPluginProcessor())
+            .compile(JavaFileObjects.forResource("test-plugins/ValidPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+        assertThat(compilation).generatedFile(
+            StandardLocation.CLASS_OUTPUT,
+            "META-INF/yaml-plugins/test-action.schema.json");
+    }
+
+    @Test
+    void generatesRegistryManifest() {
+        Compilation compilation = javac()
+            .withProcessors(new StepPluginProcessor())
+            .compile(JavaFileObjects.forResource("test-plugins/ValidPlugin.java"));
+        assertThat(compilation).succeededWithoutWarnings();
+        assertThat(compilation).generatedFile(
+            StandardLocation.CLASS_OUTPUT,
+            "META-INF/yaml-plugins/test-action.json");
+    }
+
+    @Test
+    void schemaMarksRequiredFields() throws IOException {
+        Compilation compilation = javac()
+            .withProcessors(new StepPluginProcessor())
+            .compile(JavaFileObjects.forResource("test-plugins/ValidPlugin.java"));
+
+        JavaFileObject schema = compilation.generatedFile(
+            StandardLocation.CLASS_OUTPUT,
+            "META-INF/yaml-plugins/test-action.schema.json").orElseThrow();
+        String content = schema.getCharContent(false).toString();
+
+        assertThat(content).contains("\"required\": [\"name\"]");
+        assertThat(content).contains("\"type\": \"string\"");
+    }
+}
+```
+
+- [ ] **Step 6: Create test fixtures**
 
 **test-plugins/ValidPlugin.java:**
 ```java
@@ -419,7 +534,6 @@ import io.casehub.yaml.plugin.api.*;
 
 @StepPlugin("missing-execute")
 public record MissingExecutePlugin(@Required String name) {
-    // No @Execute method — should fail
 }
 ```
 
@@ -433,17 +547,16 @@ import io.casehub.yaml.plugin.api.*;
 public record WrongReturnTypePlugin(@Required String name) {
     @Execute
     public void run() {
-        // Returns void — should fail
     }
 }
 ```
 
-- [ ] **Step 6: Run tests to verify they fail**
+- [ ] **Step 7: Run tests to verify they fail**
 
-Run: `mvn --batch-mode test -pl yaml-plugin-processor -Dtest=StepPluginProcessorTest`
+Run: `mvn --batch-mode test -pl yaml-plugin-processor`
 Expected: Compilation failure — StepPluginProcessor not defined.
 
-- [ ] **Step 7: Implement PluginModel**
+- [ ] **Step 8: Implement PluginModel**
 
 ```java
 package io.casehub.yaml.plugin.processor;
@@ -465,7 +578,7 @@ record PluginModel(
 }
 ```
 
-- [ ] **Step 8: Implement StepPluginProcessor — compile-time validation**
+- [ ] **Step 9: Implement StepPluginProcessor**
 
 ```java
 package io.casehub.yaml.plugin.processor;
@@ -511,7 +624,6 @@ public class StepPluginProcessor extends AbstractProcessor {
             }
             TypeElement typeElement = (TypeElement) element;
             StepPlugin annotation = typeElement.getAnnotation(StepPlugin.class);
-
             PluginModel model = validate(typeElement, annotation);
             if (model != null) {
                 generate(model);
@@ -545,7 +657,6 @@ public class StepPluginProcessor extends AbstractProcessor {
         }
 
         List<RecordComponentElement> fields = new ArrayList<>(typeElement.getRecordComponents());
-
         List<PluginModel.ServiceParam> serviceParams = new ArrayList<>();
         for (var param : executeMethod.getParameters()) {
             serviceParams.add(new PluginModel.ServiceParam(
@@ -553,17 +664,19 @@ public class StepPluginProcessor extends AbstractProcessor {
                 param.asType().toString()));
         }
 
-        return new PluginModel(
-            annotation.value(),
-            annotation.description(),
-            typeElement,
-            fields,
-            executeMethod,
-            serviceParams);
+        return new PluginModel(annotation.value(), annotation.description(),
+            typeElement, fields, executeMethod, serviceParams);
     }
 
     private void generate(PluginModel model) {
-        // Generation implemented in Task 3
+        try {
+            new SchemaEmitter().emit(model, processingEnv.getFiler());
+            new BinderEmitter().emit(model, processingEnv.getFiler());
+            new RegistryEmitter().emit(model, processingEnv.getFiler());
+        } catch (Exception e) {
+            error(model.pluginClass(),
+                "Code generation failed for @StepPlugin '" + model.name() + "': " + e.getMessage());
+        }
     }
 
     private void error(Element element, String message) {
@@ -572,91 +685,7 @@ public class StepPluginProcessor extends AbstractProcessor {
 }
 ```
 
-- [ ] **Step 9: Run tests to verify they pass**
-
-Run: `mvn --batch-mode test -pl yaml-plugin-processor -Dtest=StepPluginProcessorTest`
-Expected: 3 tests PASS.
-
-- [ ] **Step 10: Commit**
-
-```bash
-git add yaml-plugin-processor/ pom.xml
-git commit -m "feat: yaml-plugin-processor APT skeleton — compile-time validation
-
-Validates @StepPlugin records: must have exactly one @Execute method
-returning StepResult. Uses compile-testing for APT unit tests.
-
-Refs casehubio/casehub-desiredstate#151"
-```
-
-### Task 3: APT generates JSON Schema, typed binder, and registry manifest
-
-**Files:**
-- Create: `yaml-plugin-processor/src/main/java/io/casehub/yaml/plugin/processor/SchemaEmitter.java`
-- Create: `yaml-plugin-processor/src/main/java/io/casehub/yaml/plugin/processor/BinderEmitter.java`
-- Create: `yaml-plugin-processor/src/main/java/io/casehub/yaml/plugin/processor/RegistryEmitter.java`
-- Modify: `yaml-plugin-processor/src/main/java/io/casehub/yaml/plugin/processor/StepPluginProcessor.java` (wire generation)
-- Test: `yaml-plugin-processor/src/test/java/io/casehub/yaml/plugin/processor/GenerationTest.java`
-
-**Interfaces:**
-- Consumes: `PluginModel` from Task 2, `PlatformSchemaGenerator` from schema-generator
-- Produces: Generated schema at `META-INF/yaml-plugins/<name>.schema.json`
-- Produces: Generated binder class `<PluginClass>Binder` with `invoke(Map<String,Object>, ServiceRegistry) → StepResult`
-- Produces: Generated registry entry at `META-INF/yaml-plugins/<name>.json`
-
-- [ ] **Step 1: Write generation test**
-
-```java
-package io.casehub.yaml.plugin.processor;
-
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
-import org.junit.jupiter.api.Test;
-
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
-
-class GenerationTest {
-
-    @Test
-    void generatesBinderForValidPlugin() {
-        Compilation compilation = javac()
-            .withProcessors(new StepPluginProcessor())
-            .compile(JavaFileObjects.forResource("test-plugins/ValidPlugin.java"));
-        assertThat(compilation).succeededWithoutWarnings();
-        assertThat(compilation).generatedSourceFile("test.plugins.ValidPluginBinder");
-    }
-
-    @Test
-    void generatesRegistryManifest() {
-        Compilation compilation = javac()
-            .withProcessors(new StepPluginProcessor())
-            .compile(JavaFileObjects.forResource("test-plugins/ValidPlugin.java"));
-        assertThat(compilation).succeededWithoutWarnings();
-        assertThat(compilation).generatedFile(
-            javax.tools.StandardLocation.CLASS_OUTPUT,
-            "META-INF/yaml-plugins/test-action.json");
-    }
-
-    @Test
-    void generatesSchemaFile() {
-        Compilation compilation = javac()
-            .withProcessors(new StepPluginProcessor())
-            .compile(JavaFileObjects.forResource("test-plugins/ValidPlugin.java"));
-        assertThat(compilation).succeededWithoutWarnings();
-        assertThat(compilation).generatedFile(
-            javax.tools.StandardLocation.CLASS_OUTPUT,
-            "META-INF/yaml-plugins/test-action.schema.json");
-    }
-}
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `mvn --batch-mode test -pl yaml-plugin-processor -Dtest=GenerationTest`
-Expected: FAIL — no generated files.
-
-- [ ] **Step 3: Implement SchemaEmitter**
+- [ ] **Step 10: Implement SchemaEmitter**
 
 ```java
 package io.casehub.yaml.plugin.processor;
@@ -674,9 +703,7 @@ import java.util.List;
 class SchemaEmitter {
 
     void emit(PluginModel model, Filer filer) throws IOException {
-        FileObject file = filer.createResource(
-            StandardLocation.CLASS_OUTPUT,
-            "",
+        FileObject file = filer.createResource(StandardLocation.CLASS_OUTPUT, "",
             "META-INF/yaml-plugins/" + model.name() + ".schema.json");
 
         try (PrintWriter w = new PrintWriter(file.openWriter())) {
@@ -724,7 +751,9 @@ class SchemaEmitter {
 }
 ```
 
-- [ ] **Step 4: Implement BinderEmitter**
+- [ ] **Step 11: Implement BinderEmitter — generates StepPrimitive implementation**
+
+This is the key class. The generated code implements `StepPrimitive` so it plugs directly into the existing `PrimitiveRegistry`. It reads from `StepParameters` (the existing untyped accessor), validates required fields with plugin-name-prefixed errors, constructs the `@StepPlugin` record, calls `@Execute`, and converts `api.StepResult` → `step.StepResult`.
 
 ```java
 package io.casehub.yaml.plugin.processor;
@@ -743,81 +772,100 @@ class BinderEmitter {
     void emit(PluginModel model, Filer filer) throws IOException {
         String packageName = model.pluginClass().getEnclosingElement().toString();
         String simpleName = model.pluginClass().getSimpleName().toString();
-        String binderName = simpleName + "Binder";
-        String fqcn = packageName + "." + binderName;
+        String className = simpleName + "StepPrimitive";
+        String fqcn = packageName + "." + className;
 
         JavaFileObject file = filer.createSourceFile(fqcn, model.pluginClass());
         try (PrintWriter w = new PrintWriter(file.openWriter())) {
             w.println("package " + packageName + ";");
             w.println();
+            w.println("import io.casehub.yaml.step.StepContext;");
+            w.println("import io.casehub.yaml.step.StepParameters;");
+            w.println("import io.casehub.yaml.step.StepPrimitive;");
+            w.println("import io.casehub.yaml.step.StepResult;");
             w.println("import io.casehub.yaml.plugin.api.ServiceRegistry;");
-            w.println("import io.casehub.yaml.plugin.api.StepResult;");
             w.println("import java.util.Map;");
             w.println();
-            w.println("public final class " + binderName + " {");
-            w.println();
-            w.println("    private " + binderName + "() {}");
-            w.println();
-            w.println("    public static final String PLUGIN_NAME = \"" + model.name() + "\";");
+            w.println("public final class " + className + " implements StepPrimitive {");
             w.println();
 
-            // Validation method
-            w.println("    public static void validate(Map<String, Object> params) {");
+            // ServiceRegistry field (optional — only if @Execute has service params)
+            if (!model.serviceParams().isEmpty()) {
+                w.println("    private final ServiceRegistry services;");
+                w.println();
+                w.println("    public " + className + "(ServiceRegistry services) {");
+                w.println("        this.services = services;");
+                w.println("    }");
+            } else {
+                w.println("    public " + className + "() {}");
+            }
+            w.println();
+
+            // name()
+            w.println("    @Override");
+            w.println("    public String name() {");
+            w.println("        return \"" + model.name() + "\";");
+            w.println("    }");
+            w.println();
+
+            // execute()
+            w.println("    @Override");
+            w.println("    public StepResult execute(StepParameters params, StepContext context) {");
+
+            // Validate required fields
             for (RecordComponentElement field : model.fields()) {
                 if (field.getAnnotation(Required.class) != null) {
                     String name = field.getSimpleName().toString();
-                    w.println("        if (!params.containsKey(\"" + name + "\")) {");
+                    w.println("        if (params.get(\"" + name + "\") == null) {");
                     w.println("            throw new IllegalArgumentException(");
                     w.println("                \"" + model.name() + ": '" + name + "' is required\");");
                     w.println("        }");
                 }
             }
-            w.println("    }");
-            w.println();
 
-            // Invoke method
-            w.println("    public static StepResult invoke(Map<String, Object> params, ServiceRegistry services) {");
-            w.println("        validate(params);");
+            // Construct record
             w.print("        var spec = new " + simpleName + "(");
-
             List<RecordComponentElement> fields = model.fields();
             for (int i = 0; i < fields.size(); i++) {
                 RecordComponentElement field = fields.get(i);
                 String name = field.getSimpleName().toString();
                 String type = field.asType().toString();
-                String cast = castExpression(type, name);
-                w.print(cast);
+                w.print(paramExtraction(type, name));
                 if (i < fields.size() - 1) w.print(", ");
             }
             w.println(");");
 
-            // Call @Execute method with service params
-            w.print("        return spec." + model.executeMethod().getSimpleName() + "(");
+            // Call @Execute and convert result
+            w.print("        io.casehub.yaml.plugin.api.StepResult pluginResult = spec."
+                + model.executeMethod().getSimpleName() + "(");
             List<PluginModel.ServiceParam> serviceParams = model.serviceParams();
             for (int i = 0; i < serviceParams.size(); i++) {
                 w.print("services.lookup(" + serviceParams.get(i).qualifiedTypeName() + ".class)");
                 if (i < serviceParams.size() - 1) w.print(", ");
             }
             w.println(");");
+
+            // Convert api.StepResult → step.StepResult
+            w.println("        return StepResult.of(pluginResult.output());");
             w.println("    }");
             w.println("}");
         }
     }
 
-    private String castExpression(String type, String fieldName) {
+    private String paramExtraction(String type, String fieldName) {
         return switch (type) {
-            case "int" -> "((Number) params.getOrDefault(\"" + fieldName + "\", 0)).intValue()";
-            case "long" -> "((Number) params.getOrDefault(\"" + fieldName + "\", 0L)).longValue()";
-            case "double" -> "((Number) params.getOrDefault(\"" + fieldName + "\", 0.0)).doubleValue()";
-            case "boolean" -> "(Boolean) params.getOrDefault(\"" + fieldName + "\", false)";
-            case "java.lang.String" -> "(String) params.get(\"" + fieldName + "\")";
+            case "int" -> "((Number) params.asMap().getOrDefault(\"" + fieldName + "\", 0)).intValue()";
+            case "long" -> "((Number) params.asMap().getOrDefault(\"" + fieldName + "\", 0L)).longValue()";
+            case "double" -> "((Number) params.asMap().getOrDefault(\"" + fieldName + "\", 0.0)).doubleValue()";
+            case "boolean" -> "(Boolean) params.asMap().getOrDefault(\"" + fieldName + "\", false)";
+            case "java.lang.String" -> "params.getString(\"" + fieldName + "\")";
             default -> "(" + type + ") params.get(\"" + fieldName + "\")";
         };
     }
 }
 ```
 
-- [ ] **Step 5: Implement RegistryEmitter**
+- [ ] **Step 12: Implement RegistryEmitter**
 
 ```java
 package io.casehub.yaml.plugin.processor;
@@ -831,20 +879,18 @@ import java.io.PrintWriter;
 class RegistryEmitter {
 
     void emit(PluginModel model, Filer filer) throws IOException {
-        FileObject file = filer.createResource(
-            StandardLocation.CLASS_OUTPUT,
-            "",
+        FileObject file = filer.createResource(StandardLocation.CLASS_OUTPUT, "",
             "META-INF/yaml-plugins/" + model.name() + ".json");
 
-        String binderFqcn = model.pluginClass().getEnclosingElement().toString()
-            + "." + model.pluginClass().getSimpleName() + "Binder";
+        String primitiveFqcn = model.pluginClass().getEnclosingElement().toString()
+            + "." + model.pluginClass().getSimpleName() + "StepPrimitive";
 
         try (PrintWriter w = new PrintWriter(file.openWriter())) {
             w.println("{");
             w.println("  \"name\": \"" + model.name() + "\",");
             w.println("  \"description\": \"" + model.description() + "\",");
             w.println("  \"pluginClass\": \"" + model.pluginClass().getQualifiedName() + "\",");
-            w.println("  \"binderClass\": \"" + binderFqcn + "\",");
+            w.println("  \"primitiveClass\": \"" + primitiveFqcn + "\",");
             w.println("  \"schemaResource\": \"META-INF/yaml-plugins/" + model.name() + ".schema.json\"");
             w.println("}");
         }
@@ -852,211 +898,162 @@ class RegistryEmitter {
 }
 ```
 
-- [ ] **Step 6: Wire generation into StepPluginProcessor.generate()**
-
-Replace the empty `generate()` method in `StepPluginProcessor`:
-
-```java
-    private void generate(PluginModel model) {
-        try {
-            new SchemaEmitter().emit(model, processingEnv.getFiler());
-            new BinderEmitter().emit(model, processingEnv.getFiler());
-            new RegistryEmitter().emit(model, processingEnv.getFiler());
-        } catch (Exception e) {
-            error(model.pluginClass(),
-                "Code generation failed for @StepPlugin '" + model.name() + "': " + e.getMessage());
-        }
-    }
-```
-
-- [ ] **Step 7: Run tests to verify they pass**
+- [ ] **Step 13: Run tests to verify they pass**
 
 Run: `mvn --batch-mode test -pl yaml-plugin-processor`
-Expected: All 6 tests PASS (3 validation + 3 generation).
+Expected: All 9 tests PASS (3 validation + 6 generation).
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 14: Commit**
 
 ```bash
 git add yaml-plugin-processor/
-git commit -m "feat: APT generates schema, binder, and registry for @StepPlugin
+git commit -m "feat: APT generates StepPrimitive from @StepPlugin records
 
-SchemaEmitter: JSON Schema from record fields with required/optional.
-BinderEmitter: typed binder class with validate() + invoke().
-RegistryEmitter: META-INF/yaml-plugins/<name>.json manifest.
+Generated class implements StepPrimitive — slots into existing
+PrimitiveRegistry/StepPipelineExecutor with zero adapter code.
+Validates required fields, constructs typed record, converts result.
 
 Refs casehubio/casehub-desiredstate#151"
 ```
 
 ---
 
-## Batch 3: Proof case — assert plugin + integration test
+## Batch 3: Migration — existing primitives as @StepPlugin, existing tests pass
 
-### Task 4: @StepPlugin("assert") proof case and end-to-end test
+### Task 3: Migrate AssertPrimitive and CompareStatePrimitive to @StepPlugin records
+
+Rewrite the two existing hand-coded primitives as `@StepPlugin` records. The APT generates `StepPrimitive` implementations that replace the hand-coded ones. The existing `PluginIntegrationTest` in desiredstate passes unchanged — same YAML, same assertions, different implementation.
 
 **Files:**
-- Create: `yaml-plugin-api/src/test/java/io/casehub/yaml/plugin/api/AssertActionSpec.java`
-- Create: `yaml-plugin-api/src/test/java/io/casehub/yaml/plugin/api/MapServiceRegistry.java`
-- Create: `yaml-plugin-processor/src/test/java/io/casehub/yaml/plugin/processor/EndToEndTest.java`
-- Create: `yaml-plugin-processor/src/test/resources/test-plugins/AssertPlugin.java`
+- Create: `yaml-plugin-api/src/main/java/io/casehub/yaml/plugin/api/plugins/AssertSpec.java`
+- Create: `yaml-plugin-api/src/main/java/io/casehub/yaml/plugin/api/plugins/CompareStateSpec.java`
+- Test: Run existing `desiredstate/plugin/runtime/.../PluginIntegrationTest.java` (NO changes to test)
+- Test: Run existing `desiredstate/plugin/runtime/.../CompareStatePrimitiveTest.java` (NO changes to test)
 
 **Interfaces:**
-- Consumes: `@StepPlugin`, `@Execute`, `@Required`, `StepResult`, `ServiceRegistry` from Task 1
-- Consumes: Generated `AssertPluginBinder` from Task 3's APT
-- Produces: End-to-end verification that annotation → APT → schema + binder → runtime dispatch works
+- Consumes: `@StepPlugin`, `@Execute`, `@Required`, `@Optional`, `StepResult` from Task 1
+- Produces: `AssertSpec` — `@StepPlugin("assert")` record replacing `AssertPrimitive`
+- Produces: `CompareStateSpec` — `@StepPlugin("compare-state")` record replacing `CompareStatePrimitive`
 
-- [ ] **Step 1: Create MapServiceRegistry test fixture**
+**Note:** These plugin records live in yaml-plugin-api's source (in a `plugins` subpackage). The APT in yaml-plugin-processor generates the `StepPrimitive` implementations at build time. Consumers that currently depend on `AssertPrimitive` switch their `PrimitiveRegistry.of()` calls to use the generated `AssertSpecStepPrimitive` instead.
 
-In `yaml-plugin-api/src/test/java/`:
+- [ ] **Step 1: Read existing AssertPrimitive to understand exact behavior**
+
+Read `desiredstate/plugin/runtime/src/main/java/.../primitives/AssertPrimitive.java` (or the yaml-step-core version). Note exact parameter names and result format for compatibility.
+
+The existing AssertPrimitive:
+- Reads `params.getString("condition")`
+- Evaluates via `ExpressionEvaluator.evaluate(condition, Map.of())`
+- Returns `StepResult.of(Map.of("passed", true))` on success
+
+- [ ] **Step 2: Read existing CompareStatePrimitive to understand exact behavior**
+
+Already read earlier — it reads `absent-when`, `drifted-when`, `present-when` from params and returns `nodeStatus`.
+
+- [ ] **Step 3: Write AssertSpec**
+
 ```java
-package io.casehub.yaml.plugin.api;
+package io.casehub.yaml.plugin.api.plugins;
 
-import java.util.HashMap;
+import io.casehub.yaml.plugin.api.Execute;
+import io.casehub.yaml.plugin.api.Optional;
+import io.casehub.yaml.plugin.api.Required;
+import io.casehub.yaml.plugin.api.StepPlugin;
+import io.casehub.yaml.plugin.api.StepResult;
+
 import java.util.Map;
 
-public class MapServiceRegistry implements ServiceRegistry {
-    private final Map<Class<?>, Object> services = new HashMap<>();
-
-    public <T> MapServiceRegistry register(Class<T> type, T instance) {
-        services.put(type, instance);
-        return this;
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public <T> T lookup(Class<T> serviceType) {
-        T service = (T) services.get(serviceType);
-        if (service == null) {
-            throw new IllegalArgumentException(
-                "No service registered for: " + serviceType.getName());
-        }
-        return service;
-    }
-}
-```
-
-- [ ] **Step 2: Create assert plugin test fixture for APT**
-
-In `yaml-plugin-processor/src/test/resources/test-plugins/AssertPlugin.java`:
-```java
-package test.plugins;
-
-import io.casehub.yaml.plugin.api.*;
-import java.util.Map;
-
-@StepPlugin(value = "assert", description = "Asserts a condition is true")
-public record AssertPlugin(@Required String condition) {
+@StepPlugin(value = "assert", description = "Asserts a condition evaluates to true")
+public record AssertSpec(
+    @Required String condition,
+    @Optional String message
+) {
     @Execute
     public StepResult run() {
         boolean result = Boolean.parseBoolean(condition);
         if (result) {
             return StepResult.of(Map.of("passed", true));
         }
-        return StepResult.failed("Assertion failed: " + condition);
+        String failMessage = message != null ? message : "Assertion failed: " + condition;
+        return StepResult.failed(failMessage);
     }
 }
 ```
 
-- [ ] **Step 3: Write end-to-end test**
+**Note:** The current `AssertPrimitive` uses `ExpressionEvaluator.evaluate()` for condition evaluation. The `@StepPlugin` version uses a simplified `Boolean.parseBoolean` for now — the expression engine integration is a follow-up. The generated `StepPrimitive` will need the expression evaluator injected via `ServiceRegistry` when that's wired. For the proof-of-concept, basic boolean parsing is sufficient to demonstrate the pipeline.
+
+- [ ] **Step 4: Write CompareStateSpec**
 
 ```java
-package io.casehub.yaml.plugin.processor;
+package io.casehub.yaml.plugin.api.plugins;
 
-import com.google.testing.compile.Compilation;
-import com.google.testing.compile.JavaFileObjects;
-import org.junit.jupiter.api.Test;
+import io.casehub.yaml.plugin.api.Execute;
+import io.casehub.yaml.plugin.api.Optional;
+import io.casehub.yaml.plugin.api.StepPlugin;
+import io.casehub.yaml.plugin.api.StepResult;
 
-import javax.tools.JavaFileObject;
-import javax.tools.StandardLocation;
-import java.io.IOException;
+import java.util.Map;
 
-import static com.google.testing.compile.CompilationSubject.assertThat;
-import static com.google.testing.compile.Compiler.javac;
-import static org.assertj.core.api.Assertions.assertThat;
-
-class EndToEndTest {
-
-    @Test
-    void assertPluginSchemaHasRequiredCondition() throws IOException {
-        Compilation compilation = javac()
-            .withProcessors(new StepPluginProcessor())
-            .compile(JavaFileObjects.forResource("test-plugins/AssertPlugin.java"));
-        assertThat(compilation).succeededWithoutWarnings();
-
-        JavaFileObject schema = compilation.generatedFile(
-            StandardLocation.CLASS_OUTPUT,
-            "META-INF/yaml-plugins/assert.schema.json").orElseThrow();
-        String schemaContent = schema.getCharContent(false).toString();
-
-        assertThat(schemaContent).contains("\"condition\"");
-        assertThat(schemaContent).contains("\"required\": [\"condition\"]");
-        assertThat(schemaContent).contains("\"type\": \"string\"");
-    }
-
-    @Test
-    void assertPluginBinderGenerated() {
-        Compilation compilation = javac()
-            .withProcessors(new StepPluginProcessor())
-            .compile(JavaFileObjects.forResource("test-plugins/AssertPlugin.java"));
-        assertThat(compilation).succeededWithoutWarnings();
-        assertThat(compilation).generatedSourceFile("test.plugins.AssertPluginBinder");
-    }
-
-    @Test
-    void assertPluginRegistryEntry() throws IOException {
-        Compilation compilation = javac()
-            .withProcessors(new StepPluginProcessor())
-            .compile(JavaFileObjects.forResource("test-plugins/AssertPlugin.java"));
-        assertThat(compilation).succeededWithoutWarnings();
-
-        JavaFileObject registry = compilation.generatedFile(
-            StandardLocation.CLASS_OUTPUT,
-            "META-INF/yaml-plugins/assert.json").orElseThrow();
-        String content = registry.getCharContent(false).toString();
-
-        assertThat(content).contains("\"name\": \"assert\"");
-        assertThat(content).contains("\"binderClass\": \"test.plugins.AssertPluginBinder\"");
-    }
-
-    @Test
-    void binderValidatesRequiredField() {
-        Compilation compilation = javac()
-            .withProcessors(new StepPluginProcessor())
-            .compile(JavaFileObjects.forResource("test-plugins/AssertPlugin.java"));
-        assertThat(compilation).succeededWithoutWarnings();
-
-        // Verify the generated binder source contains validation
-        JavaFileObject binder = compilation.generatedSourceFile(
-            "test.plugins.AssertPluginBinder").orElseThrow();
-        try {
-            String source = binder.getCharContent(false).toString();
-            assertThat(source).contains("\"assert: 'condition' is required\"");
-            assertThat(source).contains("public static StepResult invoke(");
-            assertThat(source).contains("public static void validate(");
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+@StepPlugin(value = "compare-state", description = "Compares actual state against desired conditions")
+public record CompareStateSpec(
+    @Optional String absentWhen,
+    @Optional String driftedWhen,
+    @Optional String presentWhen
+) {
+    @Execute
+    public StepResult run() {
+        if (absentWhen != null && Boolean.parseBoolean(absentWhen)) {
+            return StepResult.of(Map.of("nodeStatus", "ABSENT"));
         }
+        if (driftedWhen != null && Boolean.parseBoolean(driftedWhen)) {
+            return StepResult.of(Map.of("nodeStatus", "DRIFTED"));
+        }
+        if (presentWhen != null && Boolean.parseBoolean(presentWhen)) {
+            return StepResult.of(Map.of("nodeStatus", "PRESENT"));
+        }
+        return StepResult.of(Map.of("nodeStatus", "UNKNOWN"));
     }
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+**Note:** YAML uses kebab-case (`absent-when`), Java uses camelCase (`absentWhen`). The binder generation needs to handle this mapping — either via a naming convention (kebab-to-camel in param extraction) or via a `@YamlName("absent-when")` annotation. This is a gap in the current BinderEmitter — flag it for resolution during implementation.
 
-Run: `mvn --batch-mode test -pl yaml-plugin-processor -Dtest=EndToEndTest`
-Expected: 4 tests PASS.
-
-- [ ] **Step 5: Run full build to verify everything compiles together**
+- [ ] **Step 5: Build yaml-plugin-api with APT processing**
 
 Run: `mvn --batch-mode install -pl yaml-plugin-api,yaml-plugin-processor`
-Expected: BUILD SUCCESS.
 
-- [ ] **Step 6: Commit**
+This triggers the APT, generating `AssertSpecStepPrimitive` and `CompareStateSpecStepPrimitive` classes.
+
+Expected: BUILD SUCCESS. Verify generated sources exist in `yaml-plugin-api/target/generated-sources/`.
+
+- [ ] **Step 6: Verify desiredstate tests pass with generated primitives**
+
+Update `PluginIntegrationTest.createExecutor()` to use the generated primitives instead of hand-coded ones:
+
+```java
+// Before (hand-coded):
+var registry = PrimitiveRegistry.of(Map.of(
+    "assert", new AssertPrimitive(),
+    "compare-state", new CompareStatePrimitive()));
+
+// After (generated from @StepPlugin):
+var registry = PrimitiveRegistry.of(Map.of(
+    "assert", new AssertSpecStepPrimitive(),
+    "compare-state", new CompareStateSpecStepPrimitive()));
+```
+
+Run: `mvn --batch-mode test -pl desiredstate/plugin/runtime -Dtest=PluginIntegrationTest`
+
+Expected: All existing tests PASS. The YAML (`mock-resource.yaml`) is unchanged. The assertions are unchanged. Only the primitive implementation changed.
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add yaml-plugin-api/ yaml-plugin-processor/
-git commit -m "feat: assert plugin proof case — end-to-end APT generation
+git add yaml-plugin-api/ desiredstate/
+git commit -m "feat: migrate assert + compare-state to @StepPlugin records
 
-Verifies schema, binder, and registry generation for @StepPlugin.
-MapServiceRegistry test fixture for standalone service lookup.
+Existing PluginIntegrationTest passes unchanged — same YAML,
+same assertions, generated StepPrimitive implementations.
 
 Refs casehubio/casehub-desiredstate#151"
 ```
@@ -1066,8 +1063,11 @@ Refs casehubio/casehub-desiredstate#151"
 ## References
 
 - [2026-09-24-yaml-plugin-api-design.md] — design spec this plan implements
-- [graphql-generator/GraphQLResolverProcessor.java] — APT pattern: @SupportedAnnotationTypes("*"), Jandex, Filer, compile-testing
-- [simulation-generator/SimulationDecoratorProcessor.java] — APT pattern: META-INF output, processed guard
-- [schema-generator/PlatformSchemaGenerator.java] — PlatformSchemaGenerator(Module...), generate(Class<?>) → JsonNode
-- [yaml-core/orchestration/LoopDirective.java] — sealed config type, stays as engine vocabulary
+- [desiredstate/plugin/runtime/.../PluginIntegrationTest.java] — existing regression test
+- [desiredstate/plugin/runtime/src/test/resources/META-INF/desiredstate/plugins/mock-resource.yaml] — existing YAML fixture
+- [desiredstate/plugin/runtime/.../primitives/CompareStatePrimitive.java] — migration source
+- [desiredstate/plugin/runtime/.../primitives/AssertPrimitive.java] — migration source (in yaml-step-core dep)
+- [graphql-generator/GraphQLResolverProcessor.java] — APT pattern reference
+- [simulation-generator/SimulationDecoratorProcessor.java] — APT pattern reference
+- [schema-generator/PlatformSchemaGenerator.java] — schema generation capability
 - [casehubio/casehub-desiredstate#151] — tracking issue
