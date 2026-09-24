@@ -1,7 +1,7 @@
 # yaml-core type system polish
 
 **Branch:** issue-429-yaml-type-system  
-**Covers:** #429 (typed variables), #431 (block-level forEach/loop)  
+**Covers:** #429 (typed variables)  
 **Relates to:** #428 (YAML parsing standardisation) — this branch sidesteps YAML 1.1/1.2 parser inference by using declared types. The central `YamlMappers.create()` factory from #428 remains a separate concern.  
 **Repo:** casehubio/platform (yaml-core)
 
@@ -74,7 +74,7 @@ public ValueType scalarType() {
 }
 ```
 
-`ParameterType.scalarType()` provides build-time type mapping for the validator (§9) — it bridges module parameter types to the shared `ValueType` vocabulary. `ParameterType.parse()` retains its own parsing logic and `ParsedValue` wrapping; no delegation to `ValueType.parse()`. `ParsedValue` is the right model for module parameters — the sealed type hierarchy enables exhaustive pattern matching in `ParameterValidator`.
+`ParameterType.scalarType()` provides build-time type mapping for the validator (§7) — it bridges module parameter types to the shared `ValueType` vocabulary. `ParameterType.parse()` retains its own parsing logic and `ParsedValue` wrapping; no delegation to `ValueType.parse()`. `ParsedValue` is the right model for module parameters — the sealed type hierarchy enables exhaustive pattern matching in `ParameterValidator`.
 
 **Type checking layering:** `ParameterType.canAccept(ParameterType)` and `ValueType.accepts(String javaTypeName)` serve different layers and are not redundant. `canAccept()` validates inter-module type compatibility — can module A's INTEGER output feed module B's NUMBER parameter. `accepts()` validates YAML-to-Java compatibility at the deployment boundary — can a declared INTEGER map to an `int` field in a spec class. They are orthogonal: `canAccept` operates within the YAML type system, `accepts` bridges YAML types to Java types.
 
@@ -289,6 +289,8 @@ The "each" source uses `drillOnly()` (container roots fall through to string); t
 
 New validation step in `YamlDesiredStateProcessor.validateForEach()`:
 
+This is a new validation layer that complements the existing three-layer model from #260 (structural type check → output value validation → parameter value validation). The #260 layers validate inter-module `ParameterType` compatibility. This layer validates YAML-declared-type-to-Java-field compatibility for `${each.*}` and `${var.*}` references — a boundary the #260 layers don't cover because these references bypass module parameters. `${params.X}` references are already validated by the existing `ParameterType.canAccept()` layer.
+
 For each `${each.X.field}` or `${var.X}` reference in a spec:
 1. Trace to source via `TypedSchema`: variable declarations → `TypedMap.typeOf()`, CSV → `CsvDataSource.typeOf()`. Both implement `TypedSchema`, so the validator works generically without branching on source type.
 2. Look up target spec field via Jandex (already available in the deployment processor)
@@ -351,4 +353,5 @@ Desiredstate (casehubio/desiredstate — separate repo, separate PRs):
 **Issues:**
 - GitHub issue #429 — typed variable declarations
 - GitHub issue #428 — YAML parsing standardisation (parser inference mitigation)
+- GitHub issue #431 — block-level forEach/loop on YamlImport
 - GitHub issue #432 — block-level iteration: forEach and loop on YamlImport (extracted from this spec)
