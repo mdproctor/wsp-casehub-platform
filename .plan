@@ -12,8 +12,9 @@ covers: 16,297,24
 - [ ] casehubio/blocks#297 — Spring Boot deployment
 - [ ] casehubio/workers#24 — Spring Boot deployment
 - [ ] casehubio/platform#445 — AgentInvokeHandler eidos wiring
-- [ ] casehubio/platform#439 — StepParameterType-convergence-evaluation
-- [ ] casehubio/platform#440 — Security-model-for-invoke-handlers
-- [ ] casehubio/platform#441 — Python-script-auto-discovery
-- [ ] casehubio/platform#443 — AptPluginSource-classpath-scanning
-- [ ] casehubio/platform#444 — McpToolSource-CDI-wiring
+- [ ] casehubio/platform#446 — ProcessInvokeHandler refactor to ProcessExecutor
+- [ ] casehubio/platform#443 — AptPluginSource classpath scanning
+- [ ] casehubio/platform#444 — McpToolSource CDI wiring
+- [ ] casehubio/platform#439 — StepParameterType convergence evaluation
+- [ ] casehubio/platform#440 — Security model for invoke handlers
+- [ ] casehubio/platform#441 — Python script auto-discovery
