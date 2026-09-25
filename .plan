@@ -11,7 +11,7 @@ covers: 16,297,24
 - [ ] casehubio/casehub-worker#16 — Spring Boot deployment ← active
 - [ ] casehubio/blocks#297 — Spring Boot deployment
 - [ ] casehubio/workers#24 — Spring Boot deployment
-- [ ] casehubio/eidos#182 — AgentInvokeHandler
+- [ ] casehubio/platform#445 — AgentInvokeHandler eidos wiring
 - [ ] casehubio/platform#439 — StepParameterType-convergence-evaluation
 - [ ] casehubio/platform#440 — Security-model-for-invoke-handlers
 - [ ] casehubio/platform#441 — Python-script-auto-discovery
