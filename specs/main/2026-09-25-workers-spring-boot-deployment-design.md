@@ -41,7 +41,7 @@ with constructor injection.
 | WorkflowCompletionPublisher | EventBus | POJO — replace `eventBus.publish(EXECUTION_FINISHED, ...)` with `Consumer<WorkflowExecutionCompleted>` |
 | WorkerFaultPublisher | EventBus | POJO — replace `eventBus.publish(faultAddress, event)` with `Consumer<WorkerFaultEvent>` |
 | WorkerLifecycleOrchestrator | Quarkus StartupEvent, Instance<WorkerRuntime> | POJO — takes `List<WorkerRuntime>`, `Duration initTimeout`. Virtual thread parallel init. |
-| AsyncWorkerCompletionRegistry | Quarkus @Scheduled, CDI Event | POJO — takes `Consumer<CompletionExpiredEvent>`, `ScheduledExecutorService` for expiry tick |
+| AsyncWorkerCompletionRegistry | Quarkus @Scheduled, CDI Event | POJO — takes `Consumer<CompletionExpiredEvent>`. Public `expireStale()` method; framework calls it on a schedule. |
 | WorkerStatusPublisher | CDI | POJO — already a delegate to WorkerStatusListener SPI |
 | WorkerCapabilityResolver | none | Interface — already pure Java |
 | WorkerProvisionerSupport | none | Static utility — already pure Java |
