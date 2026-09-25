@@ -9,5 +9,14 @@ covers: 16,297,24
 
 ## Queue
 - [ ] casehubio/casehub-worker#16 — Spring Boot deployment ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: Create runtime-core module
+  - [ ] Batch 2: Rewiring
+    - [ ] Task 2: Rewire DefaultWorkerExecutor to core
+    - [ ] Task 3: Rewire MockWorkerExecutor to core mock
+  - [ ] Batch 3: Spring
+    - [ ] Task 4: Create worker-spring auto-config
+    - [ ] Task 5: Create spring-integration-test
+    - [ ] Task 6: Update docs and CLAUDE.md
 - [ ] casehubio/blocks#297 — Spring Boot deployment
 - [ ] casehubio/workers#24 — Spring Boot deployment
