@@ -19,6 +19,7 @@ For FSI operations teams writing playbooks (risk response, trading desk coordina
 - LSP-based import resolution (#438)
 - StepParameterType / ParameterType convergence evaluation (#439)
 - Security model hardening for invoke handlers (#440)
+- Python script auto-discovery as catalog source (#441)
 
 ## Design
 
@@ -51,8 +52,33 @@ public enum StepParameterType {
     public boolean isScalar() {
         return this != ARRAY && this != OBJECT;
     }
+
+    public boolean validate(Object value) {
+        return switch (this) {
+            case STRING  -> value instanceof String;
+            case INTEGER -> value instanceof Integer || value instanceof Long;
+            case NUMBER  -> value instanceof Number;
+            case BOOLEAN -> value instanceof Boolean;
+            case ARRAY   -> value instanceof java.util.List;
+            case OBJECT  -> value instanceof java.util.Map;
+        };
+    }
+
+    public Object parseScalar(String value) {
+        return switch (this) {
+            case STRING  -> value;
+            case INTEGER -> Integer.parseInt(value);
+            case NUMBER  -> Double.parseDouble(value);
+            case BOOLEAN -> io.casehub.yaml.core.condition.Truthiness.isTruthy(value);
+            case ARRAY, OBJECT -> throw new IllegalArgumentException(
+                    "Cannot parse '" + this + "' from string — "
+                    + "defaults are only supported for scalar types");
+        };
+    }
 }
 ```
+
+`validate(Object)` performs runtime type checking of values against the declared type. `parseScalar(String)` converts string defaults to typed values — available only for scalar types. OBJECT and ARRAY parameters cannot have string defaults because yaml-core is zero-dep (no JSON parser). Defaults for OBJECT/ARRAY are not supported; if a complex default is needed, it must be provided by the caller at invocation time.
 
 #### StepDefinitionFile
 
@@ -103,11 +129,15 @@ public record StepParameter(
     public StepParameter {
         if (type == null) type = StepParameterType.STRING;
         if (allowedValues == null) allowedValues = List.of();
+        if (defaultValue != null && !type.isScalar()) {
+            throw new IllegalArgumentException(
+                    "Default values are only supported for scalar types, not " + type);
+        }
     }
 }
 ```
 
-`defaultValue` is `String` — consistent with `YamlModuleParameter.defaultValue`. Values arrive as YAML text; parsing to the declared type happens at validation time via `StepParameterType`. This avoids YAML parser inference issues where `42` might arrive as `Integer` or `Long` depending on magnitude.
+`defaultValue` is `String` — consistent with `YamlModuleParameter.defaultValue`. Values arrive as YAML text; parsing to the declared type happens at validation time via `StepParameterType.parseScalar()`. This avoids YAML parser inference issues where `42` might arrive as `Integer` or `Long` depending on magnitude. Default values are restricted to scalar types (STRING, INTEGER, NUMBER, BOOLEAN) because yaml-core has no JSON parser for complex type defaults.
 
 #### InvokeBinding sealed interface
 
@@ -131,14 +161,13 @@ public sealed interface InvokeBinding {
     record Python(String script) implements InvokeBinding {}
 
     record Agent(String descriptor,
-                 String systemPrompt,
                  String model,
                  String timeout,
                  boolean structuredOutput) implements InvokeBinding {
         public Agent {
-            if (descriptor == null && systemPrompt == null)
+            if (descriptor == null)
                 throw new IllegalArgumentException(
-                        "Agent binding requires either descriptor or systemPrompt");
+                        "Agent binding requires descriptor");
         }
     }
 
@@ -161,12 +190,14 @@ public sealed interface InvokeBinding {
 
 These are pure data records — they describe the binding, they don't execute it. Parallel to how `ForEachDirective` describes iteration without executing it.
 
-**Agent binding resolution:** Either `descriptor` or `systemPrompt` must be provided:
+**Agent binding — eidos descriptor resolution:** The `descriptor` field is an eidos `agentId` or `name`, resolved at handler creation time via the platform's `AgentDescriptorRegistrar` SPI (from `casehub-eidos-api`). The eidos `AgentDescriptor` provides:
 
-- **`descriptor`** — a named reference to a YAML descriptor file loaded from a configurable path (`casehub.steps.agent-descriptors`). The descriptor file contains `systemPrompt`, `model`, `timeout`, and optional `mcpServers`. This is the FSI-preferred path: descriptors are versioned artifacts reviewed alongside step definitions.
-- **`systemPrompt`** — inline system prompt for simple agent bindings that don't warrant a separate descriptor file.
+- `briefing()` → systemPrompt for `AgentSessionConfig`
+- `modelFamily()` / `modelVersion()` → model selection (routed through `RoutingAgentProvider`)
+- `jurisdiction()`, `dataHandlingPolicy()` → compliance metadata (logged, not enforced at this layer)
+- `goals()`, `constraints()` → included in systemPrompt construction
 
-The `model` field on InvokeBinding.Agent is an override — it takes precedence over the descriptor's model if both are specified. `timeout` is a duration string (e.g. `30s`, `5m`) parsed at handler creation time.
+The `model` field on `InvokeBinding.Agent` is an override — it takes precedence over the descriptor's `modelFamily` if both are specified. `timeout` is a duration string (e.g. `30s`, `5m`) parsed at handler creation time.
 
 The handler constructs `userPrompt` at execution time by serializing the step's input parameters as structured JSON: `"Execute with the following inputs: {json}"`. When `structuredOutput: true`, the agent response is parsed as JSON and validated against the step's declared output schema.
 
@@ -207,9 +238,11 @@ public final class StepValidator {
 
 Load-time and runtime validation. Checks:
 - All `required: true` inputs are present in params
-- Parameter types match declared types (scalar types validated via parsing; OBJECT validated as `Map`; ARRAY validated as `List`)
+- Parameter types match declared types via `StepParameterType.validate(Object)` — STRING validated as `String`, INTEGER as `Integer`/`Long`, NUMBER as `Number`, BOOLEAN as `Boolean`, ARRAY as `List`, OBJECT as `Map`
 - Enum values are within allowedValues
 - Output fields match declared output schema
+
+**Load-time output reference validation** (`${result.action-name.field}` expressions) is a playbook loader concern, not a StepValidator concern. The step catalog provides the output schema via `StepDefinition.outputs()`; the playbook loader (in the consumer — Pages, desiredstate) cross-references expression references against this schema. The expression parser that extracts `${result.*}` references uses yaml-core's existing `VariableResolver` infrastructure — `result` is registered as a variable prefix, and the playbook loader validates that each referenced field exists in the resolved action's output declarations.
 
 ### Layer 2: Step catalog SPI (yaml-step-runtime)
 
@@ -237,7 +270,7 @@ The catalog SPI is minimal. Consumers resolve actions by name and get both metad
 
 New module `yaml-step-runtime/` with artifact `casehub-platform-yaml-step-runtime`.
 
-Dependencies: yaml-core, yaml-plugin-api, yaml-jackson, jackson-databind, quarkus-arc, platform-api (for AgentProvider, MCP).
+Dependencies: yaml-core, yaml-plugin-api, yaml-jackson, jackson-databind, quarkus-arc, platform-api (for AgentProvider, MCP), eidos-api (for AgentDescriptor resolution).
 
 #### InvokeHandler SPI
 
@@ -252,6 +285,19 @@ public interface InvokeHandler {
 
 Each invoke handler converts an `InvokeBinding` (data) into a `StepAction` (executable). The handler factory pattern lets the composite catalog assemble actions from definitions without knowing which binding type is being used.
 
+#### CatalogSource SPI
+
+```java
+public interface CatalogSource {
+
+    void populate(Map<String, CatalogEntry> entries);
+
+    int priority();
+}
+```
+
+Each catalog source populates entries in priority order. First-write-wins: lower priority numbers register first and are not overwritten by higher-priority (later) sources.
+
 #### Six invoke handlers
 
 **McpInvokeHandler** — Calls an MCP tool by name via the platform's existing tool infrastructure. Injects the MCP tool manager. Maps step inputs to MCP tool parameters and MCP tool result to step outputs.
@@ -264,45 +310,49 @@ Each invoke handler converts an `InvokeBinding` (data) into a `StepAction` (exec
 
 **AgentInvokeHandler** — Dispatches to an LLM agent via `AgentProvider` SPI (already in platform).
 
-Resolution: When `descriptor` is provided, loads the agent descriptor YAML file from the configured agent descriptor path. The descriptor file contains:
-
-```yaml
-# agent-descriptors/trade-rationale-analyst.yaml
-system-prompt: |
-  You are a trade rationale analyst. Given a trade decision and context,
-  explain the rationale, identify risk factors, and assess confidence.
-model: "tier:FLAGSHIP"
-timeout: 60s
-```
-
-When `systemPrompt` is provided inline, it is used directly.
+Resolution: The `descriptor` field on `InvokeBinding.Agent` is resolved via `AgentDescriptorRegistrar` (eidos SPI). The registrar is injected as `Instance<AgentDescriptorRegistrar>` — all registered descriptors are searched by agentId first, then by name.
 
 **Execution model:**
-- Constructs `AgentSessionConfig` with systemPrompt (from descriptor or inline), userPrompt (serialized step inputs as structured JSON), model (from binding override, descriptor, or null for default), and timeout.
+- Constructs `AgentSessionConfig` from the eidos `AgentDescriptor`: `briefing()` → systemPrompt, step inputs serialized as JSON → userPrompt, `modelFamily()` → model (overridden by InvokeBinding.Agent.model if set), timeout from binding or default.
 - Calls `AgentProvider.invoke(config)` which returns `Multi<AgentEvent>` (reactive stream).
 - Blocks via `.collect().asList().await().atMost(timeout)` — safe on virtual threads (the platform's execution model). Must NOT run on the Vert.x event loop.
-- Collects `AgentEvent.TextDelta` events into final text. `AgentEvent.InvocationComplete` metadata (cost, usage, timing) is captured and stored in `StepResultStore` as execution metadata.
+- Collects `AgentEvent.TextDelta` events into final text.
 - `AgentTimeoutException` and `AgentProcessException` map to `StepResult.Failure` with descriptive messages.
 - When `structuredOutput: true`, parses the collected text as JSON and validates against the step's declared output schema. Parse failure → `StepResult.Failure`.
 
 **ProcessInvokeHandler** — Runs a CLI command via `ProcessBuilder`. Args with variable interpolation. Output parsing: json (Jackson), csv (CsvParser from yaml-core), lines (split), raw (string). Timeout via `Process.waitFor(timeout)`. Environment variables and working directory. Error construction from stderr or exit code.
 
+#### Execution metadata
+
+`AgentEvent.InvocationComplete` carries cost, usage, and timing metadata. This metadata is not stored in `StepResultStore` (which has no metadata API). Instead, it is emitted as a CDI event:
+
+```java
+public record StepExecutionEvent(
+        String actionName,
+        long durationMs,
+        boolean success,
+        Map<String, Object> metadata) {}
+```
+
+`ValidatingStepAction` fires `StepExecutionEvent` after each step execution. The metadata map carries handler-specific data: for agent steps, it includes token counts, cost, and model used. Consumers (audit loggers, cost trackers, observability) observe this event via CDI `@Observes`.
+
 #### Trust model
 
 Step definitions are versioned, developer-reviewed artifacts — not arbitrary user input. The trust boundary is deployment access: who can commit step definition files to the repository. This is consistent with how Ansible treats Python modules and how Terraform treats providers.
 
-ProcessInvokeHandler and PythonInvokeHandler execute external code. Their security depends on the same controls that govern any server-side code: code review, CI gates, deployment permissions. Audit logging of step executions (action name, inputs, outputs, timing, invoking principal) is a cross-cutting concern applied by `ValidatingStepAction`.
+ProcessInvokeHandler and PythonInvokeHandler execute external code. Their security depends on the same controls that govern any server-side code: code review, CI gates, deployment permissions.
 
 Further hardening (allow-lists, resource limits, sandboxing) is deferred to #440.
 
 #### Validation-wrapping
 
-Each `StepAction` returned by an invoke handler is wrapped with input/output validation:
+Each `StepAction` returned by an invoke handler is wrapped with input/output validation and execution event emission:
 
 ```java
 class ValidatingStepAction implements StepAction {
     private final StepDefinition definition;
     private final StepAction delegate;
+    private final Event<StepExecutionEvent> executionEvent;
 
     @Override
     public StepResult execute(Map<String, Object> params, ServiceRegistry services) {
@@ -312,7 +362,9 @@ class ValidatingStepAction implements StepAction {
             return StepResult.failed("Input validation: " + String.join("; ", inputErrors));
         }
 
+        long start = System.nanoTime();
         StepResult result = delegate.execute(params, services);
+        long durationMs = (System.nanoTime() - start) / 1_000_000;
 
         if (result.isSuccess()) {
             List<String> outputErrors = StepValidator.validateOutputs(
@@ -321,6 +373,11 @@ class ValidatingStepAction implements StepAction {
                 return StepResult.failed("Output validation: " + String.join("; ", outputErrors));
             }
         }
+
+        executionEvent.fireAsync(new StepExecutionEvent(
+                definition.name(), durationMs, result.isSuccess(),
+                result.isSuccess() ? Map.of() : Map.of("error", ((StepResult.Failure) result).message())));
+
         return result;
     }
 }
@@ -333,9 +390,13 @@ class ValidatingStepAction implements StepAction {
 public class CompositeStepCatalog implements StepCatalog {
 
     private final Map<String, CatalogEntry> entries = new ConcurrentHashMap<>();
+    private volatile boolean initialized = false;
 
     @Override
     public Optional<CatalogEntry> resolve(String actionName) {
+        if (!initialized) {
+            throw new IllegalStateException("Step catalog not yet initialized");
+        }
         return Optional.ofNullable(entries.get(actionName));
     }
 
@@ -346,21 +407,17 @@ public class CompositeStepCatalog implements StepCatalog {
 }
 ```
 
-**Initialization protocol:** Three catalog sources register entries via CDI `@Observes StartupEvent` with `@Priority` ordering:
+**Initialization protocol:** `CompositeStepCatalog` discovers all `CatalogSource` beans via CDI `Instance<CatalogSource>`, sorts by `priority()`, and invokes `populate()` on each in order. This happens in a `@PostConstruct` method on the `@Startup`-annotated catalog bean. After all sources have populated, `initialized` is set to `true`.
 
-1. **YamlStepDefinitionSource** `@Priority(100)` — highest priority. Reads step definition YAML files from configurable paths. Registers qualified and unqualified names. First-write-wins in the ConcurrentHashMap.
-2. **AptPluginSource** `@Priority(200)` — scans APT-generated manifests. Does not overwrite entries already registered by YAML source.
-3. **McpToolSource** `@Priority(300)` — lowest priority. Auto-discovers MCP tools. Does not overwrite existing entries.
+The source count is dynamic — determined by which `CatalogSource` beans are on the classpath. No fixed latch count. If McpToolSource is absent (MCP not on classpath), it is simply not discovered and does not participate.
 
-`CompositeStepCatalog` itself is `@Startup` with a `CountDownLatch` that blocks `resolve()` until all three sources have completed registration. Each source calls `latch.countDown()` after registration. `resolve()` calls `latch.await(startupTimeout)` — the latch ensures consumers never see a partially-initialized catalog.
+Three built-in catalog sources:
 
-Three catalog sources:
+**YamlStepDefinitionSource** `priority 100` — Reads step definition YAML files from configurable paths (`casehub.steps.definition-files`). Parses via `StepDefinitionParser`. For each action, resolves the `InvokeBinding` to a `StepAction` via the `InvokeHandler` registry. Wraps with validation.
 
-**YamlStepDefinitionSource** — Reads step definition YAML files from configurable paths (`casehub.steps.definition-files`). Parses via `StepDefinitionParser`. For each action, resolves the `InvokeBinding` to a `StepAction` via the `InvokeHandler` registry. Wraps with validation.
+**AptPluginSource** `priority 200` — Scans `META-INF/yaml-plugins/*.json` manifests on the classpath (produced by existing `@StepPlugin` APT processor). Loads `StepAction` implementation classes. Reads schema from `META-INF/yaml-plugins/<name>.schema.json` and constructs a synthetic `StepDefinition` from the schema.
 
-**AptPluginSource** — Scans `META-INF/yaml-plugins/*.json` manifests on the classpath (produced by existing `@StepPlugin` APT processor). Loads `StepAction` implementation classes. Reads schema from `META-INF/yaml-plugins/<name>.schema.json` and constructs a synthetic `StepDefinition` from the schema.
-
-**McpToolSource** — Auto-discovers MCP tools registered in the platform's MCP tool registry. Each tool becomes a catalog entry with `InvokeBinding.Mcp(toolName)`. Input schema derived from MCP tool parameter schema. Optional — activated when MCP infrastructure is on classpath.
+**McpToolSource** `priority 300` — Auto-discovers MCP tools registered in the platform's MCP tool registry. Each tool becomes a catalog entry with `InvokeBinding.Mcp(toolName)`. Input schema derived from MCP tool parameter schema. Optional — activated when MCP infrastructure is on classpath.
 
 #### Resolution order
 
@@ -447,7 +504,7 @@ yaml-jackson gains mixins for the new types:
 | `yaml-core/` | `ModuleExpander.expand()` and `validateImports()` filter out step-import entries |
 | `yaml-core/` | `ImportExpander.expand()` filters out step-import entries |
 | `yaml-jackson/` | StepDefinitionFileMixin, InvokeBindingDeserializer |
-| `yaml-step-runtime/` | **New module** — CatalogEntry, StepCatalog SPI, CompositeStepCatalog, InvokeHandler SPI, 6 invoke handler implementations, 3 catalog sources (YAML, APT, MCP), ValidatingStepAction wrapper, ImportScopedStepCatalog |
+| `yaml-step-runtime/` | **New module** — CatalogEntry, StepCatalog SPI, CatalogSource SPI, CompositeStepCatalog, InvokeHandler SPI, 6 invoke handler implementations, 3 catalog sources (YAML, APT, MCP), ValidatingStepAction wrapper, ImportScopedStepCatalog, StepExecutionEvent |
 
 ### What does NOT change
 
@@ -486,8 +543,9 @@ StepResult result = entry.get().action().execute(params, services);
 | `@StepPlugin` APT | Not replaced — complemented. APT-generated plugins are auto-discovered as catalog entries |
 | yaml-core modules (`ModuleExpander`) | Separate concept. Step definitions use `StepParameterType` (not `ParameterType`) and are not modules |
 | Pages scenario YAML binding (#463) | Consumer — resolves `action:` references via StepCatalog |
-| Platform simulation | Simulated step actions use the same schema. `@SimulationEligible` on invoke targets means step definitions work in simulation without modification |
+| Platform simulation | InvokeHandler SPI is the simulation extension point — a `SimulatedInvokeHandler` can intercept any invoke binding and return recorded/synthetic responses without executing the real binding. Full simulation integration is a follow-on concern |
 | MCP tool registry | MCP tools are auto-discoverable catalog entries via McpToolSource |
+| Eidos agent descriptors | Agent invoke bindings reference eidos `AgentDescriptor` by agentId/name. Resolution via `AgentDescriptorRegistrar` SPI |
 
 ## Non-goals
 
@@ -498,6 +556,7 @@ StepResult result = entry.get().action().execute(params, services);
 - **LSP-based import resolution** — deferred follow-on (#438).
 - **StepParameterType / ParameterType convergence** — deferred evaluation (#439).
 - **Security hardening for invoke handlers** — deferred follow-on (#440).
+- **Python script auto-discovery** — deferred follow-on (#441).
 
 ## References
 
@@ -508,4 +567,6 @@ StepResult result = entry.get().action().execute(params, services);
 - `yaml-core/src/main/java/io/casehub/yaml/core/module/ParameterType.java` — module type enum (not used by step definitions)
 - `yaml-core/src/main/java/io/casehub/yaml/core/module/YamlModuleParameter.java` — parameter model (String defaultValue pattern)
 - `yaml-jackson/src/main/java/io/casehub/yaml/jackson/YamlModuleFileMixin.java` — @JsonAnySetter pattern for dynamic YAML sections
-- GitHub #433, #429, #432, #437, #438, #439, #440, casehubio/casehub-pages#463
+- `io.casehub.eidos.api.AgentDescriptor` — eidos agent descriptor record (descriptor resolution target)
+- `io.casehub.eidos.api.spi.AgentDescriptorRegistrar` — eidos descriptor registry SPI
+- GitHub #433, #429, #432, #437, #438, #439, #440, #441, casehubio/casehub-pages#463
