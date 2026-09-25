@@ -1,17 +1,14 @@
-# Work Plan — Spring Boot Deployment (remaining repos)
+# Work Plan — Step Catalog Completion
 
 ## State
 branch: main
 state: active
 date: 2026-09-25
 issue-repo: casehubio/platform
-covers: 16,297,24
+covers: 445,446,447,443,444,439,440,441
 
 ## Queue
-- [ ] casehubio/casehub-worker#16 — Spring Boot deployment ← active
-- [ ] casehubio/blocks#297 — Spring Boot deployment
-- [ ] casehubio/workers#24 — Spring Boot deployment
-- [ ] casehubio/platform#445 — AgentInvokeHandler eidos wiring
+- [ ] casehubio/platform#445 — AgentInvokeHandler eidos wiring ← active
 - [ ] casehubio/platform#446 — ProcessInvokeHandler refactor to ProcessExecutor
 - [ ] casehubio/platform#447 — Step plugin YAML vocabulary + P1 plugins
 - [ ] casehubio/platform#443 — AptPluginSource classpath scanning
