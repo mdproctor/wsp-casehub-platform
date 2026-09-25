@@ -2,11 +2,13 @@
 
 ## Last Session
 
-Completed ledger#213 — Spring Boot deployment for casehub-ledger. All 16 tasks across 7 batches done. Tasks 12-16 this session: signing core extraction (4 backends), consolidated `ledger-signing-spring` module, Spring integration test with Testcontainers, consumer guide update, CLAUDE.md update. Ledger branch rebased onto main and merged (ff-only). 24 commits landed on ledger main and pushed to origin.
+Completed casehub-worker#16 — Spring Boot deployment for casehub-worker. Created 3 new modules (runtime-core, worker-spring, spring-integration-test) across 6 tasks in 3 batches. Core extraction moved SchemaValidator and execution logic to framework-neutral POJOs. DefaultWorkerExecutor rewired to delegate to DefaultWorkerExecutorCore with Uni/Guard/OTel layering. WorkerRuntimeBeans CDI producer added. Spring auto-configuration with @ConditionalOnMissingBean. Integration test verifies composition. 7 modules total, 36 tests green. Consumer guide and CLAUDE.md updated. Issue closed on GitHub. Queue advanced to blocks#297.
+
+Also synced all slot repos against canonical local mains at session start — blocks, casehub-worker, engine (stash/pop with 1 conflict resolved), neocortex/platform/qhorus already ahead. Workspace repos synced from origin.
 
 ## Slot State
 
-Ledger complete. Three repos remain for the Spring Boot deployment campaign.
+Seven repos complete. Two repos remain for the Spring Boot deployment campaign.
 
 | Repo | Spring Status | Next Issue |
 |------|--------------|------------|
@@ -15,8 +17,8 @@ Ledger complete. Three repos remain for the Spring Boot deployment campaign.
 | work | Complete | — |
 | qhorus | Complete | — |
 | neocortex | Complete | — |
-| ledger | **Complete** — merged to main, pushed | casehubio/ledger#213 |
-| **casehub-worker** | **Not started** | casehubio/casehub-worker#16 |
+| ledger | Complete | — |
+| casehub-worker | **Complete** — on branch `issue-16-spring-boot-deployment` (not yet merged) | casehubio/casehub-worker#16 |
 | **blocks** | 3 modules exist, gaps | casehubio/blocks#297 |
 | **workers** | Not started (blocked by casehub-worker) | casehubio/workers#24 |
 
@@ -24,22 +26,22 @@ Ledger complete. Three repos remain for the Spring Boot deployment campaign.
 
 | Item | Scale | Complexity | Notes |
 |------|-------|------------|-------|
-| casehub-worker#16 — Spring Boot deployment | M | Med | Unblocked, next in order |
-| blocks#297 — Spring Boot deployment | M | Med | 3 Spring modules exist, gaps remain |
-| workers#24 — Spring Boot deployment | S | Low | Blocked by casehub-worker#16 |
+| blocks#297 — Spring Boot deployment | M | Med | 3 Spring modules exist, gaps remain. Now active in queue. |
+| workers#24 — Spring Boot deployment | S | Low | Unblocked now that casehub-worker#16 is done |
 
 ## Notes
 
-- Platform branch `issue-213-spring-boot-deployment` has 10 unrelated commits from #351, #422, #426, #427, yaml-plugin-api — needs separate landing
-- Workspace local main was reset to origin/main during this session (prior divergence resolved)
-- `ledger-spring-integration-test` requires Docker (Testcontainers) — not runnable locally, verified in CI
+- casehub-worker branch `issue-16-spring-boot-deployment` has 6 commits — needs work-end (merge, squash, push) in a future session
+- Engine slot has 46 uncommitted modified files from another session (stashed/popped during sync, conflict resolved)
+- neocortex slot ahead of canonical by 8 commits, platform by 7, qhorus by 14 — not yet pushed through canonical to GitHub
 - platform#430 still open (spring-generator @DefaultBean interface instantiation bug)
+- json-schema-validator version aligned to BOM (was 1.0.83 hardcoded, now BOM-managed 1.5.4)
+- DefaultWorkerExecutorCore lets dispatch exceptions propagate (not caught) — enables SmallRye Guard retry in Quarkus wrapper
 
 ## References
 
 | Artifact | Path |
 |----------|------|
-| Ledger design spec | `specs/issue-213-spring-boot-deployment/2026-09-23-ledger-spring-deployment-design.md` |
-| Decisions (D1-D6) | `specs/issue-213-spring-boot-deployment/decisions.md` |
-| Implementation plan | `plans/2026-09-23-ledger-spring-deployment.md` |
-| Garden entries | GE-20260923-e81faa, GE-20260923-1d03d4, GE-20260923-9393de, GE-20260924-bb5f55 |
+| Worker design spec | `specs/issue-16-spring-boot-deployment/2026-09-25-worker-spring-deployment-design.md` |
+| Decisions (D1-D2) | `specs/issue-16-spring-boot-deployment/decisions.md` |
+| Implementation plan | `plans/2026-09-25-worker-spring-deployment.md` |
