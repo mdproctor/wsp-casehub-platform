@@ -15,15 +15,15 @@ flyway-next-v: none
 - [x] casehubio/platform#429 — Issue #429
 - [x] casehubio/platform#432 — Block-level forEach/loop on YamlImport
 - [ ] casehubio/platform#433 — Dynamic step catalog — schema-validated YAML step definitions ← active
-  - [ ] Batch 1: Foundation model
-    - [ ] Task 1: StepParameterType + records
-    - [ ] Task 2: StepDefinitionParser + StepValidator
-  - [ ] Batch 2: Integration
-    - [ ] Task 3: StepResult metadata + YamlImport steps + filters
-    - [ ] Task 4: Jackson mixins + contract tests
-  - [ ] Batch 3: Runtime foundation
-    - [ ] Task 5: Module scaffold + SPIs + ValidatingStepAction
-  - [ ] Batch 4: Runtime handlers
-    - [ ] Task 6: Six invoke handlers
-  - [ ] Batch 5: Catalog assembly
-    - [ ] Task 7: CompositeStepCatalog + sources + ImportScopedCatalog
+  - [x] Batch 1: Foundation model
+    - [x] Task 1: StepParameterType + records
+    - [x] Task 2: StepDefinitionParser + StepValidator
+  - [x] Batch 2: Integration
+    - [x] Task 3: StepResult metadata + YamlImport steps + filters
+    - [x] Task 4: Jackson mixins + contract tests
+  - [x] Batch 3: Runtime foundation
+    - [x] Task 5: Module scaffold + SPIs + ValidatingStepAction
+  - [x] Batch 4: Runtime handlers
+    - [x] Task 6: Six invoke handlers
+  - [x] Batch 5: Catalog assembly
+    - [x] Task 7: CompositeStepCatalog + sources + ImportScopedCatalog
