@@ -1,5 +1,14 @@
 # Decisions — workers#24 Spring Boot Deployment
 
+## D0: Complete Vert.x Removal (emergent from D1+D2+D3)
+
+**Choice:** The combined effect of D1 (void replaces Uni), D2 (Consumer replaces EventBus), and D3 (JDK HttpClient replaces WebClient) removes the entire Vert.x dependency from workers-common-core. This is a consequence of Spring deployment, not a standalone goal.
+**Rationale:** Workers uses Vert.x for three things: Mutiny Uni (D1 removes), EventBus (D2 removes), WebClient (D3 removes). WorkerFaultHandler's `@Inject Vertx` field is vestigial — never referenced in any method. No other code uses Vert.x features (no timers, no executeBlocking, no Context propagation). Virtual threads + void replaces the concurrency model; fire-and-forget Consumer<T> replaces the event isolation.
+**Trade-offs:** Moves from reactive-style to blocking-on-virtual-threads. This constrains future evolution: true reactive streaming (e.g., MCP Streamable HTTP with incremental SSE) would require adding BodySubscribers rather than the current Mutiny reactive chain. This is acceptable — the current code doesn't use reactive streaming (MCP SSE parsing is buffered), and the migration path exists via JDK HttpClient's BodySubscribers.
+**Sources:** WorkerFaultHandler.java:28 (unused Vertx inject), all 7 WorkerRuntime impls (Uni wrapping), WorkerFaultPublisher/WorkflowCompletionPublisher/WorkerRetrySupport (EventBus usage)
+**Exploration:** deep-analysis (implicit — emerged from D1+D2+D3 analysis)
+**Status:** captured
+
 ## D1: WorkerRuntime Lifecycle — void + virtual threads
 
 **Choice:** `void initialize()` / `void shutdown()` with orchestrator-owned parallelism via virtual threads
@@ -30,8 +39,8 @@
 **Alternatives:**
 - Spring RestClient — ties core to Spring
 - Abstract WorkerHttpClient SPI — over-engineered for straightforward request/response
-**Rationale:** Zero dependency, virtual-thread friendly, sufficient for all 4 use cases (HTTP dispatch, GitHub API calls, MCP JSON-RPC, scenario callbacks). Same choice as platform's streams-poll module. No reactive streaming, SSE, or WebSocket in any of these modules.
-**Trade-offs:** Slightly more verbose API than RestClient for JSON serialization — requires explicit ObjectMapper usage. Not a real cost given these modules already use ObjectMapper directly.
+**Rationale:** Zero dependency, virtual-thread friendly, sufficient for all 4 use cases (HTTP dispatch, GitHub API calls, MCP JSON-RPC, scenario callbacks). Same choice as platform's streams-poll module. MCP parses SSE response bodies in buffered mode (receive full body, then split on `\n\n`) — JDK HttpClient handles this identically to WebClient's buffered approach. No reactive SSE streaming, no WebSocket.
+**Trade-offs:** Slightly more verbose API than RestClient for JSON serialization — requires explicit ObjectMapper usage. Not a real cost given these modules already use ObjectMapper directly. If MCP ever adopts true streaming SSE (Streamable HTTP), JDK HttpClient's `BodySubscribers.ofLines()` provides a migration path. Per-request timeouts are mandatory — `HttpRequest.Builder.timeout()` must be set on every call to avoid reproducing the no-timeout bug identified in D1.
 **Sources:** McpWorkerRuntime.java:121-131 (WebClient POST for tools/list), HttpWorkerExecutionManager (WebClient for HTTP dispatch), platform streams-poll module (precedent for JDK HttpClient)
 **Exploration:** quick
 **Status:** captured
@@ -43,7 +52,7 @@
 - Monolithic workers-core (all types in one module) — larger surface area, harder to review
 - workers-common-core only, no per-module (this session only) — lower scope but defers the full architecture
 **Rationale:** workers-common is the foundation — all 7 modules depend on it. Getting the shared infrastructure right (fault pipeline, completion, retry, lifecycle orchestrator) establishes patterns the per-module extraction follows mechanically. Consolidated workers-spring mirrors platform's agent-spring pattern.
-**Trade-offs:** Defers per-module extraction — but each module follows the same pattern (ExecutionManager → POJO, Runtime → void, delete FaultEventHandler), making follow-up mechanical.
+**Trade-offs:** Defers per-module extraction. Follow-up is mechanical for 6 of 7 modules (ExecutionManager → POJO, Runtime → void, delete FaultEventHandler). MCP requires deliberate design for session management and partial failure in the core extraction — not mechanical.
 **Depends on:** D1 (lifecycle pattern), D2 (EventBus replacement pattern), D3 (HTTP client choice)
 **Sources:** platform agent-spring module (consolidated Spring auto-config precedent), HANDOFF.md (audit: 40 beans across 8 modules)
 **Exploration:** quick

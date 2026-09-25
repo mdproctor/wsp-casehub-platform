@@ -121,6 +121,16 @@ Framework layer bridges to engine's event consumer.
 **After:** Constructor takes `Consumer<WorkerRetriesExhaustedEvent>`.
 Framework layer bridges to engine's event consumer.
 
+### Cross-Boundary Wiring Note
+
+Patterns B and C are cross-repo: workers publishes, engine consumes.
+`EventBus.publish()` broadcasts to all listeners on an address. With
+`Consumer<T>`, the wiring is explicit — the framework layer provides
+the implementation. If any EventBus address has multiple consumers in
+engine, the framework layer composes them into a single Consumer (e.g.,
+`event -> { listener1.accept(event); listener2.accept(event); }`).
+Engine's consumer implementations are external to this spec.
+
 ## WorkerRuntime Lifecycle
 
 ### Interface Change
@@ -248,6 +258,13 @@ JDK HttpClient is:
 - Zero-dependency (already in JDK)
 - Virtual-thread friendly (`send()` blocks on virtual thread without waste)
 - Sufficient for all use cases (POST JSON, GET with headers, timeout support)
+- MCP parses SSE response bodies in buffered mode (receive full body, then
+  split on `\n\n`) — JDK HttpClient handles this identically. If MCP ever
+  adopts true streaming SSE, `BodySubscribers.ofLines()` provides a path.
+
+Per-request timeouts are mandatory — `HttpRequest.Builder.timeout()` must
+be set on every call. This prevents reproducing the no-timeout production
+bug identified in D1.
 
 Each core module constructs its own `HttpClient` instance (or receives
 one via constructor for testability).
