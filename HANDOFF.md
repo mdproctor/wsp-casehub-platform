@@ -12,7 +12,8 @@ Ordered by dependency — handler wiring and shared primitives first, then harde
 |-------|-------|-------|------------|-------|
 | platform#445 | AgentInvokeHandler — wire eidos descriptor resolution | S | Med | Stub → real AgentProvider invocation. eidos-api types exist. |
 | platform#446 | Refactor ProcessInvokeHandler → ProcessExecutor | XS | Low | SPI landed (claudony#234, `1a832316`). Remaining: delegate ProcessInvokeHandler, register in ServiceRegistry bridge. |
-| platform#443 | AptPluginSource classpath scanning | S | Low | Skeletal scanning loop needs completion |
+| platform#447 | Step plugin YAML vocabulary + P1 plugins | M | Med | Plugin-name-as-key dispatch (no `action:` indirection), step walker, ServiceRegistry CDI bridge, P1 plugins: `process`, `rest-call`, `assert`. #151 design. |
+| platform#443 | AptPluginSource classpath scanning | S | Low | Skeletal scanning loop needs completion. Discovers P1 plugins from #447 at runtime. |
 | platform#444 | McpToolSource CDI wiring | S | Med | Auto-discover MCP tools at startup |
 | platform#439 | StepParameterType / ParameterType convergence evaluation | XS | Low | Design evaluation, may result in no change |
 | platform#440 | Security model hardening for invoke handlers | M | High | Process + Python execute external commands. Benefits from #446 landing first (constrains the defined SPI). |
