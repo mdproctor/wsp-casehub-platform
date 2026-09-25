@@ -1,45 +1,36 @@
-# HANDOFF — Slot 198
+# HANDOFF — casehub-platform
 
 ## Last Session
 
-Completed ledger#213 — Spring Boot deployment for casehub-ledger. All 16 tasks across 7 batches done. Tasks 12-16 this session: signing core extraction (4 backends), consolidated `ledger-signing-spring` module, Spring integration test with Testcontainers, consumer guide update, CLAUDE.md update. Ledger branch rebased onto main and merged (ff-only). 24 commits landed on ledger main and pushed to origin.
+Implemented all 7 tasks for #433 (dynamic step catalog) across 5 batches. Step definition model types, parser, validator in yaml-core (zero-dep). StepResult.executionMetadata + YamlImport.steps field with expander filters. Jackson mixins + contract tests. New yaml-step-runtime module: CatalogEntry/StepCatalog/CatalogSource/InvokeHandler SPIs, ValidatingStepAction, 6 invoke handlers (MCP, REST, GraphQL, Python, Agent, Process), CompositeStepCatalog with 3 catalog sources, ImportScopedStepCatalog. Code review caught 3 issues (process I/O deadlock, resource leaks) — all fixed. Branch rebased onto main (resolved 2 MCP test file conflicts — modify/delete), squashed (18→17), merged. Issues #429, #432, #433 all closed.
 
-## Slot State
+## Follow-on Work
 
-Ledger complete. Three repos remain for the Spring Boot deployment campaign.
+| Issue | Title | Scale | Complexity | Notes |
+|-------|-------|-------|------------|-------|
+| eidos#182 | AgentInvokeHandler — wire eidos descriptor resolution | S | Med | Stub → real AgentProvider invocation |
+| platform#439 | StepParameterType / ParameterType convergence evaluation | XS | Low | Design evaluation, may result in no change |
+| platform#440 | Security model hardening for invoke handlers | M | High | Process + Python execute external commands |
+| platform#441 | Python script auto-discovery as catalog source | S | Low | Convention-based discovery |
+| platform#443 | AptPluginSource classpath scanning | S | Low | Skeletal scanning loop needs completion |
+| platform#444 | McpToolSource CDI wiring | S | Med | Auto-discover MCP tools at startup |
 
-| Repo | Spring Status | Next Issue |
-|------|--------------|------------|
+## Spring Boot Deployment Campaign
+
+| Repo | Status | Issue |
+|------|--------|-------|
 | platform | Complete | — |
 | engine | Complete | — |
 | work | Complete | — |
 | qhorus | Complete | — |
 | neocortex | Complete | — |
-| ledger | **Complete** — merged to main, pushed | casehubio/ledger#213 |
-| **casehub-worker** | **Not started** | casehubio/casehub-worker#16 |
-| **blocks** | 3 modules exist, gaps | casehubio/blocks#297 |
-| **workers** | Not started (blocked by casehub-worker) | casehubio/workers#24 |
-
-## What's Next
-
-| Item | Scale | Complexity | Notes |
-|------|-------|------------|-------|
-| casehub-worker#16 — Spring Boot deployment | M | Med | Unblocked, next in order |
-| blocks#297 — Spring Boot deployment | M | Med | 3 Spring modules exist, gaps remain |
-| workers#24 — Spring Boot deployment | S | Low | Blocked by casehub-worker#16 |
-
-## Notes
-
-- Platform branch `issue-213-spring-boot-deployment` has 10 unrelated commits from #351, #422, #426, #427, yaml-plugin-api — needs separate landing
-- Workspace local main was reset to origin/main during this session (prior divergence resolved)
-- `ledger-spring-integration-test` requires Docker (Testcontainers) — not runnable locally, verified in CI
-- platform#430 still open (spring-generator @DefaultBean interface instantiation bug)
+| ledger | Complete | casehubio/ledger#213 |
+| casehub-worker | Not started | casehubio/casehub-worker#16 |
+| blocks | 3 modules exist, gaps | casehubio/blocks#297 |
+| workers | Not started (blocked by casehub-worker) | casehubio/workers#24 |
 
 ## References
 
-| Artifact | Path |
-|----------|------|
-| Ledger design spec | `specs/issue-213-spring-boot-deployment/2026-09-23-ledger-spring-deployment-design.md` |
-| Decisions (D1-D6) | `specs/issue-213-spring-boot-deployment/decisions.md` |
-| Implementation plan | `plans/2026-09-23-ledger-spring-deployment.md` |
-| Garden entries | GE-20260923-e81faa, GE-20260923-1d03d4, GE-20260923-9393de, GE-20260924-bb5f55 |
+- `specs/issue-429-yaml-type-system/2026-09-25-dynamic-step-catalog-design.md` — reviewed design spec
+- `specs/issue-429-yaml-type-system/433-decisions.md` — 5 design decisions
+- `plans/2026-09-25-dynamic-step-catalog.md` — implementation plan (completed)
