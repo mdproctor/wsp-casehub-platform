@@ -6,7 +6,7 @@ Implemented all 7 tasks for #433 (dynamic step catalog) across 5 batches. Step d
 
 ## Follow-on Work
 
-Ordered by dependency — handler wiring and shared primitives first, then hardening.
+Ordered by dependency — handler wiring and shared primitives first, then vocabulary, then hardening.
 
 | Issue | Title | Scale | Complexity | Notes |
 |-------|-------|-------|------------|-------|
@@ -18,20 +18,6 @@ Ordered by dependency — handler wiring and shared primitives first, then harde
 | platform#439 | StepParameterType / ParameterType convergence evaluation | XS | Low | Design evaluation, may result in no change |
 | platform#440 | Security model hardening for invoke handlers | M | High | Process + Python execute external commands. Benefits from #446 landing first (constrains the defined SPI). |
 | platform#441 | Python script auto-discovery as catalog source | S | Low | Convention-based discovery |
-
-## Spring Boot Deployment Campaign
-
-| Repo | Status | Issue |
-|------|--------|-------|
-| platform | Complete | — |
-| engine | Complete | — |
-| work | Complete | — |
-| qhorus | Complete | — |
-| neocortex | Complete | — |
-| ledger | Complete | casehubio/ledger#213 |
-| casehub-worker | Not started | casehubio/casehub-worker#16 |
-| blocks | 3 modules exist, gaps | casehubio/blocks#297 |
-| workers | Not started (blocked by casehub-worker) | casehubio/workers#24 |
 
 ## References
 
