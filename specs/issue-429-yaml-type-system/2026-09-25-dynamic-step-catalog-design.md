@@ -240,6 +240,12 @@ Load-time and runtime validation. Checks:
 - All `required: true` inputs are present in params
 - Parameter types match declared types via `StepParameterType.validate(Object)` — STRING validated as `String`, INTEGER as `Integer`/`Long`, NUMBER as `Number`, BOOLEAN as `Boolean`, ARRAY as `List`, OBJECT as `Map`
 - Enum values are within allowedValues
+- Format constraints validated for STRING parameters with a `format` field:
+  - `date` → `java.time.LocalDate.parse(value)` (ISO-8601 date)
+  - `date-time` → `java.time.OffsetDateTime.parse(value)` (ISO-8601 date-time)
+  - `uri` → `java.net.URI.create(value)` (valid URI syntax)
+  - Unknown format strings are ignored (documentation-only — used for JSON Schema generation in #437)
+  - All validation uses JDK classes only (zero-dep compatible)
 - Output fields match declared output schema
 
 **Load-time output reference validation** (`${result.action-name.field}` expressions) is a playbook loader concern, not a StepValidator concern. The step catalog provides the output schema via `StepDefinition.outputs()`; the playbook loader (in the consumer — Pages, desiredstate) cross-references expression references against this schema. The expression parser that extracts `${result.*}` references uses yaml-core's existing `VariableResolver` infrastructure — `result` is registered as a variable prefix, and the playbook loader validates that each referenced field exists in the resolved action's output declarations.
@@ -324,7 +330,44 @@ Resolution: The `descriptor` field on `InvokeBinding.Agent` is resolved via `Age
 
 #### Execution metadata
 
-`AgentEvent.InvocationComplete` carries cost, usage, and timing metadata. This metadata is not stored in `StepResultStore` (which has no metadata API). Instead, it is emitted as a CDI event:
+Handler-specific telemetry (agent token counts/cost, process exit codes, HTTP status codes) flows from handlers to consumers via `StepResult.Success.executionMetadata()`.
+
+**StepResult extension (yaml-plugin-api):** `StepResult.Success` gains an `executionMetadata` field:
+
+```java
+public sealed interface StepResult permits StepResult.Success, StepResult.Failure {
+
+    boolean isSuccess();
+    Map<String, Object> output();
+    default Map<String, Object> executionMetadata() { return Map.of(); }
+
+    record Success(Map<String, Object> output,
+                   Map<String, Object> executionMetadata) implements StepResult {
+        public Success {
+            output = Map.copyOf(output);
+            executionMetadata = executionMetadata != null ? Map.copyOf(executionMetadata) : Map.of();
+        }
+        @Override public boolean isSuccess() { return true; }
+    }
+
+    record Failure(String message) implements StepResult {
+        @Override public boolean isSuccess() { return false; }
+        @Override public Map<String, Object> output() { return Map.of(); }
+    }
+
+    static StepResult of(Map<String, Object> output) { return new Success(output, Map.of()); }
+    static StepResult of(Map<String, Object> output, Map<String, Object> executionMetadata) {
+        return new Success(output, executionMetadata);
+    }
+    static StepResult failed(String message) { return new Failure(message); }
+}
+```
+
+`executionMetadata` is distinct from `output` — output is the step's declared result schema (validated against StepDefinition.outputs()); metadata is execution telemetry (cost, timing, model used). The existing `StepResult.of(output)` factory defaults metadata to `Map.of()` — backwards-compatible for existing `@StepPlugin` implementations.
+
+Handlers populate metadata during `execute()`: AgentInvokeHandler includes `InvocationComplete` fields (tokenCount, cost, model); ProcessInvokeHandler includes exit code and command duration; RestInvokeHandler includes HTTP status code and response time. `ValidatingStepAction` reads `result.executionMetadata()` and includes it in the `StepExecutionEvent`.
+
+**StepExecutionEvent (yaml-step-runtime):**
 
 ```java
 public record StepExecutionEvent(
@@ -334,7 +377,7 @@ public record StepExecutionEvent(
         Map<String, Object> metadata) {}
 ```
 
-`ValidatingStepAction` fires `StepExecutionEvent` after each step execution. The metadata map carries handler-specific data: for agent steps, it includes token counts, cost, and model used. Consumers (audit loggers, cost trackers, observability) observe this event via CDI `@Observes`.
+`ValidatingStepAction` fires `StepExecutionEvent` after each step execution. Consumers (audit loggers, cost trackers, observability) observe this event via CDI `@Observes`.
 
 #### Trust model
 
@@ -374,9 +417,11 @@ class ValidatingStepAction implements StepAction {
             }
         }
 
+        Map<String, Object> metadata = result.isSuccess()
+                ? result.executionMetadata()
+                : Map.of("error", ((StepResult.Failure) result).message());
         executionEvent.fireAsync(new StepExecutionEvent(
-                definition.name(), durationMs, result.isSuccess(),
-                result.isSuccess() ? Map.of() : Map.of("error", ((StepResult.Failure) result).message())));
+                definition.name(), durationMs, result.isSuccess(), metadata));
 
         return result;
     }
@@ -508,7 +553,7 @@ yaml-jackson gains mixins for the new types:
 
 ### What does NOT change
 
-- `yaml-plugin-api/` — remains zero-dependency. No new types added.
+- `yaml-plugin-api/` — remains zero-dependency. `StepResult.Success` gains an `executionMetadata` field; existing `StepResult.of(output)` factory is backwards-compatible (defaults metadata to `Map.of()`).
 - `yaml-plugin-processor/` — APT processor is unchanged. It still generates to `META-INF/yaml-plugins/`. The new catalog simply reads what the processor already produces.
 - `ModuleExpander` — gains a filter at entry to skip step-import entries; expansion logic unchanged.
 - `ForEachExpander` — unchanged; step definitions don't use forEach.
