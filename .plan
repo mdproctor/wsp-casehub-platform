@@ -11,12 +11,12 @@ covers: 16,297,24
 - [x] casehubio/casehub-worker#16 — Spring Boot deployment
 - [x] casehubio/blocks#297 — Spring Boot deployment
 - [ ] casehubio/workers#24 — Spring Boot deployment ← active
-  - [ ] Batch 1: Module scaffold
-    - [ ] Task 1: Create workers-common-core and move pure types
-  - [ ] Batch 2: Lifecycle
-    - [ ] Task 2: Change WorkerRuntime to void and update impls
-    - [ ] Task 3: Extract orchestrator with parallel virtual thread init
-  - [ ] Batch 3: Event pipeline
-    - [ ] Task 4: Extract fault/completion/retry publishers with Consumer
-  - [ ] Batch 4: Wiring
-    - [ ] Task 5: Create Quarkus producers and delete FaultEventHandlers
+  - [x] Batch 1: Module scaffold
+    - [x] Task 1: Create workers-common-core and move pure types
+  - [x] Batch 2: Lifecycle
+    - [x] Task 2: Change WorkerRuntime to void and update impls
+    - [x] Task 3: Extract orchestrator with parallel virtual thread init
+  - [x] Batch 3: Event pipeline
+    - [x] Task 4: Extract fault/completion/retry publishers with Consumer
+  - [x] Batch 4: Wiring
+    - [x] Task 5: Create Quarkus producers and delete FaultEventHandlers
