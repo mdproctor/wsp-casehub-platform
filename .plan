@@ -1,0 +1,13 @@
+# Work Plan — Spring Boot Deployment (remaining repos)
+
+## State
+branch: main
+state: active
+date: 2026-09-25
+issue-repo: casehubio/platform
+covers: 16,297,24
+
+## Queue
+- [ ] casehubio/casehub-worker#16 — Spring Boot deployment ← active
+- [ ] casehubio/blocks#297 — Spring Boot deployment
+- [ ] casehubio/workers#24 — Spring Boot deployment
