@@ -2,21 +2,12 @@
 
 ## State
 branch: main
-state: active
+state: transitioning
 date: 2026-09-25
 issue-repo: casehubio/platform
 covers: 16,297,24
 
 ## Queue
-- [ ] casehubio/casehub-worker#16 — Spring Boot deployment ← active
-  - [x] Batch 1: Foundation
-    - [x] Task 1: Create runtime-core module
-  - [x] Batch 2: Rewiring
-    - [x] Task 2: Rewire DefaultWorkerExecutor to core
-    - [x] Task 3: Rewire MockWorkerExecutor to core mock
-  - [x] Batch 3: Spring
-    - [x] Task 4: Create worker-spring auto-config
-    - [x] Task 5: Create spring-integration-test
-    - [x] Task 6: Update docs and CLAUDE.md
-- [ ] casehubio/blocks#297 — Spring Boot deployment
+- [x] casehubio/casehub-worker#16 — Spring Boot deployment
+- [ ] casehubio/blocks#297 — Spring Boot deployment ← active
 - [ ] casehubio/workers#24 — Spring Boot deployment
