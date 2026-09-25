@@ -160,7 +160,7 @@ Load-time and runtime validation. Checks:
 
 ### Layer 2: Step catalog SPI (yaml-plugin-api, zero-dep)
 
-yaml-plugin-api gains a compile dependency on yaml-core. Both are zero-dep pure Java — this is a clean dependency.
+yaml-plugin-api gains a compile dependency on yaml-core. Both are zero-dep pure Java — this is a clean dependency. **Boundary rule update:** CLAUDE.md states "yaml-plugin-api must remain zero-dependency." This change relaxes that rule to "zero-external-dependency" — yaml-core is also zero-dep, J2CL-safe pure Java. The spirit of the rule (plugin authors don't get Quarkus/JPA on their classpath) is preserved. CLAUDE.md must be updated when this lands.
 
 New types in `io.casehub.yaml.plugin.api`:
 
@@ -305,7 +305,9 @@ imports:
   - steps: trading-steps.yaml    # step definition import
 ```
 
-A new `steps` field on `YamlImport` (parallel to `module`). When the playbook loader encounters `steps:`, it loads the step definition file and registers its actions in the catalog for this playbook's scope. Import-scoped step definitions shadow catalog-level definitions.
+A new `steps` field on `YamlImport` (parallel to `module`). `steps` and `module` are mutually exclusive on a single import entry — an import is either a module import or a step definition import. Step imports only use the `steps` field; `as`, `parameters`, `forEach`, and `loop` are ignored (they're module-expansion concerns). `when` is valid on step imports (conditional step loading).
+
+When the playbook loader encounters `steps:`, it loads the step definition file and registers its actions in the catalog for this playbook's scope. Import-scoped step definitions shadow catalog-level definitions. ImportExpander and ModuleExpander skip entries where `steps != null`.
 
 `action:` in step declarations resolves against:
 1. Import-scoped step definitions (from `steps:` imports in this playbook)
