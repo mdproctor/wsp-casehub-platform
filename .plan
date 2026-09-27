@@ -2,7 +2,7 @@
 
 ## State
 branch: main
-state: active
+state: closing:landed
 date: 2026-09-25
 issue-repo: casehubio/platform
 covers: 445,446,447,443,444,439,440,441
