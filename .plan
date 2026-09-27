@@ -2,10 +2,11 @@
 
 ## State
 branch: main
-state: active
+state: drained
 date: 2026-09-25
 issue-repo: casehubio/platform
 covers: 16,297,24
+evidence-era: true
 
 ## Queue
 - [x] casehubio/platform#9004 — Update per-module tests for faultAddress removal
