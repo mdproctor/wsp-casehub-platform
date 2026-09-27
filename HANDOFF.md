@@ -2,30 +2,16 @@
 
 ## Last Session
 
-Completed 10 issues on `issue-459-state-machine-matchpattern` (9 squashed commits landed on main), then ran a coherence audit and fixed 8 findings on main directly.
-
-**Branch work (10 issues):** AnyOfPattern + EventRouter MatchPattern dispatch (#459), ADR 0011 keyword reservation (#460), StepWalker depth limit (#462), maxOutputBytes enforcement (#461), nesting path errors (#468), hardening (#467). Then runtime evaluation stack: StructuralStepEvaluator for block/if-else/match/parallel (#465), DecoratorChain for all 12 decorator positions (#466), try/catch/finally (#463), CSP select (#464). 217 tests in yaml-step-runtime.
-
-**Post-landing coherence audit (8 fixes):**
-1. Integration gap — StructuralStepEvaluator now composes with DecoratorChain (decorators() applied to all steps)
-2. Extracted resolveCondition() helper (duplicate condition paths)
-3. evaluateParallel uses Future[] pattern (consistency with evaluateSelect)
-4. on-error returns success with fallback routing info (was swallowing fallback name)
-5. SelectBranchType enum replaces magic strings
-6. ScopeUtils.pushScope() extracts duplicated map-drill pattern (4 call sites)
-7. StepWalker warns on try without catch or finally
-8. 5 composition tests verifying decorators apply to structural + leaf steps
+Completed #469 (barrier/quorum sugar + StepResultStore wiring) — full cycle from brainstorming through design spec, light design review, and 4-task implementation. The design review caught three real issues before any code was written: broken error variable resolution architecture, missing parse-time reference validation, and silent success on quorum unreachability. All fixed in the spec before implementation. Queue advanced to #470.
 
 ## Immediate Next Step
 
-Start #469 (barrier/quorum sugar + StepResultStore wiring). M-scale — needs StepResultStore recording in the evaluator, OrcLatch sugar parsing in StepWalker, and ${result.<step>} variable resolution. The OrcLatch primitive and StepResultStore interface already exist in yaml-core.
-
-## Queue State
-
-`.plan` has 2 issues (#469, #470). Both on main — no feature branch yet.
+Start #470 (deadline propagation — parent timeout creates child ScenarioScope deadline). M-scale. Needs brainstorming. The ScenarioScope already has `withDeadline(Duration)` and `isDeadlineExpired()` — this wires propagation from parent scope to child scope so hung barriers/quorums get interrupted by the parent's deadline.
 
 ## References
 
-- `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/` — StructuralStepEvaluator, DecoratorChain, ScopeUtils, StepRunner, DecoratedExecution
-- `yaml-core/src/main/java/io/casehub/yaml/core/orchestration/` — OrcLatch, StepResultStore, ScenarioScope (all exist, need wiring)
-- `specs/issue-386-runtime-orchestration/2026-09-22-runtime-orchestration-primitives-design.md` — section 2.2 Latch (barrier/quorum spec)
+- `specs/issue-469-barrier-quorum-sugar/2026-09-27-barrier-quorum-stepresultstore-design.md` — design spec
+- `plans/2026-09-27-barrier-quorum-stepresultstore.md` — implementation plan
+- `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/StructuralStepEvaluator.java` — evaluator with recording, latch wiring, barrier/quorum evaluation
+- `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/QuorumTracker.java` — success-only counting with unreachability detection
+- `docs/specs/issue-386-runtime-orchestration/2026-09-22-runtime-orchestration-primitives-design.md` — parent spec (§2.2 Latch, §3.1 VariableSource)
