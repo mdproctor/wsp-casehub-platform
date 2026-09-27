@@ -8,9 +8,16 @@ issue-repo: casehubio/platform
 covers: 16,297,24
 
 ## Queue
+- [x] casehubio/platform#9004 — Update per-module tests for faultAddress removal
+- [x] casehubio/platform#9005 — Update docs for deleted classes
+- [x] casehubio/platform#9006 — Fix pre-existing K8s Optional<CaseInstance> compilation error
+- [x] casehubio/platform#9000 — Per-module -core extraction (6 mechanical modules)
+- [ ] casehubio/platform#9001 — MCP -core extraction (deliberate design) ← active
+- [ ] casehubio/platform#9002 — WebClient → JDK HttpClient (4 modules)
+- [ ] casehubio/platform#9003 — Consolidated workers-spring auto-config
 - [x] casehubio/casehub-worker#16 — Spring Boot deployment
 - [x] casehubio/blocks#297 — Spring Boot deployment
-- [ ] casehubio/workers#24 — Spring Boot deployment ← active
+- [ ] casehubio/workers#24 — Spring Boot deployment
   - [x] Batch 1: Module scaffold
     - [x] Task 1: Create workers-common-core and move pure types
   - [x] Batch 2: Lifecycle
@@ -20,12 +27,3 @@ covers: 16,297,24
     - [x] Task 4: Extract fault/completion/retry publishers with Consumer
   - [x] Batch 4: Wiring
     - [x] Task 5: Create Quarkus producers and delete FaultEventHandlers
-
-## Deferred
-- [ ] Per-module -core extraction (6 mechanical modules) (M / Low) [casehubio/workers] — Mechanical follow-up: HTTP, Camel, GitHub Actions, Script, Scenario, K8s — same pattern as workers-common-core (ExecutionManager → POJO, Runtime → void). FaultEventHandlers already deleted.
-- [ ] MCP -core extraction (deliberate design) (M / High) [casehubio/workers] — MCP has session management, multi-server partial failure, and buffered SSE parsing. Not mechanical — needs deliberate design for McpSessionManager and WebClient→HttpClient conversion.
-- [ ] WebClient → JDK HttpClient (4 modules) (M / Med) [casehubio/workers] — HTTP, GitHub Actions, MCP, Scenario use Vert.x WebClient. Replace with java.net.http.HttpClient in -core modules. Per-request timeouts mandatory (D3). MCP has buffered SSE parsing that needs BodyHandlers.ofByteArray().
-- [ ] Consolidated workers-spring auto-config (M / Med) [casehubio/workers] — Single workers-spring module wiring all core POJOs with Spring @AutoConfiguration. Mirrors platform agent-spring pattern. Depends on per-module -core extraction completing first.
-- [ ] Update per-module tests for faultAddress removal (S / Low) [casehubio/workers] — Tests in workers-http, workers-k8s, workers-mcp etc. reference deleted EventBusAddresses constants and faultAddress params. Compilation-breaking in test scope only — main sources compile clean.
-- [ ] Update docs for deleted classes (XS / Low) [casehubio/workers] — CLAUDE.md, contributor-guide.md, ARC42STORIES.MD, and design specs reference deleted FaultEventHandler/EventBusAddresses classes. Text-only updates.
-- [ ] Fix pre-existing K8s Optional<CaseInstance> compilation error (XS / Low) [casehubio/workers] — workers-k8s has Optional<CaseInstance> vs CaseInstance type mismatch in K8sJobInformerManager.java:191 and K8sWorkerExecutionManager.java:188. Pre-existing — not caused by this branch.
