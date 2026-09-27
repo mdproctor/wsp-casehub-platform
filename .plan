@@ -12,9 +12,9 @@ covers: 16,297,24
 - [x] casehubio/platform#9005 — Update docs for deleted classes
 - [x] casehubio/platform#9006 — Fix pre-existing K8s Optional<CaseInstance> compilation error
 - [x] casehubio/platform#9000 — Per-module -core extraction (6 mechanical modules)
-- [ ] casehubio/platform#9001 — MCP -core extraction (deliberate design) ← active
-- [ ] casehubio/platform#9002 — WebClient → JDK HttpClient (4 modules)
-- [ ] casehubio/platform#9003 — Consolidated workers-spring auto-config
+- [x] casehubio/platform#9001 — MCP -core extraction (deliberate design)
+- [x] casehubio/platform#9002 — WebClient → JDK HttpClient (4 modules)
+- [ ] casehubio/platform#9003 — Consolidated workers-spring auto-config ← active
 - [x] casehubio/casehub-worker#16 — Spring Boot deployment
 - [x] casehubio/blocks#297 — Spring Boot deployment
 - [ ] casehubio/workers#24 — Spring Boot deployment
