@@ -2,7 +2,7 @@
 
 ## Last Session
 
-Workers#24 Phase 2 progress — test fixes, doc updates, Script core extraction, and WebClient→HttpClient migration (in progress). 6 commits on branch `issue-24-spring-boot-deployment` in the workers repo.
+Workers#24 Phase 2 — test fixes, doc updates, Script core extraction, and complete WebClient→HttpClient migration. 8 commits on branch `issue-24-spring-boot-deployment` in the workers repo.
 
 ### What was built
 
@@ -17,16 +17,11 @@ Workers#24 Phase 2 progress — test fixes, doc updates, Script core extraction,
 
 3. **workers-script-core module** (commit 09640e8) — New module with 5 POJO classes. ScriptDefinitionResolver (constructor-injected defaults), ScriptWorkerExecutionManager (constructor-injected deps, j.u.l logging), ScriptWorkerRuntime (POJO). workers-script slimmed to ScriptWorkerBeans (@Produces wiring). Removed quarkus-vertx dependency.
 
-4. **WebClient→HttpClient** (commits 1ca3cd3 + ec362e3) — Production code complete in all 4 modules (HTTP, GitHub Actions, Scenario, MCP). GitHubActionsWorkerExecutionManagerTest fully rewritten and passing. **3 test files still need rewriting** (see below).
+4. **WebClient→HttpClient** (commits 1ca3cd3, ec362e3, 0f0dc5a) — Complete. Production code migrated in all 4 modules (HTTP, GitHub Actions, Scenario, MCP). All 4 test files rewritten for JDK HttpClient mocking pattern. D3 mandatory per-request timeout enforced (GitHub Actions had none before).
 
-### What's still in progress
+### WebClient→HttpClient test pattern
 
-**WebClient→HttpClient test rewrites** — 3 test files reference old Vert.x WebClient mocks:
-- `workers-http/.../HttpWorkerExecutionManagerTest.java` — 587 lines, most complex (sync+async paths, header verification, body verification)
-- `workers-scenario/.../ScenarioWorkerExecutionManagerTest.java` — moderate
-- `workers-mcp/.../McpWorkerExecutionManagerTest.java` — moderate (JSON-RPC specific)
-
-The pattern is established by the GitHub Actions rewrite:
+All 4 ExecutionManager tests now use:
 - Mock `java.net.http.HttpClient` instead of `WebClient`
 - `when(httpClient.send(any(), any())).thenReturn(response)` for response stubs
 - `HttpHeaders.of(headerMap, (a, b) -> true)` for response headers
@@ -37,26 +32,32 @@ The pattern is established by the GitHub Actions rewrite:
 
 ## Queue State
 
-Position 5/10. Active: #9000 (per-module core extraction). #9002 (WebClient→HttpClient) is being done first because it unblocks ExecutionManager extraction.
+Position 5/10. Active: #9000 (per-module core extraction). #9002 (WebClient→HttpClient) is complete.
 
 ### Completed this session
 - #9004: Update tests for faultAddress removal
 - #9005: Update docs for deleted classes
 - #9006: Fix K8s Optional<CaseInstance> error
+- #9002: WebClient→HttpClient (complete — production + all 4 test rewrites)
 - workers-script-core extraction (partial #9000)
-- WebClient→HttpClient production code (#9002 production done, 1/4 tests done)
 
 ### Remaining
-| # | Item | Status |
-|---|------|--------|
-| #9002 | WebClient→HttpClient | Production done, 3/4 test rewrites remaining |
-| #9000 | Per-module -core extraction | Script done; HTTP/Scenario/GH-Actions/K8s need WebClient tests first; Camel limited (2 pure types only) |
-| #9001 | MCP -core extraction | Not started — deliberate design needed |
-| #9003 | Consolidated workers-spring | Blocked by #9000 + #9001 |
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| #9000 | Per-module -core extraction | Script done | HTTP/GH-Actions/Scenario/K8s now unblocked. Camel limited (2 pure types) |
+| #9001 | MCP -core extraction | Not started | Deliberate design needed for session mgmt |
+| #9003 | Consolidated workers-spring | Blocked | Depends on #9000 + #9001 |
 
-### Analysis from this session
+### Per-module core extraction readiness (from survey)
 
-Per-module core extraction is partially blocked by WebClient→HttpClient. Three ExecutionManagers (HTTP, GitHub Actions, Scenario) use Vert.x WebClient and can't move to core until that's replaced. Script was the only module where the full pipeline (ExecutionManager, Resolver, Runtime) could move. Camel is framework-coupled (ProducerTemplate) — only 2 pure types can move.
+| Module | Pure types | ExecutionManager extractable? | Notes |
+|--------|-----------|------------------------------|-------|
+| Script | 2 | Done (commit 09640e8) | Full pipeline in core |
+| HTTP | 4 | Yes (JDK HttpClient now) | 2 call sites (sync+async) |
+| GitHub Actions | 1 | Yes (JDK HttpClient now) | 1 call site |
+| Scenario | 2 | Yes (JDK HttpClient now) | 2 call sites (fetch+dispatch) |
+| K8s | 3 (+2 fabric8) | Partial (fabric8-coupled) | K8sJobBuilder/OutputCapture are CDI-free but use fabric8 |
+| Camel | 2 | No (ProducerTemplate) | Only constants + CamelExchangeWorkerFunction move |
 
 ## Slot State
 
@@ -72,4 +73,4 @@ Seven repos complete. Workers Phase 2 in progress.
 | ledger | Complete | — |
 | casehub-worker | Complete | `issue-16-spring-boot-deployment` (not yet merged) |
 | blocks | Complete | `issue-297-spring-coverage-expansion` (not yet merged) |
-| **workers** | **Phase 2 in progress** | `issue-24-spring-boot-deployment` (10 commits) |
+| **workers** | **Phase 2 in progress** | `issue-24-spring-boot-deployment` (13 commits) |
