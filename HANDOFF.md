@@ -2,18 +2,30 @@
 
 ## Last Session
 
-Completed 10 issues on `issue-459-state-machine-matchpattern`, closing the branch with 9 squashed commits landed on main. Two sessions of work across the full runtime evaluation stack:
+Completed 10 issues on `issue-459-state-machine-matchpattern` (9 squashed commits landed on main), then ran a coherence audit and fixed 8 findings on main directly.
 
-**Prior session (6 issues):** AnyOfPattern added to MatchPattern sealed interface, EventRouter refactored for MatchPattern-based dispatch (from and on fields). ADR 0011 formalised three-layer evaluation model keyword reservation. Four hardening items: StepWalker MAX_DEPTH=32 with nesting path in errors, maxOutputBytes enforcement in DefaultProcessExecutor, parseTimeout deduplication to DurationParser.parseOrNull(), ToolDispatcher interface replacing reflection in McpStepCatalogWiring.
+**Branch work (10 issues):** AnyOfPattern + EventRouter MatchPattern dispatch (#459), ADR 0011 keyword reservation (#460), StepWalker depth limit (#462), maxOutputBytes enforcement (#461), nesting path errors (#468), hardening (#467). Then runtime evaluation stack: StructuralStepEvaluator for block/if-else/match/parallel (#465), DecoratorChain for all 12 decorator positions (#466), try/catch/finally (#463), CSP select (#464). 217 tests in yaml-step-runtime.
 
-**This session (4 issues):** StructuralStepEvaluator in yaml-step-runtime evaluates BlockStep (sequential, first-failure short-circuit), IfElseStep (ConditionEvaluator, branch selection), MatchStep (MatchPattern dispatch, guard evaluation, match scoping), ParallelStep (virtual threads). DecoratorChain for all 12 decorator positions (when, forEach, loop, on-error, timeout, wait, retry, semaphore, delay, signal/publish, transition, transform). TryCatchFinallyStep with error context scoping. SelectStep for CSP first-of-N channel/signal select. 92 new tests, 212 total in yaml-step-runtime.
+**Post-landing coherence audit (8 fixes):**
+1. Integration gap — StructuralStepEvaluator now composes with DecoratorChain (decorators() applied to all steps)
+2. Extracted resolveCondition() helper (duplicate condition paths)
+3. evaluateParallel uses Future[] pattern (consistency with evaluateSelect)
+4. on-error returns success with fallback routing info (was swallowing fallback name)
+5. SelectBranchType enum replaces magic strings
+6. ScopeUtils.pushScope() extracts duplicated map-drill pattern (4 call sites)
+7. StepWalker warns on try without catch or finally
+8. 5 composition tests verifying decorators apply to structural + leaf steps
+
+## Immediate Next Step
+
+Start #469 (barrier/quorum sugar + StepResultStore wiring). M-scale — needs StepResultStore recording in the evaluator, OrcLatch sugar parsing in StepWalker, and ${result.<step>} variable resolution. The OrcLatch primitive and StepResultStore interface already exist in yaml-core.
 
 ## Queue State
 
-Queue drained — all 10 issues complete, branch closed on main.
+`.plan` has 2 issues (#469, #470). Both on main — no feature branch yet.
 
 ## References
 
-- `docs/adr/0011-three-layer-evaluation-model-keyword-reservation.md` — new ADR
-- `specs/issue-386-runtime-orchestration/2026-09-22-runtime-orchestration-primitives-design.md` — decorator evaluation order spec
-- `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/` — new eval package (StructuralStepEvaluator, DecoratorChain, StepRunner, DecoratedExecution)
+- `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/` — StructuralStepEvaluator, DecoratorChain, ScopeUtils, StepRunner, DecoratedExecution
+- `yaml-core/src/main/java/io/casehub/yaml/core/orchestration/` — OrcLatch, StepResultStore, ScenarioScope (all exist, need wiring)
+- `specs/issue-386-runtime-orchestration/2026-09-22-runtime-orchestration-primitives-design.md` — section 2.2 Latch (barrier/quorum spec)

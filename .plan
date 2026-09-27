@@ -1,0 +1,11 @@
+# Work Plan —
+
+## State
+branch: main
+state: active
+date: 2026-09-27
+issue-repo: casehubio/platform
+
+## Queue
+- [ ] casehubio/platform#469 — Barrier/quorum sugar + StepResultStore wiring
+- [ ] casehubio/platform#470 — Deadline propagation parent timeout creates child ScenarioScope deadline
