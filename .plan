@@ -21,4 +21,11 @@ evidence-era: true
 - [x] casehubio/workers#24 — Spring Boot deployment
 
 ## Deferred
-- [ ] Merge workers#24 branch (XS / Low) []
+- [ ] Workers CLAUDE.md update — 7 new -core modules + workers-spring (S / Low)
+- [ ] Workers docs update — contributor guide for new module architecture (S / Low)
+- [ ] Workers spring-integration-test (M / Med)
+- [ ] MCP Spring session provider — JDK HttpClient McpSessionProvider (M / Med)
+- [ ] K8s Spring completion — fabric8 Spring integration (M / High)
+- [ ] Merge casehub-worker#16 branch (XS / Low)
+- [ ] Merge blocks#297 branch (XS / Low)
+- [ ] Merge workers#24 branch (XS / Low)

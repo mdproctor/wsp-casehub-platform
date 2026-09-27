@@ -31,41 +31,49 @@ All modules follow the same pattern:
 
 ## Queue State
 
-Position 10/10. **All items complete.**
+Position 10/10. **All planned items complete.** 8 verified remaining items below.
 
-### Completed across all sessions
-| # | Item | Session |
-|---|------|---------|
-| #9004 | Update tests for faultAddress removal | Phase 2 |
-| #9005 | Update docs for deleted classes | Phase 2 |
-| #9006 | Fix K8s Optional<CaseInstance> error | Phase 2 |
-| #9002 | WebClient → JDK HttpClient (4 modules) | Phase 2 |
-| #9000 | Per-module -core extraction (6 modules) | Phase 3 (this session) |
-| #9001 | MCP -core extraction (deliberate design) | Phase 3 (this session) |
-| #9003 | Consolidated workers-spring auto-config | Phase 3 (this session) |
-| casehub-worker#16 | Spring Boot deployment | Prior slot work |
-| blocks#297 | Spring Boot deployment | Prior slot work |
-| workers#24 | Spring Boot deployment | Phase 1–3 |
+## What's Next — Verified Against Code
 
-## What's Next
+### Workers repo (on branch `issue-24-spring-boot-deployment`)
 
-Follow-up items not covered by this slot's scope:
+| # | Item | Scale | Complexity | Verified status |
+|---|------|-------|-----------|-----------------|
+| 1 | Workers CLAUDE.md update | S | Low | Module table lists old modules only — 7 new -core modules + workers-spring missing |
+| 2 | Workers docs update | S | Low | `docs/guides/` exists but not updated for new module architecture |
+| 3 | Workers spring-integration-test | M | Med | Module does not exist — needs creating like platform's spring-integration-test |
+| 4 | MCP Spring session provider | M | Med | Auto-config references McpSessionProvider but no Spring implementation exists |
+| 5 | K8s Spring completion | M | High | K8s Runtime/ExecutionManager not in Spring auto-config (fabric8-coupled) |
 
-| Item | Scale | Complexity | Notes |
-|------|-------|-----------|-------|
-| Workers CLAUDE.md update | S | Low | Module table needs all 7 new -core modules + workers-spring |
-| Workers docs update | S | Low | Contributor guide needs new module architecture |
-| Workers spring-integration-test | M | Med | Like platform's spring-integration-test — verify all auto-configs compose |
-| MCP Spring session provider | M | Med | JDK HttpClient implementation of McpSessionProvider for Spring Boot |
-| K8s Spring completion | M | High | Spring equivalents for Runtime/ExecutionManager — needs fabric8 Spring integration |
+### Branch merges (3 repos with unmerged branches)
+
+| # | Item | Scale | Notes |
+|---|------|-------|-------|
+| 6 | Merge casehub-worker#16 | XS | Branch `issue-16-spring-boot-deployment` — still on branch, not on main |
+| 7 | Merge blocks#297 | XS | Branch `issue-297-spring-coverage-expansion` — still on branch, not on main |
+| 8 | Merge workers#24 | XS | Branch `issue-24-spring-boot-deployment` — 21 commits, not on main |
+
+### Already done (close these GitHub issues)
+
+| Item | Evidence |
+|------|----------|
+| ~~Port ledger Panache→JPA~~ (`casehubio/ledger#208`) | 0 Panache files found in ledger |
+| ~~Port work Panache→JPA~~ (`casehubio/work#401`) | 0 Panache files found in work |
+| ~~Port qhorus Panache→JPA~~ (`casehubio/qhorus#440`) | 0 Panache files found in qhorus |
+
+### Platform sync (not a feature item — infrastructure)
+
+| Item | Notes |
+|------|-------|
+| Platform project push to origin | origin/main diverged 21 commits — needs rebase with MCP test file conflict resolution |
 
 ## Slot State
 
-All 8 repos complete. Workers repo has 21 commits on `issue-24-spring-boot-deployment` (not yet merged).
+All 8 repos have Spring work complete. 3 branches unmerged.
 
 | Repo | Spring Status | Branch |
 |------|--------------|--------|
-| platform | Complete | — |
+| platform | Complete | — (push to origin pending) |
 | engine | Complete | — |
 | work | Complete | — |
 | qhorus | Complete | — |
