@@ -19,3 +19,6 @@ evidence-era: true
 - [x] casehubio/casehub-worker#16 — Spring Boot deployment
 - [x] casehubio/blocks#297 — Spring Boot deployment
 - [x] casehubio/workers#24 — Spring Boot deployment
+
+## Deferred
+- [ ] K8s Spring completion (fabric8 Spring integration) (M / High) []
