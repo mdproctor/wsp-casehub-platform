@@ -1,18 +1,20 @@
-# Work Plan — Step Catalog Completion
+# Work Plan — Work Plan —
 
 ## State
 branch: main
-state: closing:landed
-date: 2026-09-25
+state: active
+date: 2026-09-27
 issue-repo: casehubio/platform
-covers: 445,446,447,443,444,439,440,441
+covers: 459,460,462,461,468,467,465,466,463,464
 
 ## Queue
-- [ ] casehubio/platform#445 — AgentInvokeHandler eidos wiring ← active
-- [ ] casehubio/platform#446 — ProcessInvokeHandler refactor to ProcessExecutor
-- [ ] casehubio/platform#447 — Step plugin YAML vocabulary + P1 plugins
-- [ ] casehubio/platform#443 — AptPluginSource classpath scanning
-- [ ] casehubio/platform#444 — McpToolSource CDI wiring
-- [ ] casehubio/platform#439 — StepParameterType convergence evaluation
-- [ ] casehubio/platform#440 — Security model for invoke handlers
-- [ ] casehubio/platform#441 — Python script auto-discovery
+- [ ] casehubio/platform#459 — Unify state machine transitions with MatchPattern semantics
+- [ ] casehubio/platform#460 — ADR three-layer evaluation model keyword reservation
+- [ ] casehubio/platform#462 — StepWalker recursion depth limit
+- [ ] casehubio/platform#461 — Enforce maxOutputBytes in DefaultProcessExecutor
+- [ ] casehubio/platform#468 — StepWalker nesting path in error messages
+- [ ] casehubio/platform#467 — Hardening parseTimeout extraction AgentInvokeHandler config trust boundary
+- [ ] casehubio/platform#465 — Runtime evaluators for structural step types
+- [ ] casehubio/platform#466 — Runtime evaluators for step decorators
+- [ ] casehubio/platform#463 — try/catch/finally structured error handling step type
+- [ ] casehubio/platform#464 — CSP select first-of-N channel structural step type
