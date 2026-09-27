@@ -107,29 +107,52 @@ private VariableResolver withResultScope(VariableResolver resolver) {
 }
 ```
 
-The `ObjectVariableSource` resolves step names from the store:
+The `ObjectVariableSource` resolves step names from the store. It returns a **composite Map** that includes both the step's output fields and a nested `error` key. This allows `VariableResolver`'s `FieldDriller` to navigate `${result.risk-eval.error.message}` naturally — the source returns the composite Map for `risk-eval`, and drilling handles `.error.message`.
 
 ```java
 private static ObjectVariableSource buildResultSource(StepResultStore store) {
     return name -> {
-        int dot = name.indexOf('.');
-        String stepName = dot > 0 ? name.substring(0, dot) : name;
-        String remainder = dot > 0 ? name.substring(dot + 1) : null;
+        if (!store.hasCompleted(name)) return null;
 
-        if (remainder != null && remainder.startsWith("error")) {
-            StepError err = store.error(stepName);
-            if (err == null) return null;
-            return Map.of("message", err.message() != null ? err.message() : "",
+        Map<String, Object> output = store.result(name);
+        StepError err = store.error(name);
+
+        if (output == null && err == null) return null;
+
+        // Failed step with no output: return null (per issue-386 §3.1)
+        // Callers use ${result.<step>.error} to access failure details
+        if (output == null) {
+            // Return a Map with only the error key — ${result.<step>} is
+            // still non-null (step completed) but has no output fields.
+            // ${result.<step>.error.message} drills through naturally.
+            return Map.of("error", Map.of(
+                    "message", err.message() != null ? err.message() : "",
                     "exceptionClass", err.exceptionClass() != null ? err.exceptionClass() : "",
-                    "stackTrace", err.stackTrace() != null ? err.stackTrace() : "");
+                    "stackTrace", err.stackTrace() != null ? err.stackTrace() : ""));
         }
 
-        Map<String, Object> result = store.result(stepName);
-        if (result == null && !store.hasCompleted(stepName)) return null;
-        return result != null ? result : Map.of();
+        // Successful step: return output Map, with error = null
+        // ${result.<step>.score} drills into output
+        // ${result.<step>.error} returns null (success)
+        if (err == null) return output;
+
+        // Edge case: step has both output and error (shouldn't happen
+        // with current StepResultStore contract, but defensive)
+        var composite = new java.util.HashMap<>(output);
+        composite.put("error", Map.of(
+                "message", err.message() != null ? err.message() : "",
+                "exceptionClass", err.exceptionClass() != null ? err.exceptionClass() : "",
+                "stackTrace", err.stackTrace() != null ? err.stackTrace() : ""));
+        return composite;
     };
 }
 ```
+
+**Resolution semantics (corrected per issue-386 §3.1):**
+- **Step not completed:** `${result.<step>}` → null (ObjectVariableSource returns null)
+- **Step succeeded:** `${result.<step>}` → output Map (typed pass-through), `${result.<step>.error}` → null
+- **Step failed:** `${result.<step>}` → Map with `error` key only, `${result.<step>.error.message}` drills through
+- **Guard pattern:** `when: ${result.risk-eval.error} != null` correctly tests for failure
 
 The `ObjectVariableSource` resolves the step name portion and returns the result map. `VariableResolver.drillFields()` handles nested field navigation (`${result.risk-eval.score}` → resolve `risk-eval` → drill `score`).
 
@@ -172,7 +195,50 @@ record BarrierStep(
 
 Recognise `barrier` as a structural type keyword (alongside block, parallel, try, select). Extract `await` (required list of step name strings) and `timeout` (optional duration string, parsed via `DurationParser`). Validate that `await` is non-empty.
 
-Step name cross-validation (that awaited names exist in the scenario) is **not** done in StepWalker — it would require a second pass after all steps are resolved. Instead, runtime validation in the evaluator checks that awaited step names are resolvable.
+Step name cross-validation uses a two-pass approach in StepWalker, per issue-386's type safety principle ("every construct must be parse-time-validatable"):
+
+```java
+public static List<ResolvedStep> resolve(List<Map<String, Object>> steps, StepCatalog catalog) {
+    Set<String> seenNames = new HashSet<>();
+    List<ResolvedStep> result = resolve(steps, catalog, 0, "root", seenNames);
+    validateBarrierQuorumReferences(result, seenNames);
+    return result;
+}
+
+private static void validateBarrierQuorumReferences(
+        List<ResolvedStep> steps, Set<String> knownNames) {
+    for (ResolvedStep step : steps) {
+        switch (step) {
+            case ResolvedStep.BarrierStep b -> {
+                for (String name : b.awaitSteps()) {
+                    if (!knownNames.contains(name)) {
+                        throw new IllegalArgumentException(
+                                "barrier '" + b.name() + "' awaits unknown step '" + name + "'");
+                    }
+                }
+            }
+            case ResolvedStep.QuorumStep q -> {
+                for (String name : q.ofSteps()) {
+                    if (!knownNames.contains(name)) {
+                        throw new IllegalArgumentException(
+                                "quorum '" + q.name() + "' references unknown step '" + name + "'");
+                    }
+                }
+            }
+            case ResolvedStep.BlockStep b -> validateBarrierQuorumReferences(b.steps(), knownNames);
+            case ResolvedStep.ParallelStep p -> validateBarrierQuorumReferences(p.steps(), knownNames);
+            case ResolvedStep.TryCatchFinallyStep t -> {
+                validateBarrierQuorumReferences(t.trySteps(), knownNames);
+                validateBarrierQuorumReferences(t.catchSteps(), knownNames);
+                validateBarrierQuorumReferences(t.finallySteps(), knownNames);
+            }
+            default -> {}
+        }
+    }
+}
+```
+
+This catches typos like `[momentun-eval]` at parse time rather than at evaluation time.
 
 ### 4.4 Evaluation
 
@@ -231,7 +297,7 @@ public void preRegisterLatches(List<ResolvedStep> steps) {
             case ResolvedStep.QuorumStep q -> {
                 OrcLatch latch = scope.latch("quorum:" + q.name(), q.required());
                 var tracker = new QuorumTracker(latch, q.required(), q.ofSteps().size(),
-                        new AtomicInteger(), new AtomicInteger());
+                        new AtomicInteger(), new AtomicInteger(), new AtomicBoolean(false));
                 for (String name : q.ofSteps()) {
                     quorumTrackers.put(name, tracker);
                 }
@@ -348,6 +414,14 @@ private StepResult evaluateQuorum(ResolvedStep.QuorumStep quorum,
         Thread.currentThread().interrupt();
         return StepResult.failed("Quorum interrupted");
     }
+
+    // Check if latch was released due to unreachability (too many failures)
+    QuorumTracker tracker = quorumTrackers.get(quorum.ofSteps().get(0));
+    if (tracker != null && tracker.isUnreachable()) {
+        return StepResult.failed("Quorum unreachable — "
+                + tracker.failureCount().get() + " of " + quorum.ofSteps().size()
+                + " steps failed, " + quorum.required() + " successes required");
+    }
     return StepResult.of(Map.of());
 }
 ```
@@ -358,21 +432,24 @@ This requires a slightly different wiring than barrier. Instead of the simple `s
 
 ```java
 record QuorumTracker(OrcLatch latch, int required, int totalSteps,
-                     AtomicInteger successCount, AtomicInteger failureCount) {
+                     AtomicInteger successCount, AtomicInteger failureCount,
+                     AtomicBoolean unreachable) {
 
-    boolean onStepComplete(boolean success) {
+    void onStepComplete(boolean success) {
         if (success) {
             successCount.incrementAndGet();
             latch.countDown();
-            return true;
+            return;
         }
         int failures = failureCount.incrementAndGet();
         if (failures > totalSteps - required) {
-            // Quorum unreachable — release latch to unblock
+            unreachable.set(true);
             while (latch.getCount() > 0) latch.countDown();
-            return false; // signals QuorumUnreachableException
         }
-        return true;
+    }
+
+    boolean isUnreachable() {
+        return unreachable.get();
     }
 }
 ```
@@ -437,6 +514,8 @@ No change — barrier/quorum are self-contained maps, not companion keys.
 - `walker_duplicateStepName_throws`
 - `walker_barrierWithoutAwait_throws`
 - `walker_quorumRequiredExceedsOf_throws`
+- `walker_barrierAwaitsUnknownStep_throws`
+- `walker_quorumReferencesUnknownStep_throws`
 
 **Composition:**
 - `parallel_then_barrier_executesSequentially`
