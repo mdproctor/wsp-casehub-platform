@@ -19,5 +19,5 @@ evidence-era: true
 - [x] casehubio/casehub-worker#16 — Spring Boot deployment
 - [x] casehubio/blocks#297 — Spring Boot deployment
 - [x] casehubio/workers#24 — Spring Boot deployment
-- [ ] casehubio/casehub-desiredstate#139 — Core extraction and Spring Boot adapters
+- [ ] casehubio/casehub-desiredstate#139 — Core extraction and Spring Boot adapters ← active
 - [ ] casehubio/parent#515 — Spring deployment completion epic
