@@ -209,35 +209,76 @@ private StepResult evaluateBarrier(ResolvedStep.BarrierStep barrier,
 
 ### 4.5 Countdown wiring
 
-The evaluator's `recordResult` method, after recording to `StepResultStore`, checks if any barrier/quorum latches are waiting on that step name and calls `countDown()`. This is implemented via a `Map<String, List<OrcLatch>>` that maps step names to latches awaiting them:
+**Race condition prevention:** Barrier/quorum latches and their step-name bindings must be registered BEFORE any of the awaited steps can complete. If a parallel step completes before the barrier evaluator runs, the countdown would fire with no latch — a lost countdown. This matches the spec's §Lifecycle: "created eagerly at scenario load time."
+
+The solution: **eager latch registration during step resolution**, not during evaluation.
+
+`StructuralStepEvaluator` gains a setup phase. When `evaluate()` is called for the first time (or when a new set of resolved steps is loaded), it walks the step tree to find barrier/quorum steps and pre-registers their latches and bindings:
 
 ```java
 private final Map<String, List<OrcLatch>> stepLatches = new ConcurrentHashMap<>();
+private final Map<String, QuorumTracker> quorumTrackers = new ConcurrentHashMap<>();
 
-private void registerLatch(List<String> stepNames, OrcLatch latch) {
-    for (String name : stepNames) {
-        stepLatches.computeIfAbsent(name, k -> new CopyOnWriteArrayList<>()).add(latch);
+public void preRegisterLatches(List<ResolvedStep> steps) {
+    for (ResolvedStep step : steps) {
+        switch (step) {
+            case ResolvedStep.BarrierStep b -> {
+                OrcLatch latch = scope.latch("barrier:" + b.name(), b.awaitSteps().size());
+                for (String name : b.awaitSteps()) {
+                    stepLatches.computeIfAbsent(name, k -> new CopyOnWriteArrayList<>()).add(latch);
+                }
+            }
+            case ResolvedStep.QuorumStep q -> {
+                OrcLatch latch = scope.latch("quorum:" + q.name(), q.required());
+                var tracker = new QuorumTracker(latch, q.required(), q.ofSteps().size(),
+                        new AtomicInteger(), new AtomicInteger());
+                for (String name : q.ofSteps()) {
+                    quorumTrackers.put(name, tracker);
+                }
+            }
+            case ResolvedStep.BlockStep b -> preRegisterLatches(b.steps());
+            case ResolvedStep.ParallelStep p -> preRegisterLatches(p.steps());
+            case ResolvedStep.TryCatchFinallyStep t -> {
+                preRegisterLatches(t.trySteps());
+                preRegisterLatches(t.catchSteps());
+                preRegisterLatches(t.finallySteps());
+            }
+            default -> {} // leaf steps, if/match — no nested latches
+        }
     }
 }
+```
 
+The caller (whoever builds the evaluator and kicks off evaluation) calls `preRegisterLatches(resolvedSteps)` once after resolution and before execution begins. This guarantees all latches exist and are bound to step names before any step can complete.
+
+`recordResult` then notifies these pre-registered bindings:
+
+```java
 private void recordResult(String stepName, StepResult result) {
     if (stepName == null || scope == null) return;
     // ... record to store (§2.2) ...
 
-    // Notify waiting latches
+    // Notify waiting barrier latches (success OR failure counts)
     List<OrcLatch> latches = stepLatches.get(stepName);
     if (latches != null) {
         for (OrcLatch l : latches) {
             l.countDown();
         }
     }
+
+    // Notify quorum trackers (only success counts toward threshold)
+    QuorumTracker tracker = quorumTrackers.get(stepName);
+    if (tracker != null) {
+        tracker.onStepComplete(result.isSuccess());
+    }
 }
 ```
 
-Barrier evaluation registers the latch before blocking:
+Barrier evaluation simply retrieves the pre-created latch and blocks:
 ```java
-registerLatch(barrier.awaitSteps(), latch);
-latch.await(); // blocks until all awaited steps complete
+OrcLatch latch = scope.latch("barrier:" + barrier.name(), barrier.awaitSteps().size());
+// latch and bindings already exist from preRegisterLatches
+latch.await();
 ```
 
 ## 5. Quorum Step Type
