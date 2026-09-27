@@ -21,4 +21,4 @@ evidence-era: true
 - [x] casehubio/workers#24 — Spring Boot deployment
 
 ## Deferred
-- [ ] K8s Spring completion (fabric8 Spring integration) (M / High) []
+- [ ] Merge workers#24 branch (XS / Low) []
