@@ -14,16 +14,7 @@ covers: 16,297,24
 - [x] casehubio/platform#9000 — Per-module -core extraction (6 mechanical modules)
 - [x] casehubio/platform#9001 — MCP -core extraction (deliberate design)
 - [x] casehubio/platform#9002 — WebClient → JDK HttpClient (4 modules)
-- [ ] casehubio/platform#9003 — Consolidated workers-spring auto-config ← active
+- [x] casehubio/platform#9003 — Consolidated workers-spring auto-config
 - [x] casehubio/casehub-worker#16 — Spring Boot deployment
 - [x] casehubio/blocks#297 — Spring Boot deployment
-- [ ] casehubio/workers#24 — Spring Boot deployment
-  - [x] Batch 1: Module scaffold
-    - [x] Task 1: Create workers-common-core and move pure types
-  - [x] Batch 2: Lifecycle
-    - [x] Task 2: Change WorkerRuntime to void and update impls
-    - [x] Task 3: Extract orchestrator with parallel virtual thread init
-  - [x] Batch 3: Event pipeline
-    - [x] Task 4: Extract fault/completion/retry publishers with Consumer
-  - [x] Batch 4: Wiring
-    - [x] Task 5: Create Quarkus producers and delete FaultEventHandlers
+- [x] casehubio/workers#24 — Spring Boot deployment
