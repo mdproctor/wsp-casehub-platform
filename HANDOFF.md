@@ -2,26 +2,38 @@
 
 ## Last Session
 
-Implemented all 7 tasks for #433 (dynamic step catalog) across 5 batches. Step definition model types, parser, validator in yaml-core (zero-dep). StepResult.executionMetadata + YamlImport.steps field with expander filters. Jackson mixins + contract tests. New yaml-step-runtime module: CatalogEntry/StepCatalog/CatalogSource/InvokeHandler SPIs, ValidatingStepAction, 6 invoke handlers (MCP, REST, GraphQL, Python, Agent, Process), CompositeStepCatalog with 3 catalog sources, ImportScopedStepCatalog. Code review caught 3 issues (process I/O deadlock, resource leaks) — all fixed. Branch rebased onto main (resolved 2 MCP test file conflicts — modify/delete), squashed (18→17), merged. Issues #429, #432, #433 all closed.
+Completed 9 issues on `issue-445-agent-invoke-handler-wiring`, closing the branch with 17 squashed commits landed on main. Two phases of work:
 
-## Follow-on Work
+**Block control flow (#449-#453):** Renamed `when` → `if` across Java and TypeScript. Added MatchPattern sealed interface (ValuePattern, StructuralPattern, DefaultPattern), MatchCase record, Jackson deserializers, StepWalker three-way key classification with recursive structural step resolution (block, if/else, match/cases, parallel), StepSchemaComposer structural variants.
 
-Ordered by dependency — handler wiring and shared primitives first, then vocabulary, then hardening.
+**Follow-ups (#454-#458):** TypeScript `when→if` rename (pages repo, cross-repo), parse-time warning for match without default, ProcessExecutor `@DefaultBean` with configurable allow-list, TypeScript MatchPattern parity (pages repo), `matchContext()` VariableSource for `${match}` scoping.
 
-| Issue | Title | Scale | Complexity | Notes |
-|-------|-------|-------|------------|-------|
-| platform#445 | AgentInvokeHandler — wire eidos descriptor resolution | S | Med | Stub → real AgentProvider invocation. eidos-api types exist. |
-| platform#446 | Refactor ProcessInvokeHandler → ProcessExecutor | XS | Low | SPI landed (claudony#234, `1a832316`). Remaining: delegate ProcessInvokeHandler, register in ServiceRegistry bridge. |
-| platform#447 | Step plugin YAML vocabulary + P1 plugins | M | Med | Plugin-name-as-key dispatch (no `action:` indirection), step walker, ServiceRegistry CDI bridge, P1 plugins: `process`, `rest-call`, `assert`. #151 design. |
-| platform#443 | AptPluginSource classpath scanning | S | Low | Skeletal scanning loop needs completion. Discovers P1 plugins from #447 at runtime. |
-| platform#444 | McpToolSource CDI wiring | S | Med | Auto-discover MCP tools at startup |
-| platform#439 | StepParameterType / ParameterType convergence evaluation | XS | Low | Design evaluation, may result in no change |
-| platform#440 | Security model hardening for invoke handlers | M | High | Process + Python execute external commands. Benefits from #446 landing first (constrains the defined SPI). |
-| platform#441 | Python script auto-discovery as catalog source | S | Low | Convention-based discovery |
+**Docs:** YAML language guide fully rewritten — 10 sections covering variables through step plugins. `when.schema.json` renamed to `if.schema.json`. Code review fix: MatchCaseDeserializer rejects cases without pattern or default. Case validation in StepWalker.
+
+**Cross-repo commits (pages):**
+- `6ac41cd0`: `when→if/condition` rename in TS yaml-core (8 files, 283 tests)
+- `f2522e55`: MatchPattern types + matches() function in TS yaml-core
+
+**Brainstorming:** Explored FSI concurrency needs and match/cases unification with state machine transitions. Key design outcome: state machine `from/on` fields should accept the same pattern shapes as `match/cases` — short form (concise `from/to/on/when`) and long form (full `match/cases`) with identical underlying semantics. Three-layer evaluation model identified: imperative (`match/if`), reactive (`when`), future rules engine (TBD keyword).
+
+## Immediate Next Step
+
+Start Batch 1 from `.plan-next`: #459 (unify state machine transitions with MatchPattern), #460 (three-layer ADR), plus hardening (#461, #462, #467, #468). All XS-S scale, one session.
+
+## Queue State
+
+`.plan-next` has 4 batches, 10 issues (#459-#468). No `.plan` active — branch is closed, work is on main.
+
+## Key Design Decisions (this session)
+
+- State machine `from` and `on` accept ValuePattern/StructuralPattern/AnyOfPattern/DefaultPattern — same shapes as `match/cases` `pattern:`. Short form stays concise; long form uses full match/cases.
+- Three-layer evaluation model: imperative (`match/if`), reactive (`when/on:`), future rules (TBD). Keywords must not collide across layers.
+- try/catch/finally (#463) must dovetail with casehub-work's existing saga/compensation implementation — review before designing.
 
 ## References
 
-- `specs/issue-429-yaml-type-system/2026-09-25-dynamic-step-catalog-design.md` — reviewed design spec
-- `specs/issue-429-yaml-type-system/433-decisions.md` — 5 design decisions
-- `plans/2026-09-25-dynamic-step-catalog.md` — implementation plan (completed)
-- `docs/specs/issue-151-orchestration-scope-bridge/2026-09-24-yaml-plugin-api-design.md` — ProcessExecutor origin (§ process-execute plugin, § Out of scope)
+- `.plan-next` — queued work: 4 batches, 10 issues
+- `docs/guides/yaml-language-guide.md` — 10-section guide (updated this session)
+- `specs/issue-445-agent-invoke-handler-wiring/2026-09-26-inline-block-control-flow-design.md` — block control flow spec
+- `specs/issue-445-agent-invoke-handler-wiring/decisions.md` — D1-D5 block control flow decisions
+- `specs/issue-386-runtime-orchestration/2026-09-22-runtime-orchestration-primitives-design.md` — decorator evaluation order, state machines, concurrency primitives
