@@ -2,38 +2,18 @@
 
 ## Last Session
 
-Completed 9 issues on `issue-445-agent-invoke-handler-wiring`, closing the branch with 17 squashed commits landed on main. Two phases of work:
+Completed 10 issues on `issue-459-state-machine-matchpattern`, closing the branch with 9 squashed commits landed on main. Two sessions of work across the full runtime evaluation stack:
 
-**Block control flow (#449-#453):** Renamed `when` → `if` across Java and TypeScript. Added MatchPattern sealed interface (ValuePattern, StructuralPattern, DefaultPattern), MatchCase record, Jackson deserializers, StepWalker three-way key classification with recursive structural step resolution (block, if/else, match/cases, parallel), StepSchemaComposer structural variants.
+**Prior session (6 issues):** AnyOfPattern added to MatchPattern sealed interface, EventRouter refactored for MatchPattern-based dispatch (from and on fields). ADR 0011 formalised three-layer evaluation model keyword reservation. Four hardening items: StepWalker MAX_DEPTH=32 with nesting path in errors, maxOutputBytes enforcement in DefaultProcessExecutor, parseTimeout deduplication to DurationParser.parseOrNull(), ToolDispatcher interface replacing reflection in McpStepCatalogWiring.
 
-**Follow-ups (#454-#458):** TypeScript `when→if` rename (pages repo, cross-repo), parse-time warning for match without default, ProcessExecutor `@DefaultBean` with configurable allow-list, TypeScript MatchPattern parity (pages repo), `matchContext()` VariableSource for `${match}` scoping.
-
-**Docs:** YAML language guide fully rewritten — 10 sections covering variables through step plugins. `when.schema.json` renamed to `if.schema.json`. Code review fix: MatchCaseDeserializer rejects cases without pattern or default. Case validation in StepWalker.
-
-**Cross-repo commits (pages):**
-- `6ac41cd0`: `when→if/condition` rename in TS yaml-core (8 files, 283 tests)
-- `f2522e55`: MatchPattern types + matches() function in TS yaml-core
-
-**Brainstorming:** Explored FSI concurrency needs and match/cases unification with state machine transitions. Key design outcome: state machine `from/on` fields should accept the same pattern shapes as `match/cases` — short form (concise `from/to/on/when`) and long form (full `match/cases`) with identical underlying semantics. Three-layer evaluation model identified: imperative (`match/if`), reactive (`when`), future rules engine (TBD keyword).
-
-## Immediate Next Step
-
-Start Batch 1 from `.plan-next`: #459 (unify state machine transitions with MatchPattern), #460 (three-layer ADR), plus hardening (#461, #462, #467, #468). All XS-S scale, one session.
+**This session (4 issues):** StructuralStepEvaluator in yaml-step-runtime evaluates BlockStep (sequential, first-failure short-circuit), IfElseStep (ConditionEvaluator, branch selection), MatchStep (MatchPattern dispatch, guard evaluation, match scoping), ParallelStep (virtual threads). DecoratorChain for all 12 decorator positions (when, forEach, loop, on-error, timeout, wait, retry, semaphore, delay, signal/publish, transition, transform). TryCatchFinallyStep with error context scoping. SelectStep for CSP first-of-N channel/signal select. 92 new tests, 212 total in yaml-step-runtime.
 
 ## Queue State
 
-`.plan-next` has 4 batches, 10 issues (#459-#468). No `.plan` active — branch is closed, work is on main.
-
-## Key Design Decisions (this session)
-
-- State machine `from` and `on` accept ValuePattern/StructuralPattern/AnyOfPattern/DefaultPattern — same shapes as `match/cases` `pattern:`. Short form stays concise; long form uses full match/cases.
-- Three-layer evaluation model: imperative (`match/if`), reactive (`when/on:`), future rules (TBD). Keywords must not collide across layers.
-- try/catch/finally (#463) must dovetail with casehub-work's existing saga/compensation implementation — review before designing.
+Queue drained — all 10 issues complete, branch closed on main.
 
 ## References
 
-- `.plan-next` — queued work: 4 batches, 10 issues
-- `docs/guides/yaml-language-guide.md` — 10-section guide (updated this session)
-- `specs/issue-445-agent-invoke-handler-wiring/2026-09-26-inline-block-control-flow-design.md` — block control flow spec
-- `specs/issue-445-agent-invoke-handler-wiring/decisions.md` — D1-D5 block control flow decisions
-- `specs/issue-386-runtime-orchestration/2026-09-22-runtime-orchestration-primitives-design.md` — decorator evaluation order, state machines, concurrency primitives
+- `docs/adr/0011-three-layer-evaluation-model-keyword-reservation.md` — new ADR
+- `specs/issue-386-runtime-orchestration/2026-09-22-runtime-orchestration-primitives-design.md` — decorator evaluation order spec
+- `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/` — new eval package (StructuralStepEvaluator, DecoratorChain, StepRunner, DecoratedExecution)
