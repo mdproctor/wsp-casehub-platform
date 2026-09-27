@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-469-barrier-quorum-sugar
-state: active
+state: transitioning
 date: 2026-09-27
 issue-repo: casehubio/platform
 project-sha: 7a880a5cb1d34f309619982f230a4304d0d75d9c
@@ -12,11 +12,5 @@ design-section-hashes: 4d2cc5ab:## §1 Introduction and Goals|4f6b26ef:## §2 Co
 title: Barrier/quorum sugar + StepResultStore wiring
 
 ## Queue
-- [ ] casehubio/platform#469 — Barrier/quorum sugar + StepResultStore wiring ← active
-  - [x] Batch 1: Foundation
-    - [x] Task 1: ResolvedStep name + StepWalker extraction + duplicate validation
-    - [x] Task 2: StepResultStore recording + result ObjectVariableSource
-  - [x] Batch 2: Coordination
-    - [x] Task 3: BarrierStep + QuorumStep + StepWalker parsing + reference validation
-    - [x] Task 4: Barrier/quorum evaluation + latch wiring + QuorumTracker + composition
-- [ ] casehubio/platform#470 — Deadline propagation parent timeout creates child ScenarioScope deadline
+- [x] casehubio/platform#469 — Barrier/quorum sugar + StepResultStore wiring
+- [ ] casehubio/platform#470 — Deadline propagation parent timeout creates child ScenarioScope deadline ← active
