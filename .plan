@@ -13,10 +13,10 @@ title: Barrier/quorum sugar + StepResultStore wiring
 
 ## Queue
 - [ ] casehubio/platform#469 — Barrier/quorum sugar + StepResultStore wiring ← active
-  - [ ] Batch 1: Foundation
-    - [ ] Task 1: ResolvedStep name + StepWalker extraction + duplicate validation
-    - [ ] Task 2: StepResultStore recording + result ObjectVariableSource
-  - [ ] Batch 2: Coordination
-    - [ ] Task 3: BarrierStep + QuorumStep + StepWalker parsing + reference validation
-    - [ ] Task 4: Barrier/quorum evaluation + latch wiring + QuorumTracker + composition
+  - [x] Batch 1: Foundation
+    - [x] Task 1: ResolvedStep name + StepWalker extraction + duplicate validation
+    - [x] Task 2: StepResultStore recording + result ObjectVariableSource
+  - [x] Batch 2: Coordination
+    - [x] Task 3: BarrierStep + QuorumStep + StepWalker parsing + reference validation
+    - [x] Task 4: Barrier/quorum evaluation + latch wiring + QuorumTracker + composition
 - [ ] casehubio/platform#470 — Deadline propagation parent timeout creates child ScenarioScope deadline
