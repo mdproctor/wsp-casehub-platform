@@ -2,34 +2,20 @@
 
 ## Last Session
 
-Audited parent#515 (Spring deployment completion epic). Reconciled all 21 child issues against codebase evidence. Closed 9 issues total:
+Completed platform#397 (Spring config metadata). Audited all 5 target modules — only streams-spring has Spring config properties (5 props: kafka topic/enabled, amqp queue/enabled, poll interval). The other 4 modules (agent-config-spring, agent-router-spring, mcp-spring, platform-view-spring) have zero Spring-configurable properties.
 
-**Housekeeping from prior session:**
-- Pushed 14 desiredstate commits to canonical (slot clone → local main)
-- Closed blocks#297, workers#24 (work done, issues were still open)
-
-**Verified and closed (code confirmed landed on main):**
-- platform#430 — spring-generator @DefaultBean interface types (resolveConcreteType fix)
-- parent#513 — @PostConstruct initMethod scanning (effectiveType fix)
-- parent#479 — llm-config-core extraction (LlmConfigApi SPI)
-- platform#394 — 15 Spring modules consolidated (agent-spring, streams-spring)
-- platform#395 — spring-boot-starter split into core/agent/streams
-- parent#508 — OIDC + SCIM for Spring (oidc-spring, scim-spring, scim-core, credentials-spring)
-- parent#506 — consumer guide Spring Boot section (~400 lines)
-
-**Also closed:** parent#469 (dual-framework epic, 10/10 repos complete)
-
-**Updated parent#515 body** with checkmarks — 11/21 items done.
+- Committed: `ff0c7a55 feat(#397): add Spring config metadata for streams-spring`
+- Closed: platform#397
+- Updated parent#515 body: 12/21 items done, Phase 2 fully complete
 
 ## Immediate Next Step
 
-parent#515 has 10 remaining items. Next priority by execution order:
+parent#515 has 9 remaining items. Next priority by execution order:
 
-1. **platform#397** — config metadata for streams-spring + mcp-spring (XS, partial)
-2. **Phase 4 REST** — #483, #480, #495 (3 issues, all M/Med)
-3. **Phase 5 Persistence** — #498 MongoDB, work#401 Panache→JPA (2 issues)
-4. **engine#1103** — compile errors (XS)
-5. **Phase 8 Workers** — docs, spring-integration-test, MCP Spring, K8s (5 items)
+1. **Phase 4 REST** — #483, #480, #495 (3 issues, all M/Med)
+2. **Phase 5 Persistence** — #498 MongoDB, work#401 Panache→JPA (2 issues)
+3. **engine#1103** — compile errors (XS)
+4. **Phase 8 Workers** — docs, spring-integration-test, MCP Spring, K8s (4 items)
 
 ## Cross-Module
 
