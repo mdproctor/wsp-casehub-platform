@@ -1,0 +1,15 @@
+# Work Plan — issue-474-476-mcp-domain-reporting
+
+## State
+branch: issue-474-476-mcp-domain-reporting
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 474,475,476
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#474 — Issue #474 ← active
