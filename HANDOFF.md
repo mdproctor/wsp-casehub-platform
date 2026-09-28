@@ -2,14 +2,15 @@
 
 ## Last Session
 
-Landed platform#477 and parent#480, advanced to parent#495.
+Landed platform#477, parent#480, and parent#495.
 
-1. **platform#477** — Fixed graphql-generator BeanParam constructor ordering. Jandex `recordComponents()` and `fields()` both return alphabetical order; fix uses canonical constructor parameter names which preserve declaration order. Landed on main, pushed, issue closed.
-2. **parent#480** — Merged qhorus `issue-480-mcpdomain-spi-migration` branch to main. Squashed 2 WIP commits. Pushed. Removed duplicate `@McpDomain` from concrete classes, fixed domain filter, added `@RestMethod(POST)` for reactionsBatch.
+1. **platform#477** — Fixed graphql-generator BeanParam constructor ordering (canonical constructor params for declaration order).
+2. **parent#480** — Merged qhorus McpDomain migration (removed duplicate annotations, fixed domain filter, added @RestMethod(POST) for reactionsBatch).
+3. **parent#495** — Enhanced rest-spring-generator with multipart FileUpload support (@RestForm FileUpload → @RequestPart MultipartFile with byte[]/filename expansion). Fixed Jandex annotation() → declaredAnnotation() for class-level media types. Enabled ComplianceReportResource generation (added verifyUpload to core). 9/10 qhorus resources now generated.
 
 ## Immediate Next Step
 
-parent#495 — Generate Spring REST controllers for qhorus. The `qhorus-rest-spring` module (rest-spring-generator from @Path resources) is already in the reactor. May need verification and updates.
+Next item in .plan queue. A2AResource (the 10th) needs core extraction before generation — tracked in qhorus#458.
 
 ## Loose Ends Filed
 
