@@ -78,7 +78,31 @@
 - Per-correlation child scope with deadline — one child scope + watcher thread per correlation is heavier; latch doesn't carry data
 - Channel-per-correlation — pushes routing to callers, doesn't compose with external event sources
 **Rationale:** Clean separation — one reader thread, keyed dispatch via ConcurrentHashMap, per-key timeout via scheduler. CompletableFuture naturally generalizes 1:1 (complete) to 1:N (collecting). ScheduledExecutorService is minimal overhead (single virtual thread).
-**Trade-offs:** ScheduledExecutorService is an additional resource to manage (shutdown on close). Unmatched messages (no pending correlation for the extracted key) need a policy — discard silently or buffer.
+**Trade-offs:** ScheduledExecutorService is an additional resource to manage (shutdown on close).
 **Sources:** DefaultOrcChannel implementation, java.util.concurrent patterns
+**Exploration:** quick
+**Status:** captured
+
+## D8: Unmatched messages — discard silently
+
+**Choice:** When a value arrives on the channel but no pending correlation matches the extracted key, discard silently. Log at TRACE/DEBUG level for diagnostics.
+**Alternatives:**
+- Buffer for late registration — holds unmatched values briefly in case expectResponse() is called after the response arrives; adds complexity and memory pressure
+**Rationale:** CorrelationScope is for expected request-response patterns. If a response arrives before the correlation is registered, the design is wrong — the caller should register before sending the request.
+**Trade-offs:** Race condition where expectResponse() is called slightly after the response arrives causes a missed match. Caller must ensure expectResponse() precedes the request send.
+**Depends on:** D7 (listener architecture)
+**Sources:** Request-response ordering contract
+**Exploration:** quick
+**Status:** captured
+
+## D9: Partial results on 1:N timeout — carry in exception
+
+**Choice:** CorrelationTimeoutException includes a `List<V> partialResults()` accessor. For 1:1, this is empty. For 1:N scatter-gather that times out after receiving K of N responses, the list contains the K received values.
+**Alternatives:**
+- Discard partial results — simpler exception but caller loses data that was successfully received
+**Rationale:** Partial results are valuable — a scatter-gather that receives 4 of 5 responses may still be actionable. The caller decides whether partial is good enough.
+**Trade-offs:** Exception carries mutable state (the list). Defensive copy on construction.
+**Depends on:** D5 (configurable cardinality)
+**Sources:** Scatter-gather pattern, partial-success handling
 **Exploration:** quick
 **Status:** captured
