@@ -2,47 +2,23 @@
 
 ## Last Session
 
-Repo sync and slot housekeeping. Rebased all slot repos to canonical main, pushed all 5 canonical repos (engine, neocortex, platform, qhorus, work) to both mdproctor and casehubio remotes. Populated landed SHAs for all 5 repos. All verify checks pass.
+Completed casehubio/casehub-desiredstate#139 — full core extraction and Spring Boot adapters. Added desiredstate repo to slot 198. Created 11 new modules (runtime-core, persistence-jpa-common, annotations/core, runtime-spring, annotations/spring, yaml/spring, ts-dsl/spring, plugin/spring, persistence-spring-jpa, GoalCompilerFactory, DescriptorScanner). Slimmed 4 existing modules. 14 commits on desiredstate main, issue closed on GitHub. Advanced queue to parent#515.
 
-### What was done
+## Immediate Next Step
 
-1. **Platform slot → canonical sync** — rebased 14 slot commits onto canonical main (48 commits divergence). Resolved 5 conflicts (deleted test files renamed to McpModelComprehensionIT.java, DomainScanResult/McpDomainJandexScanner app+summary fields). 10 commits survived rebase (4 auto-dropped as already present). Pushed canonical to origin + upstream.
+Work on casehubio/parent#515 — Spring deployment completion epic. This is a cross-repo audit tracking issue (L/High), not implementation. Survey all repos that received Spring Boot support across slot 198 to verify completeness and identify remaining gaps.
 
-2. **Neocortex sync** — rebased canonical onto origin (1 ahead/1 behind divergence), pushed to both remotes.
+## Cross-Module
 
-3. **Work sync** — pushed 7 canonical commits to upstream (casehubio).
+3 pre-existing upstream failures in desiredstate (not caused by this work):
+- work-adapter: WorkItemRef constructor mismatch (casehub-work API added field)
+- yaml/runtime: ForEachAdapter.getWhen→getCondition (platform yaml-core rename)
+- plugin/spring: missing yaml-step-core in slot .m2
 
-4. **Workspace sync** — rebased 36 workspace commits onto origin (14 behind), resolved rename/rename conflict (plan archived to two attic paths), pushed.
+Desiredstate commits are on the slot clone's main — need pushing to canonical via `git -C desiredstate push local main`.
 
-5. **Landed SHAs populated** — all 5 repos recorded in `.landed` with current main SHAs.
+## References
 
-6. **Stale scaffold removed** — `.artifacts-promoted` deleted.
-
-### All 5 repos fully synced
-
-| Repo | canonical = origin = upstream |
-|------|------------------------------|
-| engine | f5f0df01 |
-| neocortex | 70d72953 |
-| platform | 932d0538 |
-| qhorus | d692ad8f |
-| work | bef64db6 |
-
-## Queue State
-
-Position 10/12. Active issue: `casehubio/casehub-desiredstate#139` — Core extraction and Spring Boot adapters.
-
-## What's Next
-
-| # | Item | Repo | Scale | Complexity | Notes |
-|---|------|------|-------|-----------|-------|
-| 1 | Core extraction and Spring Boot adapters | casehub-desiredstate | M | High | Active — next session starts here |
-| 2 | Spring deployment completion epic | parent | L | High | Final epic — tracks remaining cross-repo gaps |
-
-### Context for desiredstate#139
-
-The desiredstate repo needs the same core extraction + Spring auto-configuration treatment applied to all other slot repos. Pattern is well-established: extract CDI-free POJOs into `-core` modules, generate Spring `@AutoConfiguration` classes, wire `@ConditionalOnMissingBean` for SPIs.
-
-## Slot State
-
-Slot 198 remains active. 10/12 queue items complete across 8 repos. All canonical repos fully synced with both GitHub remotes. Not archiving — desiredstate and the completion epic remain.
+- Spec: `wsp-casehub-desiredstate/specs/main/2026-09-28-core-extraction-spring-adapters-design.md`
+- Plan: `wsp-casehub-desiredstate/plans/2026-09-28-core-extraction-spring-adapters.md`
+- Decisions: `wsp-casehub-desiredstate/specs/main/decisions.md`
