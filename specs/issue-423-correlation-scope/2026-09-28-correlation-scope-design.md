@@ -32,6 +32,8 @@ Platform #410 D1 resolved correlation at the primitive layer as composition over
 
 CorrelationScope's dependencies are exclusively yaml-core types (OrcChannel) and JDK (ConcurrentHashMap, CompletableFuture, ScheduledExecutorService, Function). Zero external deps — same profile as DefaultScenarioScope.
 
+**Note on issue #423 text:** The issue body says "Consuming module (scenario-runtime or orchestration-runtime), not yaml-core." The decision review (D1 revision, R1-02) moved placement to yaml-core based on CorrelationScope's actual dependency profile — it composes only yaml-core types and JDK, identical to DefaultScenarioScope. Placing it in yaml-step-runtime would force consumers who only want CorrelationScope (simulation drivers, request-reply bridges) to pull Quarkus, Jackson, and platform-api transitive deps. See `decisions.md` D1 for the full rationale.
+
 ### Public API
 
 ```java
@@ -85,18 +87,19 @@ On construction:
 public static <K, V> CorrelationScope<K, V> forScope(
         ScenarioScope scope, String name, Function<V, K> keyExtractor) {
     OrcChannel<V> channel = scope.channel(name + ".correlation");
-    CorrelationScope<K, V> cs = new CorrelationScope<>(channel, keyExtractor, /* scope's speedMultiplier */);
-    // Register as primitive for lifecycle cascade
-    // scope.primitive() lookup with the name will find it
+    CorrelationScope<K, V> cs = new CorrelationScope<>(channel, keyExtractor, scope.speedMultiplier());
+    ((DefaultScenarioScope) scope).registerPrimitive(name, cs);
     return cs;
 }
 ```
 
 The factory creates a named channel, constructs CorrelationScope with the scope's SpeedMultiplier, and registers the CorrelationScope in the scope's primitive map. When `ScenarioScope.close()` cascades, it calls `CorrelationScope.releaseForClose()` automatically.
 
-**SpeedMultiplier access:** `forScope()` needs the SpeedMultiplier from the scope. DefaultScenarioScope stores it as a field. The factory can access it via a package-private method or by passing it as a parameter. Since CorrelationScope is in the same package (`io.casehub.yaml.core.orchestration`), package-private access is available.
+**SpeedMultiplier on ScenarioScope interface:** Add `SpeedMultiplier speedMultiplier()` to the `ScenarioScope` interface. SpeedMultiplier is a fundamental property of a scenario's temporal model — every scope has one, and any consuming-layer utility that deals with time needs it. Keeping it hidden behind a concrete cast forces every time-aware utility to cast. DefaultScenarioScope already stores it as a field — the interface method just exposes it.
 
-**Primitive registration:** DefaultScenarioScope stores primitives in a `ConcurrentHashMap<String, Object>`. The `forScope()` factory must register the CorrelationScope in this map (via a package-private registration method or by making CorrelationScope's constructor accept a registration callback). The key is the provided `name`.
+**Primitive registration:** DefaultScenarioScope stores primitives in a `ConcurrentHashMap<String, Object>`. The `forScope()` factory registers via a package-private `registerPrimitive()` method. The cast to `DefaultScenarioScope` is acceptable here — `registerPrimitive` is an internal mechanism, not a public contract. If a non-DefaultScenarioScope is passed, `forScope()` throws `IllegalArgumentException` with a message directing to the OrcChannel constructor.
+
+**Close ordering:** When ScenarioScope.close() iterates primitives, ConcurrentHashMap iteration order is undefined — the internal channel might be released before CorrelationScope or vice versa. The listener thread handles this gracefully: if the channel is closed first, `receive()` returns null or throws ChannelClosedException, and the listener exits. If CorrelationScope is closed first, pending futures are cancelled and the listener is interrupted before the channel is released. Both orderings produce correct behavior.
 
 ---
 
@@ -137,14 +140,15 @@ private void listenerLoop() {
         V value;
         try {
             value = channel.receive();
+        } catch (ChannelClosedException e) {
+            // Channel error-closed — propagate upstream error to all pending correlations (D10)
+            failAllPending(e.getCause() != null ? e.getCause() : e);
+            return;
         } catch (InterruptedException e) {
             return; // scope closing
         }
         if (value == null) {
-            // Channel closed — propagate error or exit
-            if (channel.isErrorClosed()) {
-                failAllPending(channel.closeError());
-            }
+            // Channel normal-closed — listener exits, pending correlations timeout individually
             return;
         }
 
@@ -152,16 +156,20 @@ private void listenerLoop() {
         try {
             key = keyExtractor.apply(value);
         } catch (Exception e) {
-            // Log at DEBUG, skip message, continue
+            // Log at DEBUG, skip message, continue (D6 safety)
+            continue;
+        }
+        if (key == null) {
+            // Null key — skip message, continue
             continue;
         }
 
         PendingCorrelation<K, V> pc = pending.remove(key);
         if (pc != null) {
-            pc.timeoutTask().cancel(false);
+            if (pc.timeoutTask() != null) pc.timeoutTask().cancel(false);
             pc.future().complete(value);
         } else {
-            // Buffer for late registration
+            // Buffer for late registration (D8)
             earlyArrivals.put(key, new BufferedValue<>(value, System.nanoTime()));
         }
     }
@@ -169,10 +177,11 @@ private void listenerLoop() {
 ```
 
 **Key behaviors:**
-- Extractor failure: caught, logged at DEBUG, message discarded, listener continues (D6 safety)
+- Extractor failure: caught, logged at DEBUG, message discarded, listener continues (D6)
+- Extractor returns null: message discarded, listener continues
 - Channel normal close: `receive()` returns null, listener exits
-- Channel error close: `receive()` throws `ChannelClosedException` with cause, all pending correlations failed with the cause (D10)
-- Matched value: removes PendingCorrelation, cancels timeout task, completes future
+- Channel error close: `receive()` throws `ChannelClosedException`, all pending correlations failed with the upstream cause (D10)
+- Matched value: removes PendingCorrelation, null-checks and cancels timeout task, completes future
 - Unmatched value: buffered in early-arrival map with timestamp (D8)
 
 ### expectResponse()
@@ -181,44 +190,56 @@ private void listenerLoop() {
 public void expectResponse(K correlationKey, Duration timeout) {
     if (closed) throw new IllegalStateException("CorrelationScope is closed");
 
-    // D11: fail-fast on duplicate key
-    CompletableFuture<V> future = new CompletableFuture<>();
-    PendingCorrelation<K, V> pc = new PendingCorrelation<>(
-        correlationKey, future, System.nanoTime(), null);
-
-    PendingCorrelation<K, V> existing = pending.putIfAbsent(correlationKey, pc);
-    if (existing != null) {
-        throw new IllegalStateException(
-            "Correlation key already pending: " + correlationKey);
-    }
-
-    // D8: check early-arrival buffer first
-    BufferedValue<V> buffered = earlyArrivals.remove(correlationKey);
-    if (buffered != null) {
-        pending.remove(correlationKey);
-        future.complete(buffered.value());
-        return;
-    }
-
-    // Schedule timeout (SpeedMultiplier-aware)
+    // Schedule timeout first (SpeedMultiplier-aware) — avoids null timeoutTask race
     double speed = Math.max(speedMultiplier.currentSpeed(), 0.001);
     long realTimeoutNanos = (long) (timeout.toNanos() / speed);
+    CompletableFuture<V> future = new CompletableFuture<>();
     ScheduledFuture<?> timeoutTask = scheduler.schedule(() -> {
         PendingCorrelation<K, V> removed = pending.remove(correlationKey);
         if (removed != null) {
             removed.future().completeExceptionally(
-                new CorrelationTimeoutException(correlationKey, timeout));
+                new CorrelationTimeoutException<>(correlationKey, timeout));
         }
     }, realTimeoutNanos, TimeUnit.NANOSECONDS);
 
-    // Update PendingCorrelation with the timeout task
-    // (CAS to handle race with listener completing between putIfAbsent and here)
-    pending.computeIfPresent(correlationKey, (k, v) ->
-        new PendingCorrelation<>(k, v.future(), v.registeredAtNanos(), timeoutTask));
+    // D11: fail-fast on duplicate key
+    PendingCorrelation<K, V> pc = new PendingCorrelation<>(
+        correlationKey, future, System.nanoTime(), timeoutTask);
+
+    PendingCorrelation<K, V> existing = pending.putIfAbsent(correlationKey, pc);
+    if (existing != null) {
+        timeoutTask.cancel(false);
+        throw new IllegalStateException(
+            "Correlation key already pending: " + correlationKey);
+    }
+
+    // Post-insertion closed check — handles race with concurrent close()
+    if (closed) {
+        PendingCorrelation<K, V> removed = pending.remove(correlationKey);
+        if (removed != null) {
+            timeoutTask.cancel(false);
+            future.cancel(true);
+        }
+        throw new IllegalStateException("CorrelationScope closed during registration");
+    }
+
+    // D8: check early-arrival buffer — complete immediately if match found
+    // Leave the completed future in pending so awaitResponse() can find it
+    BufferedValue<V> buffered = earlyArrivals.remove(correlationKey);
+    if (buffered != null) {
+        timeoutTask.cancel(false);
+        future.complete(buffered.value());
+    }
 }
 ```
 
-**SpeedMultiplier note:** The timeout is computed once at registration time using `currentSpeed()`. This is a snapshot — if speed changes after registration, the timeout is not adjusted. This is the same trade-off as DefaultScenarioScope's deadline watcher, where each sleep iteration re-reads speed. For correlation timeouts (typically seconds, not minutes), a single-read snapshot is sufficient. If finer-grained speed tracking is needed, the timeout task can use adaptive rescheduling (future enhancement, not in this spec).
+**Key design changes from review:**
+- Timeout scheduled BEFORE insertion — PendingCorrelation always has a non-null timeoutTask. Eliminates NPE race where listener matches between insertion and scheduling (review R1-03).
+- Early-arrival match does NOT remove from pending — the completed future stays in the map so `awaitResponse()` can find it via `pending.get()` and `future.get()` returns immediately (review R1-04).
+- Post-insertion closed check — detects concurrent `close()` that cleared the map between the pre-check and insertion. Prevents zombie correlations with a dead listener (review R1-09).
+- On duplicate key, the pre-scheduled timeout task is cancelled before throwing.
+
+**SpeedMultiplier note:** The timeout is computed once at registration time using `currentSpeed()`. This is a snapshot — if speed changes after registration, the timeout is not adjusted. For correlation timeouts (typically seconds, not minutes), a single-read snapshot is sufficient.
 
 ### awaitResponse()
 
@@ -291,22 +312,22 @@ package io.casehub.yaml.core.orchestration;
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;
 
-public class CorrelationTimeoutException extends TimeoutException {
-    private final Object correlationKey;
+public class CorrelationTimeoutException<K> extends TimeoutException {
+    private final K correlationKey;
     private final Duration timeout;
 
-    public CorrelationTimeoutException(Object correlationKey, Duration timeout) {
+    public CorrelationTimeoutException(K correlationKey, Duration timeout) {
         super("Correlation timeout for key '" + correlationKey + "' after " + timeout);
         this.correlationKey = correlationKey;
         this.timeout = timeout;
     }
 
-    public Object correlationKey() { return correlationKey; }
+    public K correlationKey() { return correlationKey; }
     public Duration timeout() { return timeout; }
 }
 ```
 
-The key is stored as `Object` (not `K`) because TimeoutException is not generic. Callers who know the key type can cast. The key's `toString()` appears in the exception message for diagnostics.
+Generic `<K>` provides compile-time type safety at the catch site — callers get the key as the correct type without casting. The type parameter is erased at runtime (Java generics) but TimeoutException allows generic subclasses. The key's `toString()` appears in the exception message for diagnostics.
 
 ---
 
@@ -320,12 +341,20 @@ private static final long BUFFER_GRACE_NANOS = Duration.ofSeconds(1).toNanos();
 // Scheduled at construction, runs every 1s
 scheduler.scheduleAtFixedRate(() -> {
     long now = System.nanoTime();
-    earlyArrivals.entrySet().removeIf(e ->
-        (now - e.getValue().arrivedAtNanos()) > BUFFER_GRACE_NANOS);
+    earlyArrivals.entrySet().removeIf(e -> {
+        boolean stale = (now - e.getValue().arrivedAtNanos()) > BUFFER_GRACE_NANOS;
+        if (stale) {
+            // Log at WARN — an evicted early arrival means a response was received
+            // but never claimed. This usually indicates an ordering bug or a missing
+            // expectResponse() call. The key is included for correlation with upstream logs.
+            // logger.warn("Evicting unclaimed early arrival for key: {}", e.getKey());
+        }
+        return stale;
+    });
 }, BUFFER_GRACE_NANOS, BUFFER_GRACE_NANOS, TimeUnit.NANOSECONDS);
 ```
 
-Entries older than 1 second are evicted. The grace period is fixed (not SpeedMultiplier-adjusted) because it covers real-time scheduling jitter, not scenario time.
+Entries older than 1 second are evicted with a WARN log. The grace period is fixed (not SpeedMultiplier-adjusted) because it covers real-time scheduling jitter, not scenario time. The WARN log is important for diagnosing unexplained correlation timeouts — an evicted early arrival means the response arrived but was never claimed.
 
 ---
 
@@ -386,7 +415,7 @@ public static <K, V> CorrelationScope<K, V> forScope(
 
 | Module | Changes |
 |--------|---------|
-| yaml-core | CorrelationScope, CorrelationTimeoutException (new classes). DefaultScenarioScope: `registerPrimitive()` + `speedMultiplier()` package-private accessors |
+| yaml-core | CorrelationScope, CorrelationTimeoutException (new classes). ScenarioScope: add `speedMultiplier()` to interface. DefaultScenarioScope: `registerPrimitive()` package-private accessor |
 
 ---
 
@@ -428,11 +457,20 @@ close_schedulerShutdown_noLeakedThreads
 
 # Error propagation
 channelErrorClose_failsAllPendingWithCause
+channelErrorClose_awaitResponseThrowsUpstreamCause
 channelNormalClose_listenerExits
 
 # Key extractor safety
 extractor_throws_messageDropped_listenerContinues
 extractor_returnsNull_messageDropped_listenerContinues
+
+# Close race conditions
+expectResponse_duringClose_throwsIllegalState
+expectResponse_closedScope_throwsIllegalState
+
+# Early-arrival edge cases
+earlyArrival_eviction_logsAtWarn
+earlyArrival_awaitResponse_afterEarlyMatch_returnsImmediately
 
 # Observability
 pendingCount_empty_returnsZero
