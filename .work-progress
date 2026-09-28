@@ -1,3 +1,6 @@
 report_init=done
 code_review_attempt=1
-last_yielded=code_review
+last_yielded=branch_name
+sync_main=done
+stacked_pr_detect=done
+branch_name_attempt=3
