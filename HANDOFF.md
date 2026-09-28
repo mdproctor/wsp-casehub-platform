@@ -2,38 +2,24 @@
 
 ## Last Session
 
-Fixed rest-spring-generator status mapping (parent#483). Generated Spring controllers for CallbackDispatch, Webhook, and EngagementCallback now use correct HTTP status codes from DispatchResult and WebhookResult instead of always returning 204.
+Fixed rest-spring-generator status mapping (parent#483). When a Quarkus resource returns `Response` but the delegate returns a type with `int status()` (DispatchResult, WebhookResult), the generator now produces `ResponseEntity.status(result.status()).body(result)` instead of always returning 204. Landed as 842de2dc on main.
 
-Also populated .plan with all 11 remaining parent#515 child items, phase-batched. Created 5 issues for Phase 8 (workers#25-27, platform#472-473).
+Also populated .plan with 11 remaining parent#515 child items and created 5 GitHub issues for Phase 8 (workers#25-27, platform#472-473).
 
-## Queue (10 items remaining, phase-batched)
+## Immediate Next Step
 
-**Phase 4 — REST (2 remaining):**
-- parent#480 — Pattern 2 migration: qhorus @McpDomain to SPI interfaces (M/Med)
-- parent#495 — Generate Spring REST controllers for qhorus (M/Med)
-
-**Phase 5 — Persistence (2):**
-- parent#498 — Spring Data MongoDB for work persistence (L/Med)
-- work#401 — Port Panache to plain JPA, 21 files (M/Med)
-
-**Phase 6 — Consumer repos (1):**
-- engine#1103 — Fix compile errors: TrustGateService + AgentCapability (XS/Low)
-
-**Phase 8 — Workers follow-up (5):**
-- workers#25 — Workers CLAUDE.md update (S/Low) — partially done
-- workers#26 — Workers contributor guide update (S/Low) — partially done
-- workers#27 — Workers spring-integration-test (M/Med)
-- platform#472 — MCP Spring session provider (M/Med)
-- platform#473 — K8s Spring fabric8 integration (M/High)
+parent#480 — Pattern 2 migration: qhorus @McpDomain to SPI interfaces (M/Med). Move `@McpDomain` from concrete classes to SPI interfaces in the qhorus repo so `graphql-spring-generator` can scan them.
 
 ## Cross-Module
 
 3 pre-existing upstream failures in desiredstate (not caused by slot 198 work):
-- work-adapter: WorkItemRef constructor mismatch (casehub-work API added field)
-- yaml/runtime: ForEachAdapter.getWhen→getCondition (platform yaml-core rename)
+- work-adapter: WorkItemRef constructor mismatch
+- yaml/runtime: ForEachAdapter.getWhen→getCondition
 - plugin/spring: missing yaml-step-core in slot .m2
 
 ## References
 
 - Epic: casehubio/parent#515
-- Closed epic: casehubio/parent#469 (dual-framework, all 10 repos done)
+- .plan: 10 items remaining (Phase 4-8)
+- Design spec: specs/issue-483-spring-rest-handwritten-path/ (D5 pivot documented)
+- Diary: blog/2026-09-28-mdp01-the-controllers-were-already-there.md
