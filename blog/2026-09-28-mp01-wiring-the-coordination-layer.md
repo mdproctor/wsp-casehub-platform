@@ -5,7 +5,7 @@ date: 2026-09-28
 entry_type: note
 subtype: diary
 projects: [casehubio/platform]
-tags: [yaml-runtime, orchestration, barrier, quorum, coordination]
+tags: [yaml-runtime, orchestration, barrier, quorum, coordination, deadline, deadline-propagation]
 series: issue-469-barrier-quorum-sugar
 ---
 
@@ -44,8 +44,20 @@ The parent spec (issue-386 §2.2) already had the answer — "created eagerly at
 
 Quorum adds one more piece: an `AtomicBoolean` unreachability flag. When enough steps fail that the required threshold can never be met, the tracker drains the latch and sets the flag. The quorum evaluator checks it after `await()` returns — distinguishing "quorum met" from "quorum drained because it was hopeless."
 
+## Making It Production-Safe: Deadline Propagation
+
+Coordination primitives without deadlines are a liability. A barrier waiting on a step that never completes blocks forever. A semaphore acquire inside a timeout block doesn't know the timeout exists — it blocks indefinitely until `Future.cancel(true)` interrupts it, producing an opaque "interrupted" error instead of "deadline exceeded."
+
+The core problem is architectural: the decorator chain's `wrapTimeout` enforces deadlines via `Future.get(timeout)`, but inner decorators — `wrapWait`, `wrapSemaphore` — have no way to query remaining time. The scope hierarchy doesn't help because `wrapTimeout` creates a deadline on a child scope while the evaluator and other decorators reference the parent scope.
+
+I considered three propagation mechanisms. `InheritableThreadLocal` would require zero interface changes — virtual threads inherit thread-locals naturally, and the deadline would flow through parallel execution automatically. But implicit state means a developer adding a new decorator has no signal in the method signature that deadline info exists. They have to know to check `DeadlineContext.current()`. The compiler can't enforce it. A missing check means a hung step inside a timeout block.
+
+The explicit alternative: a `StepContext` carrying `VariableResolver` plus a `DeadlineContext` through the execution chain. `DecoratedExecution.execute(StepContext)` replaces the bare resolver parameter. Every decorator sees `ctx.deadline().remainingTime()` in its signature. `DeadlineContext` is an immutable value type — `withTimeout(Duration)` composes via `Math.min(existing, new)`, so nested timeouts naturally produce the tighter deadline without any special nesting logic.
+
+The refactoring touched every decorator lambda in DecoratorChain and every dispatch method in StructuralStepEvaluator — roughly 25 method signatures across two files. Mechanical, but the result is that `wrapWait` and `wrapSemaphore` now check `ctx.deadline().remainingTime()` and use timed variants (`signal.await(remaining, MILLISECONDS)`, `semaphore.tryAcquire(remaining, MILLISECONDS)`) when a deadline exists. The error messages say "exceeded deadline" — the developer debugging a hung scenario sees exactly what happened, not a generic interruption.
+
 ## What This Opens Up
 
-The combination matters more than the individual pieces. `${result.<step>}` alone lets sequential steps consume each other's output. Barrier alone lets parallel work synchronise. Together, they enable the pattern the spec was designed around: fork evaluation across parallel strategies, wait at a barrier for all of them, then use their results to make a decision. Quorum makes the voting variant possible — proceed when two of three strategies agree, without waiting for the slow one.
+The coordination layer is now complete enough to support the target pattern: fork evaluation across parallel strategies, synchronise at a barrier, consume results via `${result.<step>}`, and know that the whole thing has a time budget. A `timeout: 30s` on a parallel block propagates to every signal wait and semaphore acquire inside it — if step A takes 25 seconds, step B's semaphore acquire gets 5 seconds, not infinity.
 
-The next issue on the branch is deadline propagation — parent timeouts creating child `ScenarioScope` deadlines. That's the piece that makes the coordination primitives production-safe: without it, a hung barrier blocks forever. With it, the parent scope's deadline cascades through and interrupts the wait.
+The deadline mechanism is deliberately lightweight. `DeadlineContext` tracks an absolute nanos timestamp — no scope hierarchy, no watcher threads, no cleanup cascades. The `ScenarioScope.withDeadline()` API exists for cases that need scope-level enforcement with primitive release on expiry. The two mechanisms are complementary: scope deadlines for infrastructure cleanup, `DeadlineContext` for cooperative awareness.
