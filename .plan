@@ -1,7 +1,7 @@
 # Work Plan — Spring Boot Deployment (remaining repos)
 
 ## State
-branch: issue-480-mcpdomain-spi-migration
+branch: main
 state: active
 date: 2026-09-25
 issue-repo: casehubio/platform
