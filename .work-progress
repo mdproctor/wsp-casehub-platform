@@ -1,6 +1,6 @@
 report_init=done
 code_review_attempt=1
-last_yielded=handoff_write
+last_yielded=load_context
 loose_ends=done
 epic_hygiene_attempt=1
 epic_hygiene=done
@@ -17,3 +17,8 @@ notes_attempt=0
 notes=skipped
 handoff_write_attempt=1
 handoff_write=done
+wip_commit=done
+lifecycle_continue=done
+health_check=done
+load_specs=done
+load_context_attempt=2
