@@ -1,19 +1,37 @@
-# Next Work — YAML Runtime and Language Completion
+# Work Plan — Spring Boot Deployment (remaining repos)
 
-## Batch 1: Foundation — patterns + hardening (XS-S, same session)
-- [ ] casehubio/platform#459 — Unify state machine transitions with MatchPattern semantics
-- [ ] casehubio/platform#460 — ADR: three-layer evaluation model keyword reservation
-- [ ] casehubio/platform#462 — StepWalker recursion depth limit
-- [ ] casehubio/platform#461 — Enforce maxOutputBytes in DefaultProcessExecutor
-- [ ] casehubio/platform#468 — StepWalker nesting path in error messages
-- [ ] casehubio/platform#467 — Hardening: parseTimeout extraction, AgentInvokeHandler config, trust boundary
+## State
+branch: main
+state: active
+date: 2026-09-25
+issue-repo: casehubio/platform
+covers: 16,297,24
+evidence-era: true
 
-## Batch 2: Runtime evaluators — step types (L, own session)
-- [ ] casehubio/platform#465 — Runtime evaluators for structural step types (block, if/else, match, parallel)
-
-## Batch 3: Runtime evaluators — decorators (L, own session)
-- [ ] casehubio/platform#466 — Runtime evaluators for step decorators (forEach, loop, timeout, retry, etc.)
-
-## Batch 4: Structural extensions (M each, own sessions)
-- [ ] casehubio/platform#463 — try/catch/finally — structured error handling step type
-- [ ] casehubio/platform#464 — CSP select — first-of-N channel structural step type
+## Queue
+- [x] casehubio/platform#9004 — Update per-module tests for faultAddress removal
+- [x] casehubio/platform#9005 — Update docs for deleted classes
+- [x] casehubio/platform#9006 — Fix pre-existing K8s Optional<CaseInstance> compilation error
+- [x] casehubio/platform#9000 — Per-module -core extraction (6 mechanical modules)
+- [x] casehubio/platform#9001 — MCP -core extraction (deliberate design)
+- [x] casehubio/platform#9002 — WebClient → JDK HttpClient (4 modules)
+- [x] casehubio/platform#9003 — Consolidated workers-spring auto-config
+- [x] casehubio/casehub-worker#16 — Spring Boot deployment
+- [x] casehubio/blocks#297 — Spring Boot deployment
+- [x] casehubio/workers#24 — Spring Boot deployment
+- [x] casehubio/casehub-desiredstate#139 — Core extraction and Spring Boot adapters
+- [x] casehubio/parent#515 — Spring deployment completion epic
+- [x] casehubio/parent#483 — Spring_REST_controllers_for_hand-written_Path_resources
+- [x] casehubio/parent#480 — Pattern_2_migration_qhorus_McpDomain_to_SPI_interfaces
+- [ ] casehubio/parent#495 — Generate_Spring_REST_controllers_for_qhorus ← active
+- [ ] casehubio/parent#498 — Spring_Data_MongoDB_for_work_persistence
+- [ ] casehubio/work#401 — Port_Panache_to_plain_JPA
+- [ ] casehubio/engine#1103 — Fix_compile_errors_TrustGateService_AgentCapability
+- [ ] casehubio/workers#25 — Workers_CLAUDE.md_update
+- [ ] casehubio/workers#26 — Workers_contributor_guide_update
+- [ ] casehubio/workers#27 — Workers_spring-integration-test
+- [ ] casehubio/platform#472 — MCP_Spring_session_provider
+- [ ] casehubio/platform#473 — K8s_Spring_fabric8_integration
+- [ ] casehubio/qhorus#458 — Complete_runtime-core_extraction_for_runtime-spring
+- [ ] casehubio/qhorus#459 — Fix_pre-existing_qhorus_test_failures
+- [ ] casehubio/platform#477 — Fix_graphql-generator_BeanParam_constructor_ordering
