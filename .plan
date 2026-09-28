@@ -20,4 +20,15 @@ evidence-era: true
 - [x] casehubio/blocks#297 — Spring Boot deployment
 - [x] casehubio/workers#24 — Spring Boot deployment
 - [x] casehubio/casehub-desiredstate#139 — Core extraction and Spring Boot adapters
-- [ ] casehubio/parent#515 — Spring deployment completion epic ← active
+- [x] casehubio/parent#515 — Spring deployment completion epic
+- [ ] casehubio/parent#483 — Spring_REST_controllers_for_hand-written_Path_resources ← active
+- [ ] casehubio/parent#480 — Pattern_2_migration_qhorus_McpDomain_to_SPI_interfaces
+- [ ] casehubio/parent#495 — Generate_Spring_REST_controllers_for_qhorus
+- [ ] casehubio/parent#498 — Spring_Data_MongoDB_for_work_persistence
+- [ ] casehubio/work#401 — Port_Panache_to_plain_JPA
+- [ ] casehubio/engine#1103 — Fix_compile_errors_TrustGateService_AgentCapability
+- [ ] casehubio/workers#25 — Workers_CLAUDE.md_update
+- [ ] casehubio/workers#26 — Workers_contributor_guide_update
+- [ ] casehubio/workers#27 — Workers_spring-integration-test
+- [ ] casehubio/platform#472 — MCP_Spring_session_provider
+- [ ] casehubio/platform#473 — K8s_Spring_fabric8_integration
