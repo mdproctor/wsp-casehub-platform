@@ -1,37 +1,15 @@
-# Work Plan — Spring Boot Deployment (remaining repos)
+# Work Plan — issue-477-fix-beanparam-constructor-order
 
 ## State
-branch: main
-state: active
-date: 2026-09-25
+branch: issue-477-fix-beanparam-constructor-order
+state: scaffolded
+project-sha: 
+date: 
 issue-repo: casehubio/platform
 covers: 16,297,24
-evidence-era: true
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
 
 ## Queue
-- [x] casehubio/platform#9004 — Update per-module tests for faultAddress removal
-- [x] casehubio/platform#9005 — Update docs for deleted classes
-- [x] casehubio/platform#9006 — Fix pre-existing K8s Optional<CaseInstance> compilation error
-- [x] casehubio/platform#9000 — Per-module -core extraction (6 mechanical modules)
-- [x] casehubio/platform#9001 — MCP -core extraction (deliberate design)
-- [x] casehubio/platform#9002 — WebClient → JDK HttpClient (4 modules)
-- [x] casehubio/platform#9003 — Consolidated workers-spring auto-config
-- [x] casehubio/casehub-worker#16 — Spring Boot deployment
-- [x] casehubio/blocks#297 — Spring Boot deployment
-- [x] casehubio/workers#24 — Spring Boot deployment
-- [x] casehubio/casehub-desiredstate#139 — Core extraction and Spring Boot adapters
-- [x] casehubio/parent#515 — Spring deployment completion epic
-- [x] casehubio/parent#483 — Spring_REST_controllers_for_hand-written_Path_resources
-- [ ] casehubio/parent#480 — Pattern_2_migration_qhorus_McpDomain_to_SPI_interfaces ← active
-- [ ] casehubio/parent#495 — Generate_Spring_REST_controllers_for_qhorus
-- [ ] casehubio/parent#498 — Spring_Data_MongoDB_for_work_persistence
-- [ ] casehubio/work#401 — Port_Panache_to_plain_JPA
-- [ ] casehubio/engine#1103 — Fix_compile_errors_TrustGateService_AgentCapability
-- [ ] casehubio/workers#25 — Workers_CLAUDE.md_update
-- [ ] casehubio/workers#26 — Workers_contributor_guide_update
-- [ ] casehubio/workers#27 — Workers_spring-integration-test
-- [ ] casehubio/platform#472 — MCP_Spring_session_provider
-- [ ] casehubio/platform#473 — K8s_Spring_fabric8_integration
-- [ ] casehubio/qhorus#458 — Complete_runtime-core_extraction_for_runtime-spring
-- [ ] casehubio/qhorus#459 — Fix_pre-existing_qhorus_test_failures
-- [ ] casehubio/platform#477 — Fix_graphql-generator_BeanParam_constructor_ordering
+- [ ] casehubio/platform#477 — Issue #477 ← active
