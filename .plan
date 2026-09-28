@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-481-cdi-step-execution-event
-state: closing:pushed
+state: closing:merged
 project-sha: 
 date: 
 issue-repo: casehubio/platform
