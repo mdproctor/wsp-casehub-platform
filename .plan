@@ -1,0 +1,15 @@
+# Work Plan — issue-471-typed-variables-round-trip
+
+## State
+branch: issue-471-typed-variables-round-trip
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 471
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#471 — Issue #471 ← active
