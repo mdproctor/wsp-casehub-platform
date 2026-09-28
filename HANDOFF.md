@@ -2,16 +2,10 @@
 
 ## Last Session
 
-Completed parent#480 — Pattern 2 migration for qhorus @McpDomain. The SPI interfaces already existed in `api/spi/` from prior work. This session:
+Landed platform#477 and parent#480, advanced to parent#495.
 
-1. Fixed graphql-generator domain filter (`channels` → `qhorus/channels` + added agents, data, audit)
-2. Removed duplicate `@McpDomain` from `ChannelsSubscriptionResolver` and `ChannelsModelEnricher`
-3. Added `@RestMethod(POST)` on `MessagingApi.reactionsBatch(List<Long>)` — can't be GET with BeanParam
-4. Fixed platform's `graphql-generator` BeanParam constructor order bug (Jandex returns alphabetical, constructor needs declaration order) — on branch `fix-beanparam-constructor-order` in slot 198 platform
-
-Generated output verified:
-- 6 Quarkus GraphQL resolvers + 6 REST resources from APT
-- 7 Spring GraphQL + 7 Spring REST controllers from `graphql-spring-generator`
+1. **platform#477** — Fixed graphql-generator BeanParam constructor ordering. Jandex `recordComponents()` and `fields()` both return alphabetical order; fix uses canonical constructor parameter names which preserve declaration order. Landed on main, pushed, issue closed.
+2. **parent#480** — Merged qhorus `issue-480-mcpdomain-spi-migration` branch to main. Squashed 2 WIP commits. Pushed. Removed duplicate `@McpDomain` from concrete classes, fixed domain filter, added `@RestMethod(POST)` for reactionsBatch.
 
 ## Immediate Next Step
 
@@ -21,14 +15,8 @@ parent#495 — Generate Spring REST controllers for qhorus. The `qhorus-rest-spr
 
 - casehubio/qhorus#458 — runtime-spring -core extraction incomplete (CausalGraphCore, SpaceCore, etc.)
 - casehubio/qhorus#459 — Pre-existing test failures (PeerAttestation, A2ATenantScoping, AgentCardTenant)
-- casehubio/platform#477 — BeanParam constructor ordering fix (branch exists, needs work-end)
-
-## Cross-Module
-
-Platform branch `fix-beanparam-constructor-order` in slot 198 has the generator fix. Needs to land via work-end before qhorus CI can pass without the slot .m2 override.
 
 ## References
 
 - Epic: casehubio/parent#515
-- .plan: 13 items remaining (including 3 newly filed)
-- Qhorus branch: `issue-480-mcpdomain-spi-migration`
+- .plan: position 15/26, parent#495 active
