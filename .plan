@@ -1,0 +1,15 @@
+# Work Plan — issue-429-yaml-typed-variables
+
+## State
+branch: issue-429-yaml-typed-variables
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 429
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#429 — Issue #429 ← active
