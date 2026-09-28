@@ -21,8 +21,8 @@ evidence-era: true
 - [x] casehubio/workers#24 — Spring Boot deployment
 - [x] casehubio/casehub-desiredstate#139 — Core extraction and Spring Boot adapters
 - [x] casehubio/parent#515 — Spring deployment completion epic
-- [ ] casehubio/parent#483 — Spring_REST_controllers_for_hand-written_Path_resources ← active
-- [ ] casehubio/parent#480 — Pattern_2_migration_qhorus_McpDomain_to_SPI_interfaces
+- [x] casehubio/parent#483 — Spring_REST_controllers_for_hand-written_Path_resources
+- [ ] casehubio/parent#480 — Pattern_2_migration_qhorus_McpDomain_to_SPI_interfaces ← active
 - [ ] casehubio/parent#495 — Generate_Spring_REST_controllers_for_qhorus
 - [ ] casehubio/parent#498 — Spring_Data_MongoDB_for_work_persistence
 - [ ] casehubio/work#401 — Port_Panache_to_plain_JPA
