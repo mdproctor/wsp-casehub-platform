@@ -378,7 +378,7 @@ public static <K, V> CorrelationScope<K, V> forScope(
 }
 ```
 
-**Trade-off:** The cast to `DefaultScenarioScope` couples `forScope()` to the concrete implementation. This is acceptable — `forScope()` is a convenience factory, not a contract. Users who implement custom ScenarioScope implementations use the OrcChannel constructor directly.
+**Trade-off:** The cast to `DefaultScenarioScope` couples `forScope()` to the concrete implementation. This is acceptable — `forScope()` is a convenience factory, not a contract. Users who implement custom ScenarioScope implementations use the OrcChannel constructor directly. If a non-DefaultScenarioScope is passed, `forScope()` throws `IllegalArgumentException` with a message directing to the OrcChannel constructor.
 
 ---
 
