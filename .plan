@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-482-unsupported-capability-exception-dispatcher
-state: closing:verified
+state: closing:promoted
 project-sha: 4b4a4394
 date: 2026-09-29
 issue-repo: casehubio/platform
