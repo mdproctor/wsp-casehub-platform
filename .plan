@@ -13,3 +13,9 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/parent#518 — Issue #518 ← active
+- [ ] casehubio/platform#493 — spring-integration-test missing agent and streams starters
+- [ ] casehubio/platform#494 — add ConditionalOnMissingBean to expression MCP and actuator beans
+- [ ] casehubio/platform#492 — memory modules Spring persistence path
+
+## Deferred
+- [ ] memory modules Spring persistence path (S / Med) []
