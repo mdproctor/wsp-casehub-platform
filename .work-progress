@@ -31,3 +31,4 @@ trajectory_produced=0
 rebase=done
 report_rebase=done
 report_squash=done
+land_mechanical_attempt=1
