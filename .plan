@@ -24,8 +24,8 @@ evidence-era: true
 - [x] casehubio/parent#483 — Spring_REST_controllers_for_hand-written_Path_resources
 - [x] casehubio/parent#480 — Pattern_2_migration_qhorus_McpDomain_to_SPI_interfaces
 - [x] casehubio/parent#495 — Generate_Spring_REST_controllers_for_qhorus
-- [ ] casehubio/parent#498 — Spring_Data_MongoDB_for_work_persistence ← active
-- [ ] casehubio/work#401 — Port_Panache_to_plain_JPA
+- [x] casehubio/parent#498 — Spring_Data_MongoDB_for_work_persistence
+- [ ] casehubio/work#401 — Port_Panache_to_plain_JPA ← active
 - [ ] casehubio/engine#1103 — Fix_compile_errors_TrustGateService_AgentCapability
 - [ ] casehubio/workers#25 — Workers_CLAUDE.md_update
 - [ ] casehubio/workers#26 — Workers_contributor_guide_update
