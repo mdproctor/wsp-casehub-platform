@@ -218,7 +218,7 @@ public final class StepDefinitionParser {
 
 Pure function, zero dependencies beyond yaml-core. Accepts the parsed YAML map (from Jackson or any YAML parser) and produces the typed model. Validates structural correctness (required fields, valid invoke binding types, valid parameter types).
 
-**Relationship to Jackson deserialization:** Both `StepDefinitionParser` and the Jackson mixins produce the same model types (`StepDefinitionFile`, `StepDefinition`, etc.). Jackson is the primary path for consumers with Jackson on their classpath. `StepDefinitionParser` is the zero-dep fallback — needed because yaml-core must remain zero-dependency. This parallels the existing `YamlModuleFile`/`YamlModuleFileMixin` pattern. Contract tests verify both paths produce identical results for the same input.
+**Relationship to Jackson deserialization:** Both `DeclarationParser` and the Jackson mixins produce the same model types (`DeclarationFile`, `StepDefinition`, etc.). Jackson is the primary path for consumers with Jackson on their classpath. `DeclarationParser` is the zero-dep fallback — needed because yaml-core must remain zero-dependency. This parallels the existing `YamlModuleFile`/`YamlModuleFileMixin` pattern. Contract tests verify both paths produce identical results for the same input.
 
 #### StepValidator
 
@@ -458,7 +458,7 @@ The source count is dynamic — determined by which `CatalogSource` beans are on
 
 Three built-in catalog sources:
 
-**YamlStepDefinitionSource** `priority 100` — Reads step definition YAML files from configurable paths (`casehub.steps.definition-files`). Parses via `StepDefinitionParser`. For each action, resolves the `InvokeBinding` to a `StepAction` via the `InvokeHandler` registry. Wraps with validation.
+**YamlStepDefinitionSource** `priority 100` — Reads step definition YAML files from configurable paths (`casehub.steps.definition-files`). Parses via `DeclarationParser`. For each action, resolves the `InvokeBinding` to a `StepAction` via the `InvokeHandler` registry. Wraps with validation.
 
 **AptPluginSource** `priority 200` — Scans `META-INF/yaml-plugins/*.json` manifests on the classpath (produced by existing `@StepPlugin` APT processor). Loads `StepAction` implementation classes. Reads schema from `META-INF/yaml-plugins/<name>.schema.json` and constructs a synthetic `StepDefinition` from the schema.
 
