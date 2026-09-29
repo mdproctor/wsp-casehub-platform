@@ -1,0 +1,15 @@
+# Work Plan — issue-336-remote-source-auth-integrity
+
+## State
+branch: issue-336-remote-source-auth-integrity
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 336
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#336 — Issue #336 ← active
