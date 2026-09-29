@@ -188,7 +188,62 @@ public class SecretManagerCore implements SecretManager {
 }
 ```
 
-### 5. Quarkus refactor (expression/)
+### 5. JQEvaluatorCore (expression-core)
+
+`JQEvaluator` in expression/ is `@ApplicationScoped` with `@Inject`
+SecretManager and ConfigManager. It provides `$secret`/`$config` scope
+injection in JQ expressions. Without extraction, these variables won't
+work on Spring.
+
+Extract to constructor-injected POJO:
+
+```java
+package io.casehub.platform.expression;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.casehub.platform.api.expression.ConfigManager;
+import io.casehub.platform.api.expression.SecretManager;
+import net.thisptr.jackson.jq.BuiltinFunctionLoader;
+import net.thisptr.jackson.jq.JsonQuery;
+import net.thisptr.jackson.jq.Scope;
+import net.thisptr.jackson.jq.Versions;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class JQEvaluatorCore {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private final SecretManager secretManager;
+    private final ConfigManager configManager;
+    private final Scope rootScope;
+    private final ConcurrentHashMap<String, JsonQuery> queryCache = new ConcurrentHashMap<>();
+
+    public JQEvaluatorCore(SecretManager secretManager, ConfigManager configManager) {
+        this.secretManager = Objects.requireNonNull(secretManager);
+        this.configManager = Objects.requireNonNull(configManager);
+        this.rootScope = Scope.newEmptyScope();
+        BuiltinFunctionLoader.getInstance().loadFunctions(Versions.JQ_1_6, rootScope);
+    }
+
+    public ValidationResult eval(String jqExpr, JsonNode input) {
+        return eval(jqExpr, input, Set.of(), Set.of());
+    }
+
+    public ValidationResult eval(String jqExpr, JsonNode input,
+                                 Set<String> secretNames, Set<String> configMapNames) {
+        // Same implementation as current JQEvaluator.eval()
+    }
+}
+```
+
+Quarkus `JQEvaluator` becomes a thin CDI wrapper delegating to
+`JQEvaluatorCore`. Spring auto-config creates `JQEvaluatorCore` bean
+directly.
+
+### 6. Quarkus refactor (expression/)
 
 Replace `MockConfigManager` body with delegation to `ConfigManagerCore`:
 
@@ -210,8 +265,9 @@ public class MockConfigManager implements ConfigManager {
 }
 ```
 
-Same for `MockSecretManager`. `SmallRyePropertySource` is package-private
-in expression/:
+Same for `MockSecretManager`. `JQEvaluator` becomes a thin CDI wrapper
+delegating to `JQEvaluatorCore`. `SmallRyePropertySource` is
+package-private in expression/:
 
 ```java
 class SmallRyePropertySource implements PropertySource {
@@ -226,7 +282,7 @@ class SmallRyePropertySource implements PropertySource {
 }
 ```
 
-### 6. expression-spring module (new)
+### 7. expression-spring module (new)
 
 **pom.xml:** depends on expression-core, platform-api, spring-boot-autoconfigure. Optional dep on spring-cloud-kubernetes-fabric8-config.
 
@@ -281,6 +337,12 @@ public class ExpressionSpringAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean(JQEvaluatorCore.class)
+    public JQEvaluatorCore jqEvaluator(SecretManager secretManager, ConfigManager configManager) {
+        return new JQEvaluatorCore(secretManager, configManager);
+    }
+
+    @Bean
     @ConditionalOnMissingBean
     public DefaultExpressionEngineRegistry defaultExpressionEngineRegistry(
             List<ExpressionEngine> engines) {
@@ -295,7 +357,7 @@ public class ExpressionSpringAutoConfiguration {
 
 **Add to spring-boot-starter:** dependency on `casehub-platform-expression-spring`.
 
-### 7. Consumer guide update
+### 8. Consumer guide update
 
 Add Spring Boot K8s section to `docs/guides/consumer-guide.md`:
 
@@ -312,6 +374,7 @@ Same ConfigMap/Secret YAML examples already documented for Quarkus.
 ## Testing Strategy
 
 - **ConfigManagerCore / SecretManagerCore:** Unit tests in expression-core with a simple in-memory PropertySource. Test prefix scanning, nested map building, type conversion, empty/missing cases.
+- **JQEvaluatorCore:** Unit tests in expression-core verifying $secret/$config scope injection with mock SecretManager/ConfigManager. Existing JQEvaluatorTest coverage migrates to core.
 - **SmallRyePropertySource:** Existing MockConfigManager and MockSecretManager tests in expression/ continue to pass — behavioral parity.
 - **EnvironmentPropertySource:** Unit test with MockEnvironment. Verify property lookup and name enumeration.
 - **ExpressionSpringAutoConfiguration:** Verify beans are created, ConditionalOnMissingBean works, expression engines are registered.
@@ -321,8 +384,8 @@ Same ConfigMap/Secret YAML examples already documented for Quarkus.
 
 | Module | Change |
 |--------|--------|
-| expression-core | Add PropertySource, PropertyMapBuilder, ConfigManagerCore, SecretManagerCore |
-| expression | Refactor MockConfigManager/MockSecretManager to delegate to core |
+| expression-core | Add PropertySource, PropertyMapBuilder, ConfigManagerCore, SecretManagerCore, JQEvaluatorCore |
+| expression | Refactor MockConfigManager/MockSecretManager/JQEvaluator to delegate to core |
 | expression-spring (new) | EnvironmentPropertySource + auto-config + optional spring-cloud-kubernetes-fabric8 |
 | spring-boot-starter | Add expression-spring dependency |
 | spring-integration-test | Verify expression auto-config composes |
@@ -330,6 +393,7 @@ Same ConfigMap/Secret YAML examples already documented for Quarkus.
 
 ## References
 
+- expression-spring/target/ — orphan build output from prior generation attempt; clean up when creating real module
 - expression/MockSecretManager.java — existing Quarkus implementation
 - expression/MockConfigManager.java — existing Quarkus implementation
 - expression/pom.xml:56 — quarkus-kubernetes-config optional dep
