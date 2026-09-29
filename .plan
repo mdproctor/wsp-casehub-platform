@@ -13,11 +13,11 @@ flyway-next-v: none
 
 ## Queue
 - [ ] casehubio/platform#473 — Issue #473 ← active
-  - [ ] Batch 1: Core extraction
-    - [ ] Task 1: PropertySource + ConfigManagerCore + SecretManagerCore
-    - [ ] Task 2: JQEvaluatorCore
-  - [ ] Batch 2: Quarkus refactor
-    - [ ] Task 3: Delegate to core POJOs
-  - [ ] Batch 3: Spring module
-    - [ ] Task 4: Create expression-spring
-    - [ ] Task 5: Wire starter + integration + docs
+  - [x] Batch 1: Core extraction
+    - [x] Task 1: PropertySource + ConfigManagerCore + SecretManagerCore
+    - [x] Task 2: JQEvaluatorCore
+  - [x] Batch 2: Quarkus refactor
+    - [x] Task 3: Delegate to core POJOs
+  - [x] Batch 3: Spring module
+    - [x] Task 4: Create expression-spring
+    - [x] Task 5: Wire starter + integration + docs
