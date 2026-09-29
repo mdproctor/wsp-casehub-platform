@@ -1,8 +1,8 @@
 # Work Plan — issue-401-port-panache-to-jpa
 
 ## State
-branch: issue-401-port-panache-to-jpa
-state: scaffolded
+branch: main
+state: active
 project-sha: 
 date: 
 issue-repo: casehubio/platform
