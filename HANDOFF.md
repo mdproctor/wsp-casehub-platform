@@ -2,6 +2,22 @@
 
 ## Last Session
 
+Closed platform#473 (K8s Spring fabric8 integration).
+
+### platform#473 — K8s Spring completion — fabric8 Spring integration
+- Extracted `PropertySource`, `PropertyMapBuilder`, `ConfigManagerCore`, `SecretManagerCore`, `JQEvaluatorCore` to expression-core
+- Refactored `MockConfigManager`, `MockSecretManager`, `JQEvaluator` in expression/ to delegate to core via `SmallRyePropertySource`
+- Created expression-spring module: `EnvironmentPropertySource` + `ExpressionSpringAutoConfiguration` (7 beans, all `@ConditionalOnMissingBean`)
+- Added expression-spring to spring-boot-starter
+- Spring integration test verifies ConfigManager, SecretManager, JQEvaluatorCore compose
+- Consumer guide: Spring Boot K8s config section
+- Contributor guide: updated expression/, expression-core/, added expression-spring/
+- Garden entry: GE-20260929-ef0897 (jackson-jq setValue overload ambiguity)
+
+Landed as `424be6ec` on main.
+
+## Prior Session
+
 Closed 4 issues: work#401, platform#484, platform#485, parent#483.
 
 ### work#401 — Port Panache to plain JPA
