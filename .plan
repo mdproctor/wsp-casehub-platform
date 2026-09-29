@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-473-k8s-spring-fabric8
-state: active
+state: closing:review
 project-sha: 
 date: 
 issue-repo: casehubio/platform
@@ -11,6 +11,7 @@ design-repo:
 design-section-hashes: 
 flyway-next-v: none
 
+evidence-era: true
 ## Queue
 - [ ] casehubio/platform#473 — Issue #473 ← active
   - [x] Batch 1: Core extraction
