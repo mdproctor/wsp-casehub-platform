@@ -1,19 +1,15 @@
-# Next Work — YAML Runtime and Language Completion
+# Work Plan — issue-472-mcp-spring-session-provider
 
-## Batch 1: Foundation — patterns + hardening (XS-S, same session)
-- [ ] casehubio/platform#459 — Unify state machine transitions with MatchPattern semantics
-- [ ] casehubio/platform#460 — ADR: three-layer evaluation model keyword reservation
-- [ ] casehubio/platform#462 — StepWalker recursion depth limit
-- [ ] casehubio/platform#461 — Enforce maxOutputBytes in DefaultProcessExecutor
-- [ ] casehubio/platform#468 — StepWalker nesting path in error messages
-- [ ] casehubio/platform#467 — Hardening: parseTimeout extraction, AgentInvokeHandler config, trust boundary
+## State
+branch: issue-472-mcp-spring-session-provider
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 472
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
 
-## Batch 2: Runtime evaluators — step types (L, own session)
-- [ ] casehubio/platform#465 — Runtime evaluators for structural step types (block, if/else, match, parallel)
-
-## Batch 3: Runtime evaluators — decorators (L, own session)
-- [ ] casehubio/platform#466 — Runtime evaluators for step decorators (forEach, loop, timeout, retry, etc.)
-
-## Batch 4: Structural extensions (M each, own sessions)
-- [ ] casehubio/platform#463 — try/catch/finally — structured error handling step type
-- [ ] casehubio/platform#464 — CSP select — first-of-N channel structural step type
+## Queue
+- [ ] casehubio/platform#472 — Issue #472 ← active
