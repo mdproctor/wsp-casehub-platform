@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-473-k8s-spring-fabric8
-state: closing:promoted
+state: closing:pushed
 project-sha: 
 date: 
 issue-repo: casehubio/platform
