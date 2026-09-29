@@ -326,7 +326,7 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
 - Test: `yaml-core/src/test/java/io/casehub/yaml/core/step/StepValidatorTest.java`
 
 **Interfaces:**
-- Consumes: `StepDefinitionFile`, `StepDefinition`, `StepParameter`, `StepParameterType`, `InvokeBinding` (from Task 1)
+- Consumes: `DeclarationFile`, `StepDefinition`, `StepParameter`, `StepParameterType`, `InvokeBinding` (from Task 1)
 - Produces: `StepDefinitionParser.parse(Map<String, Object>) → StepDefinitionFile`, `StepValidator.validateStep(String, Map<String, Object>, StepDefinition) → List<String>`, `StepValidator.validateOutputs(Map<String, Object>, StepDefinition) → List<String>`
 
 - [ ] **Step 1: Write StepDefinitionParser tests**
@@ -835,7 +835,7 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
 - Test: `yaml-jackson/src/test/java/io/casehub/yaml/jackson/StepDefinitionParserContractTest.java`
 
 **Interfaces:**
-- Consumes: `StepDefinitionFile`, `StepDefinition`, `StepParameter`, `StepParameterType`, `InvokeBinding` (from Task 1), `StepDefinitionParser` (from Task 2)
+- Consumes: `DeclarationFile`, `StepDefinition`, `StepParameter`, `StepParameterType`, `InvokeBinding` (from Task 1), `DeclarationParser` (from Task 2)
 - Produces: Jackson deserializer for step definition YAML → StepDefinitionFile
 
 - [ ] **Step 1: Write Jackson deserialization test**
@@ -905,8 +905,8 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
 - Test: `yaml-step-runtime/src/test/java/io/casehub/yaml/step/ValidatingStepActionTest.java`
 
 **Interfaces:**
-- Consumes: `StepDefinition`, `StepValidator` (from yaml-core), `StepAction`, `StepResult` (from yaml-plugin-api)
-- Produces: `CatalogEntry(String qualifiedName, StepDefinition definition, StepAction action)`, `StepCatalog` interface, `CatalogSource` interface, `InvokeHandler` interface, `ValidatingStepAction` (wraps StepAction with input/output validation + event emission), `StepExecutionEvent(String actionName, long durationMs, boolean success, Map<String, Object> metadata)`
+- Consumes: `StepDefinition`, `Validator` (from yaml-core), `Action`, `StepResult` (from yaml-plugin-api)
+- Produces: `CatalogEntry(String qualifiedName, StepDefinition definition, StepAction action)`, `StepCatalog` interface, `CatalogSource` interface, `InvokeHandler` interface, `ValidatingAction` (wraps StepAction with input/output validation + event emission), `StepExecutionEvent(String actionName, long durationMs, boolean success, Map<String, Object> metadata)`
 
 - [ ] **Step 1: Create pom.xml for yaml-step-runtime**
 
@@ -984,7 +984,7 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
 - Test: `yaml-step-runtime/src/test/java/io/casehub/yaml/step/handler/GraphqlInvokeHandlerTest.java`
 
 **Interfaces:**
-- Consumes: `InvokeHandler` SPI (from Task 5), `InvokeBinding.*` (from Task 1), `StepDefinition` (from Task 1), `StepAction`/`StepResult` (from yaml-plugin-api), `AgentProvider` (from platform agent-api)
+- Consumes: `InvokeHandler` SPI (from Task 5), `InvokeBinding.*` (from Task 1), `StepDefinition` (from Task 1), `Action`/`StepResult` (from yaml-plugin-api), `AgentProvider` (from platform agent-api)
 - Produces: 6 CDI `@ApplicationScoped` beans implementing `InvokeHandler`
 
 - [ ] **Step 1: Write McpInvokeHandler test**
@@ -1069,7 +1069,7 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
 - Test: `yaml-step-runtime/src/test/java/io/casehub/yaml/step/catalog/ImportScopedStepCatalogTest.java`
 
 **Interfaces:**
-- Consumes: `CatalogEntry`, `StepCatalog`, `CatalogSource`, `InvokeHandler` (from Task 5), `StepDefinitionParser` (from Task 2), `ValidatingStepAction` (from Task 5), all invoke handlers (from Task 6)
+- Consumes: `CatalogEntry`, `StepCatalog`, `CatalogSource`, `InvokeHandler` (from Task 5), `DeclarationParser` (from Task 2), `ValidatingAction` (from Task 5), all invoke handlers (from Task 6)
 - Produces: `CompositeStepCatalog @ApplicationScoped @Startup implements StepCatalog`, `ImportScopedStepCatalog implements StepCatalog`
 
 - [ ] **Step 1: Write CompositeStepCatalog test**
