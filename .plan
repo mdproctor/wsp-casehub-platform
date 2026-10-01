@@ -1,0 +1,15 @@
+# Work Plan — issue-491-playbook-state-machine-exec
+
+## State
+branch: issue-491-playbook-state-machine-exec
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 491
+design-repo: project
+design-section-hashes: 
+flyway-next-v: unknown
+
+## Queue
+- [ ] casehubio/platform#491 — Issue #491 ← active
