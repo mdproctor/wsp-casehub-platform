@@ -1,0 +1,15 @@
+# Work Plan — issue-490-491-yaml-runtime-infra
+
+## State
+branch: issue-490-491-yaml-runtime-infra
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 490
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#490 — Issue #490 ← active
