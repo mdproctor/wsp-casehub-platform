@@ -12,6 +12,22 @@ design-section-hashes:
 flyway-next-v: 
 
 ## Queue
-- [ ] casehubio/work#403 — Rest module tests broken after APT migration <- active
+- [ ] casehubio/work#403 — Rest module tests broken after APT migration ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: Create fixture + smoke test
+  - [ ] Batch 2: Core CRUD
+    - [ ] Task 2: Migrate WorkItemResourceTest
+  - [ ] Batch 3: Lifecycle
+    - [ ] Task 3: Migrate lifecycle tests
+  - [ ] Batch 4: Relations
+    - [ ] Task 4: Migrate relation/note/link/label tests
+  - [ ] Batch 5: Features
+    - [ ] Task 5: Migrate spawn/bulk/clone/inbox/SSE tests
+  - [ ] Batch 6: Templates
+    - [ ] Task 6: Migrate template + schedule tests
+  - [ ] Batch 7: Remaining
+    - [ ] Task 7: Migrate audit/filter/remaining tests
+  - [ ] Batch 8: Validation
+    - [ ] Task 8: Full test suite + cleanup
 - [ ] casehubio/work#409 — 21 entities still extend PanacheEntityBase
 - [ ] casehubio/work#410 — ai and queues missing from rest-spring-generator
