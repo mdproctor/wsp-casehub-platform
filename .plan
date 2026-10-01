@@ -1,0 +1,17 @@
+# Work Plan — issue-403-work-spring-panache
+
+## State
+branch: issue-403-work-spring-panache
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/work
+covers: 403
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/work#403 — Rest module tests broken after APT migration <- active
+- [ ] casehubio/work#409 — 21 entities still extend PanacheEntityBase
+- [ ] casehubio/work#410 — ai and queues missing from rest-spring-generator
