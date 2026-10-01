@@ -1,0 +1,36 @@
+# Work Plan — epic-502-yaml-parity
+
+## State
+branch: epic-502-yaml-parity
+state: scaffolded
+project-sha: slot-creation
+date: 2026-10-01
+issue-repo: casehubio/platform
+covers: 502
+design-repo: project
+design-section-hashes: 
+flyway-next-v: unknown
+
+## Queue
+- [ ] casehubio/platform#502 — Issue #502 ← active
+- [ ] casehubio/casehub-pages#483 — StepWalker match default key
+- [ ] casehubio/casehub-pages#484 — StepDefinitionParser enum kebab
+- [ ] casehubio/casehub-pages#485 — ModuleExpander original key
+- [ ] casehubio/casehub-pages#486 — VariableResolver typed values
+- [ ] casehubio/casehub-pages#487 — VariableResolver bare name error
+- [ ] casehubio/casehub-pages#488 — ScenarioScope close children
+- [ ] casehubio/casehub-pages#489 — ScenarioScope parent chain
+- [ ] casehubio/platform#428 — Standardise YAML parsing ObjectMapper
+- [ ] casehubio/platform#487 — Separate parsed structure from catalog
+- [ ] casehubio/platform#496 — Accept do reject steps in nested
+- [ ] casehubio/casehub-pages#476 — ImportExpander forEach loop steps
+- [ ] casehubio/casehub-pages#477 — DecoratorChain 13-layer pipeline
+- [ ] casehubio/casehub-pages#478 — StructuralStepEvaluator execution engine
+- [ ] casehubio/casehub-pages#479 — TypedSchema TypedMap typed values
+- [ ] casehubio/casehub-pages#481 — SpeedMultiplier simulation dilation
+- [ ] casehubio/casehub-pages#490 — StepRunner StepContext interfaces
+- [ ] casehubio/casehub-pages#509 — Align TS scenario state machine DSL
+- [ ] casehubio/casehub-pages#480 — CorrelationScope async correlation
+- [ ] casehubio/platform#424 — Generated typed event dispatch Layer 3
+- [ ] casehubio/casehub-pages#465 — Optional scenario chapter section
+- [ ] casehubio/casehub-pages#502 — Epic YAML playbook ops
