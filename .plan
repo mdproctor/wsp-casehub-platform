@@ -26,9 +26,9 @@ flyway-next-v: unknown
 - [x] casehubio/casehub-pages#488 — ScenarioScope close children
 - [x] casehubio/casehub-pages#489 — ScenarioScope parent chain
 - [x] casehubio/platform#496 — Accept do reject steps in nested
-- [ ] casehubio/platform#428 — Standardise YAML parsing ObjectMapper ← active
-- [ ] casehubio/platform#402 — Error reporting model for YAML orchestration
-- [ ] casehubio/casehub-pages#476 — ImportExpander forEach loop steps
+- [x] casehubio/platform#428 — Standardise YAML parsing ObjectMapper
+- [x] casehubio/platform#402 — Error reporting model for YAML orchestration
+- [ ] casehubio/casehub-pages#476 — ImportExpander forEach loop steps ← active
 - [ ] casehubio/casehub-pages#477 — DecoratorChain 13-layer pipeline
 - [ ] casehubio/casehub-pages#478 — StructuralStepEvaluator execution engine
 - [ ] casehubio/casehub-pages#479 — TypedSchema TypedMap typed values
