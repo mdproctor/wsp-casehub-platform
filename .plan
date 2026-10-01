@@ -1,0 +1,15 @@
+# Work Plan — issue-461-qhorus-spring-completeness
+
+## State
+branch: issue-461-qhorus-spring-completeness
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/qhorus
+covers: 461
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/qhorus#461 — Issue #461 ← active
