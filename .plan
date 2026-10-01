@@ -1,0 +1,17 @@
+# Work Plan — main
+
+## State
+branch: main
+state: scaffolded
+project-sha: 14775108
+date: 2026-10-01
+issue-repo: 
+covers: 499,500,501
+design-repo: project
+design-section-hashes: 
+flyway-next-v: unknown
+
+## Queue
+- [ ] casehubio/platform#499 — Spring auto-configuration for remote source auth
+- [ ] casehubio/platform#500 — Consumer guide docs for remote source auth
+- [ ] casehubio/platform#501 — Integration test for ManifestLoader fetchRemote pipeline
