@@ -8,25 +8,25 @@ date: 2026-10-01
 issue-repo: casehubio/platform
 covers: 502
 design-repo: project
-design-section-hashes:
+design-section-hashes: 
 flyway-next-v: unknown
 
 ## Queue
-- [ ] casehubio/platform#502 — Epic YAML cross-repo parity <- active
-- [ ] casehubio/casehub-pages#480 — CorrelationScope async correlation
-- [ ] casehubio/casehub-pages#481 — SpeedMultiplier simulation dilation
-- [ ] casehubio/casehub-pages#465 — Optional scenario chapter section
-- [ ] casehubio/casehub-pages#495 — Clean up orphaned sample dirs
-- [ ] casehubio/casehub-pages#482 — StepWalker name uniqueness and ref validation
-- [ ] casehubio/casehub-pages#483 — StepWalker match default key
-- [ ] casehubio/casehub-pages#484 — StepDefinitionParser enum kebab
-- [ ] casehubio/casehub-pages#485 — ModuleExpander original key
-- [ ] casehubio/casehub-pages#486 — VariableResolver typed values
-- [ ] casehubio/casehub-pages#487 — VariableResolver bare name error
-- [ ] casehubio/casehub-pages#488 — ScenarioScope close children
-- [ ] casehubio/casehub-pages#489 — ScenarioScope parent chain
-- [ ] casehubio/platform#496 — Accept do reject steps in nested
-- [ ] casehubio/platform#428 — Standardise YAML parsing ObjectMapper
+- [x] casehubio/platform#502 — Epic YAML cross-repo parity
+- [x] casehubio/casehub-pages#480 — CorrelationScope async correlation
+- [x] casehubio/casehub-pages#481 — SpeedMultiplier simulation dilation
+- [x] casehubio/casehub-pages#465 — Optional scenario chapter section
+- [x] casehubio/casehub-pages#495 — Clean up orphaned sample dirs
+- [x] casehubio/casehub-pages#482 — StepWalker name uniqueness and ref validation
+- [x] casehubio/casehub-pages#483 — StepWalker match default key
+- [x] casehubio/casehub-pages#484 — StepDefinitionParser enum kebab
+- [x] casehubio/casehub-pages#485 — ModuleExpander original key
+- [x] casehubio/casehub-pages#486 — VariableResolver typed values
+- [x] casehubio/casehub-pages#487 — VariableResolver bare name error
+- [x] casehubio/casehub-pages#488 — ScenarioScope close children
+- [x] casehubio/casehub-pages#489 — ScenarioScope parent chain
+- [x] casehubio/platform#496 — Accept do reject steps in nested
+- [ ] casehubio/platform#428 — Standardise YAML parsing ObjectMapper ← active
 - [ ] casehubio/platform#402 — Error reporting model for YAML orchestration
 - [ ] casehubio/casehub-pages#476 — ImportExpander forEach loop steps
 - [ ] casehubio/casehub-pages#477 — DecoratorChain 13-layer pipeline
