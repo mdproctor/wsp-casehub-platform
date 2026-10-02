@@ -6,23 +6,27 @@
 **Queue:** work#403 → work#409 → work#410
 
 ### work#403 — Rest module tests broken after APT migration
-- **Status:** 282 of 348 tests pass (was 59 before this session, 289 failing)
-- 56 remaining failures need per-test investigation
-- `maven.test.skip` removed, tests are running
+- **Status:** DONE — 348 of 348 tests pass (was 59 at start, 282 after session 1)
+- All 58 remaining failures fixed in session 2
 - **Spec:** `specs/issue-403-work-spring-panache/2026-10-01-rest-test-migration-design.md`
 - **Plan:** `plans/2026-10-01-rest-test-migration.md`
 
-### Remaining failure categories (56 tests)
-- **16 TemplatePatchTest:** PATCH semantics don't exist in generated API — `POST /update` requires full body, old PATCH sent partial. Needs hand-written PATCH endpoint or SPI change.
-- **~20 body/content-type:** Tests hitting lifecycle/spawn/template endpoints without required JSON body (CompleteRequest, CancelRequest etc.)
-- **~10 status code mismatches:** Old 204→404 (DELETE→POST path), 400→201 (validation differences), 422→400
-- **~10 path/behavioral:** SSE endpoint paths, spawn idempotency, schema validation, audit assertions
+### Fixes in session 2 (work repo, commit 4aad3dea)
 
-### Infrastructure fixes this session (work repo)
-- `rest/pom.xml`: removed `maven.test.skip`; added `<proc>none</proc>` for test-compile (prevents duplicate APT generation)
-- `rest/src/test/resources/application.properties`: fixed CDI ambiguity (exclude `NoOpGroupMembershipProvider` instead of `MockGroupMembershipProvider`; exclude `io.casehub.platform.rest.generated.**`)
-- `api/WorkItemCreateRequest.java`: added `@JsonDeserialize(builder)` + `@JsonPOJOBuilder` (B1 blocker)
-- `rest/IllegalArgumentExceptionMapper.java`: new `@Provider` mapping `IllegalArgumentException` → 400
+**Production fixes (8 files):**
+- `CreateTemplateRequest`/`UpdateTemplateRequest`: `inputDataSchema`/`outputDataSchema` `String`→`JsonNode`
+- `DefaultWorkItemTemplateApi`: `JsonNode`→`String` conversion + `validateSchemaFields()`
+- `AuditEntryView`: added missing `workItemId` field; fixed `DefaultWorkItemAuditApi` + `ViewMapper`
+- `DefaultWorkItemRelationApi`: null validation for `targetId`/`relationType` (NPE→400)
+- New `LabelNotFoundExceptionMapper`: maps `LabelNotFoundException`→400
+
+**Test fixes (15 files):**
+- Path: `/workitems/...` → `/api/work/...` (spawn, bulk, instances, SSE, clone)
+- Response shape: `[0].item.X` → `[0].workItem.X` (inbox), `$` → `items` (schedule)
+- PATCH: pointed to hand-written `/workitem-templates/{id}` with merge-patch
+- Status codes: 404→400 (spawn cancel), 200→201 (idempotency), 422→400 (spawn)
+- Query params: clone `title`/`createdBy` body→queryParam
+- OpenAPI: `inbox/summary`→`inbox-summary`
 
 ### work#409 — 21 entities still extend PanacheEntityBase
 *Unchanged — see git show HEAD~1:HANDOFF.md*
