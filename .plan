@@ -36,9 +36,9 @@ flyway-next-v: unknown
 - [x] casehubio/casehub-pages#509 — Align TS scenario state machine DSL
 - [x] casehubio/casehub-pages#327 — Scenario templates parameterized include
 - [ ] casehubio/casehub-pages#359 — Spotlight targeting for table rows ← active
-  - [ ] Batch 1: Table API
+  - [x] Batch 1: Table API
     - [x] Task 1: aria-label on rows
-    - [ ] Task 2: scrollToRow method
+    - [x] Task 2: scrollToRow method
   - [ ] Batch 2: Scenario command
     - [ ] Task 3: step definition
     - [ ] Task 4: executor implementation
