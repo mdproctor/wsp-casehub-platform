@@ -2,32 +2,42 @@
 
 ## Status
 
-**Branch:** main (all work landed)
-**Queue:** drained — all 3 issues complete, branch closed
+**Branch:** issue-521-spring-completeness-v2
+**Queue:** drained — platform#504 and platform#505 complete
 
 ## Completed This Session (2026-10-02)
 
+### parent#521 — Spring completeness v2 (platform issues)
+
+#### platform#504 — Remove Panache from MongoPreferenceDocument
+- Replaced `quarkus-mongodb-panache` with `quarkus-mongodb-client`
+- Removed `extends PanacheMongoEntityBase` — last Panache entity across all repos
+- Converted all 4 production classes + test to use MongoClient + MongoCollection API with POJO codec
+- All 12 tests green
+
+#### platform#505 — Review parity exceptions
+- Evaluated agent-ollama, acl-admin, acl-worker exceptions
+- None are critical deployment blockers
+- Updated `spring-parity-exceptions.txt` with proper justifications
+- Filed 3 follow-up issues:
+  - platform#506 — acl-admin @RolesAllowed → @PreAuthorize mapping
+  - platform#507 — acl-worker JAX-RS filter → Spring Filter
+  - platform#508 — agent-ollama -core extraction + agent-spring integration
+
+## Prior Session Work
+
 ### work#403 — REST test migration after APT migration
 - 348/348 tests green (was 59/348 at session start)
-- 58 failures fixed: template PATCH, schema String→JsonNode, path migrations, response shapes, validation gaps
-- 8 production files + 15 test files changed
 
 ### work#409 — Remove PanacheEntityBase from all 21 entities
 - 21 entities across 6 modules migrated to plain JPA (EntityManager)
-- ~25 stores + ~26 test files converted
-- Zero Panache imports remain in any .java file
-- 78 files changed total
 
 ### work#410 — ai/queues missing from rest-spring-generator
-- Closed as already resolved — graphql-spring-generator dual output covers all @McpDomain SPIs
+- Closed as already resolved
 
 ### work#402 — Complete Panache-to-JPA port
-- Closed — all items verified complete across work, engine, and ledger repos
-
-## Cross-Repo Spring Audit
-
-Created **parent#521** — Spring completeness v2 epic with sub-epics in 7 repos (21 issues total). See parent#521 for full priority list.
+- Closed — all items verified complete
 
 ## Next Work
 
-`work start parent#521` — drive via work-slot. Priority: criticals first (platform#504, engine#1207), then importants, then generation candidates, then cleanup.
+Branch ready for work-end. Remaining parent#521 work is in other repos (engine, work, qhorus, ledger, neocortex, blocks).
