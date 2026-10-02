@@ -297,3 +297,26 @@
 **Sources:** yaml-plugin-api (zero-dep SPI), yaml-plugin-processor (APT generates schema + Action)
 **Exploration:** quick
 **Status:** captured
+
+## D25: Delete bespoke command model, not refine it
+
+**Choice:** Delete HierarchicalParser's step/command parsing entirely. Replace with a thin scenario envelope parser that reads chapters/sections/metadata and delegates step resolution to the standard Walker/plugin catalog. Delete ScenarioCommand record, parseCommand(), parseAriaTarget(), ScenarioStep sealed interface, ScenarioParser (Format A).
+**Alternatives:**
+- Refine the bespoke model (original #390 approach) — renames and new fields on a model that shouldn't exist
+- Keep both parsers — the commands[] model for Java, compact for TS. Defers convergence.
+**Rationale:** Every feature of the commands[] model is already handled by the standard step system. The HierarchicalParser's unique value is the scenario envelope (chapters, sections, top-level metadata). Step parsing should go through the plugin catalog, not a bespoke parser.
+**Trade-offs:** Larger scope than original #390. But avoids applying refinements to a model that's being deleted.
+**Sources:** HierarchicalParser.java (parseCommand, parseStep — redundant with Walker), engine sequential-onboarding.yaml (do: blocks already use compact syntax), parseScenarioFromParsed in parser.ts (TS already delegates to Walker)
+**Exploration:** deep-analysis
+**Status:** captured
+
+## D26: Migrate outlier YAML files to compact format
+
+**Choice:** Migrate existing hierarchical-format YAML files (commands[] syntax) to the compact format (action-name-as-key). Format A's compact YAML was already correct — the hierarchical format introduced the wrong step syntax. Converged format: Format A's compact steps + hierarchical's envelope (chapters, sections, metadata), with decorators for step metadata (label, target, actor).
+**Alternatives:**
+- Support both syntaxes in the parser — adds complexity, defers cleanup
+**Rationale:** The commands[] syntax is the outlier. The compact syntax matches what the engine, ARIA, and plugin systems all use. One format means one parser, one catalog, one resolution path.
+**Trade-offs:** Breaking change for any YAML files using commands[] syntax. Acceptable since it's pre-release and the file count is small.
+**Sources:** META-INF/scenarios/helpdesk-intake.yaml (commands[] format), helpdesk-demo.yaml (already compact)
+**Exploration:** quick
+**Status:** captured
