@@ -57,6 +57,8 @@ sections:
 
 Top-level includes prepend their steps before the scenario's own steps.
 Section-level includes prepend before that section's steps.
+Multiple includes within the same block prepend in declaration order —
+the first include's steps appear first.
 
 ### Template Format
 
@@ -255,6 +257,7 @@ Errors during include expansion produce structured error messages:
 | Type mismatch | `Include 'seeds/foo.yaml': parameter 'count' expects integer, got 'abc'` |
 | Circular include | `Circular include detected: a.yaml → b.yaml → a.yaml` |
 | Invalid enum value | `Include 'seeds/foo.yaml': parameter 'level' must be one of [Low, Medium, High], got 'None'` |
+| No loader provided | `Scenario contains 'includes' but no template loader was provided` |
 
 ### Testing Strategy
 
