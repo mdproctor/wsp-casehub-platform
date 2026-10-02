@@ -1,6 +1,7 @@
 # HANDOFF — Slot 198
 
 ## Current Work
+<<<<<<< HEAD
 
 **Branch:** `issue-403-work-spring-panache` (platform + work repos)
 **Queue:** work#403 → work#409 → work#410
@@ -21,77 +22,29 @@
 - Once #403 lands: add ai/queues to rest-spring-generator quarkusModules, restore work-rest-spring
 
 ## Previous Session (2026-09-30, session 2)
+=======
+>>>>>>> issue-403-work-spring-panache
 
-Worked parent#518 (Spring completeness audit epic) — swept all S/Low items across slot repos.
+**Branch:** `issue-403-work-spring-panache` (platform + work repos)
+**Queue:** all 3 issues complete — ready for work-end
 
-### Completed
+### work#403 — Rest module tests broken after APT migration
+- **Status:** DONE — 348/348 green (was 59/348 at start)
 
-| Issue | Repo | What |
-|-------|------|------|
-| platform#492 | platform | Closed as stale — memory modules migrated to neocortex, Spring path already done there |
-| platform#490 | platform | ConfigVariableSource added to yaml-step-runtime. Also fixed Maven reactor cycle (yaml-step-runtime ↔ yaml-step-testing). Landed on main |
-| engine#1200 | engine | AutoConfiguration.imports added to 5 Spring modules (4 existing @AutoConfiguration + new LedgerAutoConfiguration with @ComponentScan). Branch: issue-1200-spring-autoconfig-imports |
-| workers#29 | workers | ScriptWorkerAutoConfiguration added (resolver + execution manager + runtime). Camel deferred — needs CDI→constructor refactoring. Branch: issue-29-script-camel-spring-autoconfig |
+### work#409 — 21 entities still extend PanacheEntityBase
+- **Status:** DONE — all 21 entities migrated to plain JPA, zero PanacheEntityBase refs remain
 
-### Blocked / Re-scoped (comments added to each issue)
+### work#410 — ai and queues missing from rest-spring-generator
+- **Status:** CLOSED (not planned) — already resolved by graphql-spring-generator scanning ../api
 
-| Issue | Repo | Blocker |
-|-------|------|---------|
-| work#410 | work | ai/queues commented out in root pom (#403 compilation failures), work-rest-spring deleted |
-| qhorus#461 | qhorus | runtime-spring commented out — DeliveryConfig type-mapping bug (#458) |
-| workers#30 | workers | Generator wiring needs dedicated build-system work, not a quick fix |
-| qhorus#463 | qhorus | Re-scoped to M/Med: runtime-core has CDI leakage, compliance-core extraction needed |
-| desiredstate#155 | desiredstate | Re-scoped to M/Med: uses SmartInitializingSingleton + dynamic registerBean(), generator can't handle |
+## Session 3 (2026-10-02)
 
-### Open branches (not yet work-ended)
+| What | Result |
+|------|--------|
+| work#403 final 58 failures | Fixed: template PATCH, schema JsonNode, path migrations, response shapes, validation |
+| work#409 Panache removal | 21 entities across 6 modules, ~78 files, all stores + tests converted to EntityManager |
+| work#410 investigation | Already resolved — graphql-spring-generator covers all @McpDomain SPIs |
 
-- engine: `issue-1200-spring-autoconfig-imports` — committed, needs work-end
-- workers: `issue-29-script-camel-spring-autoconfig` — committed, needs work-end
+## Previous Sessions
 
-## Remaining parent#518 items (14 open, by actionability)
-
-### Actionable now (M/Med)
-
-| Repo | Issue | Title | Scale |
-|------|-------|-------|-------|
-| engine | #1201 | No spring-integration-test for engine | M / Med |
-| engine | #1202 | No mcp-spring module | M / Med |
-| work | #411 | No spring-integration-test for work | M / Med |
-| desiredstate | #154 | No spring-integration-test despite 5 auto-configs | M / Med |
-| blocks | #322 | 608-line monolithic auto-config — candidate for spring-generator | M / Med |
-| work | #409 | 21 entities still extend PanacheEntityBase | M / Med |
-
-### Blocked by upstream
-
-| Repo | Issue | Title | Blocked by |
-|------|-------|-------|------------|
-| work | #410 | ai/queues missing from rest-spring-generator | work#403 |
-| qhorus | #461 | No graphql-spring-generator for 7 services | qhorus#458 |
-| workers | #29 | Camel auto-config (script done) | workers-camel CDI refactoring |
-| workers | #30 | No generators — 288 lines hand-written | Build-system work |
-
-### Large / needs design
-
-| Repo | Issue | Title | Scale |
-|------|-------|-------|-------|
-| engine | #1199 | No rest-spring module — 5 REST resources | L / Med |
-| qhorus | #460 | ~12 CDI modules without core extraction | XL / High |
-| qhorus | #463 | Partial core extraction in CDI modules | M / Med (re-scoped) |
-| desiredstate | #155 | Spring modules could use generators | M / Med (re-scoped) |
-
-## Previous Session (2026-09-30, session 1)
-
-Worked parent#518. Platform-specific items:
-
-| Issue | Status | What |
-|-------|--------|------|
-| platform#493 | CLOSED | Added agent + streams starters to spring-integration-test |
-| platform#494 | CLOSED | Added @ConditionalOnMissingBean to 9 beans |
-
-Landed as `3e7aaf0f` on main. Branch `issue-518-spring-completeness` stamped and closed.
-
-## Earlier
-
-- Closed platform#473 (K8s Spring fabric8 integration)
-- Workers branch `issue-24-spring-boot-deployment` squash-merged (170 files, ~3990/~4400 lines)
-- Triaged and closed 6 items from parent#515
+See git history for session 1-2 details.
