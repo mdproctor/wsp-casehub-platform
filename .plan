@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-403-work-spring-panache
-state: active
+state: closing:review
 project-sha: 
 date: 
 issue-repo: casehubio/work
@@ -11,6 +11,7 @@ design-repo:
 design-section-hashes: 
 flyway-next-v: 
 
+evidence-era: true
 ## Queue
 - [x] casehubio/work#403 — Rest module tests broken after APT migration
 - [x] casehubio/work#409 — 21 entities still extend PanacheEntityBase
