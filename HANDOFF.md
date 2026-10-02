@@ -4,15 +4,16 @@
 
 **Branch:** main (work landed)
 **Epic:** parent#521 — Spring completeness v2
-**Platform issues:** done (504, 505)
+**Platform issues:** done (504, 505, 508)
 
 ## This Session
 
-- Removed last Panache entity (MongoPreferenceDocument) — `quarkus-mongodb-panache` → `quarkus-mongodb-client`, all MongoCollection API
-- Reviewed 3 Spring parity exceptions (agent-ollama, acl-admin, acl-worker) — none are deployment blockers
-- Filed 3 follow-up issues: platform#506, #507, #508
-- All slot repos rebased against canonical local main
+- Extracted agent-ollama-core from agent-ollama (same pattern as agent-openai-core)
+- Wired into agent-spring generator — Spring auto-configuration now generated
+- Removed agent-ollama from spring-parity-exceptions.txt
+- Filed follow-up issues from prior session: platform#506, #507, #508
+- Completed #508, squashed, landed on main
 
 ## Next
 
-Remaining parent#521 work is in other repos — engine has the most (5 issues, both criticals). Start `work start parent#521` in an engine slot.
+Remaining platform follow-ups: #506 (acl-admin @RolesAllowed → @PreAuthorize mapping) and #507 (acl-worker Spring Filter). Both are S/Med.
