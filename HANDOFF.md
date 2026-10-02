@@ -2,37 +2,28 @@
 
 ## Last Session
 
-Completed 6 issues from the epic-502 YAML parity queue (plan 21/31).
+Completed casehub-pages#327 — parameterized @include for scenario YAML.
+Full design + implementation cycle (brainstorming → spec → plan → execution).
 
-**pages#476 — ImportExpander forEach/loop/steps.** Added `steps` field
-to YamlImport type, filter steps-based imports from module expansion
-(matching Java behavior), dot-in-value validation, cross-import alias
-uniqueness. Commits: `50dd7da0`, `ed609f53`.
-
-**pages#477 — DecoratorChain 13-layer pipeline.** Complete rewrite of
-decorator-chain.ts porting all Java layers. New: forEach (sequential +
-parallel), wait (signal await with deadline), publish (channel send).
-Fixed: when (variable resolution via VariableResolver), loop (until/
-count-until conditions), retry (exponential backoff), delay (pre-exec +
-speed multiplier), on-error (failure interception + metadata), semaphore
-(permits map + mutex), signal → PostSignal (payload), timeout (speed
-multiplier + deadline propagation). Context now carries VariableResolver.
-72 tests. Commits: `f44641c3`, `c024a3dd`.
-
-**pages#478 — StructuralStepEvaluator.** Already implemented — closed.
-All 11 step variants covered, 48 tests passing.
-
-**pages#479 — TypedSchema/TypedMap/TypedName/TypedVariables.** Already
-implemented — closed. 24 tests passing.
-
-**pages#490 — StepRunner/StepContext interfaces.** Already implemented —
-closed. Runner, DeadlineContext, QuorumTracker, ScopeUtils all present.
+**pages#327 — Scenario templates parameterized include.**
+IncludeExpander in both TS (yaml-core) and Java (scenario module).
+Parse-time expansion: loads template files via caller-provided loader,
+validates params via ParameterValidator, resolves ${params.name} via
+VariableResolver, evaluates when: conditions via isTruthy/Truthiness,
+detects cycles via DFS path tracking. Supports nested includes and
+section-level includes. TS: parseScenarioWithIncludes async entry
+point (parseScenario stays synchronous for backward compatibility).
+Java: ScenarioCompiler.compile 4-arg overload with TemplateLoader.
+22 tests total (12 TS, 7+1 Java). Also fixed pre-existing compilation:
+ParameterType import path (yaml.core.module → yaml.plugin.api),
+ForEachAdapter.getCondition rename.
+Commits: `3bf00570`, `c5070e86`, `bbdade8f`, `158a57ef`.
 
 ## Immediate Next Step
 
-casehub-pages#509 — Align TS scenario state machine DSL with platform
-syntax. Port ScenarioParser, ScenarioCompiler, ScenarioValidator from
-Java yaml-step-runtime. M/High complexity.
+casehub-pages#359 — Spotlight targeting for table rows. Different
+domain (UI/ARIA targeting), no overlap with YAML template work.
+Fresh session recommended.
 
 ## Slot Repos
 
@@ -41,9 +32,10 @@ Slot 210 has 4 repos:
 - `slots/210/pages` — 4 new commits on `epic-502-yaml-parity`
 - `slots/210/engine` — no new commits
 - `slots/210/work` — no new commits
-- `slots/210/desiredstate` — no new commits
 
 ## References
 
-- `.plan` — queue at position 21/31, active issue pages#509
-- Pages commits: `50dd7da0` (ImportExpander steps), `ed609f53` (expand integration test), `f44641c3` (DecoratorChain rewrite), `c024a3dd` (structural-evaluator test fix)
+- `.plan` — queue at position 23/31, active issue pages#359
+- Design spec: `specs/epic-502-yaml-parity/2026-10-02-scenario-includes-design.md`
+- Implementation plan: `plans/2026-10-02-scenario-includes.md`
+- Pages commits: `3bf00570` (IncludeExpander TS), `c5070e86` (parseScenarioWithIncludes), `bbdade8f` (IncludeExpander Java), `158a57ef` (ScenarioCompiler wiring)
