@@ -39,9 +39,9 @@ flyway-next-v: unknown
   - [x] Batch 1: Table API
     - [x] Task 1: aria-label on rows
     - [x] Task 2: scrollToRow method
-  - [ ] Batch 2: Scenario command
-    - [ ] Task 3: step definition
-    - [ ] Task 4: executor implementation
+  - [x] Batch 2: Scenario command
+    - [x] Task 3: step definition
+    - [x] Task 4: executor implementation
 - [ ] casehubio/casehub-pages#390 — Scenario format refinements
 - [ ] casehubio/casehub-pages#466 — Single-source YAML scenarios for tutorials
 - [ ] casehubio/platform#424 — Generated typed event dispatch Layer 3
