@@ -1,7 +1,7 @@
 _branch=issue-403-work-spring-panache
 report_init=done
 code_review_attempt=1
-last_yielded=squash
+last_yielded=arc42_scan
 =======
 sweep_config_attempt=1
 sweep_config=done
@@ -182,7 +182,6 @@ squash_attempt=1
 squash=done
 squash_produced=0
 report_squash=done
-land=done
 report_land=done
 push_pass=done
 merge_pass=done
@@ -196,3 +195,10 @@ write_marker=done
 land:platform_mechanical_attempt=1
 land:engine=done
 land:qhorus=done
+checkout_main=done
+cleanup_stack=done
+cleanup=done
+report_scaffold=done
+arc42_scan_attempt=1
+arc42_scan=done
+land:platform=done
