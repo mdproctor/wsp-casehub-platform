@@ -3,9 +3,9 @@
 ## State
 branch: issue-403-work-spring-panache
 <<<<<<< HEAD
-state: scaffolded
+state: active
 =======
-state: closing:promoted
+state: active
 >>>>>>> issue-403-work-spring-panache
 project-sha: 
 date: 
