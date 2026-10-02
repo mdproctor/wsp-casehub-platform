@@ -142,3 +142,66 @@
 **Rationale:** Templates declare params with type/required/default (matching Java ParamDescriptor). Fail-fast with clear error on missing required param is essential for YAML authors who may not see the resulting step errors.
 **Trade-offs:** Templates must declare params explicitly. This is the desired behavior — params serve as the template's contract.
 **Sources:** ParamDescriptor.java, parameterized-onboard.yaml (params with name/type/required/default)
+
+---
+
+# Decisions — pages#359 Spotlight Targeting for Table Rows
+
+## D13: Table scrollToRow API shape
+
+**Choice:** `scrollToRow(predicate: (row: TypedRow) => boolean): Promise<boolean>` — generic predicate over row data
+**Alternatives:**
+- By row key only — simpler but can't match on column values
+- Multiple named methods (scrollToRowByKey, scrollToRowByIndex) — more surface area
+- Options object with discriminated fields — one method but still limited
+**Rationale:** A predicate is the most general form. The scenario command layer provides YAML-friendly sugar (key, column+value, index) that compiles down to predicates. The table doesn't need to know about lookup modes.
+**Trade-offs:** Callers must construct a predicate rather than passing a key directly. Mitigated by the scenario command sugar and by the fact that programmatic callers already have row data context.
+**Sources:** pages-data-table.ts:2111 (_scrollToRowIfNeeded private method), pages-data-table.ts:33 (getRowKey callback)
+**Exploration:** quick
+**Status:** captured
+
+## D14: Row ARIA labeling
+
+**Choice:** Auto-label rendered rows from getRowKey — when getRowKey is set, each row div gets `aria-label={getRowKey(row)}`
+**Alternatives:**
+- Dedicated getRowLabel callback — separate from key, allows label != key. Another prop to configure.
+- No auto-labeling — leave to consumer. Manual aria-label via getRowClass or slot.
+**Rationale:** getRowKey already produces human-meaningful identifiers (customer names, ticket IDs). Adding aria-label from getRowKey means spotlight can target rows by ARIA role+name with zero spotlight changes. Also improves accessibility for screen readers.
+**Trade-offs:** Key and label are conflated — if a key is a UUID, the aria-label won't be human-readable. Acceptable because getRowKey is already designed to produce meaningful identifiers, and consumers can override via getRowClass if needed.
+**Sources:** pages-data-table.ts:2842-2857 (_renderRow — row div has role="row" but no aria-label)
+**Exploration:** quick
+**Status:** captured
+
+## D15: Scroll-to auto-wait
+
+**Choice:** scroll-to-row auto-waits for the row to render after scrolling, then resolves
+**Alternatives:**
+- Explicit wait step — author adds a wait: step between scroll-to and spotlight. More control but boilerplate.
+- Composite scroll-and-spotlight action — single action does both. Less flexible.
+**Rationale:** Virtual scroll re-renders on scroll events. The scroll-to action should guarantee the row is in the DOM when it resolves — otherwise every scenario would need a boilerplate wait step. Composability is preserved since scroll-to is still a separate action from spotlight.
+**Trade-offs:** The auto-wait adds latency (one Lit updateComplete cycle). Negligible for scenario playback.
+**Sources:** pages-data-table.ts:2128 (_focusRow already awaits updateComplete)
+**Exploration:** quick
+**Status:** captured
+
+## D16: Scope — table-specific command
+
+**Choice:** Table-specific scroll-to-row command that targets a table by ARIA role+name, then calls its scrollToRow API
+**Alternatives:**
+- Generic scroll-into-view for any scrollable container — but virtual scroll elements aren't in the DOM, so generic scrollIntoView fails. Would still need the table's data API.
+**Rationale:** Virtual scroll is the only case where elements don't exist in the DOM. A table-specific command can use the data model to find the row index and scroll to it. Can generalize later if needed.
+**Trade-offs:** Won't work for non-table virtual scrolling containers. None exist today.
+**Sources:** command-executor.ts:8 (resolveTarget), pages-data-table.ts:2202 (_useVirtualScroll)
+**Exploration:** quick
+**Status:** captured
+
+## D17: Element access pattern
+
+**Choice:** resolveTarget + cast — use existing resolveTarget(AriaTarget) to find the grid element, cast to PagesDataTable, call scrollToRow
+**Alternatives:**
+- Custom element query by tag name — bypasses ARIA targeting model
+**Rationale:** Consistent with all other scenario commands. ARIA targeting is the universal addressing mechanism. A clear error when the target isn't a PagesDataTable is better than silently finding the wrong element.
+**Trade-offs:** Depends on the element being a PagesDataTable instance. If someone uses a different grid component, the cast fails. Acceptable since this is explicitly a PagesDataTable feature.
+**Sources:** command-executor.ts:8-32 (resolveTarget function)
+**Exploration:** quick
+**Status:** captured
