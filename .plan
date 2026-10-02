@@ -13,12 +13,12 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/work#403 — Rest module tests broken after APT migration ← active
-  - [ ] Batch 1: Foundation
-    - [ ] Task 1: Create fixture + smoke test
-  - [ ] Batch 2: Core CRUD
-    - [ ] Task 2: Migrate WorkItemResourceTest
-  - [ ] Batch 3: Lifecycle
-    - [ ] Task 3: Migrate lifecycle tests
+  - [x] Batch 1: Foundation
+    - [x] Task 1: Create fixture + smoke test
+  - [x] Batch 2: Core CRUD
+    - [x] Task 2: Migrate WorkItemResourceTest
+  - [x] Batch 3: Lifecycle
+    - [x] Task 3: Migrate lifecycle tests
   - [ ] Batch 4: Relations
     - [ ] Task 4: Migrate relation/note/link/label tests
   - [ ] Batch 5: Features
