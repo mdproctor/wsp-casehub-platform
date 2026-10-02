@@ -35,13 +35,13 @@ flyway-next-v: unknown
 - [x] casehubio/casehub-pages#490 — StepRunner StepContext interfaces
 - [x] casehubio/casehub-pages#509 — Align TS scenario state machine DSL
 - [ ] casehubio/casehub-pages#327 — Scenario templates parameterized include ← active
-  - [ ] Batch 1: TS yaml-core
-    - [ ] Task 1: IncludeExpander with tests
-  - [ ] Batch 2: TS pages-aria
-    - [ ] Task 2: Wire into parseScenario
-  - [ ] Batch 3: Java scenario
-    - [ ] Task 3: IncludeExpander with tests
-    - [ ] Task 4: Wire into ScenarioCompiler
+  - [x] Batch 1: TS yaml-core
+    - [x] Task 1: IncludeExpander with tests
+  - [x] Batch 2: TS pages-aria
+    - [x] Task 2: Wire into parseScenario
+  - [x] Batch 3: Java scenario
+    - [x] Task 3: IncludeExpander with tests
+    - [x] Task 4: Wire into ScenarioCompiler
 - [ ] casehubio/casehub-pages#359 — Spotlight targeting for table rows
 - [ ] casehubio/casehub-pages#390 — Scenario format refinements
 - [ ] casehubio/casehub-pages#466 — Single-source YAML scenarios for tutorials
