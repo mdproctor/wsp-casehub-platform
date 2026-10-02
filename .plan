@@ -37,7 +37,7 @@ flyway-next-v: unknown
 - [x] casehubio/casehub-pages#327 — Scenario templates parameterized include
 - [ ] casehubio/casehub-pages#359 — Spotlight targeting for table rows ← active
   - [ ] Batch 1: Table API
-    - [ ] Task 1: aria-label on rows
+    - [x] Task 1: aria-label on rows
     - [ ] Task 2: scrollToRow method
   - [ ] Batch 2: Scenario command
     - [ ] Task 3: step definition
