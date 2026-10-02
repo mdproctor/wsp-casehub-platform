@@ -298,15 +298,15 @@
 **Exploration:** quick
 **Status:** captured
 
-## D25: Delete bespoke command model, not refine it
+## D25: Delete both parsers, write one clean one
 
-**Choice:** Delete HierarchicalParser's step/command parsing entirely. Replace with a thin scenario envelope parser that reads chapters/sections/metadata and delegates step resolution to the standard Walker/plugin catalog. Delete ScenarioCommand record, parseCommand(), parseAriaTarget(), ScenarioStep sealed interface, ScenarioParser (Format A).
+**Choice:** Delete both ScenarioParser (Format A) and HierarchicalParser. Write a single scenario envelope parser that reads the envelope (scenario name, speed, actor, meta, simulation) and structure (chapters → sections → `do:` blocks), then delegates step resolution within `do:` blocks to the standard Walker/plugin catalog. Delete ScenarioCommand, ScenarioStep, HierarchicalStep, and all bespoke parsing methods.
 **Alternatives:**
-- Refine the bespoke model (original #390 approach) — renames and new fields on a model that shouldn't exist
-- Keep both parsers — the commands[] model for Java, compact for TS. Defers convergence.
-**Rationale:** Every feature of the commands[] model is already handled by the standard step system. The HierarchicalParser's unique value is the scenario envelope (chapters, sections, top-level metadata). Step parsing should go through the plugin catalog, not a bespoke parser.
-**Trade-offs:** Larger scope than original #390. But avoids applying refinements to a model that's being deleted.
-**Sources:** HierarchicalParser.java (parseCommand, parseStep — redundant with Walker), engine sequential-onboarding.yaml (do: blocks already use compact syntax), parseScenarioFromParsed in parser.ts (TS already delegates to Walker)
+- Refactor HierarchicalParser — carries naming baggage, partial deletion is messy
+- Refine the bespoke model (original #390 approach) — applies changes to code that shouldn't exist
+**Rationale:** Pre-release, no technical debt. Two parsers for the same thing is the problem. One parser that uses the standard step system is the solution. The scenario layer adds envelope + structure, nothing else.
+**Trade-offs:** Larger scope than original #390. But cleaner result — no legacy code paths.
+**Sources:** HierarchicalParser.java, ScenarioParser.java, engine sequential-onboarding.yaml (do: blocks), parseScenarioFromParsed in parser.ts (TS already delegates to Walker)
 **Exploration:** deep-analysis
 **Status:** captured
 
