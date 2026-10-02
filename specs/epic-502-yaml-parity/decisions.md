@@ -205,3 +205,95 @@
 **Sources:** command-executor.ts:8-32 (resolveTarget function)
 **Exploration:** quick
 **Status:** captured
+
+---
+
+# Decisions — pages#390 Scenario Format Refinements
+
+## D18: Format convergence direction
+
+**Choice:** The compact TS step-catalog format is canonical. Java parser converges to read the same format. Scenarios are custom steps (resolved through the standard plugin/catalog system) with presentation structure layered on top.
+**Alternatives:**
+- Java 3-level format is canonical, TS adapts — forces verbose commands[] wrapper on all YAML authors
+- Keep both formats, shared envelope — defers convergence, every refinement applied twice
+**Rationale:** The compact format evolved through the YAML parity work (Walker, DecoratorChain, StepWalker). It's what authors write. The Java 3-level format (steps → commands) is redundant infrastructure — the step system already handles action resolution, parameter validation, and dispatch.
+**Trade-offs:** Java HierarchicalParser needs rewriting to read compact format. Acceptable since the bespoke parsing duplicates what the plugin system already does.
+**Sources:** HierarchicalParser.java (329 lines of bespoke parsing), parser.ts (Walker-based catalog resolution), definitions.ts (step catalog), aria-actions.step.yaml
+**Exploration:** deep-analysis (first-principles evaluation)
+**Status:** captured
+
+## D19: Step taxonomy
+
+**Choice:** Three categories, all plugins using yaml-plugin-api:
+- **AriaStep** — browser DOM actions via ARIA targeting (fill, click, spotlight, scroll-to-row, etc.)
+- **ScenarioStep** — presentation actions not requiring ARIA (show-markdown, callouts, slides)
+- **ScenarioStructure** — hierarchical containers (chapters, sections) — parsed structure, not dispatched
+**Alternatives:**
+- Single undifferentiated step type — loses the executor routing signal (ARIA needs browser, etc.)
+- Separate systems per category — duplicates the step infrastructure
+**Rationale:** All three use the same plugin format (@StepPlugin, @Execute, Result, ServiceRegistry). The category tag (aria, scenario, structure) tells the orchestrator how to route. The plugin registry resolves them uniformly.
+**Trade-offs:** ScenarioStructure as a plugin is a stretch — chapters/sections are structural, not executable. But treating them as plugins means they get schema validation and catalog discoverability for free.
+**Sources:** yaml-plugin-api (zero-dep plugin SPI), yaml-plugin-processor (APT), command-executor.ts (AriaStep dispatch)
+**Exploration:** quick
+**Status:** captured
+
+## D20: Speed default change
+
+**Choice:** Clean break — speed omitted = no inter-step delay. Pacing becomes opt-in via explicit `speed: 1.0`.
+**Alternatives:**
+- Backward compat with flag — keep speed=1.0 default, add opt-in no-delay mode
+**Rationale:** Pre-release, no backward compat needed. Steps should execute as fast as possible by default. Pacing is a demo/tutorial concern, not a default.
+**Trade-offs:** Existing YAML scenarios that rely on the 1.0 default will run without pacing. Authors add explicit speed: 1.0 where needed.
+**Sources:** HierarchicalParser.java:23 (speed default 1.0)
+**Exploration:** quick
+**Status:** captured
+
+## D21: REST/GraphQL wiring
+
+**Choice:** Adapt existing RestDispatcher/GraphQLDispatcher to work with the compact step format. REST and GraphQL become step definitions in the catalog — standard plugins, not special dispatchers.
+**Alternatives:**
+- Write fresh dispatch logic — simpler but discards proven code
+- Defer — independent concern, but would mean two passes through the files
+**Rationale:** The dispatchers have working HTTP/GraphQL logic. The adaptation is wrapping them as plugins that the catalog resolves by action name (rest, graphql).
+**Trade-offs:** The adapted dispatchers carry some Format A assumptions that need cleanup.
+**Sources:** RestDispatcher.java, GraphQLDispatcher.java, RestInvokeHandler.ts, GraphqlInvokeHandler.ts
+**Exploration:** quick
+**Status:** captured
+
+## D22: target naming resolution
+
+**Choice:** In the compact YAML format, the `target` conflict dissolves naturally:
+- ARIA element fields are flat on the action (role, name, index, within) — no wrapping object
+- Executor routing uses `target:` as a decorator (sibling key on the step)
+- The rename `target → element` only applies to the wire protocol (JSON serialized from orchestrator to executor) and the TS ScenarioCommand interface
+**Alternatives:**
+- Rename executor routing to `executor:` instead — clearer but breaks existing YAML that uses `target: browser`
+**Rationale:** In the compact format there's only one `target` concept at the YAML level (executor routing). The ARIA element fields aren't wrapped. The wire protocol rename avoids confusion in code without affecting YAML authoring.
+**Trade-offs:** The wire protocol rename (target → element) is a breaking change for any code reading the serialized JSON. Acceptable since it's internal protocol.
+**Sources:** ScenarioCommand.java (target: AriaTarget), ScenarioOrchestrator.java (serializes to "target" key), scenario-handler.ts:18-25 (ScenarioCommand interface)
+**Exploration:** quick
+**Status:** captured
+
+## D23: Result aggregation
+
+**Choice:** Last-write-wins merge for multi-command results. Intra-step variable references (${thisStep.field}) prohibited.
+**Alternatives:**
+- Namespaced by command — preserves all results but complex to reference
+- Defer — can be defined when actual multi-command scenarios are authored
+**Rationale:** Steps are single-action in the compact format, so multi-command aggregation is rarely needed. When it occurs (via do: grouping), simple merge is sufficient. The step runner infrastructure stays simple.
+**Trade-offs:** Can't reference earlier command results within the same step. Acceptable — compose via sequential steps with variable references instead.
+**Sources:** Issue #390 proposal
+**Exploration:** quick
+**Status:** captured
+
+## D24: All step types are plugins
+
+**Choice:** AriaStep, ScenarioStep, and ScenarioStructure all use the yaml-plugin-api plugin format. No special-case parsing — the plugin registry resolves them uniformly.
+**Alternatives:**
+- Bespoke parsing per category — current Java approach, duplicates infrastructure
+**Rationale:** The plugin system (@StepPlugin, @Execute, Result, ServiceRegistry, generated JSON Schema) already handles registration, validation, and dispatch. Using it for all step types means one resolution path, one schema format, one catalog.
+**Trade-offs:** ScenarioStructure (chapters/sections) as plugins is unconventional — they're containers, not actions. But they benefit from schema validation and catalog discoverability.
+**Depends on:** D19 (taxonomy)
+**Sources:** yaml-plugin-api (zero-dep SPI), yaml-plugin-processor (APT generates schema + Action)
+**Exploration:** quick
+**Status:** captured
