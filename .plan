@@ -35,14 +35,8 @@ flyway-next-v: unknown
 - [x] casehubio/casehub-pages#490 — StepRunner StepContext interfaces
 - [x] casehubio/casehub-pages#509 — Align TS scenario state machine DSL
 - [x] casehubio/casehub-pages#327 — Scenario templates parameterized include
-- [ ] casehubio/casehub-pages#359 — Spotlight targeting for table rows ← active
-  - [x] Batch 1: Table API
-    - [x] Task 1: aria-label on rows
-    - [x] Task 2: scrollToRow method
-  - [x] Batch 2: Scenario command
-    - [x] Task 3: step definition
-    - [x] Task 4: executor implementation
-- [ ] casehubio/casehub-pages#390 — Scenario format refinements
+- [x] casehubio/casehub-pages#359 — Spotlight targeting for table rows
+- [ ] casehubio/casehub-pages#390 — Scenario format refinements ← active
 - [ ] casehubio/casehub-pages#466 — Single-source YAML scenarios for tutorials
 - [ ] casehubio/platform#424 — Generated typed event dispatch Layer 3
 - [ ] casehubio/platform#487 — Separate parsed structure from catalog
