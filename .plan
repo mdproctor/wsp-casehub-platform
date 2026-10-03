@@ -10,6 +10,7 @@ covers: 502
 design-repo: project
 design-section-hashes: 
 flyway-next-v: unknown
+task7: done
 
 ## Queue
 - [x] casehubio/platform#502 — Epic YAML cross-repo parity
@@ -45,9 +46,9 @@ flyway-next-v: unknown
   - [x] Batch 3: Orchestrator
     - [x] Task 4: ScenarioOrchestrator wire protocol
     - [x] Task 5: ScenarioExecutorClient rewrite
-  - [ ] Batch 4: TS
+  - [x] Batch 4: TS
     - [x] Task 6: Walker DECORATOR_KEYS+parser.ts
-    - [ ] Task 7: scenario-handler.ts dispatch rewrite
+    - [x] Task 7: scenario-handler.ts dispatch rewrite
   - [ ] Batch 5: Migration
     - [ ] Task 8: Migrate YAML files
     - [ ] Task 9: Delete old types+tests
