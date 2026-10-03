@@ -49,9 +49,9 @@ task7: done
   - [x] Batch 4: TS
     - [x] Task 6: Walker DECORATOR_KEYS+parser.ts
     - [x] Task 7: scenario-handler.ts dispatch rewrite
-  - [ ] Batch 5: Migration
-    - [ ] Task 8: Migrate YAML files
-    - [ ] Task 9: Delete old types+tests
+  - [x] Batch 5: Migration
+    - [x] Task 8: Migrate YAML files
+    - [x] Task 9: Delete old types+tests
 - [ ] casehubio/casehub-pages#466 — Single-source YAML scenarios for tutorials
 - [ ] casehubio/platform#424 — Generated typed event dispatch Layer 3
 - [ ] casehubio/platform#487 — Separate parsed structure from catalog
