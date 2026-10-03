@@ -12,16 +12,11 @@ design-section-hashes:
 flyway-next-v: 
 
 ## Queue
-- [ ] casehubio/engine#1206 — Issue #1206 ← active
-  - [ ] Batch 1: fix
-    - [ ] Task 1: Add DeadLetterEntryStore mock to spring-integration-test
-- [ ] casehubio/engine#1207 — Quarkus imports leaked into core
-- [ ] casehubio/engine#1208 — CDI modules without core extraction
+- [x] casehubio/engine#1206 — Issue #1206
+- [x] casehubio/engine#1207 — Quarkus imports leaked into core
+- [ ] casehubio/engine#1208 — CDI modules without core extraction ← active
 - [ ] casehubio/engine#1209 — MCP Spring module
 - [ ] casehubio/engine#1210 — persistence-spring-jpa generation
 - [ ] casehubio/engine#1211 — runtime-spring generation
 - [ ] casehubio/engine#1095 — McpDomain SPI migration
 - [ ] casehubio/engine#1199 — rest-spring module
-
-## Deferred
-- [ ] Fix spring-integration-test for newly generated beans (S / Low) [] — CDI cleanup exposed more beans to spring-generator, test needs mock SPIs for RoutingSignalAssembler and resilience beans
