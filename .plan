@@ -13,20 +13,8 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/engine#1206 — Issue #1206 ← active
-  - [x] Batch 1: common-core
-    - [x] Task 1: Clean 5 CDI files
-  - [x] Batch 2: engine-support-core
-    - [x] Task 2: Arc.container static holder
-    - [x] Task 3: PheromoneCloudEventBridge POJO
-  - [x] Batch 3: runtime-core-quarkus
-    - [x] Task 4: DefaultBean+Unremovable+StartupEvent
-  - [x] Batch 4: runtime-core-cdi
-    - [x] Task 5: improvement/ package
-    - [x] Task 6: remaining packages
-  - [x] Batch 5: runtime-spring
-    - [x] Task 7: RuntimeManualConfig update
-  - [x] Batch 6: verification
-    - [x] Task 8: Zero CDI imports check
+  - [ ] Batch 1: fix
+    - [ ] Task 1: Add DeadLetterEntryStore mock to spring-integration-test
 - [ ] casehubio/engine#1207 — Quarkus imports leaked into core
 - [ ] casehubio/engine#1208 — CDI modules without core extraction
 - [ ] casehubio/engine#1209 — MCP Spring module
@@ -34,3 +22,6 @@ flyway-next-v:
 - [ ] casehubio/engine#1211 — runtime-spring generation
 - [ ] casehubio/engine#1095 — McpDomain SPI migration
 - [ ] casehubio/engine#1199 — rest-spring module
+
+## Deferred
+- [ ] Fix spring-integration-test for newly generated beans (S / Low) [] — CDI cleanup exposed more beans to spring-generator, test needs mock SPIs for RoutingSignalAssembler and resilience beans
