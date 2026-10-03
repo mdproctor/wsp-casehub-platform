@@ -117,10 +117,17 @@ Key format properties:
 - Reads structure: chapters → sections → `steps:` arrays
 - Extracts step data as raw maps: each step is {actionName → params} plus
   decorator sibling keys
-- Does NOT resolve steps through a catalog — the Java side is a pass-through.
-  Step resolution happens on the TS executor side via Walker.resolve()
-- ForEach expansion and variable interpolation remain in the ScenarioCompiler
-  pipeline (see §Data-Driven Features below)
+- Performs a thin structural transformation: identifies the action key (the
+  single non-decorator key), extracts decorator sibling keys (`label:`,
+  `step:`, `target:`, `actor:`, `delay:`, `when:`, `forEach:`), and
+  produces a `CompactStep` record containing action name, params map,
+  and decorator map
+- No catalog resolution — step semantics are resolved at execution time
+  on the executor side
+
+**`CompactStep.java`** — record replacing `HierarchicalStep`. Fields:
+action (String), params (Map), decorators (Map — label, step, target,
+actor, delay, when, forEach, content, trigger), temporal (TemporalSpec).
 
 **`ScenarioEnvelope.java`** — record holding parsed envelope + structure.
 Replaces HierarchicalScenario. Fields:
@@ -140,7 +147,63 @@ Replaces HierarchicalScenario. Fields:
 | `simulation` | Simulation overlay config (strategies, corpus, capture) | Top-level `simulation:` block |
 | `chapters` | Chapter containers (label, content, sections) | Top-level `chapters:` array |
 | `sections` | Section containers (label, content, steps) | Top-level `sections:` array |
-| `steps` | Flat step list (raw maps, not resolved) | Top-level `steps:` array |
+| `steps` | Flat step list (CompactStep records) | Top-level `steps:` array |
+
+### What Gets Rewritten
+
+**`ScenarioCompiler.java`** — complete rewrite of the glue code. The
+platform-level infrastructure (`ForEachExpander`, `ForEachDirective`,
+`CsvDataSource`, `VariableResolver`, `Truthiness`, `ParameterValidator`
+from yaml-core) is format-agnostic and survives unchanged. Every piece of
+pages-level glue that wires these to the step model is rewritten:
+
+| Component | Current state | After rewrite |
+|---|---|---|
+| `compile()` entry point | Calls `HierarchicalParser.parse()` | Calls `ScenarioEnvelopeParser.parse()` |
+| Step collection | `scenario.allSteps()` → `List<HierarchicalStep>` | `envelope.allSteps()` → `List<CompactStep>` |
+| ForEach expansion | `ForEachExpander.expand(stepMap, ...)` with `ScenarioStepAdapter` | Same expansion, new `CompactStepAdapter` |
+| Return type | `CompiledScenario(List<HierarchicalStep>)` | `CompiledScenario(List<CompactStep>)` |
+| Call inlining | `inlineCalls()` constructs `HierarchicalStep` records | Rewritten to construct `CompactStep` records |
+| Call detection | `step.commands().stream().filter(cmd → "call".equals(cmd.action()))` | `"call".equals(step.action())` |
+
+**`ScenarioStepAdapter.java`** → **`CompactStepAdapter.java`** — rewritten:
+
+| Method | Current | After rewrite |
+|---|---|---|
+| `stamp()` | Creates `HierarchicalStep` + resolved `ScenarioCommand` list | Creates `CompactStep` with resolved params map |
+| `getForEach()` | `element.forEach()` (from HierarchicalStep field) | `step.decorator("forEach")` (from decorator map) |
+| `getCondition()` | `element.when()` (from HierarchicalStep field) | `step.decorator("when")` (from decorator map) |
+| Variable resolution | Iterates `ScenarioCommand` fields (`value`, `target`, `callParams`) | Iterates flat params map entries |
+
+**`ScenarioExecutorClient.java`** — rewritten to consume the new wire
+format. Currently receives `DispatchStep` with `commands[]` array and
+iterates commands to invoke `@ScenarioAction` handlers:
+
+| Concern | Current | After rewrite |
+|---|---|---|
+| Step shape | `stepNode.get("commands")` → iterate command array | Single action: `stepNode.get("action")` + `stepNode.get("params")` |
+| Action dispatch | `cmdNode.path("action")` per command | `stepNode.path("action")` once per step |
+| ActionContext data | `ActionContext.of(actor, data, awaitMatch)` from command `data` field | `ActionContext.of(actor, params, awaitMatch)` from step params map |
+| Execution modes | `cmdNode.path("mode")` — SINGLE, BULK, STEPPED, STREAM | Step-level decorator: `stepNode.path("mode")` |
+| Await handling | `cmdNode.get("await")` per command | `stepNode.get("await")` per step |
+| Result aggregation | Last-write-wins across commands | Single action result per step |
+
+The `@ScenarioAction` annotation and `ActionRegistry` are unchanged — they
+still discover and route by action name. The change is in how the executor
+client extracts the action name and builds `ActionContext` from the new
+wire format.
+
+**TS `scenario-handler.ts`** — `DispatchStep` interface and dispatch logic
+rewritten:
+
+| Interface | Current | After rewrite |
+|---|---|---|
+| `DispatchStep` | `{ name, label, actor?, commands: ScenarioCommand[] }` | `{ name, label, actor?, action, params, element? }` |
+| `ScenarioCommand` | `{ action, target?, value?, data?, state?, timeout? }` | Removed — step IS the action |
+| `CommandPayload` | `{ id, action, target?, value?, state?, timeout? }` | Adapted to read from step-level fields |
+
+Dispatch logic changes from command-array iteration to single-action
+execution per step.
 
 ### Plugin Taxonomy
 
@@ -148,13 +211,27 @@ Two plugin categories, using yaml-plugin-api:
 
 | Category | Examples | Runtime | Executor routing |
 |---|---|---|---|
-| AriaStep | fill, click, navigate, spotlight, scroll-to-row | Browser DOM | Implicit → browser |
-| ScenarioStep | show-markdown, callout, slide, rest, graphql | Presentation / Server | Explicit via `target:` decorator |
+| AriaStep | fill, click, navigate, spotlight, scroll-to-row | Browser DOM | Default → `browser` executor |
+| ScenarioStep | show-markdown, callout, slide, rest, graphql | Presentation / Server | Explicit `target:` decorator required |
 
 Registered through `@Plugin` annotation (from `io.casehub.yaml.plugin.api`).
 Plugin `portability` field indicates execution environment (JAVA, TS, BOTH,
 UNIVERSAL). Default routing inferred from portability; `target:` decorator
 overrides per-step.
+
+**Executor routing model:** Each step's `target:` decorator specifies which
+executor receives the dispatch message. Executors register with the
+`ExecutorRegistry` via `executor-register` messages, providing a name and
+action list. The `SequencePartitioner` groups consecutive steps by target
+for batched dispatch.
+
+- AriaStep actions (fill, click, navigate, spotlight, etc.) default to
+  `target: browser` — the browser executor (TS scenario-handler)
+- REST/GraphQL steps must specify `target:` explicitly (e.g.,
+  `target: server`) — the server-side executor (ScenarioExecutorClient)
+- If `target:` is omitted, the default is `browser`
+- The orchestrator validates all target executors are registered before
+  dispatching
 
 Chapters and sections are **structural containers**, not plugins. They are
 parsed directly by the envelope parser — they do not appear in the plugin
@@ -167,9 +244,10 @@ wire protocol. REST and GraphQL handlers use this annotation. As the
 scenario system converges with the platform plugin model, `@ScenarioAction`
 handlers will be adapted to receive step params from the new compact format
 instead of `ScenarioCommand` fields. The migration path is:
-1. New envelope parser produces raw step maps (action name + params)
-2. Orchestrator serializes these for dispatch
-3. Executor client routes to `@ScenarioAction` handlers using action name
+1. New envelope parser produces `CompactStep` records (action name + params)
+2. Orchestrator serializes these for dispatch (new wire format)
+3. Executor client routes to `@ScenarioAction` handlers using action name,
+   building `ActionContext` from the step params map instead of command fields
 4. Future: `@ScenarioAction` converges with `@Plugin` as the scenario
    executor framework matures
 
@@ -187,6 +265,7 @@ RestDispatcher and GraphQLDispatcher adapted as standard step plugins:
     body:
       subject: "${subject}"
     expected-status: 201
+  target: server
 
 - step: inject-chat
   graphql:
@@ -196,6 +275,7 @@ RestDispatcher and GraphQLDispatcher adapted as standard step plugins:
       platform: "slack"
       sender: "Alice"
       text: "My laptop won't boot"
+  target: server
 
 - step: verify-classified
   graphql:
@@ -203,6 +283,7 @@ RestDispatcher and GraphQLDispatcher adapted as standard step plugins:
     operation: caseContext
     params:
       caseId: "${create-case.id}"
+  target: server
   await:
     match:
       category: "HARDWARE"
@@ -212,6 +293,10 @@ RestDispatcher and GraphQLDispatcher adapted as standard step plugins:
 
 The `step:` decorator names the step for result capture. Subsequent steps
 reference results via `${stepName.field}` — e.g., `${create-case.id}`.
+
+The `target: server` decorator routes these steps to the server-side
+executor (`ScenarioExecutorClient`), which dispatches to `@ScenarioAction`
+handlers for `rest` and `graphql` actions.
 
 **Step result store:** Each named step (`step: name`) captures its execution
 result. Results are stored in a session-scoped result map keyed by step name.
@@ -241,13 +326,12 @@ The pipeline is:
    - Expands forEach steps into concrete stamped steps
 3. **Orchestrator** dispatches the expanded (flattened) step list
 
-This pipeline already exists — `ScenarioCompiler.java` uses
-`ForEachExpander`, `ForEachDirective`, `CsvDataSource`, `VariableResolver`,
-`Truthiness`, and `ScenarioStepAdapter` from yaml-core. The only change is
-the step representation: instead of `HierarchicalStep` + `ScenarioCommand`,
-the adapter works with raw step maps (action-name-as-key + params). The
-`ScenarioStepAdapter` is updated to stamp raw step maps instead of
-`HierarchicalStep` records.
+The platform-level infrastructure (`ForEachExpander`, `ForEachDirective`,
+`CsvDataSource`, `VariableResolver`, `Truthiness` from yaml-core) is
+format-agnostic and survives unchanged. The pages-level glue code
+(ScenarioCompiler, ScenarioStepAdapter) is completely rewritten to work
+with `CompactStep` instead of `HierarchicalStep` + `ScenarioCommand`.
+See §What Gets Rewritten for the full scope.
 
 **Example (data-driven steps in compact format):**
 
@@ -293,44 +377,84 @@ action from Format A is replaced by the standard include mechanism:
 
 ```yaml
 includes:
-  - template: seed/create-user
+  - file: seeds/create-user.yaml
     params:
       userName: "Alice"
       userRole: "Admin"
 ```
 
 Include expansion happens as a pre-processing phase before step resolution
-(D7 in decisions.md). The `IncludeExpander` loads templates, substitutes
-parameters via `VariableResolver`, and inlines the expanded steps. Nested
-includes with cycle detection are supported (D10).
+(D7 in decisions.md). The `IncludeExpander` loads templates via the `file:`
+key, substitutes parameters via `VariableResolver`, and inlines the expanded
+steps. Nested includes with cycle detection are supported (D10).
 
-For backward compatibility during migration, existing `action: call` +
-`script:` patterns are handled by the `ScenarioCompiler.inlineCalls()`
-method, which remains until all YAML files are migrated to the include
-format.
+The `ScenarioCompiler.inlineCalls()` method is rewritten (not retained) as
+part of the compiler rewrite — the call-inlining functionality is
+reimplemented using `CompactStep` records instead of `HierarchicalStep`.
+Existing `action: call` + `script:` YAML files are migrated to the
+`includes:` format.
 
 See decisions D5–D12 in decisions.md for full include design rationale.
 
 ### Wire Protocol Changes
 
-When the Java orchestrator serializes steps for browser executor dispatch:
-- `target` (AriaTarget) renamed to `element` in the JSON payload
-- TS interfaces updated:
-  - `ScenarioCommand` interface (scenario-handler.ts:18-25): `target → element`
-  - `CommandPayload` interface (scenario-handler.ts:9-16): `target → element`
-- Java `ScenarioOrchestrator.serializeSteps()` updated to write `element`
-  instead of `target` for ARIA element data
+The wire protocol between the Java orchestrator and executors changes from
+a command-array format to a single-action-per-step format.
 
-**Orchestrator serialization change:** The orchestrator currently serializes
-`HierarchicalStep` + `ScenarioCommand` into JSON with `commands[]` arrays.
-With the compact format, serialization changes to emit the raw step map
-directly: `{action: "fill", element: {role: "textbox", name: "Subject"},
-value: "..."}`. The `commands[]` wrapper is removed — each step IS one
-action.
+**Current wire format (being replaced):**
+```json
+{
+  "name": "fill-subject",
+  "label": "Fill ticket subject",
+  "actor": "system",
+  "commands": [
+    {"action": "fill", "target": {"role": "textbox", "name": "Subject"}, "value": "..."}
+  ]
+}
+```
 
-In the YAML format itself, ARIA element fields remain flat (role, name,
-index, within) — no wrapping object. The rename only affects the
-serialized wire protocol.
+**New wire format:**
+```json
+{
+  "name": "fill-subject",
+  "label": "Fill ticket subject",
+  "actor": "system",
+  "action": "fill",
+  "element": {"role": "textbox", "name": "Subject"},
+  "params": {"value": "Network connectivity issue"}
+}
+```
+
+**Structural transformation (Java orchestrator):** The orchestrator performs
+a thin structural transformation when serializing `CompactStep` for dispatch:
+
+1. Emits step-level decorators: `name`, `label`, `actor`
+2. Emits the action name: `action`
+3. For ARIA steps: separates ARIA element fields (`role`, `name`, `index`,
+   `within`) from the action params and nests them under `element`. The
+   element field set is fixed: `{role, name, index, within}`.
+4. Emits remaining params under `params`
+5. Emits `await`, `mode` if present
+
+**Non-ARIA step wire format (REST, GraphQL):**
+```json
+{
+  "name": "create-case",
+  "label": "Create case",
+  "actor": "system",
+  "action": "rest",
+  "params": {"method": "POST", "url": "/api/cases", "body": {"subject": "..."}}
+}
+```
+
+Non-ARIA steps have no `element` key — all action params go under `params`.
+
+**TS interfaces updated:**
+- `DispatchStep`: removes `commands[]`, adds `action`, `params`, `element?`
+- `ScenarioCommand`: removed (step IS the action)
+- `CommandPayload`: adapted to step-level fields
+- `scenario-handler.ts`: dispatch logic rewritten from command-array
+  iteration to single-action execution
 
 ### Semantic Constraints
 
@@ -344,8 +468,15 @@ This is safe on any operation, including mutations. The spec distinguishes:
 
 | Pattern | Behavior | Allowed on mutations |
 |---|---|---|
-| `await: { match: {...}, timeout, interval }` | Poll-retry until match | No — rejected at parse time |
+| `await: { match: {...}, timeout, interval }` | Poll-retry until match | No — rejected by executor at dispatch time |
 | `await: { status: N }` | Single-invocation response check | Yes |
+
+**Validation location:** Poll-retry mutation rejection happens at
+**execution time in the executor** (`ScenarioExecutorClient`), not at
+parse time. The executor knows its actions' semantics — REST POST/PUT/DELETE
+are mutations, REST GET is idempotent; GraphQL operations are classified by
+their schema type (query vs. mutation). The envelope parser and compiler
+have no catalog access and cannot classify actions.
 
 **Result aggregation:** Each step is a single action in the compact format.
 Multi-action grouping (via `block:`) follows standard Walker semantics.
@@ -356,9 +487,11 @@ references instead.
 ### TS Changes
 
 - `parseScenarioFromParsed()` — already reads `steps:` (no rename needed)
-- `ScenarioCommand` interface: `target → element`
-- `CommandPayload` interface: `target → element`
-- `scenario-handler.ts`: updated dispatch to read `element`
+- `DispatchStep` interface: `commands[]` removed, `action` + `params` +
+  `element?` added
+- `ScenarioCommand` interface: removed
+- `CommandPayload` interface: adapted to step-level fields
+- `scenario-handler.ts`: dispatch rewritten for single-action-per-step
 - `types.ts`: consolidated with working types from scenario-handler.ts
 
 ### YAML Migration
@@ -379,15 +512,15 @@ format. Full scope:
 
 **Test resource YAML files (backend/scenario/src/test/resources/scenarios/):**
 - `helpdesk-demo.yaml` — already compact format (no migration needed)
-- `hybrid-helpdesk-demo.yaml` — already compact format (REST/GraphQL refs
-  need updating to use `rest:`/`graphql:` as action keys instead of
-  `delivery:` sibling)
-- `caller-script.yaml` — `action: call` with parameterized includes
-- `callee-create-user.yaml` — parameterized callee
-- `foreach-csv-inline.yaml` — forEach + when with CSV data
-- `parameterized-onboard.yaml` — parameterized steps
-- `cyclic-a.yaml`, `cyclic-b.yaml` — cycle detection tests
-- `environment-setup.yaml` (test copy)
+- `hybrid-helpdesk-demo.yaml` — already compact format (`delivery:` sibling
+  replaced with `target: server` decorator; REST/GraphQL params use
+  action-name-as-key)
+- `caller-script.yaml` — `action: call` migrated to `includes:` format
+- `callee-create-user.yaml` — parameterized callee (becomes include template)
+- `foreach-csv-inline.yaml` — forEach + when with CSV data → compact
+- `parameterized-onboard.yaml` — parameterized steps → compact
+- `cyclic-a.yaml`, `cyclic-b.yaml` — cycle detection tests → compact
+- `environment-setup.yaml` (test copy) → compact
 
 **Files already in compact format (no migration needed):**
 - `helpdesk-demo.yaml` — flat steps with action-name-as-key
@@ -421,27 +554,29 @@ and pops it at scenario stop. This mechanism is unchanged.
 
 **Java:**
 - ScenarioEnvelopeParser: envelope fields, chapters/sections/steps structure,
-  raw step map extraction
+  CompactStep extraction
 - Speed default: omitted = no delay, explicit = pacing
 - Actor inheritance: scenario-level default, step-level override
 - Delay decorator on steps
-- ForEach expansion through ScenarioCompiler with compact format
-- When-conditional evaluation with compact format
-- REST/GraphQL step maps: correct action-name-as-key shape
-- Include expansion via IncludeExpander
-- await validation: poll-retry rejected on mutations, response-check allowed
+- ForEach expansion through ScenarioCompiler with CompactStep
+- When-conditional evaluation with CompactStep
+- REST/GraphQL step maps: correct action-name-as-key shape with target: server
+- Include expansion via IncludeExpander (using `file:` key)
+- ScenarioExecutorClient: single-action dispatch, ActionContext from params map
 - Migrated YAML files parse through new parser
 - onError handling: "stop" halts on first failure
 
 **TS:**
-- Wire protocol: `element` field in ScenarioCommand and CommandPayload
+- Wire protocol: new DispatchStep shape (action + params + element?)
 - `steps:` parsing in parseScenarioFromParsed (unchanged)
+- scenario-handler.ts: single-action dispatch logic
 - Types consolidation
 
 **Integration:**
 - Scenario YAML → Java envelope parser → ScenarioCompiler (forEach, params,
-  includes) → orchestrator dispatch → TS executor → Walker step resolution →
-  browser execution
+  includes) → orchestrator serialization → executor dispatch →
+  (browser: TS Walker resolution → execution) |
+  (server: ScenarioExecutorClient → @ScenarioAction handler)
 
 ## Out of Scope
 
@@ -449,7 +584,22 @@ and pops it at scenario stop. This mechanism is unchanged.
 - Multi-executor routing table (future, when distributed scenarios need it)
 - TS-side Walker changes (already uses compact format)
 - Orchestration primitives (barriers, channels, state machines — unchanged)
-- Java-side Walker port (not needed — Java is a pass-through to TS executor)
+- Java-side Walker port (not needed — step resolution on TS executor side)
+- `@ScenarioAction` → `@Plugin` convergence (future, post-format-convergence)
+
+## Decisions revised during review
+
+Decisions D18–D26 in decisions.md record the pre-review design. The
+following were revised during adversarial design review:
+
+- **D19** originally specified three plugin categories including
+  ScenarioStructure. Revised: two categories (AriaStep, ScenarioStep).
+  Chapters/sections are structural containers, not plugins.
+- **D24** originally stated "All step types are plugins" including
+  ScenarioStructure. Revised: structural containers are excluded.
+- **D25** originally described delegation to the Walker/plugin catalog and
+  used `do:` blocks. Revised: Java side performs a thin structural
+  transformation (not catalog resolution), uses `steps:` (not `do:`).
 
 ## References
 
@@ -457,12 +607,18 @@ and pops it at scenario stop. This mechanism is unchanged.
 - `backend/scenario/src/main/java/.../ScenarioCommand.java` — bespoke command record (being deleted)
 - `backend/scenario/src/main/java/.../ScenarioParser.java` — Format A parser (being deleted)
 - `backend/scenario/src/main/java/.../ScenarioStep.java` — sealed interface (being deleted)
-- `backend/scenario/src/main/java/.../ScenarioCompiler.java` — forEach/includes pipeline (being adapted)
-- `backend/scenario/src/main/java/.../ScenarioStepAdapter.java` — ForEachAdapter impl (being adapted)
-- `backend/scenario-runtime/src/main/java/.../ScenarioOrchestrator.java` — serializes steps (wire protocol change)
-- `backend/scenario-client/src/main/java/.../ScenarioAction.java` — existing handler annotation
+- `backend/scenario/src/main/java/.../ScenarioCompiler.java` — forEach/includes pipeline (being rewritten)
+- `backend/scenario/src/main/java/.../ScenarioStepAdapter.java` — ForEachAdapter impl (being rewritten as CompactStepAdapter)
+- `backend/scenario/src/main/java/.../IncludeExpander.java` — include expansion (file: key, TemplateLoader SPI)
+- `backend/scenario-runtime/src/main/java/.../ScenarioOrchestrator.java` — serializes steps (wire protocol rewrite)
+- `backend/scenario-runtime/src/main/java/.../SequencePartitioner.java` — groups steps by target (type change: HierarchicalStep → CompactStep)
+- `backend/scenario-runtime/src/main/java/.../ExecutorRegistry.java` — executor name → connection map (unchanged)
+- `backend/scenario-client/src/main/java/.../ScenarioExecutorClient.java` — dispatch-sequence consumer (being rewritten)
+- `backend/scenario-client/src/main/java/.../ActionRegistry.java` — @ScenarioAction handler discovery (unchanged)
+- `backend/scenario-client/src/main/java/.../ActionContext.java` — handler context interface (unchanged)
+- `backend/scenario-client/src/main/java/.../ScenarioAction.java` — existing handler annotation (unchanged)
 - `packages/pages-aria/src/scenario/parser.ts` — TS parser (already uses Walker delegation)
-- `packages/pages-aria/src/server/scenario-handler.ts:9-25` — ScenarioCommand + CommandPayload interfaces (target → element)
+- `packages/pages-aria/src/server/scenario-handler.ts` — TS dispatch (DispatchStep rewrite, ScenarioCommand removal)
 - `packages/pages-aria/src/scenario/types.ts` — TS types (consolidation)
 - `packages/yaml-core/src/step/walker.ts` — Walker with REMOVED_KEYS, DECORATOR_KEYS
 - `io.casehub.yaml.plugin.api.Plugin` — platform plugin annotation
@@ -473,8 +629,8 @@ and pops it at scenario stop. This mechanism is unchanged.
 - `META-INF/scenarios/environment-setup.yaml` — commands[] with forEach (migration target)
 - `META-INF/scenarios/onboard-team-members.yaml` — commands[] with forEach + when (migration target)
 - `backend/scenario/src/test/resources/scenarios/helpdesk-demo.yaml` — already compact
-- `backend/scenario/src/test/resources/scenarios/hybrid-helpdesk-demo.yaml` — already compact (REST/GraphQL ref update)
-- Decisions D18–D26 in decisions.md (scope expansion rationale)
+- `backend/scenario/src/test/resources/scenarios/hybrid-helpdesk-demo.yaml` — already compact (routing update)
+- Decisions D18–D26 in decisions.md (scope expansion rationale; D19/D24/D25 revised during review)
 - Decisions D5–D12 in decisions.md (includes design)
 - casehub-pages#390 (original issue — body needs scope update)
 - casehub-pages#507 (closed — TS-side unification complete)
