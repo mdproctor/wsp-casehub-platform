@@ -2,70 +2,71 @@
 
 ## Last Session
 
-Completed pages#390 (Scenario format refinements) — all 9/9 tasks done.
-Previous session did Tasks 1-6; this session completed Tasks 7-9.
+Completed pages#466 (Single-source YAML scenarios for tutorials and showcase gallery).
 
-**What was built (3 commits on pages repo, 2 on platform workspace):**
+**What was built (3 commits on pages repo, 4 on platform workspace):**
 
-1. `6f7a1ddc` — scenario-handler.ts dispatch rewrite (Task 7)
-   - DispatchStep: commands[] → flat action+params
-   - Removed ScenarioCommand interface, kept CommandPayload for legacy
-   - executeAriaCommand → executeAriaAction with buildAriaTarget helper
-   - Added 'stop' control, speed≤0 guard
-   - deriveStepName in parser.ts after Walker.resolve()
-2. `3fc23b57` — Migrate YAML files to compact format (Task 8)
-   - delivery: → target: in 3 hybrid test files
-   - commands: → compact in caller/callee, 3 META-INF production files
-   - Deleted cyclic-a/b (tested old CallGraphValidator)
-   - Migrated 2 orchestrator test inline YAMLs
-   - Null-guarded temporalDriverServiceInstance for unit tests
-   - Old ScenarioParser: added target as fallback for delivery
-3. `3093560e` — Delete old parsers and Format A types, partial (Task 9)
-   - Deleted: ScenarioParser, CallGraphValidator, ScenarioStepAdapter
-   - Deleted tests: ScenarioParserTest, HierarchicalParserTest, CallGraphValidatorTest
-   - 7 types retained (live runtime refs) → filed pages#514
+1. `42769b38` — Extract 48 scenario YAML files from 8 showcase companion scripts
+   - Created `scenarios/` directory with 8 category subdirectories
+   - 48 `.scenario.yaml` files extracted from inline JS string arrays
+   - Created `scripts/generate-scenario-manifest.js` + `scripts/validate-scenarios.js`
+   - Generated `scenarios/manifest.json` (48 entries, 8 categories)
 
-**Test results:** 207 Java tests (72 scenario + 113 runtime + 22 client),
-25 TS handler tests, 25 TS scenario tests, 25 Walker tests, 32 controller
-tests — all green.
+2. `9cca7597` — Migrate 4 showcase scripts to load YAML from shared scenario files
+   - Flow Control, Coordination, Composition, Data Delivery scripts modified
+   - Inline YAML replaced with async `fetch()` from `scenarios/manifest.json`
+   - Custom UI preserved (queue-state dots, trigger panels, injection views)
+   - 474 deletions, 181 insertions — net -293 lines of inline YAML
+
+3. `7d8e1ae6` — Add scenario-ref support to tutorial host
+   - Added `scenarioRef?: string` to `TutorialSection` interface
+   - Parser passes through `scenario-ref` from YAML sections
+   - Tutorial host fetches referenced `.scenario.yaml`, displays code viewer + Run button
+   - Test added and passing (14/14 tutorial host tests green)
+
+**Scope adjustment:** Plan originally called for one generic companion script
+replacing all 8. Investigation found only 4 scripts use `parseScenario()`;
+the other 4 use `createStepRunner` with pre-built step objects (YAML is
+display-only). Adjusted to per-script migration for the 4 parseScenario
+scripts, keeping all custom UI logic.
+
+**Test results:** 14 tutorial host tests green. Showcase scripts untestable
+in CI (require browser runtime with Pages bundle).
 
 ## Immediate Next Step
 
-pages#390 is complete. Advance to next issue in queue.
+pages#466 is complete. Queue advanced to platform#424.
 
 Next queue items:
-1. **casehub-pages#466** — Single-source YAML scenarios for tutorials
-2. **casehubio/platform#424** — Generated typed event dispatch Layer 3
-3. **casehubio/platform#487** — Separate parsed structure from catalog
-4. **casehub-pages#514** — Delete remaining Format A types (follow-up from #390)
+1. **casehubio/platform#424** — Generated typed event dispatch Layer 3
+2. **casehubio/platform#487** — Separate parsed structure from catalog
+3. **casehubio/platform#502** — Epic YAML cross-repo parity
+4. **casehub-pages#502** — Epic YAML playbook ops
+5. **casehub-pages#508** — Complete type unification
+6. **casehub-pages#514** — Delete remaining Format A types
 
 ## Key Design Decisions
 
-- **Task 9 partial deletion** — 7 old types (ScenarioStep, AriaTarget,
-  Scenario, HierarchicalStep, HierarchicalParser, ScenarioCommand,
-  HierarchicalScenario) retained because runtime dispatchers + MCP still
-  reference them. Filed pages#514 for cleanup.
-- **Multi-command forEach split** — production YAMLs (onboard-team-members,
-  environment-setup) had multi-command steps with forEach. Compact format
-  splits each command into a separate step with its own forEach. Iteration
-  semantics change (per-step vs per-group), matching the new compiler design.
-- **caller-script call→includes** — moved to envelope-level includes.
-  Callee inlined at parse time, not mid-sequence at runtime.
-- **Speed sentinel** — YAML without `speed:` gets -1.0 sentinel from
-  EnvelopeParser. Tests that check speed restoration after runTo need
-  explicit `speed: 1.0` in their YAML.
+- **D27-D31** in `specs/epic-502-yaml-parity/decisions.md`
+- **Shared directory** (`scenarios/`) at repo root, not alongside samples
+- **Existing meta format** reused (ScriptMeta) — no new format
+- **Tutorial inline steps stay** — scenario-ref is additive, not a replacement
+- **4 of 8 scripts migrated** — the 4 createStepRunner scripts (Coordination
+  Primitives, Concurrency Patterns, Step Workflows, Invoke Bindings) still
+  embed display-only YAML. They could be migrated later but the ROI is lower.
 
 ## Slot Repos
 
 Slot 210:
-- `slots/210/pages` — 3 new commits on `epic-502-yaml-parity` (pages#390 Tasks 7-9)
+- `slots/210/pages` — 3 new commits on `epic-502-yaml-parity` (pages#466)
 - `slots/210/platform` — no new commits this session
 - `slots/210/engine` — no new commits
 - `slots/210/work` — no new commits
 
 ## References
 
-- `.plan` — queue at position 24/32, pages#390 all tasks complete
-- Implementation plan: `plans/2026-10-03-scenario-format-refinements.md`
-- New follow-up issue: casehub-pages#514 (Format A type cleanup)
-- Decisions D18-D26: `specs/epic-502-yaml-parity/decisions.md`
+- `.plan` — queue at position 26/32, platform#424 active
+- Design spec: `specs/epic-502-yaml-parity/2026-10-03-single-source-scenarios-design.md`
+- Implementation plan: `plans/2026-10-03-single-source-scenarios.md`
+- Decisions D27-D31: `specs/epic-502-yaml-parity/decisions.md`
+- Issue closed: casehub-pages#466
