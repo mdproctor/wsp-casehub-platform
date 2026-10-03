@@ -58,3 +58,4 @@ task7: done
 - [ ] casehubio/platform#502 — Epic YAML cross-repo parity
 - [ ] casehubio/casehub-pages#502 — Epic YAML playbook ops
 - [ ] casehubio/casehub-pages#508 — Complete type unification
+- [ ] casehubio/casehub-pages#514 — Delete remaining Format A types after runtime migration
