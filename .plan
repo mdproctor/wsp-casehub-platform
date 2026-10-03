@@ -42,9 +42,9 @@ flyway-next-v: unknown
     - [x] Task 2: ScenarioEnvelopeParser
   - [x] Batch 2: Compiler
     - [x] Task 3: CompactStepAdapter+ScenarioCompiler rewrite
-  - [ ] Batch 3: Orchestrator
+  - [x] Batch 3: Orchestrator
     - [x] Task 4: ScenarioOrchestrator wire protocol
-    - [ ] Task 5: ScenarioExecutorClient rewrite
+    - [x] Task 5: ScenarioExecutorClient rewrite
   - [ ] Batch 4: TS
     - [x] Task 6: Walker DECORATOR_KEYS+parser.ts
     - [ ] Task 7: scenario-handler.ts dispatch rewrite

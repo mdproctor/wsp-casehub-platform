@@ -2,61 +2,77 @@
 
 ## Last Session
 
-Completed pages#359, designed pages#390 (spec under review).
+Implemented pages#390 (Scenario format refinements) — 7/9 tasks complete.
+Design review ran first (3 dimensions, 38 issues, $105, all resolved),
+then writing-plans produced a 9-task plan, then executing-plans ran
+through Batches 1-4.
 
-**pages#359 — Spotlight targeting for table rows (DONE).**
-Added `aria-label` to PagesDataTable rows from `getRowKey`, public
-`scrollToRow(predicate)` API, and `scroll-to-row` scenario command
-with key/column+value/index lookup modes. 4 commits on pages repo:
-`c2716ad9` (aria-label), `97b2aa53` (scrollToRow), `89b7a519`
-(step definition), `87ce53ac` (command executor). All tests pass
-(297 table, 19 executor). Issue closed.
+**What was built (6 commits on pages repo, 1 on platform workspace):**
 
-**pages#390 — Scenario format refinements (DESIGNED, not implemented).**
-Deep first-principles analysis led to a scope expansion: instead of
-refining the bespoke Java parser, delete both parsers (ScenarioParser
-Format A + HierarchicalParser) and write a single ScenarioEnvelopeParser
-that delegates step resolution to the standard Walker/plugin catalog.
+1. `12f03003` — CompactStep + ScenarioEnvelope records (new types
+   replacing HierarchicalStep + HierarchicalScenario)
+2. `9876ffc9` — ScenarioEnvelopeParser (compact YAML parsing, decorator
+   extraction, step name derivation, target/actor defaults)
+3. `1052919e` — CompactStepAdapter + ScenarioCompiler rewrite (forEach
+   expansion with CompactStep, inlineCalls removed)
+4. `14f9a065` — ScenarioOrchestrator wire protocol rewrite (commands[]
+   → flat action+params, AtomicBoolean callback guard)
+5. `877e336c` — ScenarioExecutorClient rewrite (single-action dispatch,
+   stop control, speed≤0 guard)
+6. `9521a106` — Walker DECORATOR_KEYS + parser.ts WALKER_KNOWN_KEYS
+   (8 scenario decorator keys added)
 
-Key decisions (D18-D26 in decisions.md):
-- Compact step syntax (action-name-as-key) is canonical — same as
-  engine `do:` blocks and TS Walker
-- Three plugin categories: AriaStep, ScenarioStep, ScenarioStructure
-- All step types use yaml-plugin-api
-- Speed default: omitted = no delay (opt-in pacing)
-- REST/GraphQL become standard step plugins
-- `target` naming resolves naturally (flat ARIA fields + decorator)
-- `do:` replaces `steps:` in scenario YAML
-
-Spec at `specs/epic-502-yaml-parity/2026-10-02-scenario-format-refinements-design.md`.
-Standard design review was launched but timed out — needs re-running.
+**Test results:** 129 Java scenario tests pass, 7 partitioner tests pass,
+22 executor tests pass, 50 Walker TS tests pass, 32 parser TS tests pass.
 
 ## Immediate Next Step
 
-1. Re-run the design review for pages#390 spec (timed out)
-2. After review passes, invoke writing-plans for pages#390
-3. Implementation is substantial: delete 6 Java files, write envelope
-   parser, adapt dispatchers as plugins, migrate YAML files, TS changes
+Resume executing-plans from **Task 7** (scenario-handler.ts dispatch rewrite):
 
-## Parked
+1. **Task 7 — scenario-handler.ts dispatch rewrite** (Batch 4)
+   - Rewrite DispatchStep interface (remove commands[], add action+params)
+   - Single-action dispatch logic with AriaTarget from flat params
+   - Add 'stop' to ExecutorControl + onControl handler
+   - Speed ≤ 0 guard before delay computation
+   - Add TS step name derivation from label decorator
+   - 919 lines, substantial rewrite
 
-- **Playbook naming unification** — rename steps/scenarios/playbook to
-  "playbook" consistently across all repos. Deferred to after the YAML
-  parity epic completes. See `specs/epic-502-yaml-parity/parking-lot.md`.
+2. **Task 8 — Migrate YAML files** (Batch 5)
+   - Test fixtures: foreach-csv-inline, parameterized-onboard already done
+   - Remaining: graphql-inject-chat, hybrid-helpdesk-demo, caller-script,
+     callee-create-user, cyclic-a/b, environment-setup
+   - Production: META-INF/scenarios/ (3 files)
+   - Tutorials: check 3 tutorial.yaml files
+
+3. **Task 9 — Delete old types + tests** (Batch 5)
+   - ScenarioParser, HierarchicalParser, ScenarioStep, ScenarioCommand,
+     HierarchicalStep, HierarchicalScenario, AriaTarget, CallGraphValidator,
+     Scenario + their test files
+   - Use ide_refactor_safe_delete, verify zero references first
+
+## Key Design Decisions
+
+- **Orchestrator is format-agnostic** — no step-type discrimination, no
+  ARIA element extraction. All params flat, executor reconstructs AriaTarget.
+- **Speed ≤ 0 sentinel** for "no pacing" (both Java and TS executors guard)
+- **Envelope parser applies defaults** — target: "browser", actor inherited
+- **Step name derivation** — step: → slugify(label:) → {action}-{index}
+- **AtomicBoolean callback guard** prevents double completion callback
+- **Walker key sets intentionally asymmetric** — TS Walker gets scenario
+  decorators, Java StepWalker does not (different step domains)
 
 ## Slot Repos
 
 Slot 210:
-- `slots/210/platform` — no new commits this session (design work in workspace)
-- `slots/210/pages` — 4 new commits on `epic-502-yaml-parity` (pages#359)
+- `slots/210/pages` — 6 new commits on `epic-502-yaml-parity` (pages#390)
+- `slots/210/platform` — no new commits this session (design + plan in workspace)
 - `slots/210/engine` — no new commits
 - `slots/210/work` — no new commits
 
 ## References
 
-- `.plan` — queue at position 24/31, active issue pages#390
-- pages#359 spec: `specs/epic-502-yaml-parity/2026-10-02-spotlight-table-rows-design.md`
-- pages#359 plan: `plans/2026-10-02-spotlight-table-rows.md`
+- `.plan` — queue at position 24/31, active issue pages#390, 7/9 tasks done
 - pages#390 spec: `specs/epic-502-yaml-parity/2026-10-02-scenario-format-refinements-design.md`
+- Implementation plan: `plans/2026-10-03-scenario-format-refinements.md`
+- Design review: 3 workspaces under `~/reviews/casehub-slots/scenario-format-refinements-*`
 - Decisions D18-D26: `specs/epic-502-yaml-parity/decisions.md`
-- Parking lot: `specs/epic-502-yaml-parity/parking-lot.md`
