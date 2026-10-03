@@ -13,11 +13,11 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/engine#1206 — Issue #1206 ← active
-  - [ ] Batch 1: common-core
-    - [ ] Task 1: Clean 5 CDI files
-  - [ ] Batch 2: engine-support-core
-    - [ ] Task 2: Arc.container static holder
-    - [ ] Task 3: PheromoneCloudEventBridge POJO
+  - [x] Batch 1: common-core
+    - [x] Task 1: Clean 5 CDI files
+  - [x] Batch 2: engine-support-core
+    - [x] Task 2: Arc.container static holder
+    - [x] Task 3: PheromoneCloudEventBridge POJO
   - [ ] Batch 3: runtime-core-quarkus
     - [ ] Task 4: DefaultBean+Unremovable+StartupEvent
   - [ ] Batch 4: runtime-core-cdi
