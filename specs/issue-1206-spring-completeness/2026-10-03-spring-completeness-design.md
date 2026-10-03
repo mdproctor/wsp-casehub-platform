@@ -87,7 +87,7 @@ After #1208 extracts mcp-core, the `spring-generator` should be able to generate
 
 The platform's `mcp-spring` module already provides `SpringModelScanner`, `CaseHubToolCallbackProvider`, and `SpringMcpResourceRegistryBridge`. The engine's mcp-spring module bridges engine-specific MCP tools into this infrastructure.
 
-If `mcp-spring-generator` can scan the engine's @McpDomain classes and produce @Tool equivalents for Spring AI, use it. Otherwise, hand-write a thin adapter following platform's pattern.
+The engine's @McpDomain classes register through platform's `SpringModelScanner` automatically — no engine-specific MCP Spring code is needed beyond ensuring the -core beans are wired as Spring @Bean definitions. Verify by checking that `casehub_model` and `casehub_action` tools include engine domains in the spring-integration-test.
 
 ## Issue #1210 — persistence-spring-jpa generation candidate
 
