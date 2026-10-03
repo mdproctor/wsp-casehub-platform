@@ -127,7 +127,17 @@ Key format properties:
 
 **`CompactStep.java`** — record replacing `HierarchicalStep`. Fields:
 action (String), params (Map), decorators (Map — label, step, target,
-actor, delay, when, forEach, content, trigger), temporal (TemporalSpec).
+actor, delay, when, forEach, content, trigger, speed), temporal
+(TemporalSpec).
+
+**Step name derivation:** The wire protocol requires a `name` on every
+dispatched step (the orchestrator uses names for completion tracking,
+result storage, trigger resolution, and outline building). The name is
+derived as: `decorator("step")` if present, otherwise
+`slugify(decorator("label"))` (matching the current
+`ScenarioStepAdapter.slugify()` — lowercase, non-alphanumeric replaced
+with hyphens, leading/trailing hyphens stripped). Steps without either
+`step:` or `label:` are rejected at parse time.
 
 **`ScenarioEnvelope.java`** — record holding parsed envelope + structure.
 Replaces HierarchicalScenario. Fields:
@@ -484,9 +494,52 @@ Last-write-wins merge for block results. Intra-step variable references
 (`${thisStep.field}`) prohibited. Compose via sequential steps with variable
 references instead.
 
+### Walker DECORATOR_KEYS Extension
+
+The unified format uses decorator sibling keys on steps (`label:`,
+`target:`, `actor:`, `when:`, `speed:`, `content:`) that the Walker does
+not currently recognize. The Walker's `resolveOne()` in `walker.ts` treats
+any key not in `DECORATOR_KEYS` or `RESERVED_KEYS` as a potential action
+key — if absent from the catalog, it throws `"unknown step key"`. This
+blocks all client-side scenario loading through `parseScenario()` /
+`parseScenarioWithIncludes()` since those call `Walker.resolve()` on the
+raw step arrays.
+
+**Fix:** Add scenario decorator keys to Walker's `DECORATOR_KEYS` and
+`RESERVED_KEYS` sets:
+
+| Key | Purpose | Currently in Walker? |
+|---|---|---|
+| `label` | Step display name | No → add to DECORATOR_KEYS + RESERVED_KEYS |
+| `target` | Executor routing | No → add to DECORATOR_KEYS + RESERVED_KEYS |
+| `actor` | Authentication identity | No → add to DECORATOR_KEYS + RESERVED_KEYS |
+| `when` | Conditional execution (Truthiness) | No → add to DECORATOR_KEYS + RESERVED_KEYS |
+| `speed` | Per-step pacing override | No → add to DECORATOR_KEYS + RESERVED_KEYS |
+| `content` | Narrative content | No → add to DECORATOR_KEYS + RESERVED_KEYS |
+
+These keys are general-purpose step metadata. The Walker already carries
+domain-specific decorators (`signal`, `publish`, `semaphore`, `barrier`,
+`quorum`, `race`) through without interpretation — adding scenario-specific
+decorators is consistent with this pattern. The Walker stores them in the
+`decorators` map on `ResolvedStep`; the scenario execution layer reads
+them after resolution.
+
+**Semantic note on `when` vs. `if`:** The Walker already uses `if` for
+structural branching (`if: condition` with `then:`/`else:` blocks). `when`
+is a different mechanism — Truthiness-based conditional filtering used by
+forEach expansion. They coexist: `if` is structural control flow (Walker-
+interpreted), `when` is a decorator (Walker-carried, evaluated by the
+scenario compiler or execution layer).
+
+**`parser.ts` `preExtract()` — no change needed:** Once the keys are in
+DECORATOR_KEYS, the Walker handles them directly. The `preExtract()`
+function does not need to strip or re-attach them.
+
 ### TS Changes
 
 - `parseScenarioFromParsed()` — already reads `steps:` (no rename needed)
+- Walker `DECORATOR_KEYS` / `RESERVED_KEYS`: add `label`, `target`,
+  `actor`, `when`, `speed`, `content`
 - `DispatchStep` interface: `commands[]` removed, `action` + `params` +
   `element?` added
 - `ScenarioCommand` interface: removed
@@ -567,25 +620,31 @@ and pops it at scenario stop. This mechanism is unchanged.
 - onError handling: "stop" halts on first failure
 
 **TS:**
+- Walker DECORATOR_KEYS: `label`, `target`, `actor`, `when`, `speed`,
+  `content` carried through as decorators on ResolvedStep
+- Walker: existing tests still pass (no structural changes)
 - Wire protocol: new DispatchStep shape (action + params + element?)
 - `steps:` parsing in parseScenarioFromParsed (unchanged)
 - scenario-handler.ts: single-action dispatch logic
 - Types consolidation
 
 **Integration:**
-- Scenario YAML → Java envelope parser → ScenarioCompiler (forEach, params,
-  includes) → orchestrator serialization → executor dispatch →
-  (browser: TS Walker resolution → execution) |
+- Server-dispatched: Scenario YAML → Java envelope parser → ScenarioCompiler
+  (forEach, params, includes) → orchestrator serialization → executor dispatch →
+  (browser: scenario-handler → executeAriaCommand → DOM) |
   (server: ScenarioExecutorClient → @ScenarioAction handler)
+- Client-loaded: Scenario YAML → TS parseScenario() → Walker.resolve() →
+  ResolvedStep[] with decorators → scenario execution
 
 ## Out of Scope
 
 - Playbook naming unification (parked for post-epic)
 - Multi-executor routing table (future, when distributed scenarios need it)
-- TS-side Walker changes (already uses compact format)
 - Orchestration primitives (barriers, channels, state machines — unchanged)
 - Java-side Walker port (not needed — step resolution on TS executor side)
 - `@ScenarioAction` → `@Plugin` convergence (future, post-format-convergence)
+- Walker structural changes (control flow, resolution logic — unchanged;
+  only DECORATOR_KEYS/RESERVED_KEYS sets extended)
 
 ## Decisions revised during review
 
@@ -600,6 +659,10 @@ following were revised during adversarial design review:
 - **D25** originally described delegation to the Walker/plugin catalog and
   used `do:` blocks. Revised: Java side performs a thin structural
   transformation (not catalog resolution), uses `steps:` (not `do:`).
+- **Out of Scope** originally listed "TS-side Walker changes" as out of
+  scope. Revised: Walker DECORATOR_KEYS/RESERVED_KEYS must be extended
+  with scenario decorator keys (`label`, `target`, `actor`, `when`,
+  `speed`, `content`) — without this, client-side scenario loading fails.
 
 ## References
 
