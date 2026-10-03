@@ -39,13 +39,13 @@ task7: done
 - [x] casehubio/casehub-pages#359 — Spotlight targeting for table rows
 - [x] casehubio/casehub-pages#390 — Scenario format refinements
 - [ ] casehubio/casehub-pages#466 — Single-source YAML scenarios for tutorials ← active
-  - [ ] Batch 1: Extraction
-    - [ ] Task 1: Extract scenario YAML files
-  - [ ] Batch 2: Showcase
-    - [ ] Task 2: Create generic companion
-    - [ ] Task 3: Migrate pages and update infra
-  - [ ] Batch 3: Tutorial
-    - [ ] Task 4: Add scenario-ref to tutorial host
+  - [x] Batch 1: Extraction
+    - [x] Task 1: Extract scenario YAML files
+  - [x] Batch 2: Showcase
+    - [x] Task 2: Create generic companion
+    - [x] Task 3: Migrate pages and update infra
+  - [x] Batch 3: Tutorial
+    - [x] Task 4: Add scenario-ref to tutorial host
 - [ ] casehubio/platform#424 — Generated typed event dispatch Layer 3
 - [ ] casehubio/platform#487 — Separate parsed structure from catalog
 - [ ] casehubio/platform#502 — Epic YAML cross-repo parity
