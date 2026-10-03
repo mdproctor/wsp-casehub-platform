@@ -64,7 +64,7 @@ sections:
       - spotlight:
           role: combobox
           name: "Priority"
-          content: "Priority drives SLA timers"
+        content: "Priority drives SLA timers"
 
       - click:
           role: button
@@ -892,6 +892,12 @@ following were revised during adversarial design review:
 - **D25** originally described delegation to the Walker/plugin catalog and
   used `do:` blocks. Revised: Java side performs a thin structural
   transformation (not catalog resolution), uses `steps:` (not `do:`).
+- **D22** originally stated "The rename `target → element` only applies
+  to the wire protocol." Revised: the wire protocol now uses flat `params`
+  with no `element` field at all. ARIA element fields (`role`, `name`,
+  `index`, `within`) sit flat in `params` alongside action data. The
+  `target → element` rename was dropped — the flat-params design
+  eliminated the need for a separate `element` key.
 - **Out of Scope** originally listed "TS-side Walker changes" as out of
   scope. Revised: Walker DECORATOR_KEYS/RESERVED_KEYS must be extended
   with scenario decorator keys (see §Canonical Decorator Keys: `label`,
