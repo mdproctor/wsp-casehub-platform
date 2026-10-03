@@ -91,9 +91,12 @@ steps:
 Key format properties:
 - `steps:` as the step-list key (both top-level and inside sections)
 - Action-name-as-key with flat params (standard plugin format)
-- Decorators as sibling keys: `label:`, `step:` (naming), `target:` (executor),
-  `actor:`, `delay:`, `when:`, `speed:`, `forEach:`
-- Speed omitted = no inter-step delay (opt-in pacing via explicit `speed:`)
+- Decorators as sibling keys (see §Canonical Decorator Keys for the full
+  set): `label:`, `step:` (naming), `target:` (executor), `actor:`,
+  `delay:`, `when:`, `speed:`, `forEach:`, `await:`, `mode:`
+- Speed omitted = no inter-step delay (opt-in pacing via explicit `speed:`).
+  Executors guard: `if (speed <= 0 || speed >= 1000)` skip delay entirely —
+  speed ≤ 0 is the sentinel for "no pacing"
 - Scenario-level `actor:` is the default; step-level `actor:` overrides
 - `steps:` and `sections:` are mutually exclusive at top level
   (chapters contain sections; sections contain steps)
@@ -118,26 +121,128 @@ Key format properties:
 - Extracts step data as raw maps: each step is {actionName → params} plus
   decorator sibling keys
 - Performs a thin structural transformation: identifies the action key (the
-  single non-decorator key), extracts decorator sibling keys (`label:`,
-  `step:`, `target:`, `actor:`, `delay:`, `when:`, `forEach:`), and
-  produces a `CompactStep` record containing action name, params map,
-  and decorator map
+  single non-decorator key), extracts all decorator sibling keys (see
+  §Canonical Decorator Keys for the complete set), and produces a
+  `CompactStep` record containing action name, params map, and decorator
+  map
+- **Applies defaults:** If a step has no `target:` decorator, the parser
+  sets `target: "browser"`. If a step has no `actor:` decorator but the
+  envelope has a scenario-level `actor:`, the parser propagates the
+  scenario-level actor to the step. **Invariants after parsing:**
+  `CompactStep.decorator("target")` is never null;
+  `CompactStep.decorator("actor")` is never null when the envelope
+  declares a scenario-level actor
 - No catalog resolution — step semantics are resolved at execution time
   on the executor side
 
 **`CompactStep.java`** — record replacing `HierarchicalStep`. Fields:
-action (String), params (Map), decorators (Map — label, step, target,
-actor, delay, when, forEach, content, trigger, speed), temporal
-(TemporalSpec).
+action (String), params (Map), forEach (ForEachDirective — nullable),
+trigger (Trigger — nullable), temporal (TemporalSpec — nullable),
+decorators (Map — see §Canonical Decorator Keys).
+
+**Boundary principle:** Typed fields for data with parser-validated
+polymorphic shape — `forEach` (sealed: GroupRef | InlineIteration),
+`trigger` (sealed: AfterTrigger | TimeTrigger | DataTrigger), and
+`temporal` (structured with action enum and events list). The decorator
+map carries simple values (strings, numbers) that the parser passes
+through without structural validation. `action` and `params` are typed
+because they are the step's essential identity.
+
+#### Canonical Decorator Keys
+
+All decorator keys recognized by CompactStep, the envelope parser, and
+the Walker (where applicable). This is the single authoritative list —
+all sections of this spec reference it.
+
+| Key | Purpose | CompactStep | Walker |
+|---|---|---|---|
+| `label` | Step display name | decorator | add to DECORATOR_KEYS |
+| `step` | Step identifier (result capture, triggers) | decorator | already in RESERVED_KEYS |
+| `target` | Executor routing (browser, server) | decorator | add to DECORATOR_KEYS |
+| `actor` | Authentication identity | decorator | add to DECORATOR_KEYS |
+| `delay` | Per-step delay before execution | decorator | already in DECORATOR_KEYS |
+| `when` | Conditional execution (Truthiness filter) | decorator | add to DECORATOR_KEYS |
+| `forEach` | Data-driven expansion directive | **typed field** (ForEachDirective) | already in DECORATOR_KEYS |
+| `content` | Narrative/spotlight content (step-level only — see §Content Key Disambiguation) | decorator | add to DECORATOR_KEYS |
+| `trigger` | Step trigger specification | **typed field** (Trigger) | already in DECORATOR_KEYS |
+| `speed` | Per-step pacing override | decorator | add to DECORATOR_KEYS |
+| `await` | Polling/validation specification (see §Semantic Constraints) | decorator | add to DECORATOR_KEYS |
+| `mode` | Execution mode (SINGLE, BULK, STEPPED, STREAM) | decorator | add to DECORATOR_KEYS |
+
+`await` and `mode` migrate from `ScenarioCommand` fields to CompactStep
+decorators. In the current code, `ScenarioCommand.await()` is an
+`AwaitCondition` record (match, timeout, interval) and
+`ScenarioCommand.mode()` is a `DataMode` enum. In CompactStep, they
+become entries in the decorators map — `await` as a Map, `mode` as a
+String. The executor client reads them from the step-level wire format
+(`stepNode.get("await")`, `stepNode.path("mode")`), consistent with the
+rewrite table in §What Gets Rewritten.
+
+#### TemporalSpec
+
+`TemporalSpec` is an existing record from the scenario module
+(`io.casehub.pages.scenario.TemporalSpec`), carried forward unchanged
+from `HierarchicalStep`. It controls temporal simulation drivers and has
+fields: `action` (enum: START, STOP, PAUSE, RESUME, SET_SPEED), `name`,
+`profile`, `qualifiedName`, `tenancyId`, `events` (List of
+delay/label/payload records), `loop` (Boolean), `speed` (Double). Steps
+with `temporal` set are dispatched to `TemporalDriverService`, not to an
+executor — they have no `target` requirement.
+
+#### Content Key Disambiguation
+
+The `content:` key appears at two structural levels with distinct
+purposes:
+
+- **Section-level:** `sections: [{ label: "...", content: "Walk through
+  the form", steps: [...] }]` — narrative description of the section,
+  parsed by the envelope parser as a field of the section container. This
+  is structural metadata, not a decorator.
+- **Step-level:** `spotlight: { ... } content: "Priority drives SLA
+  timers"` — narrative text for spotlight overlays, carried as a decorator
+  on CompactStep / ResolvedStep.
+
+There is no syntactic ambiguity: the envelope parser knows whether it is
+reading a section object or a step object. Section `content:` is a field
+on the section container; step `content:` is a decorator sibling key
+extracted alongside the action.
 
 **Step name derivation:** The wire protocol requires a `name` on every
 dispatched step (the orchestrator uses names for completion tracking,
 result storage, trigger resolution, and outline building). The name is
-derived as: `decorator("step")` if present, otherwise
-`slugify(decorator("label"))` (matching the current
-`ScenarioStepAdapter.slugify()` — lowercase, non-alphanumeric replaced
-with hyphens, leading/trailing hyphens stripped). Steps without either
-`step:` or `label:` are rejected at parse time.
+derived as:
+1. `decorator("step")` if present (explicit programmatic name)
+2. Otherwise `slugify(decorator("label"))` if `label:` is present
+   (matching the current `ScenarioStepAdapter.slugify()` — lowercase,
+   non-alphanumeric replaced with hyphens, leading/trailing hyphens
+   stripped)
+3. Otherwise auto-derived as `{action}-{sequentialIndex}` where
+   `sequentialIndex` is the step's zero-based position in the
+   flattened step list (e.g., `navigate-0`, `fill-1`, `click-2`)
+
+Auto-derivation ensures existing YAML files without `step:` or `label:`
+decorators parse successfully. Only steps that need to be referenced in
+variable interpolation (`${stepName.field}`) require explicit `step:`
+names.
+
+**Step name uniqueness:** The envelope parser validates that all derived
+names (from any derivation path above) are unique across all steps in
+the scenario. If a collision is detected, the parser fails fast with an
+error identifying the conflicting names and their source labels. This
+prevents silent overwrite in the compiler's `stepMap`.
+
+**TS path step name derivation:** The step name derivation logic above
+applies to the **Java envelope parser**. On the TS Walker path, `step:`
+is handled as a RESERVED_KEY (sets `ResolvedStep.name` directly), while
+`label:` is a DECORATOR_KEY (stored in `ResolvedStep.decorators.label`).
+The Walker does NOT derive names from labels — this is correct, as the
+Walker is a step resolution tool, not a name derivation tool. The TS
+scenario execution layer (downstream of `parseScenarioFromParsed()`)
+must derive step names from `decorators.label` when `ResolvedStep.name`
+is null, using the same `slugify()` logic. For server-dispatched
+scenarios, this is handled by the Java orchestrator before dispatch; for
+client-loaded scenarios, the TS execution layer must apply the same
+derivation.
 
 **`ScenarioEnvelope.java`** — record holding parsed envelope + structure.
 Replaces HierarchicalScenario. Fields:
@@ -146,7 +251,7 @@ Replaces HierarchicalScenario. Fields:
 |---|---|---|
 | `scenario` | Scenario name (required) | Top-level `scenario:` key |
 | `description` | Human-readable description | Top-level or `meta.description` |
-| `speed` | Inter-step delay multiplier (default: 0 = no delay) | Top-level `speed:` |
+| `speed` | Inter-step delay multiplier. Omitted = no delay (speed ≤ 0 sentinel). Both executors guard: `if (speed <= 0 \|\| speed >= 1000) return` before computing delay | Top-level `speed:` |
 | `actor` | Default authentication identity | Top-level `actor:` |
 | `onError` | Error handling strategy ("stop" halts on first failure) | Top-level `on-error:` |
 | `params` | Declared parameters with type/required/default | Top-level `params:` block |
@@ -173,17 +278,36 @@ pages-level glue that wires these to the step model is rewritten:
 | Step collection | `scenario.allSteps()` → `List<HierarchicalStep>` | `envelope.allSteps()` → `List<CompactStep>` |
 | ForEach expansion | `ForEachExpander.expand(stepMap, ...)` with `ScenarioStepAdapter` | Same expansion, new `CompactStepAdapter` |
 | Return type | `CompiledScenario(List<HierarchicalStep>)` | `CompiledScenario(List<CompactStep>)` |
-| Call inlining | `inlineCalls()` constructs `HierarchicalStep` records | Rewritten to construct `CompactStep` records |
-| Call detection | `step.commands().stream().filter(cmd → "call".equals(cmd.action()))` | `"call".equals(step.action())` |
+| Call inlining | `inlineCalls()` + `CallGraphValidator` | Deleted — `IncludeExpander` replaces call-inlining (see §Scenario Includes) |
 
 **`ScenarioStepAdapter.java`** → **`CompactStepAdapter.java`** — rewritten:
 
 | Method | Current | After rewrite |
 |---|---|---|
 | `stamp()` | Creates `HierarchicalStep` + resolved `ScenarioCommand` list | Creates `CompactStep` with resolved params map |
-| `getForEach()` | `element.forEach()` (from HierarchicalStep field) | `step.decorator("forEach")` (from decorator map) |
+| `getForEach()` | `element.forEach()` (from HierarchicalStep field) | `step.forEach()` (typed field) |
 | `getCondition()` | `element.when()` (from HierarchicalStep field) | `step.decorator("when")` (from decorator map) |
 | Variable resolution | Iterates `ScenarioCommand` fields (`value`, `target`, `callParams`) | Iterates flat params map entries |
+
+**`ScenarioOrchestrator.java`** — type-change pass across all
+responsibilities. The orchestrator (590 lines) references
+`HierarchicalParser`, `HierarchicalScenario`, `HierarchicalStep`,
+`ScenarioCommand`, and `AriaTarget`. Wire serialization is fully
+rewritten (see §Wire Protocol Changes); the remaining responsibilities
+are mechanical type migrations:
+
+| Responsibility | Current type dependency | After rewrite |
+|---|---|---|
+| Parsing | `HierarchicalParser.parse(yaml)` → `HierarchicalScenario` | `ScenarioEnvelopeParser.parse(yaml)` → `ScenarioEnvelope` |
+| Step list | `scenario.allSteps()` → `List<HierarchicalStep>` | `envelope.allSteps()` → `List<CompactStep>` |
+| Step completion tracking | `step.name()` / `step.label()` | `step.decorator("step")` / `step.decorator("label")` (or step name derivation) |
+| Outline building | `step.commands().get(0).action()` | `step.action()` |
+| Narrative content | `step.content()` → `NarrativeContent` | `step.decorator("content")` → wrap as `NarrativeContent.Inline` |
+| Executor validation | `HierarchicalStep::target` | `step.decorator("target")` (never null — parser invariant) |
+| Temporal handling | `step.temporal()` | `step.temporal()` (typed field, unchanged) |
+| Trigger dispatch | `step.trigger() instanceof Trigger.AfterTrigger` | `step.trigger() instanceof Trigger.AfterTrigger` (typed field, unchanged) |
+| Run-to navigation | `step.label()` | `step.decorator("label")` |
+| Serialization | `ScenarioCommand`, `AriaTarget` → commands[] JSON | `step.action()`, `step.params()` → flat JSON (see §Wire Protocol) |
 
 **`ScenarioExecutorClient.java`** — rewritten to consume the new wire
 format. Currently receives `DispatchStep` with `commands[]` array and
@@ -203,17 +327,28 @@ still discover and route by action name. The change is in how the executor
 client extracts the action name and builds `ActionContext` from the new
 wire format.
 
+**Control handling:** The `handleControl` switch must add `case "stop"`:
+clears step queue, aborts in-progress execution, and sends a failure
+result for each uncompleted step. The `sleepForSpeed()` method must
+guard: `if (speed <= 0 || speed >= 1000) return;` before computing delay.
+
 **TS `scenario-handler.ts`** — `DispatchStep` interface and dispatch logic
 rewritten:
 
 | Interface | Current | After rewrite |
 |---|---|---|
-| `DispatchStep` | `{ name, label, actor?, commands: ScenarioCommand[] }` | `{ name, label, actor?, action, params, element? }` |
+| `DispatchStep` | `{ name, label, actor?, commands: ScenarioCommand[] }` | `{ name, label, actor?, action, params }` |
 | `ScenarioCommand` | `{ action, target?, value?, data?, state?, timeout? }` | Removed — step IS the action |
 | `CommandPayload` | `{ id, action, target?, value?, state?, timeout? }` | Adapted to read from step-level fields |
 
 Dispatch logic changes from command-array iteration to single-action
-execution per step.
+execution per step. ARIA actions reconstruct `AriaTarget` from flat
+params (`{role, name, index, within}`) at execution time.
+
+**TS control handling:** The `onControl` switch must add `case 'stop'`:
+sets a `stopped` flag, clears `stepQueue`, sends failure results for
+pending steps. The speed delay guard must also be added:
+`if (speed <= 0 || speed >= 1000)` skip delay.
 
 ### Plugin Taxonomy
 
@@ -247,6 +382,29 @@ Chapters and sections are **structural containers**, not plugins. They are
 parsed directly by the envelope parser — they do not appear in the plugin
 catalog, are not resolved by the Walker, and have no `@Plugin` annotation or
 `@Execute` method.
+
+**Parser path boundary:** The unified YAML format means one syntax, not
+one parser path. The format is the same regardless of which parser
+processes the file:
+
+- **Server-dispatched scenarios** (containing any combination of ARIA,
+  REST, GraphQL steps) go through the **Java envelope parser** →
+  ScenarioCompiler → ScenarioOrchestrator → dispatch to executors.
+  The envelope parser has no catalog — it passes action names through
+  without resolution.
+- **Client-loaded scenarios** (ARIA-only, loaded via TS
+  `parseScenario()`) go through the **TS Walker** → catalog resolution
+  → `ResolvedStep[]`. The Walker resolves action keys against the TS
+  step catalog.
+
+Server-side action keys (`rest`, `graphql`) are NOT registered in the
+TS step catalog. A unified-format file containing these steps must not
+be loaded through the TS Walker path — the Walker would throw "unknown
+step key." This is architecturally correct: the TS Walker resolves steps
+for browser execution; server-side steps are dispatched by the Java
+orchestrator to server-side executors. Scenario files that mix ARIA and
+REST/GraphQL steps are always server-dispatched (the Java orchestrator
+routes each step to the appropriate executor by `target:` decorator).
 
 **Relationship to `@ScenarioAction`:** The existing `@ScenarioAction`
 annotation (in `scenario-client`) is the CDI-based handler for the current
@@ -398,11 +556,17 @@ Include expansion happens as a pre-processing phase before step resolution
 key, substitutes parameters via `VariableResolver`, and inlines the expanded
 steps. Nested includes with cycle detection are supported (D10).
 
-The `ScenarioCompiler.inlineCalls()` method is rewritten (not retained) as
-part of the compiler rewrite — the call-inlining functionality is
-reimplemented using `CompactStep` records instead of `HierarchicalStep`.
 Existing `action: call` + `script:` YAML files are migrated to the
-`includes:` format.
+`includes:` format. With this migration complete, the
+`ScenarioCompiler.inlineCalls()` method and `CallGraphValidator` are
+**deleted** — they have no callers once all call-based YAML files use
+`includes:`. The `IncludeExpander` fully replaces the call-inlining
+functionality: both are compile-time operations that inline external
+steps, but `includes:` operates at the YAML structure level (pre-parse)
+while `inlineCalls()` operated on parsed `HierarchicalStep` records
+(post-parse). The pre-parse approach is cleaner — it composes with all
+downstream processing (forEach expansion, when-conditionals) without
+needing to understand the step model.
 
 See decisions D5–D12 in decisions.md for full include design rationale.
 
@@ -430,23 +594,25 @@ a command-array format to a single-action-per-step format.
   "label": "Fill ticket subject",
   "actor": "system",
   "action": "fill",
-  "element": {"role": "textbox", "name": "Subject"},
-  "params": {"value": "Network connectivity issue"}
+  "params": {"role": "textbox", "name": "Subject", "value": "Network connectivity issue"}
 }
 ```
 
 **Structural transformation (Java orchestrator):** The orchestrator performs
-a thin structural transformation when serializing `CompactStep` for dispatch:
+a thin, uniform transformation when serializing `CompactStep` for dispatch:
 
 1. Emits step-level decorators: `name`, `label`, `actor`
 2. Emits the action name: `action`
-3. For ARIA steps: separates ARIA element fields (`role`, `name`, `index`,
-   `within`) from the action params and nests them under `element`. The
-   element field set is fixed: `{role, name, index, within}`.
-4. Emits remaining params under `params`
-5. Emits `await`, `mode` if present
+3. Emits **all** action params flat under `params` — no element extraction
+4. Emits `await`, `mode` if present
 
-**Non-ARIA step wire format (REST, GraphQL):**
+The orchestrator has no step-type knowledge — it does not distinguish
+ARIA steps from REST/GraphQL steps. All params are passed through flat.
+Step semantics (including AriaTarget reconstruction from `{role, name,
+index, within}` params) are resolved at **execution time on the executor
+side**, consistent with the "no catalog resolution" principle.
+
+**REST/GraphQL wire format (identical structure):**
 ```json
 {
   "name": "create-case",
@@ -457,14 +623,25 @@ a thin structural transformation when serializing `CompactStep` for dispatch:
 }
 ```
 
-Non-ARIA steps have no `element` key — all action params go under `params`.
+All steps use the same flat `params` structure regardless of action type.
+
+**Orchestrator callback guard:** The `onStepResult` completion check
+(`completedSteps.size() == allSteps.size()`) must be guarded with an
+`AtomicBoolean callbackFired` to prevent double callback invocation
+from concurrent executor threads completing the last steps
+simultaneously. The guard is `callbackFired.compareAndSet(false, true)`
+before `fireCallback`.
 
 **TS interfaces updated:**
-- `DispatchStep`: removes `commands[]`, adds `action`, `params`, `element?`
+- `DispatchStep`: removes `commands[]`, adds `action`, `params`
+  (flat map — no `element` field)
 - `ScenarioCommand`: removed (step IS the action)
 - `CommandPayload`: adapted to step-level fields
 - `scenario-handler.ts`: dispatch logic rewritten from command-array
-  iteration to single-action execution
+  iteration to single-action execution. ARIA actions reconstruct
+  `AriaTarget` from flat params: `{role, name, index, within}` extracted
+  from `params` at execution time
+- `ExecutorControl` type: add `'stop'` to command union
 
 ### Semantic Constraints
 
@@ -496,17 +673,18 @@ references instead.
 
 ### Walker DECORATOR_KEYS Extension
 
-The unified format uses decorator sibling keys on steps (`label:`,
-`target:`, `actor:`, `when:`, `speed:`, `content:`) that the Walker does
-not currently recognize. The Walker's `resolveOne()` in `walker.ts` treats
-any key not in `DECORATOR_KEYS` or `RESERVED_KEYS` as a potential action
-key — if absent from the catalog, it throws `"unknown step key"`. This
-blocks all client-side scenario loading through `parseScenario()` /
+The unified format uses decorator sibling keys on steps that the Walker
+does not currently recognize (see §Canonical Decorator Keys for the full
+set). The Walker's `resolveOne()` in `walker.ts` treats any key not in
+`DECORATOR_KEYS` or `RESERVED_KEYS` as a potential action key — if absent
+from the catalog, it throws `"unknown step key"`. This blocks all
+client-side scenario loading through `parseScenario()` /
 `parseScenarioWithIncludes()` since those call `Walker.resolve()` on the
 raw step arrays.
 
 **Fix:** Add scenario decorator keys to Walker's `DECORATOR_KEYS` and
-`RESERVED_KEYS` sets:
+`RESERVED_KEYS` sets. The canonical table (§Canonical Decorator Keys)
+lists which keys need adding. Summary of additions:
 
 | Key | Purpose | Currently in Walker? |
 |---|---|---|
@@ -516,13 +694,29 @@ raw step arrays.
 | `when` | Conditional execution (Truthiness) | No → add to DECORATOR_KEYS + RESERVED_KEYS |
 | `speed` | Per-step pacing override | No → add to DECORATOR_KEYS + RESERVED_KEYS |
 | `content` | Narrative content | No → add to DECORATOR_KEYS + RESERVED_KEYS |
+| `await` | Polling/validation specification | No → add to DECORATOR_KEYS + RESERVED_KEYS |
+| `mode` | Execution mode | No → add to DECORATOR_KEYS + RESERVED_KEYS |
 
-These keys are general-purpose step metadata. The Walker already carries
+Note: `delay`, `forEach`, and `trigger` are already in Walker
+DECORATOR_KEYS. `step` is already in RESERVED_KEYS.
+
+These are scenario-specific decorators needed by the TS Walker because
+it processes both engine steps and client-loaded scenario steps (via
+`parseScenario()` → `Walker.resolve()`). The Walker already carries
 domain-specific decorators (`signal`, `publish`, `semaphore`, `barrier`,
-`quorum`, `race`) through without interpretation — adding scenario-specific
-decorators is consistent with this pattern. The Walker stores them in the
-`decorators` map on `ResolvedStep`; the scenario execution layer reads
-them after resolution.
+`quorum`, `race`) through without interpretation — adding scenario
+decorators is consistent with this pattern. The Walker stores them in
+the `decorators` map on `ResolvedStep`; the scenario execution layer
+reads them after resolution.
+
+**Java StepWalker — intentionally not updated:** The Java `StepWalker`
+(in yaml-step-runtime) processes engine `do:` blocks only. Scenario
+YAML bypasses the Java Walker entirely — the Java envelope parser reads
+steps as raw maps without catalog resolution (D25). Adding scenario
+decorators to the Java Walker would add dead recognition for keys that
+never appear in engine steps. The key sets are intentionally asymmetric:
+the TS Walker needs these keys because it handles scenarios; the Java
+Walker does not because it handles only engine steps.
 
 **Semantic note on `when` vs. `if`:** The Walker already uses `if` for
 structural branching (`if: condition` with `then:`/`else:` blocks). `when`
@@ -531,20 +725,41 @@ forEach expansion. They coexist: `if` is structural control flow (Walker-
 interpreted), `when` is a decorator (Walker-carried, evaluated by the
 scenario compiler or execution layer).
 
-**`parser.ts` `preExtract()` — no change needed:** Once the keys are in
-DECORATOR_KEYS, the Walker handles them directly. The `preExtract()`
-function does not need to strip or re-attach them.
+**`parser.ts` `WALKER_KNOWN_KEYS` — must be updated:** The
+`WALKER_KNOWN_KEYS` set in `parser.ts` is a local duplicate of the
+Walker's `RESERVED_KEYS`. It must be extended with `label`, `target`,
+`actor`, `when`, `speed`, `content`, `await`, `mode` to match. Without
+this update, the `hasActionKey()` function treats the new decorator keys
+as action keys, breaking pre-extraction for signal-fire, barrier-await,
+and signal-await steps that carry any of these decorators.
+`preExtract()` itself needs no structural changes — only its dependency
+on `WALKER_KNOWN_KEYS` is affected. Note: `preExtract()` already handles
+`await` explicitly for signal/barrier patterns; adding `await` to
+`WALKER_KNOWN_KEYS` ensures that non-signal/barrier `await:` decorators
+(e.g., `await: { match: ... }`) are also correctly excluded from
+action-key detection.
 
 ### TS Changes
 
-- `parseScenarioFromParsed()` — already reads `steps:` (no rename needed)
+- `parseScenarioFromParsed()` — already reads `steps:` (no rename needed).
+  **Section parsing:** `sec['title']` → `sec['label']` to match the
+  unified format. `TutorialSection.title` → `TutorialSection.label`
 - Walker `DECORATOR_KEYS` / `RESERVED_KEYS`: add `label`, `target`,
-  `actor`, `when`, `speed`, `content`
-- `DispatchStep` interface: `commands[]` removed, `action` + `params` +
-  `element?` added
+  `actor`, `when`, `speed`, `content`, `await`, `mode` (see §Canonical
+  Decorator Keys)
+- `parser.ts` `WALKER_KNOWN_KEYS`: add `label`, `target`, `actor`,
+  `when`, `speed`, `content`, `await`, `mode` to match Walker update
+- `DispatchStep` interface: `commands[]` removed, `action` + `params`
+  added (flat params — no `element` field)
 - `ScenarioCommand` interface: removed
 - `CommandPayload` interface: adapted to step-level fields
-- `scenario-handler.ts`: dispatch rewritten for single-action-per-step
+- `scenario-handler.ts`: dispatch rewritten for single-action-per-step.
+  ARIA actions reconstruct `AriaTarget` from flat params at execution
+  time. `executeAriaCommand` builds `AriaTarget` from
+  `{role, name, index, within}` in the params map
+- `scenario-handler.ts`: `onControl` switch: add `case 'stop'` —
+  clears step queue, aborts in-progress execution, sends results for
+  uncompleted steps
 - `types.ts`: consolidated with working types from scenario-handler.ts
 
 ### YAML Migration
@@ -608,24 +823,42 @@ and pops it at scenario stop. This mechanism is unchanged.
 **Java:**
 - ScenarioEnvelopeParser: envelope fields, chapters/sections/steps structure,
   CompactStep extraction
-- Speed default: omitted = no delay, explicit = pacing
-- Actor inheritance: scenario-level default, step-level override
+- Speed default: omitted = no delay, explicit = pacing. Speed ≤ 0 guard
+  in `sleepForSpeed()` — verify no delay computed
+- Actor inheritance: scenario-level default propagated to steps, step-level
+  override
+- Target defaulting: omitted target → `"browser"` (parser invariant)
+- Step name derivation: explicit `step:` → slugified `label:` → auto-derived
+  `{action}-{index}`. Uniqueness validation on collision
 - Delay decorator on steps
 - ForEach expansion through ScenarioCompiler with CompactStep
 - When-conditional evaluation with CompactStep
 - REST/GraphQL step maps: correct action-name-as-key shape with target: server
 - Include expansion via IncludeExpander (using `file:` key)
 - ScenarioExecutorClient: single-action dispatch, ActionContext from params map
+- ScenarioExecutorClient: `await` decorator read from step-level wire format,
+  poll-retry logic preserved from command-level
+- ScenarioExecutorClient: `mode` decorator (SINGLE/BULK/STEPPED/STREAM) read
+  from step-level wire format
+- ScenarioExecutorClient: `case "stop"` clears queue, aborts, sends failure
+  results
+- Orchestrator `onStepResult`: `AtomicBoolean callbackFired` guard prevents
+  double callback from concurrent threads
 - Migrated YAML files parse through new parser
 - onError handling: "stop" halts on first failure
 
 **TS:**
 - Walker DECORATOR_KEYS: `label`, `target`, `actor`, `when`, `speed`,
-  `content` carried through as decorators on ResolvedStep
+  `content`, `await`, `mode` carried through as decorators on ResolvedStep
 - Walker: existing tests still pass (no structural changes)
-- Wire protocol: new DispatchStep shape (action + params + element?)
-- `steps:` parsing in parseScenarioFromParsed (unchanged)
-- scenario-handler.ts: single-action dispatch logic
+- `parser.ts` WALKER_KNOWN_KEYS: updated with new decorator keys
+- Wire protocol: new DispatchStep shape (action + params, flat — no element)
+- `steps:` parsing in parseScenarioFromParsed — section field:
+  `sec['label']` (not `sec['title']`)
+- scenario-handler.ts: single-action dispatch logic with AriaTarget
+  reconstruction from flat params
+- scenario-handler.ts: `case 'stop'` in onControl clears queue
+- scenario-handler.ts: speed ≤ 0 guard before delay computation
 - Types consolidation
 
 **Integration:**
@@ -661,8 +894,9 @@ following were revised during adversarial design review:
   transformation (not catalog resolution), uses `steps:` (not `do:`).
 - **Out of Scope** originally listed "TS-side Walker changes" as out of
   scope. Revised: Walker DECORATOR_KEYS/RESERVED_KEYS must be extended
-  with scenario decorator keys (`label`, `target`, `actor`, `when`,
-  `speed`, `content`) — without this, client-side scenario loading fails.
+  with scenario decorator keys (see §Canonical Decorator Keys: `label`,
+  `target`, `actor`, `when`, `speed`, `content`, `await`, `mode`) —
+  without this, client-side scenario loading fails.
 
 ## References
 
@@ -673,7 +907,7 @@ following were revised during adversarial design review:
 - `backend/scenario/src/main/java/.../ScenarioCompiler.java` — forEach/includes pipeline (being rewritten)
 - `backend/scenario/src/main/java/.../ScenarioStepAdapter.java` — ForEachAdapter impl (being rewritten as CompactStepAdapter)
 - `backend/scenario/src/main/java/.../IncludeExpander.java` — include expansion (file: key, TemplateLoader SPI)
-- `backend/scenario-runtime/src/main/java/.../ScenarioOrchestrator.java` — serializes steps (wire protocol rewrite)
+- `backend/scenario-runtime/src/main/java/.../ScenarioOrchestrator.java` — type-change pass + wire protocol rewrite (see §What Gets Rewritten)
 - `backend/scenario-runtime/src/main/java/.../SequencePartitioner.java` — groups steps by target (type change: HierarchicalStep → CompactStep)
 - `backend/scenario-runtime/src/main/java/.../ExecutorRegistry.java` — executor name → connection map (unchanged)
 - `backend/scenario-client/src/main/java/.../ScenarioExecutorClient.java` — dispatch-sequence consumer (being rewritten)
