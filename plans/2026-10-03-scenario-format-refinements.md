@@ -649,8 +649,49 @@ void dispatchesSingleActionFromFlatWireFormat() {
 ```java
 @Test
 void handleControlStopClearsQueueAndSendsFailures() {
+    // Enqueue two steps, then stop before execution
+    executor.enqueue(stepJson("step-1", "fill"));
+    executor.enqueue(stepJson("step-2", "click"));
     executor.handleControl("stop", null);
-    // verify queue cleared, pending steps got failure results
+    assertTrue(executor.isStepQueueEmpty());
+    verify(resultCallback, times(2)).accept(argThat(
+        result -> !result.get("success").asBoolean()));
+}
+```
+
+- [ ] **Step 2b: Write test for mutation rejection with await+match**
+
+```java
+@Test
+void rejectsAwaitMatchOnMutationAction() {
+    var stepJson = mapper.createObjectNode()
+        .put("name", "create-case")
+        .put("action", "rest");
+    stepJson.putObject("params")
+        .put("method", "POST")
+        .put("url", "/api/cases");
+    stepJson.putObject("await")
+        .put("timeout", 5000)
+        .put("interval", 500)
+        .putObject("match").put("status", "created");
+
+    assertThrows(IllegalArgumentException.class,
+        () -> executor.executeStep(stepJson),
+        "poll-retry rejected on mutation");
+}
+
+@Test
+void allowsAwaitStatusOnMutation() {
+    var stepJson = mapper.createObjectNode()
+        .put("name", "create-case")
+        .put("action", "rest");
+    stepJson.putObject("params")
+        .put("method", "POST")
+        .put("url", "/api/cases");
+    stepJson.putObject("await").put("status", 201);
+
+    // Should NOT throw — response validation is safe on mutations
+    assertDoesNotThrow(() -> executor.executeStep(stepJson));
 }
 ```
 
@@ -826,12 +867,32 @@ const delay = Math.max(10, Math.round(1000 / speed));
 await sleep(delay);
 ```
 
-- [ ] **Step 5: Run scenario handler tests**
+- [ ] **Step 5: Add TS step name derivation from label decorator**
+
+The TS execution layer must derive step names when `ResolvedStep.name`
+is null (client-loaded scenarios via Walker path). Add to the TS
+scenario execution code (in `parseScenarioFromParsed()` or downstream):
+
+```typescript
+function deriveStepName(step: ResolvedStep, index: number): string {
+  if (step.name) return step.name;
+  if (step.decorators?.label) {
+    return step.decorators.label.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+  }
+  return `${step.action}-${index}`;
+}
+```
+
+Apply this in the step array post-processing after `Walker.resolve()`.
+
+- [ ] **Step 6: Run scenario handler tests**
 
 Run: `npm test -- --testPathPattern=scenario` (from pages-aria)
 Expected: PASS (update test fixtures for new DispatchStep shape)
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```
 feat(#390): rewrite scenario-handler.ts for flat action+params dispatch
