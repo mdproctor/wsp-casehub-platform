@@ -224,6 +224,9 @@
 
 ## D19: Step taxonomy
 
+**REVISED:** See §Decisions revised during review in the design spec.
+Original text retained below for historical context.
+
 **Choice:** Three categories, all plugins using yaml-plugin-api:
 - **AriaStep** — browser DOM actions via ARIA targeting (fill, click, spotlight, scroll-to-row, etc.)
 - **ScenarioStep** — presentation actions not requiring ARIA (show-markdown, callouts, slides)
@@ -235,7 +238,7 @@
 **Trade-offs:** ScenarioStructure as a plugin is a stretch — chapters/sections are structural, not executable. But treating them as plugins means they get schema validation and catalog discoverability for free.
 **Sources:** yaml-plugin-api (zero-dep plugin SPI), yaml-plugin-processor (APT), command-executor.ts (AriaStep dispatch)
 **Exploration:** quick
-**Status:** captured
+**Status:** captured — **revised to two categories (AriaStep, ScenarioStep); chapters/sections are structural containers, not plugins**
 
 ## D20: Speed default change
 
@@ -262,6 +265,9 @@
 
 ## D22: target naming resolution
 
+**REVISED:** See §Decisions revised during review in the design spec.
+Original text retained below for historical context.
+
 **Choice:** In the compact YAML format, the `target` conflict dissolves naturally:
 - ARIA element fields are flat on the action (role, name, index, within) — no wrapping object
 - Executor routing uses `target:` as a decorator (sibling key on the step)
@@ -272,7 +278,7 @@
 **Trade-offs:** The wire protocol rename (target → element) is a breaking change for any code reading the serialized JSON. Acceptable since it's internal protocol.
 **Sources:** ScenarioCommand.java (target: AriaTarget), ScenarioOrchestrator.java (serializes to "target" key), scenario-handler.ts:18-25 (ScenarioCommand interface)
 **Exploration:** quick
-**Status:** captured
+**Status:** captured — **revised: wire protocol uses flat `params`, no `element` field; `target → element` rename dropped**
 
 ## D23: Result aggregation
 
@@ -288,6 +294,9 @@
 
 ## D24: All step types are plugins
 
+**REVISED:** See §Decisions revised during review in the design spec.
+Original text retained below for historical context.
+
 **Choice:** AriaStep, ScenarioStep, and ScenarioStructure all use the yaml-plugin-api plugin format. No special-case parsing — the plugin registry resolves them uniformly.
 **Alternatives:**
 - Bespoke parsing per category — current Java approach, duplicates infrastructure
@@ -296,9 +305,12 @@
 **Depends on:** D19 (taxonomy)
 **Sources:** yaml-plugin-api (zero-dep SPI), yaml-plugin-processor (APT generates schema + Action)
 **Exploration:** quick
-**Status:** captured
+**Status:** captured — **revised: structural containers (chapters/sections) excluded from plugin model**
 
 ## D25: Delete both parsers, write one clean one
+
+**REVISED:** See §Decisions revised during review in the design spec.
+Original text retained below for historical context.
 
 **Choice:** Delete both ScenarioParser (Format A) and HierarchicalParser. Write a single scenario envelope parser that reads the envelope (scenario name, speed, actor, meta, simulation) and structure (chapters → sections → `do:` blocks), then delegates step resolution within `do:` blocks to the standard Walker/plugin catalog. Delete ScenarioCommand, ScenarioStep, HierarchicalStep, and all bespoke parsing methods.
 **Alternatives:**
@@ -308,7 +320,7 @@
 **Trade-offs:** Larger scope than original #390. But cleaner result — no legacy code paths.
 **Sources:** HierarchicalParser.java, ScenarioParser.java, engine sequential-onboarding.yaml (do: blocks), parseScenarioFromParsed in parser.ts (TS already delegates to Walker)
 **Exploration:** deep-analysis
-**Status:** captured
+**Status:** captured — **revised: Java side performs thin structural transformation (not catalog resolution), uses `steps:` (not `do:`)**
 
 ## D26: Migrate outlier YAML files to compact format
 
@@ -318,5 +330,69 @@
 **Rationale:** The commands[] syntax is the outlier. The compact syntax matches what the engine, ARIA, and plugin systems all use. One format means one parser, one catalog, one resolution path.
 **Trade-offs:** Breaking change for any YAML files using commands[] syntax. Acceptable since it's pre-release and the file count is small.
 **Sources:** META-INF/scenarios/helpdesk-intake.yaml (commands[] format), helpdesk-demo.yaml (already compact)
+**Exploration:** quick
+**Status:** captured
+
+---
+
+# Decisions — pages#466 Single-Source YAML Scenarios
+
+## D27: Scope — both showcase and tutorials
+
+**Choice:** Extract showcase YAML into standalone `.scenario.yaml` files AND let tutorials reference them. One generic companion script replaces 15 near-identical showcase scripts.
+**Alternatives:**
+- Showcase extraction only — tutorials stay unchanged. Misses the single-source goal.
+- Shared reference layer only — only addresses overlapping constructs. Leaves non-overlapping showcase scripts as inline JS strings.
+**Rationale:** The 15 showcase companion scripts are ~95% identical boilerplate. The only variation is the `EXAMPLES` data (name, tags, description, YAML string). Extracting to files eliminates the duplication AND makes scenarios available for tutorial reference.
+**Trade-offs:** Larger scope — touches both showcase and tutorial systems. But both changes are straightforward since the runtime infrastructure (parseScenario, createScheduler) is already shared.
+**Sources:** examples/samples/Scenarios/Flow Control.ts (typical companion script), tutorials/form-automation/tutorial.yaml
+**Exploration:** quick
+**Status:** captured
+
+## D28: File location — shared directory
+
+**Choice:** `scenarios/` directory at repo root, shared by both showcase and tutorials.
+**Alternatives:**
+- Alongside showcase samples (examples/samples/Scenarios/) — co-located with current consumer but tutorials would reference into examples/
+- In each tutorial directory — co-located with tutorial content but showcase would reference into tutorials/
+**Rationale:** A neutral shared directory avoids either consumer "owning" the files. Both showcase and tutorials are consumers, not sources. Category structure via subdirectories (e.g. `scenarios/flow-control/`, `scenarios/coordination/`).
+**Trade-offs:** New top-level directory. Acceptable for a single-source architecture.
+**Sources:** Issue #466 proposal
+**Exploration:** quick
+**Status:** captured
+
+## D29: Generic companion script
+
+**Choice:** One generic `.ts` companion script that discovers scenarios from a manifest, loads them via `fetch()`, and drives the picker/runner/log UI.
+**Alternatives:**
+- Web component (`<pages-scenario-showcase>`) — richer but larger scope, new Lit element
+- Keep per-page .ts, load external YAML — least change but still 15 scripts with identical boilerplate
+**Rationale:** Minimal change to the execution model (still `new Function()` via the gallery app). The boilerplate is identical across all 15 scripts — only the data source changes. A single script parameterised by a manifest reference eliminates all duplication.
+**Trade-offs:** The `.page.yaml` still needs the dropdown `<option>` list. Either generate it from the manifest or have the generic script build it dynamically at runtime. Runtime construction is simpler.
+**Sources:** examples/samples/Scenarios/Flow Control.ts, Coordination.ts, Composition.ts (identical structure)
+**Exploration:** quick
+**Status:** captured
+
+## D30: Frontmatter format — reuse existing meta block
+
+**Choice:** Use the existing `meta:` block format (title, description, labels, tags) consistent with `ScriptMeta` on Java side and tutorial `tutorial.yaml` files. Category comes from directory structure or a label.
+**Alternatives:**
+- Flat frontmatter (name, tags, description, category) — simpler but diverges from existing ScriptMeta format
+- Both formats — more flexible but more parsing
+**Rationale:** ScriptMeta already exists in `ScenarioEnvelope`, `BundledScriptSource`, and tutorial parsers. Reusing it means no new format to maintain. The Java `ScenarioEnvelopeParser` already reads `meta:` blocks.
+**Trade-offs:** Slightly more verbose than flat keys. Consistency with existing format is worth it.
+**Sources:** ScenarioEnvelope.java (meta field), ScriptMeta.java, tutorials/form-automation/tutorial.yaml (meta block)
+**Exploration:** quick
+**Status:** captured
+
+## D31: Tutorial integration — inline steps stay, add scenario references
+
+**Choice:** Existing inline tutorial steps stay. A new reference mechanism lets tutorials pull scenario YAML from shared files for demo sections where the same orchestration construct is being taught.
+**Alternatives:**
+- All scenario content from shared files — forces restructuring of tutorials that use editor-set-content with inline YAML content (e.g. yaml-composition tutorial)
+- Defer tutorial integration — misses the single-source goal
+**Rationale:** The yaml-composition tutorial uses `editor-set-content` steps that set YAML text in an editor — these embed YAML content that is *about* YAML composition, not orchestration constructs. Forcing these into external files would break the guided walkthrough flow. The overlap is specifically in orchestration construct demos (sequential, concurrent, signal/await, etc.).
+**Trade-offs:** Not all scenario content is single-sourced. Tutorial-specific inline steps remain. The single-source benefit applies to orchestration construct demos that appear in both showcase and tutorials.
+**Sources:** tutorials/yaml-composition/tutorial.yaml (editor-set-content with inline YAML), tutorials/form-automation/tutorial.yaml (ARIA steps)
 **Exploration:** quick
 **Status:** captured
