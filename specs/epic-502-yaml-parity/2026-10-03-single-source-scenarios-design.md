@@ -137,9 +137,9 @@ sections:
 
 When `scenario-ref` is present, the tutorial host:
 1. Fetches the referenced `.scenario.yaml` file
-2. Makes its YAML source available for display (e.g. in a code viewer)
-3. Makes it runnable via the existing scheduler
-4. Tutorial-specific inline steps execute alongside or after the referenced scenario
+2. Displays the YAML source in a read-only code viewer within the section (before the prose content)
+3. Adds a "Run" button that executes the scenario via the existing scheduler
+4. Tutorial-specific inline `steps` still execute when the user advances through the section — they are independent of the referenced scenario's execution
 
 This is additive — tutorials without `scenario-ref` work exactly as before.
 
