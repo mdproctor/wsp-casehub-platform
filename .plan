@@ -13,7 +13,7 @@ flyway-next-v: unknown
 task7: done
 
 ## Queue
-- [x] casehubio/platform#502 — Epic YAML cross-repo parity
+- [x] casehubio/platform#502 — Epic YAML cross-repo parity ← active
 - [x] casehubio/casehub-pages#480 — CorrelationScope async correlation
 - [x] casehubio/casehub-pages#481 — SpeedMultiplier simulation dilation
 - [x] casehubio/casehub-pages#465 — Optional scenario chapter section
@@ -40,7 +40,7 @@ task7: done
 - [x] casehubio/casehub-pages#390 — Scenario format refinements
 - [x] casehubio/casehub-pages#466 — Single-source YAML scenarios for tutorials
 - [x] casehubio/platform#424 — Generated typed event dispatch Layer 3
-- [ ] casehubio/platform#487 — Separate parsed structure from catalog ← active
+- [x] casehubio/platform#487 — Separate parsed structure from catalog
 - [ ] casehubio/platform#502 — Epic YAML cross-repo parity
 - [ ] casehubio/casehub-pages#502 — Epic YAML playbook ops
 - [ ] casehubio/casehub-pages#508 — Complete type unification
