@@ -8,19 +8,23 @@
 
 Close all remaining Spring deployment gaps in the engine repo. The engine is the largest remaining gap in the Spring story. This epic addresses: Quarkus imports leaked into core modules, 11 CDI modules without framework-neutral counterparts, missing Spring generation for REST/MCP/persistence, and the @McpDomain SPI migration prerequisite.
 
-Work order: #1207 → #1208 → #1209 → #1210 → #1211 → #1095 → #1199
+Work order: #1207 → #1208 (excluding rest/) → #1209 → #1210 → #1211 → #1095 → #1199 (includes rest-core extraction)
+
+Note: #1210 and #1211 are independent of #1208 and could run in parallel, but the .plan queue executes serially within a session. The ordering above is the recommended serial sequence.
 
 ## Issue #1207 — Remove Quarkus imports from core modules
 
 ### Problem
 
-58 files across 3 -core modules import Quarkus/CDI types that prevent Spring compilation:
+~77 files across 3 -core modules import Quarkus/CDI types that prevent Spring compilation:
 
 | Module | Files | Import patterns |
 |--------|-------|----------------|
-| runtime-core | ~50 | `@ApplicationScoped`, `@DefaultBean`, `@Unremovable`, `StartupEvent`, `@Observes`, `Event<T>`, `@ObservesAsync` |
+| runtime-core | ~69 | `@ApplicationScoped` (69), `@DefaultBean` (9), `@Unremovable` (4), `StartupEvent`/`@Observes` (3), `Event<T>`/`@ObservesAsync` (1), `Instance<T>` (multiple) |
 | common-core | 5 | `@ApplicationScoped` |
-| engine-support-core | 3 | `Arc.container()`, `@ApplicationScoped`, `Event<T>`, `@ObservesAsync` |
+| engine-support-core | 3 | `Arc.container()` (2 files), `@ApplicationScoped`, `Event<T>`, `@ObservesAsync` |
+
+This scope intentionally expands beyond issue #1207's original description (18 Quarkus-specific annotations) to include ALL framework-coupled imports in -core modules. Issue #1207 should be updated to reflect the actual scope. runtime-core is already a -core module, so its CDI cleanup falls under #1207, not #1208.
 
 ### Fix by pattern
 
@@ -30,18 +34,21 @@ Work order: #1207 → #1208 → #1209 → #1210 → #1211 → #1095 → #1199
 | `@DefaultBean` | Remove | Quarkus module `@Produces @DefaultBean`, Spring `@ConditionalOnMissingBean` |
 | `@Unremovable` | Remove (no Spring equivalent needed) | N/A |
 | `StartupEvent` / `@Observes` | `@PostConstruct` or init callback interface | N/A (PostConstruct is jakarta.annotation, not CDI) |
-| `Arc.container()` | Constructor injection | Refactor to accept dependency via constructor |
+| `Arc.container()` | Static holder populated at startup | Core class defines static `init(dep)` method; framework-specific bootstrap bean calls it. Constructor injection is infeasible here — `CasehubFlow` is a static utility class, `CasehubCallableTaskBuilder` is loaded via ServiceLoader (requires no-arg constructor). |
+| `@VirtualThreads ExecutorService` | Plain `ExecutorService` constructor param | Core POJO accepts `ExecutorService`; Quarkus qualifies with `@VirtualThreads`; Spring provides `Executors.newVirtualThreadPerTaskExecutor()` |
 | `Event<T>` | `Consumer<T>` constructor param | Quarkus: CDI `Event<T>` bridge. Spring: `ApplicationEventPublisher` bridge |
 | `@ObservesAsync` | `Consumer<T>` callback | Same as Event<T> — consumer registered by framework module |
 | `Instance<T>` | `List<T>` constructor param | Quarkus: collected from `Instance<T>`. Spring: collected from `ObjectProvider<T>` |
 
-### Impact on existing Spring modules
+### Impact on existing Spring modules — MUST update with #1207
 
-runtime-spring's `RuntimeManualConfig` (~770 lines) already contains `notResolvable()` stubs for `Instance<T>`. After cleanup, these stubs should be replaced with proper `List<T>` or `ObjectProvider<T>` injection.
+runtime-spring's `RuntimeManualConfig` (~770 lines) contains `notResolvable()` stubs that return fake `Instance<T>` implementations. When #1207 changes constructors from `Instance<T>` to `List<T>`, RuntimeManualConfig will fail to compile. Therefore, RuntimeManualConfig MUST be updated as part of #1207 (changing `notResolvable()` calls to `List.of()` or proper bean lists), not deferred to #1211.
 
-## Issue #1208 — Extract 11 -core modules
+## Issue #1208 — Extract 10 -core modules (rest/ deferred to #1199)
 
 ### Modules to extract
+
+rest/ is excluded — it depends on #1095 (SPI interfaces) and is handled as part of #1199.
 
 | Module | Beans to extract | Extraction difficulty |
 |--------|-----------------|----------------------|
@@ -52,7 +59,6 @@ runtime-spring's `RuntimeManualConfig` (~770 lines) already contains `notResolva
 | mcp | `McpBeans` (6 @Produces), `McpClientRegistryAdapter` | Easy — quarkus/ subpackage |
 | queue | `QueueBeans` (5 @Produces), 3 adapters | Easy — quarkus/ subpackage |
 | work-cloudevent | `WorkCloudEventBeans` (6 @Produces), 2 adapters | Easy — quarkus/ subpackage |
-| rest | 6 @McpDomain implementations | Medium — needs SPI extraction first (depends on #1095) |
 | work-adapter | 10 @ApplicationScoped classes directly on logic | Medium — needs refactoring to separate CDI from logic |
 | eidos-routing | `EngineAwareAgentSelector` with @ApplicationScoped | Easy — 1 class |
 | yaml-cbr | `StepExecutionCbrBridge`, `StepFileCallableDispatcher` | Easy — 2 classes |
@@ -147,7 +153,15 @@ The `graphql-generator` APT is already wired in rest/ (REST generation, GraphQL 
    public interface EngineCaseApi { ... }
    ```
 
-2. Move @McpDomain, @Path, @GET/@POST etc. from concrete classes to SPI interfaces
+2. Move annotations from concrete classes to SPI interfaces. Annotation mapping (per #1095 — `@PlatformQuery`/`@PlatformMutation` are deprecated):
+
+   | Current (concrete class) | Target (SPI interface) |
+   |-------------------------|----------------------|
+   | `@PlatformQuery` | `@GET` (jakarta.ws.rs) |
+   | `@PlatformMutation` | `@POST` / `@PUT` / `@DELETE` (per HTTP semantics) |
+   | `@PlatformStream` | Excluded from SPI — stays on concrete class (SSE is framework-specific) |
+   | `@PathParam` (platform) | `@PathParam` (jakarta.ws.rs) |
+   | `@Description` | `@Description` (unchanged) |
 
 3. Concrete classes implement the SPI, losing their own annotations:
    ```java
@@ -157,7 +171,9 @@ The `graphql-generator` APT is already wired in rest/ (REST generation, GraphQL 
 
 4. graphql-generator APT produces REST resources and GraphQL resolvers from SPIs
 
-5. SSE/streaming endpoints (`Multi<T>` returns) stay hand-written per #1095 guidance
+5. SSE/streaming endpoints (`@PlatformStream` / `Multi<T>` returns) stay on concrete classes — excluded from SPI interfaces. Stub implementations (`Multi.createFrom().empty()` in `caseLifecycle` and `caseContextChange`) should be removed rather than migrated.
+
+6. `EvolutionMcpAdapter` is a trivial case — it already delegates to `EngineEvolutionApi` (in api/). Migration: move `@McpDomain("engine/evolution")` to the existing `EngineEvolutionApi` interface and delete the adapter class entirely.
 
 ### Pre-migration cleanup (from #1095)
 
@@ -169,17 +185,16 @@ The `graphql-generator` APT is already wired in rest/ (REST generation, GraphQL 
 ### Depends on
 
 - #1095 (SPI interfaces must exist for generation)
-- #1208 (rest-core extraction)
 
 ### Solution
 
-1. Extract `rest-core` with framework-neutral service POJOs (after #1095 defines SPIs)
+1. Extract `rest-core` with framework-neutral service POJOs (deferred from #1208 because rest/ depends on #1095 SPI interfaces)
 2. Wire `rest-spring-generator` to scan SPI interfaces and generate Spring MVC @RestController classes
 3. Wire `graphql-spring-generator` to generate Spring GraphQL @Controller classes
 4. Hand-write:
    - @ControllerAdvice equivalents for 5 exception mappers
    - SseEmitter bridge for 3 SSE broadcasters (Multi<T> → SseEmitter)
-   - Spring Filter or HandlerInterceptor for CaseScopeExtractor
+   - `SpringWorkerScopeExtractor` implementation for CaseScopeExtractor (platform provides this SPI in `io.casehub.platform.acl.worker.spring` with `FailClosedSpringWorkerScopeExtractor` default — do NOT implement as a generic Filter/HandlerInterceptor)
 
 ### New module: engine-rest-spring
 
@@ -190,7 +205,7 @@ engine-rest-spring/
       generated/          # rest-spring-generator output
       ExceptionHandlers.java  # hand-written @ControllerAdvice
       SseBridges.java         # hand-written SseEmitter adapters
-      CaseScopeFilter.java    # hand-written filter
+      CaseScopeExtractor.java  # hand-written SpringWorkerScopeExtractor impl
 ```
 
 ## Testing strategy
