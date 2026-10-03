@@ -396,3 +396,66 @@ Original text retained below for historical context.
 **Sources:** tutorials/yaml-composition/tutorial.yaml (editor-set-content with inline YAML), tutorials/form-automation/tutorial.yaml (ARIA steps)
 **Exploration:** quick
 **Status:** captured
+
+# Decisions — platform#424 Generated Typed Event Dispatch
+
+## D32: Generator purpose — optional performance optimization alongside runtime interpreter
+
+**Choice:** The generated typed dispatch is an optional optimisation path. The runtime-interpreted path (ScenarioCompiler → EventRouter) remains the default. When generated code exists for a scenario, the runtime can use the generated dispatch instead for faster execution and build-time type safety. This establishes the pattern: runtime-interpreted by default, optional generated code for performance — applicable to future areas beyond state machines.
+**Alternatives:**
+- Generated code replaces runtime interpreter — forces code generation for all state machines, breaks dynamic YAML loading
+- Generated code only (no interpreter) — loses the dynamic capability that defines the YAML-first approach
+**Rationale:** All YAML is runtime. The Java and TS runtime executors interpret YAML directly. Code generation is an optional optimisation that should never be required. The interpreted path is the canonical behaviour; generated code is a performance shortcut.
+**Trade-offs:** Two code paths to maintain. Must ensure generated dispatch produces identical behaviour to interpreted dispatch.
+**Sources:** #410 D8 (three-layer architecture), #502 epic (YAML unification goal)
+**Exploration:** deep-analysis
+**Status:** captured
+
+## D33: Composition — generated dispatch wraps OrcStateMachine directly (parallel to EventRouter)
+
+**Choice:** Option A — the generated dispatch class wraps `OrcStateMachine<StateEnum>` directly and calls `transition()`. It is parallel to EventRouter, not stacked on top of it. The generated `switch` expression replaces what EventRouter does for that scenario — compile-time pattern matching instead of runtime string matching.
+**Alternatives:**
+- Generated wraps EventRouter (Option B) — unnecessary indirection, the generated switch IS the dispatch
+- EventRouter delegates to generated (Option C) — forces EventRouter to know about generated classes
+**Rationale:** Both EventRouter and the generated dispatch are event-to-transition mappers. They wrap the same Layer 1 primitive. The generated switch replaces EventRouter's string matching with compile-time pattern matching — wrapping EventRouter would be Layer 3 wrapping Layer 2 wrapping Layer 1 for no benefit.
+**Trade-offs:** None meaningful. Both paths call `transition()` on the same OrcStateMachine, so blocking semantics, handlers, and CAS atomicity work identically regardless of which path initiates the transition.
+**Depends on:** D32 (optionality — both paths must coexist)
+**Sources:** EventRouter.java (fire → transition pattern), #410 D8
+**Exploration:** deep-analysis
+**Status:** captured
+
+## D34: Input format — extend existing YAML with optional events section
+
+**Choice:** The generator consumes the same YAML format that ScenarioParser reads, extended with an optional `events:` top-level section for typed field definitions. One YAML format, not a separate schema. ScenarioParser already skips unknown top-level keys, so adding `events:` is backward-compatible.
+**Alternatives:**
+- Separate YAML format for typed state machines — fragments the format, violates the unification goal of epic #502
+- JSON Schema for event types — adds a second file and authoring step
+**Rationale:** The epic is about YAML unification. One format, two consumption paths (Java runtime, TS runtime), with optional code generation as a performance layer. A separate format works against parity.
+**Trade-offs:** The `events:` section is Java/TS-type-system-aware content in an otherwise language-neutral YAML file. Field types must map to both Java and TS primitives.
+**Sources:** ScenarioParser.java (existing format), epic #502 (unification goal)
+**Exploration:** deep-analysis
+**Status:** captured
+
+## D35: Output scope — full package (state enum + sealed events + typed dispatch)
+
+**Choice:** Generate: (1) state enum from YAML state names, (2) sealed event interface + record per event type from `events:` section, (3) typed dispatch class with `fire(Event)` using Java pattern matching. Everything needed for compile-time safe state machine usage.
+**Alternatives:**
+- Events + dispatch only (states stay as strings) — less type safety, misses the point
+- Dispatch wrapper only (events hand-written) — requires manual type authoring, misaligns with "generate from YAML" goal
+**Rationale:** The generator should produce a complete, self-contained typed API from the YAML. If consumers have to hand-write any of the types, the generation is partial and the YAML is no longer the single source of truth.
+**Trade-offs:** More generated code to maintain. State enum names derived from YAML strings may not follow Java naming conventions — generator must handle case conversion.
+**Sources:** #424 issue body (lists all four generated artifacts)
+**Exploration:** quick
+**Status:** captured
+
+## D36: Generator infrastructure — reusable pattern for future generated optimisations
+
+**Choice:** The generator module and the runtime discovery mechanism should be designed so future areas beyond state machines can follow the same pattern. The module is focused (state machine dispatch) but the interface between "runtime discovers and uses generated code" is generic enough to extend.
+**Alternatives:**
+- One-off generator with no reuse concern — simpler now but forces reinvention for each future generator
+- Generic code generation framework up front — over-engineers for a single known consumer
+**Rationale:** The user has identified this as the first of potentially several performance-optimisation generators. The pattern (interpret by default, use generated code when available) should be clean and repeatable. YAGNI on the framework, but the discovery contract should be intentional.
+**Trade-offs:** Slightly more design effort on the discovery interface. Balanced by not building a framework — just making the first implementation follow a pattern that a second implementation could replicate.
+**Sources:** User direction ("over time we may code generate other areas for performance")
+**Exploration:** quick
+**Status:** captured
