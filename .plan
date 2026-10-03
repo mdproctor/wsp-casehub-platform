@@ -39,16 +39,8 @@ task7: done
 - [x] casehubio/casehub-pages#359 — Spotlight targeting for table rows
 - [x] casehubio/casehub-pages#390 — Scenario format refinements
 - [x] casehubio/casehub-pages#466 — Single-source YAML scenarios for tutorials
-- [ ] casehubio/platform#424 — Generated typed event dispatch Layer 3 ← active
-  - [x] Batch 1: Foundation
-    - [x] Task 1: Parser and model
-  - [x] Batch 2: Emitters
-    - [x] Task 2: State enum and events
-    - [x] Task 3: Dispatch class
-  - [x] Batch 3: Plugin
-    - [x] Task 4: Mojo and descriptor
-    - [x] Task 5: E2E integration test
-- [ ] casehubio/platform#487 — Separate parsed structure from catalog
+- [x] casehubio/platform#424 — Generated typed event dispatch Layer 3
+- [ ] casehubio/platform#487 — Separate parsed structure from catalog ← active
 - [ ] casehubio/platform#502 — Epic YAML cross-repo parity
 - [ ] casehubio/casehub-pages#502 — Epic YAML playbook ops
 - [ ] casehubio/casehub-pages#508 — Complete type unification
