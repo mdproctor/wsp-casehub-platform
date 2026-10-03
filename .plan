@@ -13,3 +13,24 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/engine#1206 — Issue #1206 ← active
+  - [ ] Batch 1: common-core
+    - [ ] Task 1: Clean 5 CDI files
+  - [ ] Batch 2: engine-support-core
+    - [ ] Task 2: Arc.container static holder
+    - [ ] Task 3: PheromoneCloudEventBridge POJO
+  - [ ] Batch 3: runtime-core-quarkus
+    - [ ] Task 4: DefaultBean+Unremovable+StartupEvent
+  - [ ] Batch 4: runtime-core-cdi
+    - [ ] Task 5: improvement/ package
+    - [ ] Task 6: remaining packages
+  - [ ] Batch 5: runtime-spring
+    - [ ] Task 7: RuntimeManualConfig update
+  - [ ] Batch 6: verification
+    - [ ] Task 8: Zero CDI imports check
+- [ ] casehubio/engine#1207 — Quarkus imports leaked into core
+- [ ] casehubio/engine#1208 — CDI modules without core extraction
+- [ ] casehubio/engine#1209 — MCP Spring module
+- [ ] casehubio/engine#1210 — persistence-spring-jpa generation
+- [ ] casehubio/engine#1211 — runtime-spring generation
+- [ ] casehubio/engine#1095 — McpDomain SPI migration
+- [ ] casehubio/engine#1199 — rest-spring module
