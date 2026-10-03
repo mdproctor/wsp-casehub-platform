@@ -37,16 +37,16 @@ flyway-next-v: unknown
 - [x] casehubio/casehub-pages#327 — Scenario templates parameterized include
 - [x] casehubio/casehub-pages#359 — Spotlight targeting for table rows
 - [ ] casehubio/casehub-pages#390 — Scenario format refinements ← active
-  - [ ] Batch 1: Foundation
-    - [ ] Task 1: CompactStep+ScenarioEnvelope records
-    - [ ] Task 2: ScenarioEnvelopeParser
-  - [ ] Batch 2: Compiler
-    - [ ] Task 3: CompactStepAdapter+ScenarioCompiler rewrite
+  - [x] Batch 1: Foundation
+    - [x] Task 1: CompactStep+ScenarioEnvelope records
+    - [x] Task 2: ScenarioEnvelopeParser
+  - [x] Batch 2: Compiler
+    - [x] Task 3: CompactStepAdapter+ScenarioCompiler rewrite
   - [ ] Batch 3: Orchestrator
-    - [ ] Task 4: ScenarioOrchestrator wire protocol
+    - [x] Task 4: ScenarioOrchestrator wire protocol
     - [ ] Task 5: ScenarioExecutorClient rewrite
   - [ ] Batch 4: TS
-    - [ ] Task 6: Walker DECORATOR_KEYS+parser.ts
+    - [x] Task 6: Walker DECORATOR_KEYS+parser.ts
     - [ ] Task 7: scenario-handler.ts dispatch rewrite
   - [ ] Batch 5: Migration
     - [ ] Task 8: Migrate YAML files
