@@ -2,77 +2,70 @@
 
 ## Last Session
 
-Implemented pages#390 (Scenario format refinements) — 7/9 tasks complete.
-Design review ran first (3 dimensions, 38 issues, $105, all resolved),
-then writing-plans produced a 9-task plan, then executing-plans ran
-through Batches 1-4.
+Completed pages#390 (Scenario format refinements) — all 9/9 tasks done.
+Previous session did Tasks 1-6; this session completed Tasks 7-9.
 
-**What was built (6 commits on pages repo, 1 on platform workspace):**
+**What was built (3 commits on pages repo, 2 on platform workspace):**
 
-1. `12f03003` — CompactStep + ScenarioEnvelope records (new types
-   replacing HierarchicalStep + HierarchicalScenario)
-2. `9876ffc9` — ScenarioEnvelopeParser (compact YAML parsing, decorator
-   extraction, step name derivation, target/actor defaults)
-3. `1052919e` — CompactStepAdapter + ScenarioCompiler rewrite (forEach
-   expansion with CompactStep, inlineCalls removed)
-4. `14f9a065` — ScenarioOrchestrator wire protocol rewrite (commands[]
-   → flat action+params, AtomicBoolean callback guard)
-5. `877e336c` — ScenarioExecutorClient rewrite (single-action dispatch,
-   stop control, speed≤0 guard)
-6. `9521a106` — Walker DECORATOR_KEYS + parser.ts WALKER_KNOWN_KEYS
-   (8 scenario decorator keys added)
+1. `6f7a1ddc` — scenario-handler.ts dispatch rewrite (Task 7)
+   - DispatchStep: commands[] → flat action+params
+   - Removed ScenarioCommand interface, kept CommandPayload for legacy
+   - executeAriaCommand → executeAriaAction with buildAriaTarget helper
+   - Added 'stop' control, speed≤0 guard
+   - deriveStepName in parser.ts after Walker.resolve()
+2. `3fc23b57` — Migrate YAML files to compact format (Task 8)
+   - delivery: → target: in 3 hybrid test files
+   - commands: → compact in caller/callee, 3 META-INF production files
+   - Deleted cyclic-a/b (tested old CallGraphValidator)
+   - Migrated 2 orchestrator test inline YAMLs
+   - Null-guarded temporalDriverServiceInstance for unit tests
+   - Old ScenarioParser: added target as fallback for delivery
+3. `3093560e` — Delete old parsers and Format A types, partial (Task 9)
+   - Deleted: ScenarioParser, CallGraphValidator, ScenarioStepAdapter
+   - Deleted tests: ScenarioParserTest, HierarchicalParserTest, CallGraphValidatorTest
+   - 7 types retained (live runtime refs) → filed pages#514
 
-**Test results:** 129 Java scenario tests pass, 7 partitioner tests pass,
-22 executor tests pass, 50 Walker TS tests pass, 32 parser TS tests pass.
+**Test results:** 207 Java tests (72 scenario + 113 runtime + 22 client),
+25 TS handler tests, 25 TS scenario tests, 25 Walker tests, 32 controller
+tests — all green.
 
 ## Immediate Next Step
 
-Resume executing-plans from **Task 7** (scenario-handler.ts dispatch rewrite):
+pages#390 is complete. Advance to next issue in queue.
 
-1. **Task 7 — scenario-handler.ts dispatch rewrite** (Batch 4)
-   - Rewrite DispatchStep interface (remove commands[], add action+params)
-   - Single-action dispatch logic with AriaTarget from flat params
-   - Add 'stop' to ExecutorControl + onControl handler
-   - Speed ≤ 0 guard before delay computation
-   - Add TS step name derivation from label decorator
-   - 919 lines, substantial rewrite
-
-2. **Task 8 — Migrate YAML files** (Batch 5)
-   - Test fixtures: foreach-csv-inline, parameterized-onboard already done
-   - Remaining: graphql-inject-chat, hybrid-helpdesk-demo, caller-script,
-     callee-create-user, cyclic-a/b, environment-setup
-   - Production: META-INF/scenarios/ (3 files)
-   - Tutorials: check 3 tutorial.yaml files
-
-3. **Task 9 — Delete old types + tests** (Batch 5)
-   - ScenarioParser, HierarchicalParser, ScenarioStep, ScenarioCommand,
-     HierarchicalStep, HierarchicalScenario, AriaTarget, CallGraphValidator,
-     Scenario + their test files
-   - Use ide_refactor_safe_delete, verify zero references first
+Next queue items:
+1. **casehub-pages#466** — Single-source YAML scenarios for tutorials
+2. **casehubio/platform#424** — Generated typed event dispatch Layer 3
+3. **casehubio/platform#487** — Separate parsed structure from catalog
+4. **casehub-pages#514** — Delete remaining Format A types (follow-up from #390)
 
 ## Key Design Decisions
 
-- **Orchestrator is format-agnostic** — no step-type discrimination, no
-  ARIA element extraction. All params flat, executor reconstructs AriaTarget.
-- **Speed ≤ 0 sentinel** for "no pacing" (both Java and TS executors guard)
-- **Envelope parser applies defaults** — target: "browser", actor inherited
-- **Step name derivation** — step: → slugify(label:) → {action}-{index}
-- **AtomicBoolean callback guard** prevents double completion callback
-- **Walker key sets intentionally asymmetric** — TS Walker gets scenario
-  decorators, Java StepWalker does not (different step domains)
+- **Task 9 partial deletion** — 7 old types (ScenarioStep, AriaTarget,
+  Scenario, HierarchicalStep, HierarchicalParser, ScenarioCommand,
+  HierarchicalScenario) retained because runtime dispatchers + MCP still
+  reference them. Filed pages#514 for cleanup.
+- **Multi-command forEach split** — production YAMLs (onboard-team-members,
+  environment-setup) had multi-command steps with forEach. Compact format
+  splits each command into a separate step with its own forEach. Iteration
+  semantics change (per-step vs per-group), matching the new compiler design.
+- **caller-script call→includes** — moved to envelope-level includes.
+  Callee inlined at parse time, not mid-sequence at runtime.
+- **Speed sentinel** — YAML without `speed:` gets -1.0 sentinel from
+  EnvelopeParser. Tests that check speed restoration after runTo need
+  explicit `speed: 1.0` in their YAML.
 
 ## Slot Repos
 
 Slot 210:
-- `slots/210/pages` — 6 new commits on `epic-502-yaml-parity` (pages#390)
-- `slots/210/platform` — no new commits this session (design + plan in workspace)
+- `slots/210/pages` — 3 new commits on `epic-502-yaml-parity` (pages#390 Tasks 7-9)
+- `slots/210/platform` — no new commits this session
 - `slots/210/engine` — no new commits
 - `slots/210/work` — no new commits
 
 ## References
 
-- `.plan` — queue at position 24/31, active issue pages#390, 7/9 tasks done
-- pages#390 spec: `specs/epic-502-yaml-parity/2026-10-02-scenario-format-refinements-design.md`
+- `.plan` — queue at position 24/32, pages#390 all tasks complete
 - Implementation plan: `plans/2026-10-03-scenario-format-refinements.md`
-- Design review: 3 workspaces under `~/reviews/casehub-slots/scenario-format-refinements-*`
+- New follow-up issue: casehub-pages#514 (Format A type cleanup)
 - Decisions D18-D26: `specs/epic-502-yaml-parity/decisions.md`
