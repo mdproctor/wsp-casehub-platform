@@ -1,0 +1,15 @@
+# Work Plan — issue-512-datarealism-simulation-deco
+
+## State
+branch: issue-512-datarealism-simulation-deco
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 512
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#512 — Issue #512 ← active
