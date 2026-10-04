@@ -43,13 +43,13 @@ task7: done
 - [x] casehubio/platform#487 — Separate parsed structure from catalog
 - [x] casehubio/platform#502 — Epic YAML cross-repo parity
 - [ ] casehubio/casehub-pages#502 — Epic YAML playbook ops ← active
-  - [ ] Batch 1: Data Model
-    - [ ] Task 1: ScriptLifecycleState enum + ScriptDescriptor state field
-  - [ ] Batch 2: State Machine
-    - [ ] Task 2: CDI event records
-    - [ ] Task 3: OrcStateMachine transitions + listActive
-  - [ ] Batch 3: Verification
-    - [ ] Task 4: Full build verification
+  - [x] Batch 1: Data Model
+    - [x] Task 1: ScriptLifecycleState enum + ScriptDescriptor state field
+  - [x] Batch 2: State Machine
+    - [x] Task 2: CDI event records
+    - [x] Task 3: OrcStateMachine transitions + listActive
+  - [x] Batch 3: Verification
+    - [x] Task 4: Full build verification
 - [ ] casehubio/casehub-pages#508 — Complete type unification
 - [ ] casehubio/casehub-pages#514 — Delete remaining Format A types after runtime migration
 - [ ] casehubio/platform#510 — Playbook naming unification
