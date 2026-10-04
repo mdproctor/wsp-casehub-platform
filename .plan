@@ -58,6 +58,8 @@ task7: done
     - [x] Task 7: Full cross-repo build
 - [ ] casehubio/casehub-pages#514 — Delete remaining Format A types after runtime migration
 - [ ] casehubio/platform#510 — Playbook naming unification
+- [ ] casehubio/casehub-pages#518 — TS front matter parser + scenario migration
+- [ ] casehubio/casehub-pages#519 — Annotate spec docs with new type names
 
 ## Deferred
 - [ ] Fix TS type name drift (XS / Low) [casehub-pages] — Already fixed — all TS type names already aligned. No action needed.
