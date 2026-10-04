@@ -17,6 +17,6 @@ flyway-next-v:
 - [x] casehubio/engine#1208 — CDI modules without core extraction
 - [x] casehubio/engine#1209 — MCP Spring module
 - [x] casehubio/engine#1210 — persistence-spring-jpa generation
-- [ ] casehubio/engine#1211 — runtime-spring generation ← active
-- [ ] casehubio/engine#1095 — McpDomain SPI migration
-- [ ] casehubio/engine#1199 — rest-spring module
+- [x] casehubio/engine#1211 — runtime-spring generation
+- [x] casehubio/engine#1095 — McpDomain SPI migration
+- [x] casehubio/engine#1199 — rest-spring module
