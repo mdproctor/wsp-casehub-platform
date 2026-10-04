@@ -1,7 +1,7 @@
 sync_main=done
 stacked_pr_detect=done
 branch_name_attempt=1
-last_yielded=load_context
+last_yielded=arc42_scan_wrap
 branch_name=done
 flyway_scan=done
 create_branches=done
@@ -33,3 +33,5 @@ lifecycle_continue=done
 health_check=done
 load_context_attempt=1
 load_context=done
+arc42_scan_wrap_attempt=1
+arc42_scan_wrap=done
