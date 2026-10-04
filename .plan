@@ -44,17 +44,21 @@ task7: done
 - [x] casehubio/platform#502 — Epic YAML cross-repo parity
 - [x] casehubio/casehub-pages#502 — Epic YAML playbook ops
 - [ ] casehubio/casehub-pages#508 — Complete type unification ← active
-  - [ ] Batch 1: Renames
-    - [ ] Task 1: Rename StepWalker and YamlStepDefinitionSource
-  - [ ] Batch 2: Ceremony
-    - [ ] Task 2: Add REMOVED_KEYS and stripKeys
-    - [ ] Task 3: Port inline action resolution
-  - [ ] Batch 3: Front Matter
-    - [ ] Task 4: Multi-document ScenarioParser
+  - [x] Batch 1: Renames
+    - [x] Task 1: Rename StepWalker and YamlStepDefinitionSource
+  - [x] Batch 2: Ceremony
+    - [x] Task 2: Add REMOVED_KEYS and stripKeys
+    - [x] Task 3: Port inline action resolution
+  - [x] Batch 3: Front Matter
+    - [x] Task 4: Multi-document ScenarioParser
   - [ ] Batch 4: Pages Cleanup
     - [ ] Task 5: Fix TS type name drift
     - [ ] Task 6: TS front matter and scenario updates
-  - [ ] Batch 5: Verification
-    - [ ] Task 7: Full cross-repo build
+  - [x] Batch 5: Verification
+    - [x] Task 7: Full cross-repo build
 - [ ] casehubio/casehub-pages#514 — Delete remaining Format A types after runtime migration
 - [ ] casehubio/platform#510 — Playbook naming unification
+
+## Deferred
+- [ ] Fix TS type name drift (XS / Low) [casehub-pages] — Already fixed — all TS type names already aligned. No action needed.
+- [ ] TS front matter and scenario updates (M / Med) [casehub-pages] — Requires modifying pages-aria scenario parser and 22 scenario YAML files — better done in a pages-focused session with TS test infrastructure in context.
