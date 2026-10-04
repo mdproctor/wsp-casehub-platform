@@ -5,36 +5,26 @@
 **Branch:** issue-1206-spring-completeness
 **Epic:** engine#1206 — Spring completeness
 **Active issue:** engine#1208 — CDI modules without core extraction
-**State:** in progress — 2 of 3 modules done, work-adapter partially started
+**State:** work-adapter complete — all 3 modules done, ready to advance to #1209
 
 ## This Session
 
-- Resolved canonical engine overlap: two sessions working same epic on same branch name
-  - Canonical had 7 commits (mix of #1095 SPI + overlapping #1207 cleanup)
-  - Cherry-picked 4 clean #1095 commits into slot (SPI interfaces for 5 REST domains)
-  - Canonical branch to be reset to main after this work lands
-- Advanced .plan: #1206 and #1207 marked done, #1208 active
-- Surveyed 10 modules for #1208: 7 are pure CDI wiring (no -core needed), 3 need work
-- Completed eidos-routing: EngineAwareAgentSelector → POJO, Instance<T> → Optional<T>/direct, new EidosRoutingBeans
-- Completed yaml-cbr: StepExecutionCbrBridge + StepFileCallableDispatcher → POJOs, new YamlCbrBeans
-- Started work-adapter: HumanTaskScheduleHandler + JudgmentWorkItemScheduler → constructor injection (2 of 10 CDI files done)
+- Completed all 8 remaining work-adapter CDI removals (4 commits):
+  - HumanTaskRecoveryService: @Inject → constructor, @Observes StartupEvent → init()
+  - CaseCompensationNotifier: Instance<T> → Optional<T>, @ObservesAsync → public method
+  - CompensationSubscriptionBootstrap: 2× Instance<T> → Optional<T>, @Observes StartupEvent → init()
+  - ActionGateCancelledHandler: @ConsumeEvent → public method, constructor injection
+  - ActionGateCompletionApplier: EventBus → 3× Consumer<T> callbacks
+  - WorkStrategyContributor: 4× Instance<T> @Any → List<T>, startup → init()
+  - WorkItemLifecycleAdapter: EventBus → Consumer<T>, @ObservesAsync → public methods
+  - PlanItemCompletionApplier: 2× Event<T> → Consumer<T>, EventBus → Consumer<T>, 8 fields → constructor
+- Expanded EngineAdapterBeans with @Produces for all 10 POJOs + CDI observer bridges + EventBus consumer bridge + startup init
+- Updated 3 tests: CaseCompensationNotifierTest, CompensationSubscriptionBootstrapTest (constructor instead of reflection), HumanTaskRecoveryServiceTest (onStart→init)
+- Compilation verified. 16 unit tests pass. @QuarkusTest tests fail due to pre-existing CDI errors (stigmergy/convergence/improvement — unrelated)
 
 ## Resume Point
 
-Continue work-adapter CDI removal. 8 files remaining:
-
-| File | Key patterns | Difficulty |
-|------|-------------|------------|
-| ActionGateCancelledHandler | @ConsumeEvent (Vert.x), @Transactional | Medium |
-| ActionGateCompletionApplier | EventBus (Vert.x) → Consumer<T> | Medium |
-| CaseCompensationNotifier | Instance<T> → Optional<T>, @ObservesAsync | Easy |
-| CompensationSubscriptionBootstrap | 2× Instance<T> → Optional<T>, @Observes StartupEvent → @PostConstruct | Easy |
-| PlanItemCompletionApplier | 2× Event<T> → Consumer<T>, EventBus → Consumer<T>, 8 fields | Hard |
-| WorkItemLifecycleAdapter | EventBus, 2× @ObservesAsync | Medium |
-| WorkStrategyContributor | 4× Instance<T> @Any → List<T>, @Observes StartupEvent | Medium |
-| recovery/HumanTaskRecoveryService | @Observes @Priority StartupEvent | Easy |
-
-After all 10 files: expand EngineAdapterBeans with @Produces for all cleaned classes. Tests may need constructor updates.
+Issue #1208 is complete (all 3 modules: eidos-routing, yaml-cbr, work-adapter). Advance to #1209 — MCP Spring module.
 
 ## Architecture Decisions (this session)
 
