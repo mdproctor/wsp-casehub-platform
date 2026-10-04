@@ -466,14 +466,14 @@ Original text retained below for historical context.
 
 ## D6: Scope of lifecycle feature
 
-**Choice:** State machine + approval gate + CDI events. No application-level versioning (git handles content history). No persistence (volatile, in-memory).
+**Choice:** State machine + CDI events only. No application-level versioning, no approval SPI, no persistence, no REST governance endpoints.
 **Alternatives:**
-- State + versioning + approval — application-level version history with diffs and rollback. Rejected: git and Maven repos already handle version history.
-- Multi-version active (schema model) — multiple versions of same scenario active simultaneously. Rejected: scenarios are playbooks, not API contracts. New version supersedes old.
-- All three with JPA persistence — full durable workflow. Rejected: the issue doesn't require durability, and durable approval workflows belong in Serverless Workflow (casehub-pages#517).
-**Rationale:** Versioning is git's job. Approval workflows requiring inboxes and persistence belong in a workflow engine, not the script registry. The scenario system is scripting and automation — keep it lightweight.
-**Trade-offs:** Consumer approval use cases (FSI, clinical) need Serverless Workflow integration (#517) rather than being handled in-registry.
-**Sources:** casehub-pages#498, discussion on schema-vs-runbook model, Serverless Workflow separation
+- State + versioning + approval — rejected: versioning is git's job, approval workflows belong in Serverless Workflow (casehub-pages#517)
+- State + approval SPI — rejected: approval gate adds complexity without a proven use case. If needed, Serverless Workflow or git PRs handle governance better
+- Git-backed script storage — explored but deferred: elegant solution for versioned storage, but scope expansion beyond what #498 asks for
+**Rationale:** The issue needs a state machine for #499 (event-triggered activation) to check "is this scenario ACTIVE?" Everything beyond that is scope expansion. LLM-generated script governance, git-backed storage, and approval workflows are valid future concerns but separate issues.
+**Trade-offs:** No governance mechanism in-app. Acceptable — git PRs or Serverless Workflow (#517) handle governance when needed.
+**Sources:** casehub-pages#498, first-principles analysis of Temporal/Airflow/Serverless Workflow lifecycle rationale
 **Exploration:** deep-analysis
 **Status:** captured
 
@@ -504,15 +504,15 @@ Original text retained below for historical context.
 
 ## D9: Approval model
 
-**Choice:** Synchronous ApprovalPolicy SPI — evaluate() returns APPROVED/DENIED. Default auto-approves. No PENDING_APPROVAL state.
+**Choice:** No approval model in this issue. Deferred to casehub-pages#517 (Serverless Workflow) or git-based governance (PRs).
 **Alternatives:**
-- Async approval with PENDING_APPROVAL state — models human-in-the-loop but introduces persistence and inbox requirements that belong in Serverless Workflow
-- Hybrid sync + optional async — two code paths for the same transition, more complex
-**Rationale:** Consumer use cases requiring async approval with inboxes should use Serverless Workflow (#517). The script registry gate is a synchronous policy check — "does this caller have permission to activate?" Default: yes. Regulated domains: role check or external policy call.
-**Trade-offs:** Can't model multi-step approval workflows in-registry. By design — that's #517's job.
-**Sources:** platform RedistributionPolicy/PolicyEnforcer patterns, discussion on Serverless Workflow separation
+- Synchronous ApprovalPolicy SPI — explored but adds in-app governance that duplicates git PRs or Serverless Workflow
+- Async approval with PENDING_APPROVAL state — requires persistence and inbox infrastructure
+**Rationale:** The scenario system is scripting and automation, not a governance platform. Approval workflows belong in purpose-built tools (git PRs for developer-authored, Serverless Workflow for durable human-task workflows).
+**Trade-offs:** No in-app approval gate. Transitions are unconditional.
+**Sources:** First-principles analysis: Temporal, Airflow, CNCF Serverless Workflow lifecycle rationale
 **Exploration:** deep-analysis
-**Depends on:** D6 (no persistence, no durable workflows)
+**Depends on:** D6 (minimal scope)
 **Status:** captured
 
 ## D10: Lifecycle scope by provenance
