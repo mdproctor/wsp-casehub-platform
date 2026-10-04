@@ -525,3 +525,41 @@ Original text retained below for historical context.
 **Sources:** BundledScriptSource.java, ExternalRegistrySource.java
 **Exploration:** quick
 **Status:** captured
+
+---
+
+# Decisions — casehub-pages#508 Complete Type Unification
+
+## D37: Execution order — platform-first
+
+**Choice:** Platform-first — rename Java types and eliminate ceremony before pages cleanup
+**Alternatives:**
+- Pages-first — fix TS drift first. But pages already has the target behavior; platform is catching up. Doesn't unblock anything.
+- Interleaved — mix changes across repos. Adds context switching for no benefit.
+**Rationale:** Platform publishes first in the build order. The TS Walker already has the target behavior (inline action resolution, `REMOVED_KEYS`). Java StepWalker is the one out of alignment.
+**Trade-offs:** Pages drift persists slightly longer. Negligible since it's cosmetic (test descriptions, export names).
+**Sources:** walker.ts (TS Walker with REMOVED_KEYS, stripKeys, inline resolution), StepWalker.java (still uses `do:` wrapper)
+**Exploration:** quick
+**Status:** captured
+
+## D38: Ceremony elimination — port TS stripKeys pattern
+
+**Choice:** Port the TS `stripKeys` pattern to Java Walker. Match cases: strip `pattern`/`guard`/`default`, resolve remainder via `resolveOne()`. Select branches: strip `subscribe`/`wait`, resolve remainder via `resolveOne()`. Add `REMOVED_KEYS` set (`steps`, `do`), reject at top of `resolveOne()`.
+**Alternatives:**
+- Adapt in-place without introducing stripKeys — modify existing `resolveMatchCases`/`resolveSelectBranches` logic directly. Works but creates unnecessary divergence from TS.
+**Rationale:** The whole point of this issue is cross-repo parity. The TS Walker's approach (strip config keys, resolve remainder as a step) is clean and tested. Porting it gives structural alignment.
+**Trade-offs:** Slight refactoring churn in `resolveMatchCases` and `resolveSelectBranches`. Worth it for parity.
+**Sources:** walker.ts:301-304 (stripKeys + resolveOne in match), walker.ts:331-335 (stripKeys + resolveOne in select), StepWalker.java:309-318 (current `do:` approach)
+**Exploration:** quick
+**Status:** captured
+
+## D39: Front matter format — same issue, separate commit
+
+**Choice:** Include front matter format in this issue as a distinct commit after ceremony elimination.
+**Alternatives:**
+- Separate issue — unnecessary overhead for a trivial parser change (both SnakeYAML `loadAll()` and js-yaml `loadAll()` handle it natively).
+**Rationale:** Front matter is part of the unification story — scenarios use YAML multi-document (`---`) to separate metadata from bare action arrays. The parser change is a few lines in each language.
+**Trade-offs:** Slightly larger issue scope. Justified because the scenario document updates (22 files in pages) depend on the parser change.
+**Sources:** ScenarioParser.java, parser.ts, SnakeYAML loadAll(), js-yaml loadAll()
+**Exploration:** quick
+**Status:** captured
