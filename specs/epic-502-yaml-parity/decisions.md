@@ -459,3 +459,69 @@ Original text retained below for historical context.
 **Sources:** User direction ("over time we may code generate other areas for performance")
 **Exploration:** quick
 **Status:** captured
+
+---
+
+# Decisions — casehub-pages#498 Scenario Lifecycle State
+
+## D6: Scope of lifecycle feature
+
+**Choice:** State machine + approval gate + CDI events. No application-level versioning (git handles content history). No persistence (volatile, in-memory).
+**Alternatives:**
+- State + versioning + approval — application-level version history with diffs and rollback. Rejected: git and Maven repos already handle version history.
+- Multi-version active (schema model) — multiple versions of same scenario active simultaneously. Rejected: scenarios are playbooks, not API contracts. New version supersedes old.
+- All three with JPA persistence — full durable workflow. Rejected: the issue doesn't require durability, and durable approval workflows belong in Serverless Workflow (casehub-pages#517).
+**Rationale:** Versioning is git's job. Approval workflows requiring inboxes and persistence belong in a workflow engine, not the script registry. The scenario system is scripting and automation — keep it lightweight.
+**Trade-offs:** Consumer approval use cases (FSI, clinical) need Serverless Workflow integration (#517) rather than being handled in-registry.
+**Sources:** casehub-pages#498, discussion on schema-vs-runbook model, Serverless Workflow separation
+**Exploration:** deep-analysis
+**Status:** captured
+
+## D7: Lifecycle state location
+
+**Choice:** Add `ScriptLifecycleState` field directly to `ScriptDescriptor` record
+**Alternatives:**
+- Separate `ManagedScript` wrapper — clean separation but two types for the same concept, API split
+- External side map — state and descriptor always needed together, passing separately is error-prone
+**Rationale:** Simplest change. State is part of the script's identity from the consumer perspective. TS UI wants to show state in the library view.
+**Trade-offs:** Widens ScriptDescriptor, but the field is genuinely part of the type.
+**Sources:** ScriptDescriptor.java, ScriptMeta.java
+**Exploration:** quick
+**Status:** captured
+
+## D8: Lifecycle transition enforcement
+
+**Choice:** OrcStateMachine from yaml-core, same pattern as TemporalSimulationDriver lifecycle
+**Alternatives:**
+- Custom transition methods with if/else validation — reinvents state machine logic
+- Separate ScriptLifecycleService — splits what is conceptually one entity's mutation
+**Rationale:** OrcStateMachine already exists, enforces valid transitions, supports onTransition handlers for CDI events. TemporalSimulationDriver is the established precedent.
+**Trade-offs:** None significant — this is applying an existing primitive.
+**Sources:** OrcStateMachine.java, DefaultOrcStateMachine.java, TemporalSimulationDriver.java
+**Exploration:** quick
+**Depends on:** D7 (state lives on ScriptDescriptor)
+**Status:** captured
+
+## D9: Approval model
+
+**Choice:** Synchronous ApprovalPolicy SPI — evaluate() returns APPROVED/DENIED. Default auto-approves. No PENDING_APPROVAL state.
+**Alternatives:**
+- Async approval with PENDING_APPROVAL state — models human-in-the-loop but introduces persistence and inbox requirements that belong in Serverless Workflow
+- Hybrid sync + optional async — two code paths for the same transition, more complex
+**Rationale:** Consumer use cases requiring async approval with inboxes should use Serverless Workflow (#517). The script registry gate is a synchronous policy check — "does this caller have permission to activate?" Default: yes. Regulated domains: role check or external policy call.
+**Trade-offs:** Can't model multi-step approval workflows in-registry. By design — that's #517's job.
+**Sources:** platform RedistributionPolicy/PolicyEnforcer patterns, discussion on Serverless Workflow separation
+**Exploration:** deep-analysis
+**Depends on:** D6 (no persistence, no durable workflows)
+**Status:** captured
+
+## D10: Lifecycle scope by provenance
+
+**Choice:** Uploaded scripts only. Bundled and external scripts are implicitly ACTIVE.
+**Alternatives:**
+- All provenance types — bundled scripts can be archived (disabled), external scripts can be drafted. More uniform but adds complexity to immutable sources.
+**Rationale:** Bundled scripts ship with the app — they're active by definition. External scripts are managed by their source registry. Only uploaded scripts need lifecycle transitions.
+**Trade-offs:** Can't disable a bundled script without removing it from the classpath. Acceptable — that's a deployment concern, not a runtime lifecycle concern.
+**Sources:** BundledScriptSource.java, ExternalRegistrySource.java
+**Exploration:** quick
+**Status:** captured
