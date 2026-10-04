@@ -45,3 +45,4 @@ task7: done
 - [ ] casehubio/casehub-pages#502 — Epic YAML playbook ops ← active
 - [ ] casehubio/casehub-pages#508 — Complete type unification
 - [ ] casehubio/casehub-pages#514 — Delete remaining Format A types after runtime migration
+- [ ] casehubio/platform#510 — Playbook naming unification
