@@ -42,14 +42,19 @@ task7: done
 - [x] casehubio/platform#424 — Generated typed event dispatch Layer 3
 - [x] casehubio/platform#487 — Separate parsed structure from catalog
 - [x] casehubio/platform#502 — Epic YAML cross-repo parity
-- [ ] casehubio/casehub-pages#502 — Epic YAML playbook ops ← active
-  - [x] Batch 1: Data Model
-    - [x] Task 1: ScriptLifecycleState enum + ScriptDescriptor state field
-  - [x] Batch 2: State Machine
-    - [x] Task 2: CDI event records
-    - [x] Task 3: OrcStateMachine transitions + listActive
-  - [x] Batch 3: Verification
-    - [x] Task 4: Full build verification
-- [ ] casehubio/casehub-pages#508 — Complete type unification
+- [x] casehubio/casehub-pages#502 — Epic YAML playbook ops
+- [ ] casehubio/casehub-pages#508 — Complete type unification ← active
+  - [ ] Batch 1: Renames
+    - [ ] Task 1: Rename StepWalker and YamlStepDefinitionSource
+  - [ ] Batch 2: Ceremony
+    - [ ] Task 2: Add REMOVED_KEYS and stripKeys
+    - [ ] Task 3: Port inline action resolution
+  - [ ] Batch 3: Front Matter
+    - [ ] Task 4: Multi-document ScenarioParser
+  - [ ] Batch 4: Pages Cleanup
+    - [ ] Task 5: Fix TS type name drift
+    - [ ] Task 6: TS front matter and scenario updates
+  - [ ] Batch 5: Verification
+    - [ ] Task 7: Full cross-repo build
 - [ ] casehubio/casehub-pages#514 — Delete remaining Format A types after runtime migration
 - [ ] casehubio/platform#510 — Playbook naming unification
