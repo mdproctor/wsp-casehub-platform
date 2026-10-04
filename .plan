@@ -1,0 +1,15 @@
+# Work Plan — issue-511-manifest-pools
+
+## State
+branch: issue-511-manifest-pools
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 511
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#511 — Issue #511 ← active
