@@ -3,15 +3,15 @@
 ## Status
 
 **Platform:** main — playbook infrastructure landed (#510 partial: front matter, schema registry, schema JSON)
-**Pages:** `epic-502-yaml-parity` branch — parser + migration + sweep done, NOT merged to main, no PR open
-**Epic #520 (Playbook naming):** platform-side foundation done; pages TS + Java parser + migrations + sweep on branch
+**Pages:** main — epic-502-yaml-parity squash-merged as bdd7f366, branch stamped closed
+**Epic #520 (Playbook naming):** Phase 1 complete (5 issues closed); Phase 2 active (#510)
 **Epic #502 (YAML parity):** Batches 1–4 done; Batch 5 (pages#502 YAML ops sub-epic) open
 
-## Previous Session
+## This Session
 
-Landed epic-502 branch content on platform main (15 commits — playbook infrastructure, state machine generator, error hierarchy, front matter parser). Rebased, resolved naming conflicts (StateMachine* kept, Walker→StepWalker reverted), fast-forward merged. Closed platform#522.
+Squash-merged `epic-502-yaml-parity` (43 commits) onto pages main as bdd7f366. Resolved 13 conflicts against 15 commits that landed on main since the branch diverged (DeliveryHandler SPI #516, ESLint strict-type-checked #515). Pushed to both mdproctor and casehubio remotes. Closed pages#518, #520, #521, #522, #527.
 
-On pages `epic-502-yaml-parity` branch: added YamlMultiDocSplitter (pages#520), migrated 48 TS files (pages#518), 13 backend files (pages#521), swept terminology (pages#527). Branch pushed to GitHub but no PR created, issues still OPEN.
+Phase 1 of the .plan is complete. Phase 2 (#510 schema composition) is now active.
 
 ## Key Decision
 
@@ -19,19 +19,11 @@ Jackson `readTree()` silently drops multi-doc YAML — garden entry GE-20261005-
 
 ## Work Queue (priority order)
 
-### Phase 1 — Land pages branch (unblocks everything)
+### Phase 1 — Land pages branch ✓
 
-| # | Repo | Title | Scale | Status |
-|---|------|-------|-------|--------|
-| pages#518 | casehub-pages | TS front matter parser + 48-file migration | M | Done on branch |
-| pages#520 | casehub-pages | Java backend multi-doc parser support | M | Done on branch |
-| pages#521 | casehub-pages | Migrate 13 backend YAML files | S | Done on branch |
-| pages#522 | casehub-pages | TS PlaybookParser non-map guard | XS | Done on branch |
-| pages#527 | casehub-pages | Terminology sweep (CaseHub YAML → Playbook YAML) | S | Done on branch |
+All 5 issues closed. Landed as bdd7f366 on pages main.
 
-All five are on `epic-502-yaml-parity` — need PR + merge + issue close.
-
-### Phase 2 — Remaining #510 platform work
+### Phase 2 — Remaining #510 platform work ← active
 
 | # | Repo | Title | Scale | Status |
 |---|------|-------|-------|--------|
@@ -48,7 +40,7 @@ All five are on `epic-502-yaml-parity` — need PR + merge + issue close.
 
 | # | Repo | Title | Scale | Blocked by |
 |---|------|-------|-------|------------|
-| platform#521 | platform | aml (6) + clinical (1) YAML migration | S | Phase 1 |
+| platform#521 | platform | aml (6) + clinical (1) YAML migration | S | Unblocked |
 
 ## References
 
