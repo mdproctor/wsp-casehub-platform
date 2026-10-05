@@ -45,9 +45,15 @@ task7: done
 - [x] casehubio/casehub-pages#502 — Epic YAML playbook ops
 - [x] casehubio/casehub-pages#508 — Complete type unification
 - [x] casehubio/casehub-pages#514 — Delete remaining Format A types after runtime migration
-- [ ] casehubio/platform#510 — Playbook naming unification ← active
-- [ ] casehubio/casehub-pages#518 — TS front matter parser + scenario migration
-- [ ] casehubio/casehub-pages#519 — Annotate spec docs with new type names
+- [x] casehubio/platform#510 — Playbook naming unification
+- [x] casehubio/casehub-pages#518 — TS front matter parser + scenario migration
+- [x] casehubio/casehub-pages#519 — Annotate spec docs with new type names
+- [ ] casehubio/casehub-pages#520 — ScenarioEnvelopeParser
+- [ ] casehubio/casehub-pages#521 — Migrate-backend-YAML-files
+- [ ] casehubio/casehub-pages#522 — TS-PlaybookParser-non-map-guard
+- [ ] casehubio/casehub-pages#523 — Remaining-spec-annotation
+- [ ] casehubio/platform#518 — Platform-spec-doc-annotations
+- [ ] casehubio/platform#519 — CaseHub-YAML-terminology-audit
 
 ## Deferred
 - [ ] Fix TS type name drift (XS / Low) [casehub-pages] — Already fixed — all TS type names already aligned. No action needed.
