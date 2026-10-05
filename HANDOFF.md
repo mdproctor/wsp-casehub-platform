@@ -4,7 +4,7 @@
 
 **Branch:** main (all work landed)
 **Epic:** platform#520 — Playbook naming unification (platform-side complete)
-**State:** platform work done; remaining work is pages-side + consumer repos
+**State:** platform work done; pages#520 parser update done; remaining work is pages YAML migration + renames
 
 ## This Session (2026-10-05)
 
@@ -24,9 +24,17 @@ Landed features (from epic branch):
 - PlaybookFrontMatter + PlaybookParser + PlaybookSchemaRegistry + playbook.schema.json
 - Walker → StepWalker revert (Step* types are valid internal vocabulary)
 
+### Pages cross-repo work
+
+- **pages#520** — Parser multi-doc support: committed `14a33dcf` on `epic-502-yaml-parity`
+  - `YamlMultiDocSplitter` (Jackson-native multi-doc + PlaybookFrontMatter extraction)
+  - `ScenarioEnvelopeParser`, `ScriptDescriptorExtractor`, `ScenarioCompiler` updated
+  - 86 tests pass (10 new)
+  - Unblocks pages#521, pages#525, platform#521
+
 ### Issues closed
 
-- **#522** — Epic branch cleanup complete (rebase + naming alignment)
+- **platform#522** — Epic branch cleanup complete (rebase + naming alignment)
 
 ### Design decisions
 
@@ -38,17 +46,17 @@ Landed features (from epic branch):
 
 | # | Repo | Title | Scale | Blocked by |
 |---|------|-------|-------|------------|
-| pages#520 | casehub-pages | Parser multi-doc support | M | — |
-| pages#521 | casehub-pages | Migrate 13 backend YAML files | S | pages#520 |
-| pages#525 | casehub-pages | 14 class renames + directory renames | L | pages#520 |
+| pages#520 | casehub-pages | Parser multi-doc support | M | — (done, pending close) |
+| pages#521 | casehub-pages | Migrate 13 backend YAML files | S | — (unblocked) |
+| pages#525 | casehub-pages | 14 class renames + directory renames | L | — (unblocked) |
 | pages#526 | casehub-pages | REST endpoint deprecation | M | pages#525 |
 | pages#527 | casehub-pages | Terminology sweep (~27 files) | S | — |
-| platform#521 | platform | aml + clinical YAML migration | S | pages#520, pages#521 |
+| platform#521 | platform | aml + clinical YAML migration | S | pages#521 |
 
 ## Slot Repos
 
 Slot 210:
 - `slots/210/platform` — main (all platform work landed, epic branch stamped closed)
-- `slots/210/pages` — epic-502-yaml-parity (paused, pages-side work pending)
+- `slots/210/pages` — epic-502-yaml-parity (pages#520 done, more work pending)
 - `slots/210/engine` — no changes
 - `slots/210/work` — no changes
