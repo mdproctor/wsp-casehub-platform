@@ -2,60 +2,67 @@
 
 ## Status
 
-**Branch:** epic-502-yaml-parity
-**Epic:** platform#502 — YAML cross-repo parity
-**State:** paused — queue 35/41 (6 new audit issues added this session)
-**Active issue:** none (between issues)
+**Branch:** main (all work landed)
+**Epic:** platform#520 — Playbook naming unification (platform-side complete)
+**State:** platform work done; remaining work is pages-side + consumer repos
 
-## This Session
+## This Session (2026-10-05)
 
-Completed platform#510 (playbook naming), pages#518 (TS parser + migration), pages#519 (spec annotations), pages#522 (TS non-map guard), pages#523 (closed — already done). Started platform#520 (Scenario→Playbook rename) — platform classes done, TS types done, Java backend classes remaining.
+Completed all platform-side naming unification for epic #520:
 
-### Commits — platform repo (5 on `epic-502-yaml-parity`)
+### Landed commits — platform main
 
-1. `16542d02` — PlaybookFrontMatter types + PlaybookParser
-2. `2de1e7e4` — PlaybookSchemaRegistry and capability model
-3. `19f58cd3` — playbook.schema.json
-4. `aef69589` — Scenario→Playbook renames (PlaybookDefinition, CompiledPlaybook, PlaybookCompiler, PlaybookValidator)
+1. `da7ee461` — fix(#519): rename 'CaseHub YAML' to 'CaseHub Playbook YAML' in platform docs
+2. `2069de3b` — refactor(#520): rename Scenario* → StateMachine* in yaml-step-runtime
+3. `0a8de66a` — refactor(#520): rename ScenarioScope → ExecutionScope
 
-### Commits — pages repo (7 on `epic-502-yaml-parity`)
+### Issues closed
 
-1. `17e9b28e` — TS PlaybookFrontMatter types
-2. `0783d1ac` — TS PlaybookSchemaRegistry
-3. `4ae7d38b` — Multi-doc YAML + playbook front matter in parser
-4. `fa70134a` — Migrated 48 scenario YAML files to playbook format
-5. `1a8d53d9` — Spec doc annotations
-6. `f32df019` — TS Scenario→Playbook renames (10 types/functions)
-7. `8b7a1758` — TS non-map guard on second YAML document
+- **#518** — Closed as invalid (Step* types are valid internal playbook vocabulary)
+- **#519** — Done (2 files updated)
 
-## Remaining Issues
+### Design decisions
+
+- **Three naming tiers:** Playbook (top-level construct), Step* (internal execution), StateMachine* (state machine DSL)
+- **ScenarioScope → ExecutionScope** — the scope manages execution lifecycle, not "scenarios"
+- **Step* names stay** — StepWalker, StructuralStepEvaluator are internal components, not alternative top-level naming
+- **ScenarioScope (as concept) stays** only in: `scenario:` YAML key (playbook name field), test method names using "scenario" as English
+
+### Issues created
+
+| # | Repo | Title | Scale |
+|---|------|-------|-------|
+| pages#525 | casehub-pages | Rename 14 Scenario* classes → Playbook* + directory renames | L |
+| pages#526 | casehub-pages | Deprecate /scenario REST endpoints — add /playbook alias | M |
+| pages#527 | casehub-pages | Terminology sweep: ~27 files CaseHub YAML → Playbook YAML | S |
+| platform#521 | platform | Migrate scenario YAML — aml (6) + clinical (1) | S |
+| platform#522 | platform | Epic branch cleanup: revert StepWalker→Walker + align renames | M |
+
+## Remaining Work (tracked in issues)
 
 | # | Repo | Title | Scale | Blocked by |
 |---|------|-------|-------|------------|
-| pages#520 | casehub-pages | ScenarioEnvelopeParser multi-doc support | M | — |
-| pages#521 | casehub-pages | Migrate 13 backend YAML files | S | #520 |
-| platform#518 | platform | Platform spec doc annotations | S | — |
-| platform#519 | platform | CaseHub YAML → Playbook YAML terminology sweep | M | — |
-| platform#520 | platform | Scenario→Playbook rename epic (14 Java backend classes + directories) | L | — |
+| pages#520 | casehub-pages | Parser multi-doc support | M | — |
+| pages#521 | casehub-pages | Migrate 13 backend YAML files | S | pages#520 |
+| pages#525 | casehub-pages | 14 class renames + directory renames | L | pages#520 |
+| pages#526 | casehub-pages | REST endpoint deprecation | M | pages#525 |
+| pages#527 | casehub-pages | Terminology sweep (~27 files) | S | — |
+| platform#521 | platform | aml + clinical YAML migration | S | pages#520, pages#521 |
+| platform#522 | platform | Epic branch cleanup (revert Walker, align StateMachine/ExecutionScope) | M | — |
 
-## Iterative Migration
+## Epic Branch State
 
-YAML files are actively being written by others. Run `scan-unmigrated-yaml.sh` periodically:
-```
-./scripts/scan-unmigrated-yaml.sh /path/to/pages /path/to/aml /path/to/clinical
-```
+`epic-502-yaml-parity` is paused with conflicting renames that need resolution (platform#522):
+- Has StepWalker→Walker (should revert)
+- Has Scenario*→Playbook* (should become StateMachine*)
+- Has ScenarioScope references (should become ExecutionScope)
 
-Unmigrated repos: aml (6 files), clinical (1 file), pages backend (13 files — blocked on #520).
+These will surface naturally on next rebase onto main.
 
 ## Slot Repos
 
 Slot 210:
-- `slots/210/platform` — epic-502-yaml-parity
-- `slots/210/pages` — epic-502-yaml-parity
+- `slots/210/platform` — main (all work landed)
+- `slots/210/pages` — epic-502-yaml-parity (paused)
 - `slots/210/engine` — no changes
 - `slots/210/work` — no changes
-
-## References
-
-- `.plan` — queue at position 35/41
-- Scan script: `wsp-casehub-platform/scripts/scan-unmigrated-yaml.sh`
