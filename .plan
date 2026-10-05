@@ -1,0 +1,26 @@
+# Work Plan — playbook-unification
+
+## State
+branch: main
+state: active
+issue-repo: casehubio/casehub-pages
+covers: casehubio/casehub-pages#518
+Current: casehubio/casehub-pages#518 — TS front matter parser + 48-file migration
+date: 2026-10-05
+note: Phase 1 items all done on epic-502-yaml-parity branch — need PR + merge + close
+
+## Queue
+- [ ] casehubio/platform#520 — Playbook naming unification — complete Scenario→Playbook migration (epic)
+  ### Phase 1: Land pages branch ← current
+  - [ ] casehubio/casehub-pages#518 — TS front matter parser + 48-file migration ← active
+  - [ ] casehubio/casehub-pages#520 — Java backend multi-doc parser support
+  - [ ] casehubio/casehub-pages#522 — TS PlaybookParser non-map guard
+  - [ ] casehubio/casehub-pages#521 — Migrate 13 backend YAML files
+  - [ ] casehubio/casehub-pages#527 — Terminology sweep CaseHub YAML → Playbook YAML
+  ### Phase 2: Platform schema
+  - [ ] casehubio/platform#510 — Schema composition/extension mechanism
+  ### Phase 3: Pages renames + deprecation
+  - [ ] casehubio/casehub-pages#525 — 14 Scenario→Playbook class renames + dir renames
+  - [ ] casehubio/casehub-pages#526 — Deprecate /scenario REST → /playbook alias
+  ### Phase 4: Consumer repo migration
+  - [ ] casehubio/platform#521 — aml (6) + clinical (1) YAML migration
