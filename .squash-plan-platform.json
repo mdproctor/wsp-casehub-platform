@@ -1,9 +1,0 @@
-{
-  "verified": true,
-  "groups": [
-    {
-      "message": "refactor(#520): rename ScenarioScope → ExecutionScope",
-      "commits": ["0a8de66a"]
-    }
-  ]
-}
