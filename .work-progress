@@ -97,3 +97,4 @@ verify=done
 report_verify=done
 upstream_push_mechanical_attempt=2
 squash=done
+checkout_main_mechanical_attempt=1
