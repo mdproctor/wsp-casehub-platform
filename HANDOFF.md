@@ -2,61 +2,31 @@
 
 ## Status
 
-**Branch:** main (all work landed)
-**Epic:** platform#520 — Playbook naming unification (platform-side complete)
-**State:** platform work done; pages#520 parser update done; remaining work is pages YAML migration + renames
+**Platform:** main — epic branch content landed
+**Pages:** `epic-502-yaml-parity` — parser + migration + sweep done, pushed to GitHub
+**Epic #520:** platform-side complete; pages parser + migration + terminology done
 
-## This Session (2026-10-05)
+## This Session
 
-### Epic branch landed on main
+Landed the `epic-502-yaml-parity` branch on platform main (15 commits — playbook infrastructure, state machine generator, error hierarchy, front matter parser). Rebased onto main, resolved naming conflicts (StateMachine* kept, Walker→StepWalker reverted), fast-forward merged.
 
-Rebased `epic-502-yaml-parity` onto main, resolved all naming conflicts, landed via fast-forward merge.
+Cross-repo: added `YamlMultiDocSplitter` to pages backend (Jackson `readValues()` for multi-doc YAML), migrated 13 YAML files to playbook format, swept 48 "CaseHub YAML" → "CaseHub Playbook YAML" across 32 files.
 
-Landed features (from epic branch):
-- YamlMappers factory (YAML 1.2 Core Schema)
-- YamlError sealed hierarchy + YamlErrorMapper
-- SourceLocation on StepContext
-- yaml-statemachine-generator module (typed event dispatch from YAML)
-- Parsed structure / catalog resolution separation
-- REMOVED_KEYS rejection + stripKeys utility on StepWalker
-- Inline action resolution (match/select branches)
-- Multi-document YAML front matter support on StateMachineParser
-- PlaybookFrontMatter + PlaybookParser + PlaybookSchemaRegistry + playbook.schema.json
-- Walker → StepWalker revert (Step* types are valid internal vocabulary)
+Closed: platform#522. Pages#520, #521, #527 done (pending close on epic merge).
 
-### Pages cross-repo work
+## Key Decision
 
-- **pages#520** — Parser multi-doc support: committed `14a33dcf` on `epic-502-yaml-parity`
-  - `YamlMultiDocSplitter` (Jackson-native multi-doc + PlaybookFrontMatter extraction)
-  - `ScenarioEnvelopeParser`, `ScriptDescriptorExtractor`, `ScenarioCompiler` updated
-  - 86 tests pass (10 new)
-  - Unblocks pages#521, pages#525, platform#521
+Jackson `readTree()` silently drops multi-doc YAML — garden entry GE-20261005-fadf75 captures this. `readValues()` with explicit parser is the fix.
 
-### Issues closed
+## Remaining (epic #520)
 
-- **platform#522** — Epic branch cleanup complete (rebase + naming alignment)
+| # | Repo | Title | Scale |
+|---|------|-------|-------|
+| pages#525 | casehub-pages | 14 class renames + directory renames | L |
+| pages#526 | casehub-pages | REST endpoint deprecation | M |
+| platform#521 | platform | aml + clinical YAML migration | S |
 
-### Design decisions
+## References
 
-- **Three naming tiers:** Playbook (top-level construct), Step* (internal execution), StateMachine* (state machine DSL)
-- **ScenarioScope → ExecutionScope** — the scope manages execution lifecycle, not "scenarios"
-- **Step* names stay** — StepWalker, StructuralStepEvaluator are internal components, not alternative top-level naming
-
-## Remaining Work (tracked in issues)
-
-| # | Repo | Title | Scale | Blocked by |
-|---|------|-------|-------|------------|
-| pages#520 | casehub-pages | Parser multi-doc support | M | — (done, pending close) |
-| pages#521 | casehub-pages | Migrate 13 backend YAML files | S | — (unblocked) |
-| pages#525 | casehub-pages | 14 class renames + directory renames | L | — (unblocked) |
-| pages#526 | casehub-pages | REST endpoint deprecation | M | pages#525 |
-| pages#527 | casehub-pages | Terminology sweep (~27 files) | S | — |
-| platform#521 | platform | aml + clinical YAML migration | S | pages#521 |
-
-## Slot Repos
-
-Slot 210:
-- `slots/210/platform` — main (all platform work landed, epic branch stamped closed)
-- `slots/210/pages` — epic-502-yaml-parity (pages#520 done, more work pending)
-- `slots/210/engine` — no changes
-- `slots/210/work` — no changes
+- Blog: `wsp-casehub-platform/blog/2026-10-05-mdp01-landing-the-epic.md`
+- Garden: `~/.hortora/garden/jvm/GE-20261005-fadf75.md`
