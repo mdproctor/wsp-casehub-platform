@@ -306,7 +306,7 @@ git commit -m "feat(#386): add Condition, ConditionEvaluator, RuntimeForEach, Sp
 - Test: `../../yaml-core/src/test/java/io/casehub/yaml/core/orchestration/DefaultStepResultStoreTest.java`
 
 **Interfaces:**
-- Produces: `DurationParser.parse(String) → Duration`, `StepResultStore` (interface), `StepError` (record), `ScenarioScope` (interface), `DefaultStepResultStore` (ConcurrentHashMap-backed)
+- Produces: `DurationParser.parse(String) → Duration`, `StepResultStore` (interface), `StepError` (record), `ExecutionScope` (interface), `DefaultStepResultStore` (ConcurrentHashMap-backed)
 
 - [ ] **Step 1: Create orchestration-core pom.xml**
 
@@ -802,7 +802,7 @@ git commit -m "feat(#386): add OrcStateMachine — CAS transitions, guards, hand
 
 **Interfaces:**
 - Consumes: `OrcSemaphore`, `OrcLatch`, `OrcSignal`, `OrcChannel`, `OrcStateMachine`, `StepResultStore` (all from Tasks 4-8)
-- Produces: `DefaultScenarioScope` (ConcurrentHashMap name-to-instance, idempotent creation via computeIfAbsent, lifecycle cleanup on close)
+- Produces: `DefaultExecutionScope` (ConcurrentHashMap name-to-instance, idempotent creation via computeIfAbsent, lifecycle cleanup on close)
 
 - [ ] **Step 1: Write failing tests**
 

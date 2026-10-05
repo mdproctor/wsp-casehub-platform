@@ -467,7 +467,7 @@ After this batch: a parsed and validated YAML scenario can be compiled and execu
 - Test: `yaml-step-runtime/src/test/java/io/casehub/yaml/step/scenario/ScenarioCompilerTest.java`
 
 **Interfaces:**
-- Consumes: `StateMachineDefinition` from Task 2, `ScenarioScope` (yaml-core), `StructuralStepEvaluator` (yaml-step-runtime), `StepWalker` (yaml-step-runtime), `StepRunner` (yaml-step-runtime), `VariableResolver` (yaml-core), `PluginRegistry` (yaml-plugin-api), `DeadlineContext` (yaml-step-runtime)
+- Consumes: `StateMachineDefinition` from Task 2, `ExecutionScope` (yaml-core), `StructuralStepEvaluator` (yaml-step-runtime), `StepWalker` (yaml-step-runtime), `StepRunner` (yaml-step-runtime), `VariableResolver` (yaml-core), `PluginRegistry` (yaml-plugin-api), `DeadlineContext` (yaml-step-runtime)
 - Produces: `ScenarioCompiler.compile(ScenarioDefinition, ScenarioScope, PluginRegistry, VariableResolver, StepRunner) → CompiledScenario`, `CompiledScenario.execute() → Result`
 
 - [ ] **Step 1: Write test for linear scenario execution**

@@ -4,7 +4,7 @@
 
 Wire barrier and quorum as structural step sugar over `OrcLatch`, integrate `StepResultStore` recording into `StructuralStepEvaluator`, and enable `${result.<step>}` variable resolution via `ObjectVariableSource`. Together these transform the step runtime from fire-and-forget execution into a coordination engine where steps share results and synchronize.
 
-**Module scope:** `yaml-step-runtime` (evaluator, walker, resolved step types). No changes to `yaml-core` — all primitives (`OrcLatch`, `StepResultStore`, `DefaultStepResultStore`, `ScenarioScope`, `ObjectVariableSource`, `VariableResolver.withObjectScope`) already exist and are tested.
+**Module scope:** `yaml-step-runtime` (evaluator, walker, resolved step types). No changes to `yaml-core` — all primitives (`OrcLatch`, `StepResultStore`, `DefaultStepResultStore`, `ExecutionScope`, `ObjectVariableSource`, `VariableResolver.withObjectScope`) already exist and are tested.
 
 ## 1. Step Name Propagation
 

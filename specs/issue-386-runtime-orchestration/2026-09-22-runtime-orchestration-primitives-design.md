@@ -591,7 +591,7 @@ All coordination primitives are interfaces in `orchestration-core`. Implementati
 
 ### Lifecycle and Scope
 
-All coordination primitives are scoped to a **single scenario execution**. The orchestration runtime owns a `ScenarioScope` that creates, tracks, and disposes all named primitive instances.
+All coordination primitives are scoped to a **single scenario execution**. The orchestration runtime owns a `ExecutionScope` that creates, tracks, and disposes all named primitive instances.
 
 **ScenarioScope interface** (in `orchestration-core`):
 
@@ -630,15 +630,15 @@ public interface StepResultStore {
 public record StepError(String message, String exceptionClass, String stackTrace) {}
 ```
 
-**Module placement:** `ScenarioScope` is an interface in `orchestration-core` (JDK-only — it references only the coordination primitive interfaces and `StepResultStore`). The consuming module provides the implementation that:
+**Module placement:** `ExecutionScope` is an interface in `orchestration-core` (JDK-only — it references only the coordination primitive interfaces and `StepResultStore`). The consuming module provides the implementation that:
 - Walks the parsed scenario AST to determine which primitives to create eagerly
 - Registers runtime `VariableSource`/`ObjectVariableSource` implementations for `result`, `loop`, `machine`, `signal`, `channel` prefixes
 - Tracks step execution contexts for semaphore reentrancy detection
 - Delegates to `ScenarioScope.close()` on scenario completion or abort
 
-**Access mechanism:** The consuming module's step decorator evaluators receive the `ScenarioScope` via constructor injection at step construction time (not CDI — the scope is per-scenario-execution, not per-CDI-scope). The decorator evaluators use `scope.semaphore(name, permits)` to obtain shared primitive instances.
+**Access mechanism:** The consuming module's step decorator evaluators receive the `ExecutionScope` via constructor injection at step construction time (not CDI — the scope is per-scenario-execution, not per-CDI-scope). The decorator evaluators use `scope.semaphore(name, permits)` to obtain shared primitive instances.
 
-**Thread safety:** `ScenarioScope` implementations must be thread-safe — parallel steps access the scope concurrently. The `primitive()` method uses a `ConcurrentHashMap` for name-to-instance mapping; factory methods (`semaphore()`, `latch()`, etc.) delegate to `computeIfAbsent()` for idempotent creation.
+**Thread safety:** `ExecutionScope` implementations must be thread-safe — parallel steps access the scope concurrently. The `primitive()` method uses a `ConcurrentHashMap` for name-to-instance mapping; factory methods (`semaphore()`, `latch()`, etc.) delegate to `computeIfAbsent()` for idempotent creation.
 
 **Lifecycle:**
 - **Creation:** Primitives are created eagerly at scenario load time, based on the parsed scenario definition. Latches, signals, channels, semaphores, and state machines referenced in the YAML are instantiated before step execution begins. This eliminates race conditions from lazy initialization.
@@ -1394,7 +1394,7 @@ Tests follow the existing yaml-core test structure. Add to existing test classes
 | `TriggerEvaluatorTest` (new) | consuming module | Data/time/event triggers, polling, timeout |
 | `TransformEvaluatorTest` (new) | consuming module | Expression-based transforms, engine selection |
 | `RetryDecoratorTest` (new) | consuming module | Retry with backoff, circuit breaker, PolicyEnforcer delegation |
-| `ScenarioScopeTest` (new) | orchestration-core | Primitive creation, idempotent name lookup, lifecycle (dispose unblocks waiters), thread-safe concurrent access |
+| `ExecutionScopeTest` (new) | orchestration-core | Primitive creation, idempotent name lookup, lifecycle (dispose unblocks waiters), thread-safe concurrent access |
 | `OrcSemaphoreTest` (new) | orchestration-core | Permits, blocking, time-windowed replenishment |
 | `OrcLatchTest` (new) | orchestration-core | Countdown, await, timeout |
 | `OrcSignalTest` (new) | orchestration-core | Signal/await, payload, one-shot vs repeatable |

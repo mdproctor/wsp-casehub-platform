@@ -386,7 +386,7 @@ Test: childScope inherits parent's primitive namespace (counter created in paren
 
 - [ ] **Step 5: Implement childScope in DefaultScenarioScope**
 
-`childScope(String name)` creates a new `DefaultScenarioScope` sharing the parent's primitives map + PrimitiveFactory, with its own spawned-tasks list. Register child in parent's children list. `close()` recursively closes children first.
+`childScope(String name)` creates a new `DefaultExecutionScope` sharing the parent's primitives map + PrimitiveFactory, with its own spawned-tasks list. Register child in parent's children list. `close()` recursively closes children first.
 
 - [ ] **Step 6: Write cancellation contract tests**
 

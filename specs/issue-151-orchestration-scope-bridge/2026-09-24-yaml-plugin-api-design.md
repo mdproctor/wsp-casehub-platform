@@ -271,7 +271,7 @@ Plugin classes stay framework-neutral. The existing CDI patterns (`@DefaultBean`
 **What services are available vs engine-internal:**
 
 Step action plugins can request services that are platform SPIs (e.g., `ProcessExecutor`, `CredentialResolver`, `ExpressionEngine`). The following are **engine-internal** and NOT exposed to plugins:
-- `ScenarioScope` — orchestration coordination primitives
+- `ExecutionScope` — orchestration coordination primitives
 - `VariableResolver` — variable resolution (the engine resolves `${var}` in YAML parameters BEFORE passing them to the plugin)
 - `StepResultStore` — result recording (the engine records results AFTER the plugin returns)
 - Decorator evaluation context — the plugin doesn't know its position in the decorator stack

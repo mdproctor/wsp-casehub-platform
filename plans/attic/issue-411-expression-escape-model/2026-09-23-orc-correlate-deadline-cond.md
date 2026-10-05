@@ -391,7 +391,7 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `OrcPrimitive.releaseForClose()` from Task 1
-- Produces: `awaitAnyState(Set<S>)`, `awaitAnyState(Set<S>, Duration)` on `BlockingOrcStateMachine`; `released` flag + `releaseForClose()` on `DefaultBlockingOrcStateMachine`; covariant `stateMachine()` return type on `ScenarioScope`
+- Produces: `awaitAnyState(Set<S>)`, `awaitAnyState(Set<S>, Duration)` on `BlockingOrcStateMachine`; `released` flag + `releaseForClose()` on `DefaultBlockingOrcStateMachine`; covariant `stateMachine()` return type on `ExecutionScope`
 
 - [ ] **Step 1: Write failing tests for awaitAnyState and releaseForClose**
 

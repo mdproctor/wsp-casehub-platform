@@ -358,7 +358,7 @@ scenarioScope_stateMachine_returnsBlockingVariant
 
 ### ScenarioScope API
 
-Add to `ScenarioScope`:
+Add to `ExecutionScope`:
 
 ```java
 ScenarioScope withDeadline(Duration deadline);
@@ -389,7 +389,7 @@ public class DeadlineExceededException extends RuntimeException {
 
 ### Implementation
 
-`DefaultScenarioScope` gains new fields and constructor changes:
+`DefaultExecutionScope` gains new fields and constructor changes:
 
 **Constructor changes (SpeedMultiplier + parent reference):**
 
