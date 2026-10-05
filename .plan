@@ -1,22 +1,15 @@
-# Work Plan — playbook-unification
+# Work Plan — issue-510-schema-composition
 
 ## State
-branch: main
-state: active
+branch: issue-510-schema-composition
+state: scaffolded
+project-sha: 
+date: 
 issue-repo: casehubio/platform
 covers: casehubio/platform#510
-Current: casehubio/platform#510 — Schema composition/extension mechanism
-date: 2026-10-05
-note: Phase 1 landed — bdd7f366 on pages main. 5 issues closed.
+design-repo: 
+design-section-hashes: 
+flyway-next-v: none
 
 ## Queue
-- [ ] casehubio/platform#520 — Playbook naming unification — complete Scenario→Playbook migration (epic)
-  - [x] casehubio/casehub-pages#518 — TS front matter parser + 48-file migration
-  - [x] casehubio/casehub-pages#520 — Java backend multi-doc parser support
-  - [x] casehubio/casehub-pages#522 — TS PlaybookParser non-map guard
-  - [x] casehubio/casehub-pages#521 — Migrate 13 backend YAML files
-  - [x] casehubio/casehub-pages#527 — Terminology sweep CaseHub YAML → Playbook YAML
-  - [ ] casehubio/platform#510 — Schema composition/extension mechanism ← active
-  - [ ] casehubio/casehub-pages#525 — 14 Scenario→Playbook class renames + dir renames
-  - [ ] casehubio/casehub-pages#526 — Deprecate /scenario REST → /playbook alias
-  - [ ] casehubio/platform#521 — aml (6) + clinical (1) YAML migration
+- [ ] casehubio/platform#510 — Issue #510 ← active
