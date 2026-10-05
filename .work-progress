@@ -225,3 +225,4 @@ verify=done
 report_verify=done
 upstream_push=done
 elevate_plan=done
+push_and_stack=done
