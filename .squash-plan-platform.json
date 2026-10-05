@@ -1,0 +1,17 @@
+{
+  "verified": true,
+  "groups": [
+    {
+      "message": "fix(#519): rename 'CaseHub YAML' to 'CaseHub Playbook YAML' in platform docs\n\nTwo references updated: yaml-language-guide title and visual diagram\neditor spec open question.\n\nCloses #519\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "commits": ["da7c2d696ffe846385f80c29f2d6c09844423ceb"]
+    },
+    {
+      "message": "refactor(#520): rename Scenario* → StateMachine* in yaml-step-runtime\n\nThese types parse and compile the state machine DSL within playbooks.\n\"Scenario\" was the old top-level concept; \"StateMachine\" precisely\ndescribes what the content actually is — states, transitions, events.\n\nRenames:\n- ScenarioParser → StateMachineParser\n- ScenarioDefinition → StateMachineDefinition\n- ScenarioCompiler → StateMachineCompiler\n- ScenarioValidator → StateMachineValidator\n- CompiledScenario → CompiledStateMachine\n- Package: io.casehub.yaml.step.scenario → statemachine\n\nNote: ScenarioScope stays — it's a runtime orchestration primitive,\nnot part of the old naming. Step* types (StepWalker, etc.) also stay —\n\"Step\" is valid internal playbook vocabulary, not the top-level name.\n\nRefs #520\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+      "commits": [
+        "09f384865c78be5fb4371bc22d57a75a5eee8e44",
+        "21bd7e58e4d14234e9b6d81ec592c36a5c7c832d",
+        "3471079cfcdcccd694e4648cf49ee6f989f68bf3"
+      ]
+    }
+  ]
+}
