@@ -2,39 +2,57 @@
 
 ## Last Session
 
-Completed casehub-pages#514 (Delete remaining Format A types after runtime migration). All 7 Format A types plus 2 supporting types deleted from casehub-pages backend.
+Working on platform#510 (Playbook naming unification) — Phase 1 infrastructure complete.
 
-**What was built (3 commits on pages repo):**
+**What was built:**
 
-1. `1ed4c577` — Delete hierarchical type cluster
-   - Migrated SimulationSpecParsingTest from HierarchicalParser to ScenarioEnvelopeParser (compact YAML format)
-   - Deleted 6 types: HierarchicalParser, HierarchicalScenario, HierarchicalStep, ScenarioCommand, ScenarioSection, ScenarioChapter
+### Platform repo (3 commits on `epic-502-yaml-parity`)
 
-2. `e2ced761` — Migrate dispatchers and executor from ScenarioStep to CompactStep
-   - AriaDispatcher, RestDispatcher, GraphQLDispatcher now take CompactStep (extract params from map)
-   - ScenarioExecutor takes List<CompactStep> instead of Scenario, dispatches by action string
-   - All tests migrated to construct CompactStep directly
-   - Deleted: ScenarioStep sealed interface, Scenario record
+1. `16542d02` — PlaybookFrontMatter types + PlaybookParser
+   - `PlaybookFrontMatter`, `PlaybookDocument`, `PlaybookSchemas` records in yaml-core (zero-dep)
+   - `PlaybookParser` in yaml-step-runtime — multi-doc YAML splitting, front matter extraction
+   - `ScenarioParser.parseYaml()` refactored to delegate to PlaybookParser
+   - Full backward compat for files without `playbook:` header
 
-3. `71f95ee0` — Migrate AriaResolver and ScriptDescriptor from AriaTarget to flat params
-   - AriaResolver: within parameter changed from AriaTarget to Map<String, Object>
-   - ScriptDescriptor: firstStepTargets changed from List<AriaTarget> to List<Map<String, String>>
-   - Deleted: AriaTarget record
+2. `2de1e7e4` — PlaybookSchemaRegistry and capability model
+   - `PlaybookSchemaDescriptor` with capability sets
+   - `PlaybookCapabilities` constants (shared, client-only, server-only)
+   - `PlaybookSchemaRegistry` SPI + `MapPlaybookSchemaRegistry` implementation
+   - Pre-registers `client` and `server` built-in schemas
 
-**Build verification:** 38 tests pass (17 scenario + 21 scenario-runtime). MCP test has pre-existing compilation errors from platform API changes (unrelated to this work).
+3. `19f58cd3` — playbook.schema.json
+   - JSON Schema (Draft 2020-12) for front matter validation
+
+### Pages repo (2 commits on `epic-502-yaml-parity`)
+
+1. `17e9b28e` — PlaybookFrontMatter types in TS yaml-core
+   - `PlaybookFrontMatter`, `PlaybookDocument` interfaces
+   - `parsePlaybookFrontMatter()`, `isBuiltInSchema()`, `isDomainSchema()`
+   - Exported from `@casehubio/yaml-core`
+
+2. `0783d1ac` — PlaybookSchemaRegistry in TS yaml-core
+   - `PlaybookSchemaDescriptor`, `PLAYBOOK_CAPABILITIES`
+   - `createPlaybookSchemaRegistry()`, `domainSchema()`
+
+**Build verification:**
+- Platform: 760 yaml-core tests + 341 yaml-step-runtime tests pass
+- Pages: 30 playbook tests pass
+
+## Phase 2 (not started)
+
+File migration — rename `.yaml` → `.playbook.yaml` across repos, add front matter to existing files. Repos with YAML files: platform (test), casehub-pages (~17 files), aml (6 files), clinical (1 file). YAML is actively being edited by others — coordinate timing.
 
 ## Immediate Next Step
 
-Queue at position 32/35. Next items:
-1. **platform#510** — Playbook naming unification ← active
-2. **casehub-pages#518** — TS front matter parser + scenario migration
-3. **casehub-pages#519** — Annotate spec docs with new type names
+Continue platform#510 Phase 2, or advance to:
+1. **casehub-pages#518** — TS front matter parser + scenario migration
+2. **casehub-pages#519** — Annotate spec docs with new type names
 
 ## Slot Repos
 
 Slot 210:
-- `slots/210/platform` — 4 commits (casehub-pages#508, prior session)
-- `slots/210/pages` — 3 new commits on `epic-502-yaml-parity` (casehub-pages#514)
+- `slots/210/platform` — 7 commits on `epic-502-yaml-parity` (prior + platform#510)
+- `slots/210/pages` — 5 commits on `epic-502-yaml-parity` (prior + platform#510)
 - `slots/210/engine` — no new commits
 - `slots/210/work` — no new commits
 
