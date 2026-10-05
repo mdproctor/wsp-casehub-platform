@@ -1,0 +1,15 @@
+# Work Plan — issue-517-datarealism-e2e-verification
+
+## State
+branch: issue-517-datarealism-e2e-verification
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 517
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#517 — Issue #517 ← active
