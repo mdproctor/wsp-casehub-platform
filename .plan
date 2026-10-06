@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-1215-spring-remaining
-state: active
+state: closing:review
 project-sha: 
 date: 
 issue-repo: casehubio/engine
@@ -11,5 +11,6 @@ design-repo:
 design-section-hashes: 
 flyway-next-v: 
 
+evidence-era: true
 ## Queue
-- [ ] casehubio/engine#1215 — Spring: scope extractor, rest-core extraction, integration-test mocks <- active
+- [x] casehubio/engine#1215 — Spring: scope extractor, rest-core extraction, integration-test mocks
