@@ -1,0 +1,15 @@
+# Work Plan — issue-1214-sse-emitter-bridge
+
+## State
+branch: issue-1214-sse-emitter-bridge
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/engine
+covers: 1214
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/engine#1214 — Issue #1214 ← active
