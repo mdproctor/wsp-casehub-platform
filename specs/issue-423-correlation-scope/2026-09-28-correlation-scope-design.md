@@ -95,9 +95,9 @@ public static <K, V> CorrelationScope<K, V> forScope(
 
 The factory creates a named channel, constructs CorrelationScope with the scope's SpeedMultiplier, and registers the CorrelationScope in the scope's primitive map. When `ScenarioScope.close()` cascades, it calls `CorrelationScope.releaseForClose()` automatically.
 
-**SpeedMultiplier on ScenarioScope interface:** Add `SpeedMultiplier speedMultiplier()` to the `ScenarioScope` interface. SpeedMultiplier is a fundamental property of a scenario's temporal model — every scope has one, and any consuming-layer utility that deals with time needs it. Keeping it hidden behind a concrete cast forces every time-aware utility to cast. DefaultScenarioScope already stores it as a field — the interface method just exposes it.
+**SpeedMultiplier on ScenarioScope interface:** Add `SpeedMultiplier speedMultiplier()` to the `ExecutionScope` interface. SpeedMultiplier is a fundamental property of a scenario's temporal model — every scope has one, and any consuming-layer utility that deals with time needs it. Keeping it hidden behind a concrete cast forces every time-aware utility to cast. DefaultScenarioScope already stores it as a field — the interface method just exposes it.
 
-**Primitive registration:** DefaultScenarioScope stores primitives in a `ConcurrentHashMap<String, Object>`. The `forScope()` factory registers via a package-private `registerPrimitive()` method. The cast to `DefaultScenarioScope` is acceptable here — `registerPrimitive` is an internal mechanism, not a public contract. If a non-DefaultScenarioScope is passed, `forScope()` throws `IllegalArgumentException` with a message directing to the OrcChannel constructor.
+**Primitive registration:** DefaultScenarioScope stores primitives in a `ConcurrentHashMap<String, Object>`. The `forScope()` factory registers via a package-private `registerPrimitive()` method. The cast to `DefaultExecutionScope` is acceptable here — `registerPrimitive` is an internal mechanism, not a public contract. If a non-DefaultScenarioScope is passed, `forScope()` throws `IllegalArgumentException` with a message directing to the OrcChannel constructor.
 
 **Close ordering:** When ScenarioScope.close() iterates primitives, ConcurrentHashMap iteration order is undefined — the internal channel might be released before CorrelationScope or vice versa. The listener thread handles this gracefully: if the channel is closed first, `receive()` returns null or throws ChannelClosedException, and the listener exits. If CorrelationScope is closed first, pending futures are cancelled and the listener is interrupted before the channel is released. Both orderings produce correct behavior.
 
@@ -407,7 +407,7 @@ public static <K, V> CorrelationScope<K, V> forScope(
 }
 ```
 
-**Trade-off:** The cast to `DefaultScenarioScope` couples `forScope()` to the concrete implementation. This is acceptable — `forScope()` is a convenience factory, not a contract. Users who implement custom ScenarioScope implementations use the OrcChannel constructor directly. If a non-DefaultScenarioScope is passed, `forScope()` throws `IllegalArgumentException` with a message directing to the OrcChannel constructor.
+**Trade-off:** The cast to `DefaultExecutionScope` couples `forScope()` to the concrete implementation. This is acceptable — `forScope()` is a convenience factory, not a contract. Users who implement custom ScenarioScope implementations use the OrcChannel constructor directly. If a non-DefaultScenarioScope is passed, `forScope()` throws `IllegalArgumentException` with a message directing to the OrcChannel constructor.
 
 ---
 

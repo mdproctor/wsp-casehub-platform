@@ -175,18 +175,18 @@ Refs #491"
 
 ## Batch 2: YAML scenario format — parser and validator
 
-After this batch: YAML scenario definitions can be parsed into a validated `ScenarioDefinition` model. No execution yet — just parsing and validation.
+After this batch: YAML scenario definitions can be parsed into a validated `StateMachineDefinition` model. No execution yet — just parsing and validation.
 
 ### Task 2: Define ScenarioDefinition model types
 
 **Files:**
 - Create: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/scenario/ScenarioDefinition.java`
-- Create: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/scenario/StateDefinition.java`
-- Create: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/scenario/EventTransition.java`
+- Create: `../../../../yaml-step-runtime/src/main/java/io/casehub/yaml/step/statemachine/StateDefinition.java`
+- Create: `../../../../yaml-step-runtime/src/main/java/io/casehub/yaml/step/statemachine/EventTransition.java`
 - Test: `yaml-step-runtime/src/test/java/io/casehub/yaml/step/scenario/ScenarioDefinitionTest.java`
 
 **Interfaces:**
-- Produces: `ScenarioDefinition` (record: name, initialState, states Map<String, StateDefinition>), `StateDefinition` (record: name, steps List<Map<String,Object>>, next String, onFailure String, deadline String, events Map<String, EventTransition>, isTerminal boolean), `EventTransition` (sealed: Simple(target), Guarded(target, when), MatchBased(List<MatchCase>))
+- Produces: `StateMachineDefinition` (record: name, initialState, states Map<String, StateDefinition>), `StateDefinition` (record: name, steps List<Map<String,Object>>, next String, onFailure String, deadline String, events Map<String, EventTransition>, isTerminal boolean), `EventTransition` (sealed: Simple (target), Guarded (target, when), MatchBased (List<MatchCase>))
 
 - [ ] **Step 1: Write test for ScenarioDefinition construction and validation**
 
@@ -213,7 +213,7 @@ void validLinearScenario_constructsSuccessfully() {
 
 - [ ] **Step 2: Implement ScenarioDefinition, StateDefinition, EventTransition**
 
-Records with validation in compact constructors. `ScenarioDefinition` derives `initialState` from the first entry in the ordered map.
+Records with validation in compact constructors. `StateMachineDefinition` derives `initialState` from the first entry in the ordered map.
 
 - [ ] **Step 3: Run test to verify**
 
@@ -239,7 +239,7 @@ Refs #491"
 - Test: `yaml-step-runtime/src/test/java/io/casehub/yaml/step/scenario/ScenarioParserTest.java`
 
 **Interfaces:**
-- Consumes: `ScenarioDefinition`, `StateDefinition`, `EventTransition` from Task 2
+- Consumes: `StateMachineDefinition`, `StateDefinition`, `EventTransition` from Task 2
 - Produces: `ScenarioParser.parse(Map<String, Object> yamlRoot) → ScenarioDefinition`
 
 - [ ] **Step 1: Write test for parsing linear scenario YAML**
@@ -395,7 +395,7 @@ Refs #491"
 - Test: `yaml-step-runtime/src/test/java/io/casehub/yaml/step/scenario/ScenarioValidatorTest.java`
 
 **Interfaces:**
-- Consumes: `ScenarioDefinition` from Task 2
+- Consumes: `StateMachineDefinition` from Task 2
 - Produces: `ScenarioValidator.validate(ScenarioDefinition) → List<String>` (empty = valid, otherwise list of error messages)
 
 - [ ] **Step 1: Write failing tests for each validation rule**
@@ -467,7 +467,7 @@ After this batch: a parsed and validated YAML scenario can be compiled and execu
 - Test: `yaml-step-runtime/src/test/java/io/casehub/yaml/step/scenario/ScenarioCompilerTest.java`
 
 **Interfaces:**
-- Consumes: `ScenarioDefinition` from Task 2, `ScenarioScope` (yaml-core), `StructuralStepEvaluator` (yaml-step-runtime), `StepWalker` (yaml-step-runtime), `StepRunner` (yaml-step-runtime), `VariableResolver` (yaml-core), `PluginRegistry` (yaml-plugin-api), `DeadlineContext` (yaml-step-runtime)
+- Consumes: `StateMachineDefinition` from Task 2, `ExecutionScope` (yaml-core), `StructuralStepEvaluator` (yaml-step-runtime), `StepWalker` (yaml-step-runtime), `StepRunner` (yaml-step-runtime), `VariableResolver` (yaml-core), `PluginRegistry` (yaml-plugin-api), `DeadlineContext` (yaml-step-runtime)
 - Produces: `ScenarioCompiler.compile(ScenarioDefinition, ScenarioScope, PluginRegistry, VariableResolver, StepRunner) → CompiledScenario`, `CompiledScenario.execute() → Result`
 
 - [ ] **Step 1: Write test for linear scenario execution**
@@ -564,7 +564,7 @@ The `execute()` method:
    c. On success + has `next:` → `transition(current, next)`
    d. On failure + has `on-failure:` → `transition(current, onFailure)`
 5. For event-driven states: build EventRouter mappings
-6. Return `CompiledScenario`
+6. Return `CompiledStateMachine`
 
 - [ ] **Step 7: Run all compiler tests**
 
@@ -593,10 +593,10 @@ After this batch: end-to-end tests cover all use cases from the spec. Full Maven
 ### Task 6: Integration tests for all spec use cases
 
 **Files:**
-- Create: `yaml-step-runtime/src/test/java/io/casehub/yaml/step/scenario/ScenarioIntegrationTest.java`
+- Create: `../../../../yaml-step-runtime/src/test/java/io/casehub/yaml/step/statemachine/StateMachineIntegrationTest.java`
 
 **Interfaces:**
-- Consumes: `ScenarioParser`, `ScenarioValidator`, `ScenarioCompiler`, `CompiledScenario` from Tasks 2-5
+- Consumes: `StateMachineParser`, `StateMachineValidator`, `StateMachineCompiler`, `CompiledStateMachine` from Tasks 2-5
 
 - [ ] **Step 1: Write integration test — linear incident lifecycle**
 

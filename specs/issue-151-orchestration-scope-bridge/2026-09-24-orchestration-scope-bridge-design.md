@@ -12,7 +12,7 @@ yaml-core orchestration (ScenarioScope, primitives) and desiredstate's reconcili
 
 ### OrchestrationScope interface (desiredstate-api)
 
-A new interface in `io.casehub.desiredstate.api` that mirrors `ScenarioScope` from yaml-core. No dependency on yaml-core — pure API contract.
+A new interface in `io.casehub.desiredstate.api` that mirrors `ExecutionScope` from yaml-core. No dependency on yaml-core — pure API contract.
 
 ```java
 package io.casehub.desiredstate.api;
@@ -88,7 +88,7 @@ The scope is the node's child scope — provisioners call `scope().semaphore("ca
 
 ### Bridge adapter (desiredstate-runtime)
 
-`ScenarioScopeAdapter` in desiredstate-runtime wraps `ScenarioScope` as `OrchestrationScope`:
+`ScenarioScopeAdapter` in desiredstate-runtime wraps `ExecutionScope` as `OrchestrationScope`:
 
 ```java
 package io.casehub.desiredstate.runtime;

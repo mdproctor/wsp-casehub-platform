@@ -121,7 +121,7 @@ Default method — no breaking change to existing implementations.
 
 - [ ] **Step 5: Add speedMultiplier() and registerPrimitive() to DefaultScenarioScope**
 
-Add two package-private methods to `DefaultScenarioScope`:
+Add two package-private methods to `DefaultExecutionScope`:
 
 ```java
 @Override
@@ -598,7 +598,7 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
 - Modify: `yaml-core/src/test/java/io/casehub/yaml/core/orchestration/CorrelationScopeTest.java` (add edge case tests)
 
 **Interfaces:**
-- Consumes: `CorrelationScope<K, V>` (from Task 2), `DefaultScenarioScope` (registerPrimitive from Task 1)
+- Consumes: `CorrelationScope<K, V>` (from Task 2), `DefaultExecutionScope` (registerPrimitive from Task 1)
 - Produces: validated edge-case coverage — no new public API
 
 - [ ] **Step 1: Write error propagation + extractor safety tests**
