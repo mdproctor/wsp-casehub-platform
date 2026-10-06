@@ -15,29 +15,19 @@ Three SSE broadcasters in the engine `rest/` module use SmallRye Mutiny `Broadca
 Change `@PlatformStream` methods in `EngineCaseApi` and `EnginePlanApi` from `Multi<T>` to `java.util.concurrent.Flow.Publisher<T>`:
 
 - `EngineCaseApi.caseStream(UUID)` → `Flow.Publisher<CaseStreamEventView>`
-- `EngineCaseApi.caseLifecycle(UUID)` → `Flow.Publisher<CaseLifecycleEventView>`
-- `EngineCaseApi.caseContextChange(UUID)` → `Flow.Publisher<CaseContextChangeEventView>`
 - `EnginePlanApi.executionStateStream(UUID)` → `Flow.Publisher<JsonNode>`
 
 Remove `io.smallrye.reactive:mutiny` dependency from `api/pom.xml`.
 
-#### Empty Publisher for Stub Methods
+#### Divergence from parent epic #1206
 
-`DefaultEngineCaseApi.caseLifecycle()` and `caseContextChange()` currently return `Multi.createFrom().empty()`. Since the Quarkus `rest/` module retains its Mutiny dependency, these stubs continue to work — `Multi<T>` IS `Flow.Publisher<T>`.
+The parent epic spec (#1206, §1095) states: "`@PlatformStream` | Excluded from SPI — stays on concrete class (SSE is framework-specific)." The concern was that `Multi<T>` couples the SPI to Quarkus. This spec supersedes that instruction: with `Flow.Publisher<T>` (a JDK standard type in `java.util.concurrent`), the framework-specificity concern is eliminated. Keeping `@PlatformStream` on the SPI gives both runtimes a single contract for streaming, which is architecturally superior to framework-specific concrete-class streaming.
 
-For Spring implementations, introduce a utility method in `runtime-spring/` (reusable across future SPI migrations):
+#### Stub removal — caseLifecycle and caseContextChange
 
-```java
-static <T> Flow.Publisher<T> emptyPublisher() {
-    return subscriber -> {
-        subscriber.onSubscribe(new Flow.Subscription() {
-            @Override public void request(long n) {}
-            @Override public void cancel() {}
-        });
-        subscriber.onComplete();
-    };
-}
-```
+`EngineCaseApi.caseLifecycle()` and `caseContextChange()` are stubs returning `Multi.createFrom().empty()`. The parent epic spec (#1206, §1095 line 174) explicitly states: "Stub implementations should be removed rather than migrated." These stubs generate dead SSE endpoints — the connection opens and immediately completes without sending events.
+
+Remove both methods from the SPI interface (`EngineCaseApi`) and the implementation (`DefaultEngineCaseApi`). The generated REST and GraphQL controllers will stop producing the dead endpoints. Re-add when real implementations exist.
 
 ### 2. Quarkus Adaptation — rest/ module
 
@@ -132,7 +122,7 @@ The scanner (`McpDomainJandexScanner`) requires no changes — it detects stream
 
 ### 5. @PlatformStream Annotation
 
-No changes needed — `@PlatformStream` already marks streaming methods. The scanner detects streams via annotation presence and is type-agnostic. The only change is in `SpringDomainRestControllerWriter` (§4) — the generated subscriber bridge code.
+No changes needed — `@PlatformStream` already marks streaming methods. The scanner detects streams via annotation presence and is type-agnostic. The only changes are in the generators (§4) — the generated subscriber bridge code.
 
 ## Data Flow
 
@@ -160,13 +150,13 @@ Spring Event → @EventListener → iterate ActiveStreams, offer() to matching c
 ## Scope
 
 **In scope:**
-- SPI contract change (Multi → Flow.Publisher)
+- SPI contract change (Multi → Flow.Publisher) for `caseStream` and `executionStateStream`
+- Remove stub methods `caseLifecycle` and `caseContextChange` from SPI and implementation (per #1206 §1095)
 - 2 Spring broadcaster components (CaseStream, ExecutionState)
 - Generator update for Flow.Publisher bridge (SpringDomainRestControllerWriter)
 - Generator fix: subscription lifecycle callbacks (both RestControllerWriter and SpringDomainRestControllerWriter)
 - Generator fix: `SseEmitter(0L)` infinite timeout (SpringDomainRestControllerWriter)
 - Quarkus SPI implementation return type widening (broadcasters unchanged)
-- Empty publisher utility for Spring stub methods
 - Unit tests for Spring broadcasters
 
 **Out of scope:**
