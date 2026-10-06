@@ -1,68 +1,51 @@
-# HANDOFF — casehub-platform
+# HANDOFF — Slot 198
 
 ## Status
 
-**Branch:** main (all work landed)
-**Epic:** platform#520 — Playbook naming unification (platform-side complete)
-**State:** platform work done; remaining work is pages-side + consumer repos
+**Branch:** issue-1214-sse-emitter-bridge (both platform and engine repos)
+**Active issue:** engine#1214 — SSE broadcasters SseEmitter bridge
+**State:** 3 of 6 tasks complete (Batch 1 + Batch 2 done)
 
-## This Session (2026-10-05)
+## Queue
 
-Completed all platform-side naming unification for epic #520:
+1. casehubio/engine#1214 — SSE broadcasters SseEmitter bridge (M/Med) ← active
 
-### Landed commits — platform main
+## Resume Point
 
-1. `da7ee461` — fix(#519): rename 'CaseHub YAML' to 'CaseHub Playbook YAML' in platform docs
-2. `2069de3b` — refactor(#520): rename Scenario* → StateMachine* in yaml-step-runtime
-3. `0a8de66a` — refactor(#520): rename ScenarioScope → ExecutionScope
+Batches 1–2 complete. Batches 3–4 remain:
 
-### Issues closed
+### Batch 3: Spring broadcasters (engine runtime-spring/)
+- **Task 4:** `CaseStreamSpringBroadcaster` — @EventListener + SubmissionPublisher registry
+- **Task 5:** `ExecutionStateSpringBroadcaster` — same pattern, plus composition logic (mirrors `ExecutionStateBroadcaster` in rest/)
 
-- **#518** — Closed as invalid (Step* types are valid internal playbook vocabulary)
-- **#519** — Done (2 files updated)
+### Batch 4: Regenerate and verify
+- **Task 6:** Rebuild platform install, regenerate engine Spring controllers, full compile + test
 
-### Design decisions
+### What's done
 
-- **Three naming tiers:** Playbook (top-level construct), Step* (internal execution), StateMachine* (state machine DSL)
-- **ScenarioScope → ExecutionScope** — the scope manages execution lifecycle, not "scenarios"
-- **Step* names stay** — StepWalker, StructuralStepEvaluator are internal components, not alternative top-level naming
-- **ScenarioScope (as concept) stays** only in: `scenario:` YAML key (playbook name field), test method names using "scenario" as English
+**Platform repo** (branch: issue-1214-sse-emitter-bridge):
+- `graphql-spring-generator/SpringDomainRestControllerWriter.buildStreamMethod()` — replaced Mutiny `.subscribe().with()` with `Flow.Subscriber` bridge, `SseEmitter(0L)`, `onTimeout`/`onCompletion` callbacks
+- `rest-spring-generator/RestControllerWriter` — added `onTimeout`/`onCompletion` lifecycle callbacks
+- `graphql-generator/GraphQLResolverProcessor` — wraps `Flow.Publisher<T>` in `Multi.createFrom().publisher()` for generated Quarkus resources; fixed nested class type handling (`Flow$Publisher` → `Flow.Publisher`) in `typeToJava`/`addTypeImport`
 
-### Issues created
+**Engine repo** (branch: issue-1214-sse-emitter-bridge):
+- `api/EngineCaseApi` — `caseStream()` returns `Flow.Publisher<CaseStreamEventView>`. Deleted `caseLifecycle()` and `caseContextChange()` stubs
+- `api/EnginePlanApi` — `executionStateStream()` returns `Flow.Publisher<JsonNode>`
+- `api/pom.xml` — removed `io.smallrye.reactive:mutiny` dependency
+- `rest/DefaultEngineCaseApi` — return type widened, stubs deleted
+- `rest/DefaultEnginePlanApi` — return type widened
 
-| # | Repo | Title | Scale |
-|---|------|-------|-------|
-| pages#525 | casehub-pages | Rename 14 Scenario* classes → Playbook* + directory renames | L |
-| pages#526 | casehub-pages | Deprecate /scenario REST endpoints — add /playbook alias | M |
-| pages#527 | casehub-pages | Terminology sweep: ~27 files CaseHub YAML → Playbook YAML | S |
-| platform#521 | platform | Migrate scenario YAML — aml (6) + clinical (1) | S |
-| platform#522 | platform | Epic branch cleanup: revert StepWalker→Walker + align renames | M |
+### Known issue
 
-## Remaining Work (tracked in issues)
+Pre-existing CDI failure: `EngineEvolutionApi` unsatisfied dependency blocks `@QuarkusTest` in rest module. Not caused by our changes — same failure on main. Investigate separately.
 
-| # | Repo | Title | Scale | Blocked by |
-|---|------|-------|-------|------------|
-| pages#520 | casehub-pages | Parser multi-doc support | M | — |
-| pages#521 | casehub-pages | Migrate 13 backend YAML files | S | pages#520 |
-| pages#525 | casehub-pages | 14 class renames + directory renames | L | pages#520 |
-| pages#526 | casehub-pages | REST endpoint deprecation | M | pages#525 |
-| pages#527 | casehub-pages | Terminology sweep (~27 files) | S | — |
-| platform#521 | platform | aml + clinical YAML migration | S | pages#520, pages#521 |
-| platform#522 | platform | Epic branch cleanup (revert Walker, align StateMachine/ExecutionScope) | M | — |
+### Key files for remaining work
 
-## Epic Branch State
+- Plan: `wsp-casehub-platform/plans/2026-10-06-sse-emitter-bridge.md` — Tasks 4-6
+- Spec: `wsp-casehub-platform/specs/issue-1214-sse-emitter-bridge/2026-10-06-sse-emitter-bridge-design.md`
+- Quarkus broadcasters to mirror: `engine/rest/src/main/java/io/casehub/engine/rest/CaseStreamBroadcaster.java`, `ExecutionStateBroadcaster.java`
+- Spring target: `engine/runtime-spring/src/main/java/io/casehub/engine/runtime/spring/broadcast/` (create)
 
-`epic-502-yaml-parity` is paused with conflicting renames that need resolution (platform#522):
-- Has StepWalker→Walker (should revert)
-- Has Scenario*→Playbook* (should become StateMachine*)
-- Has ScenarioScope references (should become ExecutionScope)
+## Prior Work (landed)
 
-These will surface naturally on next rebase onto main.
-
-## Slot Repos
-
-Slot 210:
-- `slots/210/platform` — main (all work landed)
-- `slots/210/pages` — epic-502-yaml-parity (paused)
-- `slots/210/engine` — no changes
-- `slots/210/work` — no changes
+Branch `issue-516-spring-remaining` closed — platform#516 was already on main.
