@@ -1,48 +1,48 @@
-# HANDOFF — casehub-platform
+# HANDOFF — Slot 198
 
 ## Status
 
-**Platform:** main — playbook infrastructure landed (#510 partial: front matter, schema registry, schema JSON)
-**Pages:** main — epic-502-yaml-parity squash-merged as bdd7f366, branch stamped closed
-**Epic #520 (Playbook naming):** Phase 1 complete (5 issues closed); Phase 2 active (#510)
-**Epic #502 (YAML parity):** Batches 1–4 done; Batch 5 (pages#502 YAML ops sub-epic) open
+**Branch:** issue-1214-sse-emitter-bridge (both platform and engine repos)
+**Active issue:** engine#1214 — SSE broadcasters SseEmitter bridge
+**State:** All 6 tasks complete — ready for work-end
 
-## This Session
+## Queue
 
-Squash-merged `epic-502-yaml-parity` (43 commits) onto pages main as bdd7f366. Resolved 13 conflicts against 15 commits that landed on main since the branch diverged (DeliveryHandler SPI #516, ESLint strict-type-checked #515). Pushed to both mdproctor and casehubio remotes. Closed pages#518, #520, #521, #522, #527.
+1. casehubio/engine#1214 — SSE broadcasters SseEmitter bridge (M/Med) ← all tasks done
 
-Phase 1 of the .plan is complete. Phase 2 (#510 schema composition) is now active.
+## Summary
 
-## Key Decision
+All 4 batches complete:
 
-Jackson `readTree()` silently drops multi-doc YAML — garden entry GE-20261005-fadf75 captures this. `readValues()` with explicit parser is the fix.
+### What's done
 
-## Work Queue (priority order)
+**Platform repo** (branch: issue-1214-sse-emitter-bridge):
+- `graphql-spring-generator/SpringDomainRestControllerWriter.buildStreamMethod()` — replaced Mutiny `.subscribe().with()` with `Flow.Subscriber` bridge, `SseEmitter(0L)`, `onTimeout`/`onCompletion` callbacks
+- `rest-spring-generator/RestControllerWriter` — added `onTimeout`/`onCompletion` lifecycle callbacks
+- `graphql-generator/GraphQLResolverProcessor` — wraps `Flow.Publisher<T>` in `Multi.createFrom().publisher()` for generated Quarkus resources; fixed nested class type handling (`Flow$Publisher` → `Flow.Publisher`) in `typeToJava`/`addTypeImport`
 
-### Phase 1 — Land pages branch ✓
+**Engine repo** (branch: issue-1214-sse-emitter-bridge):
+- `api/EngineCaseApi` — `caseStream()` returns `Flow.Publisher<CaseStreamEventView>`. Deleted `caseLifecycle()` and `caseContextChange()` stubs
+- `api/EnginePlanApi` — `executionStateStream()` returns `Flow.Publisher<JsonNode>`
+- `api/pom.xml` — removed `io.smallrye.reactive:mutiny` dependency
+- `rest/DefaultEngineCaseApi` — return type widened, stubs deleted
+- `rest/DefaultEnginePlanApi` — return type widened
+- `common-core/ExecutionStateSnapshot` — moved from `rest/dto/` to `common-core` (`io.casehub.engine.plan.execution`) so both rest (Quarkus) and runtime-spring (Spring) can access it. Test moved alongside.
+- `runtime-spring/broadcast/CaseStreamSpringBroadcaster` — @EventListener + SubmissionPublisher registry, Flow.Publisher\<CaseStreamEventView\>, caseId filtering, lazy dead-subscriber cleanup
+- `runtime-spring/broadcast/ExecutionStateSpringBroadcaster` — @EventListener + SubmissionPublisher registry, composes ExecutionStateSnapshot → JsonNode, Flow.Publisher\<JsonNode\>, constructor-injected dependencies
 
-All 5 issues closed. Landed as bdd7f366 on pages main.
+### Verification
 
-### Phase 2 — Remaining #510 platform work ← active
+- Platform: compiles and installs (skipping agent-spring — pre-existing ManifestResult constructor mismatch)
+- Engine common-core: compiles, 38 ExecutionStateSnapshotTest pass
+- Engine rest: compiles including test-compile (QuarkusTest can't run due to pre-existing CDI failure)
+- Engine runtime-spring: broadcaster code compiles, 10 unit tests pass (5 per broadcaster)
 
-| # | Repo | Title | Scale | Status |
-|---|------|-------|-------|--------|
-| platform#510 | platform | Schema composition/extension mechanism | M | Open — front matter + registry landed, composition TBD |
+### Known issues (pre-existing, not caused by this work)
 
-### Phase 3 — Pages renames + deprecation
+- CDI failure: `EngineEvolutionApi` unsatisfied dependency blocks `@QuarkusTest` in rest module
+- Platform agent-spring: `ManifestResult` constructor mismatch (pools field added but generated code not regenerated)
 
-| # | Repo | Title | Scale | Status |
-|---|------|-------|-------|--------|
-| pages#525 | casehub-pages | 14 Scenario→Playbook class renames + dir renames | L | Open |
-| pages#526 | casehub-pages | Deprecate /scenario REST → /playbook alias | M | Open |
+## Prior Work (landed)
 
-### Phase 4 — Consumer repo migration
-
-| # | Repo | Title | Scale | Blocked by |
-|---|------|-------|-------|------------|
-| platform#521 | platform | aml (6) + clinical (1) YAML migration | S | Unblocked |
-
-## References
-
-- Blog: `wsp-casehub-platform/blog/2026-10-05-mdp01-landing-the-epic.md`
-- Garden: `~/.hortora/garden/jvm/GE-20261005-fadf75.md`
+Branch `issue-516-spring-remaining` closed — platform#516 was already on main.
