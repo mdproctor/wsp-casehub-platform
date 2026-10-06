@@ -18,8 +18,8 @@ flyway-next-v:
     - [x] Task 2: Fix RestControllerWriter subscription lifecycle
   - [x] Batch 2: SPI contract
     - [x] Task 3: Change SPI stream return types to Flow.Publisher
-  - [ ] Batch 3: Spring broadcasters
-    - [ ] Task 4: CaseStreamSpringBroadcaster
-    - [ ] Task 5: ExecutionStateSpringBroadcaster
-  - [ ] Batch 4: Verify
-    - [ ] Task 6: Regenerate and verify compilation
+  - [x] Batch 3: Spring broadcasters
+    - [x] Task 4: CaseStreamSpringBroadcaster
+    - [x] Task 5: ExecutionStateSpringBroadcaster
+  - [x] Batch 4: Verify
+    - [x] Task 6: Regenerate and verify compilation

@@ -4,22 +4,15 @@
 
 **Branch:** issue-1214-sse-emitter-bridge (both platform and engine repos)
 **Active issue:** engine#1214 — SSE broadcasters SseEmitter bridge
-**State:** 3 of 6 tasks complete (Batch 1 + Batch 2 done)
+**State:** All 6 tasks complete — ready for work-end
 
 ## Queue
 
-1. casehubio/engine#1214 — SSE broadcasters SseEmitter bridge (M/Med) ← active
+1. casehubio/engine#1214 — SSE broadcasters SseEmitter bridge (M/Med) ← all tasks done
 
-## Resume Point
+## Summary
 
-Batches 1–2 complete. Batches 3–4 remain:
-
-### Batch 3: Spring broadcasters (engine runtime-spring/)
-- **Task 4:** `CaseStreamSpringBroadcaster` — @EventListener + SubmissionPublisher registry
-- **Task 5:** `ExecutionStateSpringBroadcaster` — same pattern, plus composition logic (mirrors `ExecutionStateBroadcaster` in rest/)
-
-### Batch 4: Regenerate and verify
-- **Task 6:** Rebuild platform install, regenerate engine Spring controllers, full compile + test
+All 4 batches complete:
 
 ### What's done
 
@@ -34,17 +27,21 @@ Batches 1–2 complete. Batches 3–4 remain:
 - `api/pom.xml` — removed `io.smallrye.reactive:mutiny` dependency
 - `rest/DefaultEngineCaseApi` — return type widened, stubs deleted
 - `rest/DefaultEnginePlanApi` — return type widened
+- `common-core/ExecutionStateSnapshot` — moved from `rest/dto/` to `common-core` (`io.casehub.engine.plan.execution`) so both rest (Quarkus) and runtime-spring (Spring) can access it. Test moved alongside.
+- `runtime-spring/broadcast/CaseStreamSpringBroadcaster` — @EventListener + SubmissionPublisher registry, Flow.Publisher\<CaseStreamEventView\>, caseId filtering, lazy dead-subscriber cleanup
+- `runtime-spring/broadcast/ExecutionStateSpringBroadcaster` — @EventListener + SubmissionPublisher registry, composes ExecutionStateSnapshot → JsonNode, Flow.Publisher\<JsonNode\>, constructor-injected dependencies
 
-### Known issue
+### Verification
 
-Pre-existing CDI failure: `EngineEvolutionApi` unsatisfied dependency blocks `@QuarkusTest` in rest module. Not caused by our changes — same failure on main. Investigate separately.
+- Platform: compiles and installs (skipping agent-spring — pre-existing ManifestResult constructor mismatch)
+- Engine common-core: compiles, 38 ExecutionStateSnapshotTest pass
+- Engine rest: compiles including test-compile (QuarkusTest can't run due to pre-existing CDI failure)
+- Engine runtime-spring: broadcaster code compiles, 10 unit tests pass (5 per broadcaster)
 
-### Key files for remaining work
+### Known issues (pre-existing, not caused by this work)
 
-- Plan: `wsp-casehub-platform/plans/2026-10-06-sse-emitter-bridge.md` — Tasks 4-6
-- Spec: `wsp-casehub-platform/specs/issue-1214-sse-emitter-bridge/2026-10-06-sse-emitter-bridge-design.md`
-- Quarkus broadcasters to mirror: `engine/rest/src/main/java/io/casehub/engine/rest/CaseStreamBroadcaster.java`, `ExecutionStateBroadcaster.java`
-- Spring target: `engine/runtime-spring/src/main/java/io/casehub/engine/runtime/spring/broadcast/` (create)
+- CDI failure: `EngineEvolutionApi` unsatisfied dependency blocks `@QuarkusTest` in rest module
+- Platform agent-spring: `ManifestResult` constructor mismatch (pools field added but generated code not regenerated)
 
 ## Prior Work (landed)
 
