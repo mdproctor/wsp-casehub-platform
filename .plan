@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-1214-sse-emitter-bridge
-state: active
+state: closing:review
 project-sha: 
 date: 
 issue-repo: casehubio/engine
@@ -11,15 +11,6 @@ design-repo:
 design-section-hashes: 
 flyway-next-v: 
 
+evidence-era: true
 ## Queue
-- [ ] casehubio/engine#1214 — Issue #1214 ← active
-  - [x] Batch 1: Generator fixes
-    - [x] Task 1: Fix SpringDomainRestControllerWriter stream bridge
-    - [x] Task 2: Fix RestControllerWriter subscription lifecycle
-  - [x] Batch 2: SPI contract
-    - [x] Task 3: Change SPI stream return types to Flow.Publisher
-  - [x] Batch 3: Spring broadcasters
-    - [x] Task 4: CaseStreamSpringBroadcaster
-    - [x] Task 5: ExecutionStateSpringBroadcaster
-  - [x] Batch 4: Verify
-    - [x] Task 6: Regenerate and verify compilation
+- [x] casehubio/engine#1214 — Issue #1214
