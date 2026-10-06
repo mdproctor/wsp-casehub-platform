@@ -95,4 +95,5 @@ close_issues=done
 report_close_issues=done
 verify=done
 report_verify=done
-upstream_push_mechanical_attempt=1
+upstream_push_mechanical_attempt=2
+squash=done
