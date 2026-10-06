@@ -41,18 +41,19 @@ static <T> Flow.Publisher<T> emptyPublisher() {
 
 ### 2. Quarkus Adaptation — rest/ module
 
-Update existing broadcasters' `stream()` return type from `Multi<T>` to `Flow.Publisher<T>`. `Multi<T>` extends `Flow.Publisher<T>` directly (verified: Mutiny 3.x type hierarchy), so the return value widens automatically — no conversion needed:
+Broadcaster `stream()` methods remain `Multi<T>` — they are internal to the `rest/` module and their callers depend on Mutiny operators (`filter()`, `map()`). Only the SPI implementation methods change their declared return types.
 
-```java
-public Flow.Publisher<CaseStreamEventView> stream(UUID caseId) {
-    return processor.toHotStream()
-        .filter(e -> caseId.equals(e.caseId()));
-}
-```
+`Multi<T>` extends `Flow.Publisher<T>` directly (verified: Mutiny 3.x type hierarchy), so internal `Multi<T>` return values widen automatically at the SPI boundary — no conversion needed.
 
-Mutiny operators (`filter()`, `map()`) remain available internally since the implementation works with `Multi`; only the return type widens to the JDK interface at the SPI boundary.
+| Layer | Return type | Changes? |
+|-------|-------------|----------|
+| `CaseStreamBroadcaster.stream()` (internal, `rest/`) | `Multi<CaseStreamEventView>` | **unchanged** |
+| `ExecutionStateBroadcaster.stream()` (internal, `rest/`) | `Multi<ExecutionStateSnapshot>` | **unchanged** |
+| `PlanService.executionStateStream()` (internal, `rest/`) | `Multi<JsonNode>` | **unchanged** — `.map()` requires `Multi` |
+| `DefaultEngineCaseApi.caseStream()` (SPI impl, `rest/`) | `Flow.Publisher<CaseStreamEventView>` | declared return type widens; returns `Multi` from broadcaster |
+| `DefaultEnginePlanApi.executionStateStream()` (SPI impl, `rest/`) | `Flow.Publisher<JsonNode>` | declared return type widens; returns `Multi` from PlanService |
 
-Update `DefaultEngineCaseApi` and `PlanService` return types to match. `PlanService.executionStateStream()` continues to use `Multi.map()` for the `ExecutionStateSnapshot` → `JsonNode` conversion — the resulting `Multi<JsonNode>` satisfies `Flow.Publisher<JsonNode>` directly.
+`PlanService.executionStateStream()` continues to use `Multi.map()` for the `ExecutionStateSnapshot` → `JsonNode` conversion — the resulting `Multi<JsonNode>` satisfies the widened `Flow.Publisher<JsonNode>` return type on `DefaultEnginePlanApi`.
 
 ### 3. Spring Broadcasters — runtime-spring/ module
 
@@ -85,15 +86,25 @@ This broadcaster produces `Flow.Publisher<JsonNode>` directly — the `objectMap
 
 Composes `ExecutionStateSnapshot` from multiple sources (`CasePlanModelSnapshotProvider`, `ExecutionSnapshotStore`, `CaseDefinitionRegistry`, `CaseInstanceRepository`). Constructor-injected dependencies, same composition logic as the Quarkus version. Also exposes `composeInitial(UUID, String)` for the initial snapshot on connection.
 
-### 4. Generator Update — platform graphql-spring-generator/
+### 4. Generator Updates — both Spring generators
 
-`SpringDomainRestControllerWriter.buildStreamMethod()` currently generates Mutiny `.subscribe().with()` calls. Change to generate `Flow.Subscriber<T>` bridge on a virtual thread, matching the pattern in `rest-spring-generator/RestControllerWriter.buildMethodBody()`.
+Both `SpringDomainRestControllerWriter` (graphql-spring-generator) and `RestControllerWriter` (rest-spring-generator) generate `Flow.Subscriber` bridge code for SSE streams. Both need the same subscription lifecycle fix.
 
-Two changes to the existing `buildStreamMethod()`:
+#### 4a. SpringDomainRestControllerWriter.buildStreamMethod()
+
+Currently generates Mutiny `.subscribe().with()` calls. Two changes:
 
 1. **`SseEmitter(0L)` — infinite timeout.** The current code generates `new SseEmitter()` (default 30-second timeout). Change to `new SseEmitter(0L)` to match `RestControllerWriter` and prevent premature SSE connection drops. A 30-second default means streams like execution state (which only fire on case events, potentially minutes apart) silently terminate.
 
-2. **`Flow.Subscriber` bridge with subscription lifecycle.** Replace the Mutiny `.subscribe().with()` call with a `Flow.Subscriber` that manages subscription cancellation on client disconnect:
+2. **`Flow.Subscriber` bridge with subscription lifecycle.** Replace the Mutiny `.subscribe().with()` call with a `Flow.Subscriber` that manages subscription cancellation on client disconnect.
+
+#### 4b. RestControllerWriter.buildMethodBody()
+
+Already generates a `Flow.Subscriber` bridge with `new SseEmitter(0L)`. But its `onSubscribe` only calls `subscription.request(Long.MAX_VALUE)` — it lacks `onTimeout`/`onCompletion` callbacks. This is the same resource leak identified in R1-03: dead subscribers accumulate because the subscription is never cancelled on client disconnect.
+
+#### Shared bridge pattern
+
+Both generators produce the same bridge code after this change:
 
 ```java
 SseEmitter emitter = new SseEmitter(0L);
@@ -128,8 +139,8 @@ No changes needed — `@PlatformStream` already marks streaming methods. The sca
 **Quarkus:**
 ```
 CDI Event → @ObservesAsync → BroadcastProcessor.onNext()
-  → processor.toHotStream().filter(caseId)
-  → Multi<T> (IS Flow.Publisher<T>) → JAX-RS SSE endpoint
+  → processor.toHotStream().filter(caseId) → Multi<T> (internal)
+  → SPI impl widens to Flow.Publisher<T> → JAX-RS SSE endpoint
 ```
 
 **Spring:**
@@ -152,8 +163,9 @@ Spring Event → @EventListener → iterate ActiveStreams, offer() to matching c
 - SPI contract change (Multi → Flow.Publisher)
 - 2 Spring broadcaster components (CaseStream, ExecutionState)
 - Generator update for Flow.Publisher bridge (SpringDomainRestControllerWriter)
-- Generator fix: `SseEmitter(0L)` infinite timeout
-- Quarkus broadcaster adaptation
+- Generator fix: subscription lifecycle callbacks (both RestControllerWriter and SpringDomainRestControllerWriter)
+- Generator fix: `SseEmitter(0L)` infinite timeout (SpringDomainRestControllerWriter)
+- Quarkus SPI implementation return type widening (broadcasters unchanged)
 - Empty publisher utility for Spring stub methods
 - Unit tests for Spring broadcasters
 
@@ -169,7 +181,8 @@ Spring Event → @EventListener → iterate ActiveStreams, offer() to matching c
 - CaseId filtering: events for caseId A must not reach `stream(caseId B)`
 - Cleanup: after subscriber cancel, lazy cleanup removes `ActiveStream` on next event dispatch
 - Back pressure: verify `offer()` drops without blocking when buffer is full
-- Generator: verify generated code compiles, uses `Flow.Subscriber` pattern, `SseEmitter(0L)`, and subscription lifecycle callbacks
+- Generator (SpringDomainRestControllerWriter): verify generated code compiles, uses `Flow.Subscriber` pattern, `SseEmitter(0L)`, and subscription lifecycle callbacks
+- Generator (RestControllerWriter): verify generated code includes `onTimeout`/`onCompletion` subscription cancellation callbacks
 
 ## References
 
