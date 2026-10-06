@@ -13,11 +13,11 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/engine#1214 — Issue #1214 ← active
-  - [ ] Batch 1: Generator fixes
-    - [ ] Task 1: Fix SpringDomainRestControllerWriter stream bridge
-    - [ ] Task 2: Fix RestControllerWriter subscription lifecycle
-  - [ ] Batch 2: SPI contract
-    - [ ] Task 3: Change SPI stream return types to Flow.Publisher
+  - [x] Batch 1: Generator fixes
+    - [x] Task 1: Fix SpringDomainRestControllerWriter stream bridge
+    - [x] Task 2: Fix RestControllerWriter subscription lifecycle
+  - [x] Batch 2: SPI contract
+    - [x] Task 3: Change SPI stream return types to Flow.Publisher
   - [ ] Batch 3: Spring broadcasters
     - [ ] Task 4: CaseStreamSpringBroadcaster
     - [ ] Task 5: ExecutionStateSpringBroadcaster
