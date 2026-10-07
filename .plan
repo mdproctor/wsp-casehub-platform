@@ -1,0 +1,15 @@
+# Work Plan — issue-550-google-oauth-offline-access
+
+## State
+branch: issue-550-google-oauth-offline-access
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 550
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#550 — Issue #550 ← active
