@@ -61,3 +61,4 @@ arc42_scan_wrap_attempt=1
 arc42_scan_wrap=done
 handoff_write_attempt=1
 handoff_write=done
+checkout_main_mechanical_attempt=1
