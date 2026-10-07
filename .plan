@@ -1,14 +1,15 @@
-# Work Plan — casehub-platform
+# Work Plan — epic-549-identity-auth-completion
 
 ## State
-branch: main
-state: active
+branch: epic-549-identity-auth-completion
+state: scaffolded
+project-sha: 
+date: 
 issue-repo: casehubio/platform
 covers: 549
-date: 2026-10-07
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
 
 ## Queue
-- [ ] casehubio/platform#540 — authn-spring Spring Boot auto-configuration for authentication
-- [ ] casehubio/platform#541 — authn Spring Data JPA modules
-- [ ] casehubio/platform#544 — wire AuthenticationEventListener in Quarkus and Spring authn modules
-- [ ] casehubio/platform#546 — add authn beans to spring-integration-test composition gate
+- [ ] casehubio/platform#549 — Issue #549 ← active
