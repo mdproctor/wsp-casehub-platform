@@ -3,13 +3,12 @@
 ## State
 branch: main
 state: active
-issue-repo: casehubio/casehub-pages
-covers: casehubio/casehub-pages#528
-Current: casehubio/casehub-pages#528 — ScenarioLibraryGraphQL breaks SmallRye — verify resolved after playbook rename
-date: 2026-10-06
+issue-repo: casehubio/platform
+covers: 549
+date: 2026-10-07
 
 ## Queue
-- [ ] casehubio/casehub-pages#528 — ScenarioLibraryGraphQL breaks SmallRye — verify resolved after playbook rename ← active
-- [ ] casehubio/casehub-pages#514 — Delete remaining Format A types after runtime migration
-- [ ] casehubio/casehub-pages#390 — Scenario format refinements — cleanup items only (delete ScenarioParser, update TS types)
-- [ ] casehubio/casehub-pages#519 — Annotate historical spec docs with post-unification type names
+- [ ] casehubio/platform#540 — authn-spring Spring Boot auto-configuration for authentication
+- [ ] casehubio/platform#541 — authn Spring Data JPA modules
+- [ ] casehubio/platform#544 — wire AuthenticationEventListener in Quarkus and Spring authn modules
+- [ ] casehubio/platform#546 — add authn beans to spring-integration-test composition gate
