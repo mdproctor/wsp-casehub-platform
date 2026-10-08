@@ -1,0 +1,15 @@
+# Work Plan — issue-562-playbook-language-extensions
+
+## State
+branch: issue-562-playbook-language-extensions
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 562
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#562 — Issue #562 ← active
