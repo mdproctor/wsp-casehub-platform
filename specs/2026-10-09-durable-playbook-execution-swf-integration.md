@@ -461,6 +461,188 @@ Most of these can be emulated via `CallableTaskBuilder` /
 `CallableTaskProxyBuilder` without SDK changes. Enhancements would
 make them first-class SWF features, benefiting the broader ecosystem.
 
+## SDK Runtime Enhancements (to make integration clean)
+
+These are SDK-internal enhancements, not spec changes — they improve
+the Java implementation's extensibility without changing the SWF
+specification. Ranked by integration impact.
+
+### 1. Decouple Persistence from Execution (Critical)
+
+Currently persistence is coupled to the executor chain — you must go
+through `WorkflowApplication → WorkflowDefinition →
+WorkflowMutableInstance` to get checkpoint/resume. CaseHub needs to
+use the persistence layer as a standalone library: "checkpoint this
+state, resume from this checkpoint" without routing through SWF's
+`DoExecutor`/`ForkExecutor`.
+
+This would let CaseHub run its own `DecoratorChain` while the SDK's
+persistence machinery handles checkpoint/resume. CaseHub owns the
+execution; the SDK owns the durability.
+
+### 2. Custom State Entries on TaskContext (High)
+
+`TaskContext` carries workflow data as `WorkflowModel` (a JSON blob).
+If CaseHub could register typed state entries — "persist this counter
+value at `.primitives.supply`", "persist this flag at
+`.primitives.ready`" — primitive state would be automatically
+checkpointed with the workflow data. One JSON document holds
+everything. No separate persistence mechanism for primitives.
+
+This eliminates the need for `DurablePrimitiveFactory` entirely —
+primitive state lives in the workflow data and is checkpointed by the
+SDK.
+
+### 3. Resume Lifecycle Hooks (High)
+
+On crash recovery, the SDK skips completed tasks and re-executes the
+current one. But CaseHub needs to restore its runtime state BEFORE
+re-execution starts:
+
+- Re-register `cancel:` signal watchers
+- Re-spawn `background:` tasks from saved definitions
+- Reconnect to durable primitive values
+- Re-register `at:` threshold listeners
+
+A `WorkflowResumeListener` SPI with `onBeforeResume(instance)` would
+give CaseHub the hook to restore state before the executor chain
+restarts.
+
+### 4. Pluggable Executor Passthrough Mode (High)
+
+`TaskExecutorFactory` creates executors per task type. If there was a
+"passthrough" mode where the factory says "I'll handle this task
+entirely — just give me the lifecycle hooks (checkpoint on complete,
+retry on fail)" — CaseHub could register its `DecoratorChain` as the
+executor for all CaseHub task types. The SDK manages lifecycle;
+CaseHub manages execution. Clean boundary.
+
+```java
+// CaseHub registers a factory that handles all CaseHub tasks
+public class CaseHubExecutorFactory implements TaskExecutorFactory {
+    public boolean accept(TaskBase task) {
+        return task instanceof CaseHubTask;
+    }
+
+    public TaskExecutor create(TaskBase task, ...) {
+        return new PassthroughExecutor(task, decoratorChain,
+            // lifecycle callbacks from SDK:
+            onComplete -> persistence.checkpoint(task, result),
+            onFail -> persistence.recordFailure(task, error),
+            onRetry -> persistence.recordRetry(task, attempt));
+    }
+}
+```
+
+### 5. Transaction Participation on Checkpoint (Medium)
+
+Expose the active transaction from `PersistenceInstanceStore` so
+external code can participate in the same commit. A
+`getActiveTransaction()` method or pre/post-commit hooks would let
+CaseHub's primitive mutations commit atomically with the SDK's
+checkpoint.
+
+Currently achievable by implementing `PersistenceInstanceStore` with
+a shared JDBC connection (described in Atomic co-persistence strategy
+above), but a first-class SPI would be cleaner.
+
+### 6. Interruptible Task Execution (Medium)
+
+The SDK uses `CompletableFuture.orTimeout()` for timeouts — which
+completes the future exceptionally but does NOT interrupt the
+underlying thread. CaseHub's `cancel:` uses `Thread.interrupt()`.
+If `AbstractTaskExecutor` interrupted the execution thread on timeout
+(not just timed out the future), CaseHub's interrupt-based
+cancellation would compose naturally with SDK-managed timeouts.
+
+Has workarounds — CaseHub can manage its own interrupt inside the
+`CallableTask` — but first-class support eliminates the impedance.
+
+### Impact Summary
+
+| Enhancement | Impact | Spec change? | Difficulty |
+|---|---|---|---|
+| Decouple persistence | Critical | No | Medium |
+| Custom state entries | High | No | Easy |
+| Resume hooks | High | No | Easy |
+| Executor passthrough | High | No | Medium |
+| Transaction participation | Medium | No | Easy |
+| Interruptible execution | Medium | No | Easy |
+
+With #1 and #4, CaseHub's runtime becomes: "DecoratorChain + SWF
+persistence." No impedance mismatch, no dual persistence, no adapter
+layers. CaseHub runs the orchestration; the SDK checkpoints the state.
+
+### Additional Enhancements That Eliminate CaseHub Build Work
+
+These would remove items from the "What We Must Build" list entirely:
+
+**7. PostgreSQL Persistence Module**
+
+The SDK ships MVStore (embedded H2) and bigmap (distributed). A
+PostgreSQL `PersistenceInstanceStore` implementation would eliminate
+`PersistenceStore adapter` from the CaseHub build list. PostgreSQL
+is the production default for most CaseHub deployments — having it
+in the SDK saves every user from building their own.
+
+**8. Background Task Registry in Persistence**
+
+If the SDK tracked spawned/detached tasks in its persistence model
+(a list of active background task definitions alongside the workflow
+state), crash recovery could re-spawn them automatically. Combined
+with resume hooks (#3), this eliminates `BackgroundTaskRecovery`
+from the CaseHub build list entirely.
+
+**9. Pluggable Variable Resolution (not just JQ)**
+
+The SDK's `ExpressionFactory` defaults to JQ. If it supported
+registering additional variable resolution strategies (not replacing
+JQ but augmenting it), CaseHub's `VariableResolver` could be plugged
+in directly. `${counter.supply}` would resolve through CaseHub's
+`PrimitiveVariableSource` while `.data.field` still resolves through
+JQ. Eliminates `CaseHubExpressionFactory` from the build list.
+
+**10. Primitive-to-CloudEvent Auto-Publishing**
+
+If the SDK supported change notifications on workflow data entries
+(when `.primitives.supply` changes, emit a CloudEvent), CaseHub's
+`OrcNumericPrimitive.onThresholdChange()` listeners could be wired
+to workflow data mutations. The `CloudEventBridge` would be
+unnecessary — primitive observation flows through the SDK's event
+system.
+
+**11. Decorator-Level Lifecycle Events**
+
+`WorkflowExecutionListener` fires events at task level (started,
+completed, failed). If it also fired at decorator level (retry
+attempt, timeout triggered, resource acquired/released, threshold
+reached), the `AuditListener` would get compliance-grade audit
+trails from the SDK without CaseHub adding its own instrumentation.
+
+### What the full enhancement set eliminates
+
+| CaseHub Build Item | Eliminated By | Status |
+|---|---|---|
+| `PlaybookCompiler` | — (needed regardless) | Must build |
+| `CaseHubCallableTaskBuilder` | #4 Executor passthrough | Eliminated |
+| `CaseHubCallableTaskProxy` | #4 Executor passthrough | Eliminated |
+| `CaseHubExpressionFactory` | #9 Pluggable variable resolution | Eliminated |
+| `DurablePrimitiveFactory` | #2 Custom state entries | Eliminated |
+| `DurableOrc*` implementations | #2 Custom state entries | Eliminated |
+| `CloudEventBridge` | #10 Primitive-to-event publishing | Eliminated |
+| `BackgroundTaskRecovery` | #3 Resume hooks + #8 Background registry | Eliminated |
+| `AuditListener` | #11 Decorator-level events | Simplified |
+| `PersistenceStore` adapter | #7 PostgreSQL module | Eliminated |
+
+With all 11 enhancements, CaseHub builds only: **the PlaybookCompiler**
+(YAML → SDK API) and a **simplified AuditListener** (decorator-level
+events → compliance log). Everything else is SDK infrastructure.
+
+The question is: how many of these enhancements benefit the broader
+SWF community vs. being CaseHub-specific? #1, #4, #7, #9 benefit
+everyone. #2, #3, #5, #6 are generally useful. #8, #10, #11 are more
+niche but defensible as "rich execution observability."
+
 ## What We Must Build
 
 | Component | Size | Description |
