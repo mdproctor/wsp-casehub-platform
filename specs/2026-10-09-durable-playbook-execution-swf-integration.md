@@ -11,6 +11,90 @@ as a library. The CaseHub runtime hosts the SWF engine — not the other
 way around. The playbook YAML, decorator chain, and step resolver do not
 change.
 
+## SWF 1.0 vs CaseHub: Honest Comparison
+
+SWF 1.0 is task-based (NOT the state-machine model of 0.8). It uses
+`do:` for sequencing, `fork:` for parallel, `for:` for iteration,
+`try:` for error handling. Closer to CaseHub than 0.8, but composition
+is still structural (nesting), not annotational (decorators).
+
+**Side-by-side: retry + timeout + forEach**
+
+SWF 1.0:
+```yaml
+do:
+  - processItems:
+      try:
+        - iterateItems:
+            for:
+              each: item
+              in: '.items'
+            do:
+              - processItem:
+                  call: process
+                  with:
+                    item: ${ $item }
+                  timeout:
+                    after: PT30S
+      catch:
+        errors:
+          with:
+            type: https://serverlessworkflow.io/errors/timeout
+        retry:
+          delay: PT1S
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 3
+```
+
+CaseHub:
+```yaml
+- action: process
+  forEach: { in: items, as: item }
+  retry: { max: 3, backoff: exponential, delay: 1s }
+  timeout: 30s
+```
+
+SWF 1.0 nests `try:` around `for:` around `do:` around `call:` — 4
+levels. CaseHub puts 3 decorators on 1 step — flat.
+
+**Where SWF 1.0 `switch:` differs from CaseHub `if:`:**
+
+SWF 1.0 uses goto-style routing (`then: taskName`):
+```yaml
+do:
+  - decide:
+      switch:
+        - approve:
+            when: '.amount <= 1000'
+            then: autoApprove
+        - review:
+            when: '.amount > 1000'
+            then: managerReview
+  - autoApprove:
+      call: approve-expense
+      then: end
+  - managerReview:
+      call: request-approval
+      then: end
+```
+
+CaseHub uses per-step guards (no goto, no named targets):
+```yaml
+- action: approve-expense
+  if: "${amount} <= 1000"
+
+- action: request-approval
+  if: "${amount} > 1000"
+  timeout: 48h
+```
+
+SWF 1.0 requires naming each branch target and wiring `then:` →
+target. CaseHub guards each step independently — the sequencing is
+implicit. CaseHub's model is simpler for non-programmers.
+
 ## The SDK: What We Get for Free
 
 The SWF Java SDK is a CompletableFuture-based runtime with extensive
@@ -285,6 +369,58 @@ compensating mechanisms are needed (reconciliation on recovery).
 persistence AND durable primitives. Same database, same transaction,
 exact consistency. Redis is a Phase 3 optimisation for high-throughput
 channels where PostgreSQL latency is unacceptable.
+
+### SDK Persistence Model (verified from source)
+
+The SDK uses **CRUD with explicit begin/commit/rollback** — NOT an
+append-only log. The flow in `DefaultPersistenceInstanceWriter`:
+
+```java
+PersistenceInstanceTransaction tx = store.begin();
+try {
+    operation.accept(tx);  // writes: task status, output, context
+    tx.commit(definition);
+} catch (Exception ex) {
+    tx.rollback(definition);
+    throw ex;
+}
+```
+
+Per checkpoint: task status (COMPLETED/RETRIED), output data, workflow
+context, transition info, iteration count.
+
+**Atomic co-persistence strategy:** CaseHub implements
+`PersistenceInstanceStore` with a PostgreSQL backend. The `begin()`
+method opens a JDBC transaction. CaseHub's durable primitives use the
+SAME connection (via context-passing). `commit()` commits both SWF
+state and primitive mutations atomically.
+
+```java
+public class CaseHubPersistenceStore implements PersistenceInstanceStore {
+    private final DataSource dataSource;
+
+    public PersistenceInstanceTransaction begin() {
+        Connection conn = dataSource.getConnection();
+        conn.setAutoCommit(false);
+        // Store conn in thread-local — durable primitives read it
+        TransactionContext.setCurrent(conn);
+        return new PostgresTransaction(conn);
+    }
+}
+
+// DurableOrcCounter uses the same connection:
+public class DurableOrcCounter implements OrcCounter {
+    public void increment() {
+        Connection conn = TransactionContext.current();
+        // UPDATE counter_primitives SET value = value + 1 WHERE ...
+        // Same transaction as the SWF checkpoint
+    }
+}
+```
+
+No SDK changes required. CaseHub implements the existing SPI with
+a connection-sharing strategy. The SDK doesn't care what else happens
+in the transaction — it just calls `commit()`.
 
 ## Recovery: What Happens on Crash
 
