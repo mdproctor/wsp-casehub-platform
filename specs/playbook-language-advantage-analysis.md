@@ -5,6 +5,22 @@ imperative alternatives (Lua, Python, TypeScript) across real-world
 orchestration use cases. Each category shows what the playbook expresses,
 the equivalent imperative code, and where the advantage lies.
 
+### Honesty Policy
+
+This document tries to be fair. Where the YAML has a genuine advantage,
+we show it. Where the comparison is close or where frameworks in the
+imperative world narrow the gap, we say so. Where the YAML hides
+complexity (runtime, plugins, deployment), we acknowledge it.
+
+The imperative comparisons aim for idiomatic, framework-assisted code —
+not deliberately verbose strawmen. When a library (Temporal, RxJS,
+asyncio.TaskGroup) is the real competition, we compare against it, not
+against raw from-scratch implementations.
+
+The YAML playbook language is not universally better than code. It
+occupies a specific niche — declarative orchestration for mixed
+audiences — and we make the case for that niche honestly.
+
 ---
 
 ## Category 1: Progressive Disclosure
@@ -39,6 +55,14 @@ pb.run()
 The YAML IS the program. A non-programmer reads it and understands it
 instantly. The Python version requires understanding imports, decorators,
 context objects, and service references before writing "send email."
+
+**Honest caveat:** The YAML simplicity hides a substantial runtime — a
+YAML parser, step resolver, decorator chain, plugin system, and execution
+scope. Someone built all of that. The advantage is that the playbook
+*author* doesn't see it, not that it doesn't exist. A vanilla Python
+script (`import smtplib; send(...)`) is also 2 lines — the difference
+is that the YAML version gains retry, timeout, and resource management
+by adding words, while the Python version requires importing libraries.
 
 ### Use Case 1.2: Adding Retry (Six Months Later)
 
@@ -288,16 +312,98 @@ run_scheduler()
 ```
 
 **Advantage:** The YAML expresses "PROBE yields to PYLON when both
-need minerals" as `priority: background` vs `priority: high`. The Lua
-version requires building a priority queue, a coroutine scheduler, and
-manual yield/resume management — 60+ lines of infrastructure code before
-the first unit is trained. The YAML user doesn't know PriorityOrcSemaphore
-exists — they just wrote `priority: high`. The Lua user must implement
-the entire priority scheduling mechanism themselves.
+need minerals" as `priority: background` vs `priority: high`.
 
-The TypeScript version (above) has the same problem — standard Mutex
-doesn't support priority, so you'd need to build `PriorityMutex` from
-scratch.
+**Honest caveat on the Lua comparison:** The Lua version builds a
+scheduler from scratch, which is unfair — real Lua game scripting uses
+engine frameworks (LÖVE, Defold, Roblox) that provide task scheduling,
+timers, and basic resource management. With a framework, the Lua version
+would be shorter. However, NO Lua game framework provides priority-aware
+resource contention — that specific feature genuinely doesn't exist in
+the ecosystem. The core advantage (priority composition) holds even
+against framework-assisted Lua.
+
+The TypeScript version has the same gap — standard `Mutex` doesn't
+support priority.
+
+The YAML user doesn't know `PriorityOrcSemaphore` exists — they just
+wrote `priority: high`. That's the real advantage: the infrastructure
+is substantial (someone built it), but the author never sees it.
+
+### Use Case 3.1b: The Workflow Framework Comparison (Temporal)
+
+The skeptic's strongest counter: "Use a workflow framework, not raw code."
+Fair point. Here's the same use case in Temporal — the leading workflow
+orchestration framework.
+
+**Temporal (Python SDK):**
+```python
+from temporalio import workflow, activity
+from datetime import timedelta
+
+@activity.defn
+async def train_probe():
+    await game.train("PROBE")
+
+@activity.defn
+async def build_pylon():
+    await game.build("PYLON")
+
+@workflow.defn
+class BuildOrder:
+    @workflow.run
+    async def run(self):
+        # Background probe production
+        probe_task = workflow.start_activity(
+            train_probe,
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
+        # But: how do we loop it continuously?
+        # Temporal activities are one-shot. Continuous loop requires
+        # a child workflow or a signal-based re-trigger pattern:
+
+        while True:
+            await workflow.start_activity(
+                train_probe,
+                start_to_close_timeout=timedelta(seconds=30),
+            )
+            # No priority concept. No resource contention.
+            # Temporal schedules activities on worker pools, not
+            # priority queues. "PROBE yields to PYLON" is not
+            # expressible without custom queue routing.
+
+            if await workflow.wait_condition(
+                lambda: self.supply >= 14, timeout=timedelta(seconds=1)
+            ):
+                break
+```
+
+**Honest comparison with Temporal:**
+
+| Concern | CaseHub YAML | Temporal |
+|---------|-------------|----------|
+| Continuous loops | `loop: continuous` | While-loop in workflow code |
+| Priority contention | `priority: background/high` | Not built-in — custom task queues |
+| Threshold gates | `at: 14 supply` | `wait_condition()` with polling |
+| Cancellation | `cancel: signal-name` | `CancellationScope` (similar concept) |
+| Retry | `retry: { on: [TIMEOUT] }` | `RetryPolicy` (similar, well-designed) |
+| Background tasks | `background: true` | Child workflows / async activities |
+| Non-programmer authoring | YAML — no code | Python/Go/Java — code required |
+| Auditability | YAML diffable, schema-validated | Code — requires code review |
+
+**Where Temporal is better:** Production reliability (durable execution,
+replay, versioning), ecosystem maturity, observability tooling.
+
+**Where YAML is better:** No-code authoring, priority-aware resource
+contention, threshold-gated execution, auditability for compliance,
+progressive disclosure (Temporal front-loads workflow/activity concepts).
+
+**Bottom line:** Temporal is the strongest competition for developer
+audiences. The YAML wins when the audience includes non-programmers or
+when compliance auditability is a requirement. Temporal wins when you
+need durable execution across machine failures, which the YAML runtime
+does not currently address.
 
 ### Use Case 3.2: Cancellable Background Group
 
@@ -508,6 +614,15 @@ because the language can't express anything else. Auditing Python code
 requires understanding every import, every library, and every possible
 side effect.
 
+**Honest caveat:** The sandbox applies to playbook *authors*, not the
+*system*. The plugins that steps invoke (`action: process-payment`) are
+Java/TS code with full system access. A malicious or buggy plugin can
+do everything the Python example does. The security boundary is: "the
+person writing YAML can't cause harm beyond what the plugin set allows."
+This is meaningful — it's the difference between auditing 10 plugins
+written by developers vs. auditing every playbook written by anyone —
+but it's not a full sandbox.
+
 ### Use Case 4.2: Resource Cleanup is Guaranteed
 
 **CaseHub YAML:**
@@ -522,7 +637,7 @@ times out, or is cancelled. This is guaranteed by the decorator chain's
 `finally` blocks. The user can't forget to release a resource because
 they never acquired one — the decorator handles the lifecycle.
 
-**Python equivalent:**
+**Python equivalent (bad — manual):**
 ```python
 pool = await db_pool.acquire()
 try:
@@ -531,9 +646,19 @@ finally:
     db_pool.release(pool)  # User must remember this
 ```
 
-If the user forgets the `finally`, the connection leaks. If they put
-the `release` in the wrong place, it leaks on timeout. The YAML makes
-this impossible — the lifecycle is in the decorator, not the user's code.
+**Python equivalent (good — idiomatic):**
+```python
+async with db_pool.acquire() as conn:
+    result = await asyncio.wait_for(process_item(conn), timeout=30)
+# cleanup guaranteed by context manager — same safety as YAML
+```
+
+**Honest assessment:** Idiomatic Python with `async with` provides the
+same cleanup guarantee as the YAML decorator. The YAML advantage here
+is NOT safety — it's that the user doesn't need to know context managers
+exist. They write `resource: database-pool` and the lifecycle is handled.
+A junior Python developer might write the bad version; the YAML user
+can't, because there is no manual version to get wrong.
 
 ### Use Case 4.3: Conditional Retry Prevents Harmful Retries
 
@@ -649,7 +774,7 @@ existing primitives — no stream DSL needed.
   background: true
 ```
 
-**Java Streams equivalent:**
+**Java Streams equivalent (unfair comparison — Streams is a collection API, not a stream processing framework):**
 ```java
 sensorReadings.stream()
     .map(r -> enrichService.enrich(r))      // no retry
@@ -657,13 +782,37 @@ sensorReadings.stream()
     .forEach(r -> alertService.send(r));     // no backpressure
 ```
 
-**Advantage:** Java Streams is more concise for the happy path but has
-NO support for per-stage retry, rate limiting, resource contention,
-backpressure, or cancellation. Adding any of these to Java Streams
-requires breaking out of the stream API entirely. The YAML pipeline
-gets all of them via decorator composition — each stage is independently
-resilient because each stage is a full step with the complete decorator
-set.
+**RxJS equivalent (the real competition):**
+```typescript
+import { from, interval, mergeMap, filter, retry, tap } from 'rxjs';
+
+interval(30_000).pipe(
+  mergeMap(() => from(sensors).pipe(
+    mergeMap(sensor => readSensor(sensor)),
+  )),
+  mergeMap(reading => enrichReading(reading).pipe(
+    retry({ count: 3, delay: 1000 }),
+  )),
+  filter(enriched => enriched.severity >= WARNING),
+  tap(enriched => sendAlert(enriched)),
+  // But: no per-stage resource contention
+  // No priority between stages
+  // No cancellation by named signal
+  // Backpressure via mergeMap concurrency limit (partial)
+).subscribe();
+```
+
+**Honest assessment:** RxJS closes much of the gap — it has per-stage
+retry, filtering, and basic backpressure via concurrency limits. The
+YAML advantage narrows to: per-stage resource contention (`resource:`),
+priority (`priority:`), named signal cancellation (`cancel:`), and
+readability for non-programmers. For a developer audience, RxJS is
+competitive. For a mixed audience (developers + ops + compliance),
+the YAML wins on auditability.
+
+Java Streams is NOT the right comparison — it's a collection API, not
+a stream processing framework. Kafka Streams, Project Reactor, and
+RxJS are the real competition and should be acknowledged.
 
 ### Use Case 6.2: Fan-Out with Conditional Routing
 
