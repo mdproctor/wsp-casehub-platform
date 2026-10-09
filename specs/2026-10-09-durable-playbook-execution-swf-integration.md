@@ -714,6 +714,83 @@ Same YAML, different execution backend.
 - Priority-aware scheduling enhancements (SDK PR)
 - Audit trail listener for FSI compliance
 
+## Future: Structured Table Editor for Playbook Authoring
+
+The playbook language has three authoring surfaces: YAML (power users),
+TS DSL (programmers), and — eventually — a structured table editor
+(non-programmers). The table editor is not a flowchart. It's a
+constrained projectional editor where the schema defines what's valid
+at every position.
+
+### The model
+
+- A **step** is a row
+- A **decorator** is a column (if, at, resource, priority, loop, retry, timeout, cancel, background)
+- **Nesting** (on-complete, block, parallel) expands as indented sub-tables under the parent row
+- **Sequence** is top-to-bottom row order
+- **Resources** are a header table above the steps
+
+```
+Resources: [minerals: 1] [gas: 1] [nexus: 1]
+
+┌───┬──────────────┬────────────┬──────────┬──────────┬────────────┬───────┬────┐
+│ # │ action       │ at         │ resource │ priority │ loop       │ retry │ bg │
+├───┼──────────────┼────────────┼──────────┼──────────┼────────────┼───────┼────┤
+│ 1 │ train PROBE  │            │ minerals │ bg       │ continuous │       │ ✓  │
+│ 2 │ build PYLON  │ >=14 supply│ minerals │ high     │            │       │    │
+│ 3 │ build GATE   │ >=150 min  │ minerals │ high     │            │       │    │
+│   └─ on-complete:                                                            │
+│   │ 4 │ train STALKER│         │ gateway  │ normal   │            │ 3     │    │
+└───┴──────────────┴────────────┴──────────┴──────────┴────────────┴───────┴────┘
+```
+
+### Keyboard interaction (structural, not free-text)
+
+- **Arrow keys** move between step rows and decorator columns
+- **Enter** on an empty cell opens valid-values picker for that column
+  (e.g., resource column shows declared resources; priority shows
+  background/normal/high)
+- **Tab** cycles through decorator slots on the current step
+- **dd** deletes a step row
+- **p** pastes below cursor
+- **>** indents step into a block/on-complete under the step above
+- **<** outdents step from its parent block
+- **Drag** rows to reorder; drag into a block to nest
+
+Every keystroke produces a valid AST mutation — not a string edit that
+might or might not parse. Invalid states are unconstructable. The
+schema IS the editor constraint, enforced at interaction time rather
+than validation time.
+
+### Mouse interaction
+
+- Click a cell to edit (dropdown for enums, text for values)
+- Click + icon at bottom to add a step
+- Right-click for context menu (add block, add on-complete, wrap in
+  parallel, add decorator column)
+- Drag row handle to reorder
+- Drag row into another row's indent zone to nest
+
+### Why this matters
+
+YAML is too free — you can typo `priortiy: high` and discover it at
+runtime. The TS DSL requires programming literacy. The structured
+table is the authoring surface for the widest audience: constrained
+enough to prevent invalid playbooks, visual enough to see all
+behaviours at a glance, keyboard-efficient enough for power users.
+
+Three surfaces, one runtime:
+- **YAML** — version control, LLM generation, CI/CD
+- **TS DSL** — programmers, closures, type safety
+- **Structured table** — everyone else
+
+Export from table to YAML is serialisation of the grid state. Import
+from YAML to table is parsing into the grid model. Round-trip fidelity
+is guaranteed by the shared AST.
+
+Buildable on the existing casehub-pages grid infrastructure. Not a
+priority for the current phase — captured here for future reference.
+
 ## References
 
 - SWF Java SDK: `~/dev/swf-sdk-java` (local clone)
