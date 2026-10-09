@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-563-playbook-orchestration-extensions
-state: closing:verified
+state: closing:promoted
 project-sha: 
 date: 
 issue-repo: casehubio/platform
