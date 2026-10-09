@@ -13,3 +13,12 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/platform#563 — Issue #563 ← active
+  - [x] Batch 1: Foundations
+    - [x] Task 1: LoopDirective.Continuous + wrapLoop
+    - [x] Task 2: Result.Failure category + conditional retry
+  - [x] Batch 2: Decorators
+    - [x] Task 3: cancel decorator
+    - [x] Task 4: background decorator
+  - [x] Batch 3: Variables+Schema
+    - [x] Task 5: Primitive variable resolution
+    - [x] Task 6: forEach collect + schema + ADR
