@@ -528,6 +528,288 @@ output space is unbounded.
 
 ---
 
+## Category 8: FSI Trading Bots — Compliance by Construction
+
+**What it is:** Financial services trading bots must be auditable by
+compliance, explainable to regulators, and provably bounded. The YAML
+language makes these properties structural, not aspirational.
+
+### Use Case 8.1: Auditable Trade Execution Strategy
+
+**CaseHub YAML:**
+```yaml
+resources:
+  trading-api: { concurrency: 1 }
+  risk-engine: { concurrency: 3 }
+
+steps:
+  # Continuous market monitoring
+  - action: monitor-market
+    from: { channel: market-data, as: tick }
+    loop: continuous
+    background: true
+    publish: { channel: signals }
+
+  # Signal processing with risk gate
+  - action: evaluate-signal
+    from: { channel: signals, as: signal, filter: "${signal.strength} >= 0.7" }
+    resource: risk-engine
+    loop: continuous
+    background: true
+    publish: { channel: trade-decisions }
+
+  # Trade execution — rate-limited, risk-gated, auditable
+  - action: execute-trade
+    from: { channel: trade-decisions, as: decision }
+    if: "${decision.within-risk-limits}"
+    resource: trading-api
+    priority: high
+    retry: { max: 2, on: [TIMEOUT, RATE_LIMITED] }
+    cancel: market-close
+    loop: continuous
+    background: true
+```
+
+**Python equivalent (typical quant bot):**
+```python
+import asyncio
+import ccxt
+import numpy as np
+from typing import Optional
+from dataclasses import dataclass
+
+class TradingBot:
+    def __init__(self, exchange: ccxt.Exchange, risk_manager: RiskManager):
+        self.exchange = exchange
+        self.risk = risk_manager
+        self.running = True
+        self._positions_lock = asyncio.Lock()
+        self._api_semaphore = asyncio.Semaphore(1)
+
+    async def monitor_market(self):
+        while self.running:
+            try:
+                ticker = await self.exchange.fetch_ticker("BTC/USD")
+                signal = self.strategy.evaluate(ticker)
+                if signal and signal.strength >= 0.7:
+                    await self.process_signal(signal)
+            except Exception as e:
+                logger.error(f"Market monitor error: {e}")
+            await asyncio.sleep(1)
+
+    async def process_signal(self, signal):
+        async with self._positions_lock:
+            risk_check = await self.risk.evaluate(signal)
+            if not risk_check.within_limits:
+                logger.warning(f"Risk limit breached: {risk_check.reason}")
+                return  # silent skip — no audit trail
+
+            await self.execute_trade(signal)
+
+    async def execute_trade(self, signal):
+        for attempt in range(3):
+            try:
+                async with self._api_semaphore:
+                    order = await asyncio.wait_for(
+                        self.exchange.create_order(
+                            signal.symbol, "limit", signal.side,
+                            signal.amount, signal.price),
+                        timeout=30)
+                    return order
+            except asyncio.TimeoutError:
+                continue  # retry on timeout
+            except ccxt.InsufficientFunds:
+                break  # DON'T retry — but is this logged?
+            except ccxt.RateLimitExceeded:
+                await asyncio.sleep(2 ** attempt)
+                continue
+            except Exception as e:
+                logger.error(f"Trade failed: {e}")
+                break  # unknown error — should we retry?
+
+    async def run(self):
+        await asyncio.gather(
+            self.monitor_market(),
+            # What if monitor_market crashes? Does it restart?
+            # What happens on KeyboardInterrupt?
+            # Are positions cleaned up?
+        )
+```
+
+**Compliance advantage — point by point:**
+
+| Concern | YAML | Python |
+|---------|------|--------|
+| **What can it trade?** | Only what `action: execute-trade` plugin allows | `self.exchange` exposes every API method — withdraw, transfer, cancel-all |
+| **When does it stop?** | `cancel: market-close` — explicit, auditable | `self.running = True` — mutable flag, set from anywhere, or not at all |
+| **What does it retry?** | `on: [TIMEOUT, RATE_LIMITED]` — explicit allow-list | `except` blocks — reviewer must trace every exception path |
+| **Rate limiting?** | `resource: trading-api, concurrency: 1` — guaranteed | `asyncio.Semaphore(1)` — correct, but user must remember to use it everywhere |
+| **Risk gate?** | `if: "${decision.within-risk-limits}"` — step won't execute without it | `if not risk_check.within_limits: return` — can be commented out, bypassed, or forgotten |
+| **Audit trail?** | Every step execution is logged by the runtime (step name, decorators, result, timing) | Manual `logger.error()` calls — incomplete, inconsistent, forgettable |
+| **Side effects?** | Only what the plugin allows | `import os; os.system(...)` — no sandbox |
+
+### Use Case 8.2: MiFID II Best Execution Compliance
+
+MiFID II requires firms to demonstrate they achieved "best execution"
+for client orders. This means proving: the order was routed optimally,
+the execution venue was selected correctly, and the timing was
+appropriate.
+
+**CaseHub YAML:**
+```yaml
+resources:
+  venue-a: { concurrency: 5 }
+  venue-b: { concurrency: 5 }
+  venue-c: { concurrency: 3 }
+
+steps:
+  # Price discovery across venues — parallel, collected
+  - action: query-price
+    forEach: { in: ${var.venues}, as: venue, collect: all, parallel: true }
+    timeout: 2s
+    retry: { max: 1, on: [TIMEOUT] }
+
+  # Best execution selection — deterministic, auditable
+  - action: select-best-venue
+    # Plugin applies best-execution algorithm
+    # Input: collected prices. Output: selected venue + justification
+
+  # Execution on selected venue
+  - action: execute-order
+    resource: "${result.select-best-venue.venue}"
+    priority: high
+    retry: { max: 2, on: [TIMEOUT, RATE_LIMITED] }
+    timeout: 5s
+
+  # Compliance record — always runs, even on failure
+  - action: record-execution-report
+    # MiFID II RTS 28 execution report
+```
+
+**Why this matters for compliance:**
+
+1. **The price discovery is provably parallel and complete** — `forEach`
+   with `collect: all` and `parallel: true` means every venue was queried.
+   A reviewer can see this in the YAML without reading code.
+
+2. **The best execution selection is a single, named step** — the
+   algorithm lives in the plugin, but the FACT that it was called and
+   its output determined the venue is visible in the playbook structure.
+
+3. **Retry policy is venue-appropriate** — `retry: { on: [TIMEOUT] }`
+   means we retry connectivity issues, not rejections. A rejected
+   order at Venue A doesn't get retried (which would be wrong).
+
+4. **The execution report always runs** — it's a subsequent step, not
+   inside a try/catch that might be skipped.
+
+### Use Case 8.3: AML Transaction Monitoring
+
+**CaseHub YAML:**
+```yaml
+steps:
+  # Continuous transaction monitoring
+  - action: score-transaction
+    from: { channel: transactions, as: txn }
+    loop: continuous
+    background: true
+    publish:
+      - { channel: normal, if: "${result.risk-score} < 0.5" }
+      - { channel: review, if: "${result.risk-score} >= 0.5" }
+      - { channel: escalate, if: "${result.risk-score} >= 0.9" }
+
+  # Automatic review queue
+  - action: enrich-transaction
+    from: { channel: review, as: txn }
+    retry: { max: 3, on: [TRANSIENT] }
+    loop: continuous
+    background: true
+    publish: { channel: enriched-review }
+
+  # Immediate escalation — high priority, no retry on auth failure
+  - action: file-sar
+    from: { channel: escalate, as: txn }
+    resource: compliance-api
+    priority: high
+    retry: { max: 2, on: [TIMEOUT] }
+    loop: continuous
+    background: true
+```
+
+**Python equivalent (typical AML system):**
+```python
+class AMLMonitor:
+    async def process_transaction(self, txn):
+        score = await self.score(txn)
+
+        if score >= 0.9:
+            await self.file_sar(txn)  # What if this fails silently?
+        elif score >= 0.5:
+            await self.queue_for_review(txn)  # What if queue is full?
+        # else: normal — but is it logged?
+
+    async def file_sar(self, txn):
+        # Suspicious Activity Report
+        try:
+            await compliance_api.submit(txn)
+        except Exception as e:
+            logger.error(f"SAR filing failed: {e}")
+            # REGULATORY VIOLATION: SAR was not filed
+            # Was this error surfaced? Was it retried?
+            # The code says "log and continue" — is that compliant?
+```
+
+**Advantage:** The YAML makes the routing visible (fan-out with
+conditions), the retry policy explicit (SARs retry on timeout, not on
+auth failure), and the priority clear (SARs get `priority: high`). The
+Python version has a silent `except` that could swallow a regulatory
+violation. A compliance auditor reading the YAML can verify the SAR
+pipeline is correct; reading the Python requires understanding
+async/await, exception handling, and the queue implementation.
+
+### Use Case 8.4: Pre-Trade Risk Controls (SEC Rule 15c3-5)
+
+SEC Rule 15c3-5 requires broker-dealers to implement pre-trade risk
+controls. The controls must be documented and the documentation must
+match the implementation.
+
+**CaseHub YAML:**
+```yaml
+steps:
+  - action: check-order-size
+    if: "${order.notional} <= ${limits.max-order-size}"
+
+  - action: check-position-limit
+    if: "${portfolio.exposure} + ${order.notional} <= ${limits.max-position}"
+
+  - action: check-daily-volume
+    if: "${daily.traded-volume} + ${order.quantity} <= ${limits.max-daily-volume}"
+
+  - action: check-fat-finger
+    if: "${order.price} >= ${market.price} * 0.9"
+    if: "${order.price} <= ${market.price} * 1.1"
+
+  - action: route-order
+    resource: exchange-api
+    priority: high
+    retry: { max: 2, on: [TIMEOUT] }
+```
+
+**Advantage:** The YAML IS the documentation. Each risk check is a
+named step with a visible condition. A compliance officer reads the
+YAML and sees exactly what checks run before an order is routed. The
+YAML can be diffed against the compliance policy document — if the
+policy says "max order size $10M" and the YAML says
+`${limits.max-order-size}`, the auditor checks the config, not the
+code.
+
+In Python, the risk checks are buried in if-statements inside methods
+inside classes. The documentation is a separate Word document that
+drifts from the implementation within weeks. The YAML eliminates this
+drift — the playbook IS the policy, executable.
+
+---
+
 ## Summary: Where YAML Wins and Where It Doesn't
 
 | Dimension | YAML Advantage | Code Advantage |
