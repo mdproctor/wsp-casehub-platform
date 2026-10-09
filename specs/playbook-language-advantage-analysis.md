@@ -673,13 +673,32 @@ can't, because there is no manual version to get wrong.
 only transient failures are retried. A `PERMANENT` failure (wrong
 password) propagates immediately.
 
-**Without conditional retry (common in imperative code):**
+**Python equivalent (common — unconditional retry):**
 ```python
 @retry(max_attempts=3)
 def authenticate(user, password):
     return auth_service.login(user, password)
 # Retries wrong passwords → account locked after 3 attempts
 ```
+
+**Python equivalent (correct — conditional retry with tenacity):**
+```python
+from tenacity import retry, retry_if_exception_type, stop_after_attempt
+
+@retry(
+    stop=stop_after_attempt(3),
+    retry=retry_if_exception_type((TimeoutError, TransientError)),
+)
+def authenticate(user, password):
+    return auth_service.login(user, password)
+```
+
+**Honest assessment:** Python CAN do conditional retry with tenacity's
+`retry_if_exception_type`. The YAML advantage is: the conditional retry
+is first-class (one line: `on: [TIMEOUT, TRANSIENT]`), discoverable via
+schema completions, and the categories are standardised across all
+plugins. In Python, each library has its own exception hierarchy and
+each retry decorator has its own filter API.
 
 ---
 
@@ -733,10 +752,23 @@ editor.
 ```
 
 A one-line diff tells the reviewer exactly what changed: retry policy
-now only retries timeouts. In Python, the equivalent change touches
-imports (add tenacity), decorator stacking (add retry filter), and
-possibly a custom retry predicate function. The diff is 10+ lines
-across multiple locations.
+now only retries timeouts.
+
+**Python diff for the same change:**
+```diff
++ from tenacity import retry, retry_if_exception_type, stop_after_attempt
+  
+- @retry(max_attempts=3)
++ @retry(
++     stop=stop_after_attempt(3),
++     retry=retry_if_exception_type((TimeoutError,)),
++ )
+  def authenticate(user, password):
+```
+
+7 lines changed across imports and decorator. A reviewer must understand
+tenacity's `retry_if_exception_type` API to verify the change is correct.
+The YAML diff is self-documenting.
 
 ---
 
@@ -828,9 +860,36 @@ RxJS are the real competition and should be acknowledged.
     - { channel: critical, if: "${result.severity} >= CRITICAL" }
 ```
 
-**Advantage:** Conditional fan-out to multiple channels in a single
-declaration. The routing conditions are inline. No router classes, no
-switch statements, no if-else chains.
+**RxJS equivalent:**
+```typescript
+classify$.pipe(
+  tap(event => {
+    if (event.class === 'NORMAL') normalSubject.next(event);
+    if (event.class === 'ANOMALY') anomalySubject.next(event);
+    if (event.severity >= CRITICAL) criticalSubject.next(event);
+  }),
+).subscribe();
+```
+
+**Python equivalent:**
+```python
+async for event in classify_stream:
+    result = await classify(event)
+    if result["class"] == "NORMAL":
+        await normal_queue.put(result)
+    if result["class"] == "ANOMALY":
+        await anomaly_queue.put(result)
+    if result["severity"] >= CRITICAL:
+        await critical_queue.put(result)
+```
+
+**Honest assessment:** The imperative versions are readable and not
+much longer. The YAML advantage is modest here — inline conditional
+routing vs. explicit if-statements. The real benefit is consistency:
+the fan-out uses the same `publish:` / `from:` channel pattern as
+everything else in the playbook. A non-programmer scans the `publish:`
+list and understands the routing without knowing what a Subject or
+asyncio queue is.
 
 ---
 
@@ -846,9 +905,16 @@ The same YAML playbook runs on:
 - **TypeScript runtime** (pages, Node.js event loop, Promise-based)
 - **Future runtimes** (Go, Rust, WASM — the YAML is the spec)
 
-**Advantage:** Write once, run anywhere. The YAML is the portable
-specification. The TS DSL and Java API are authoring surfaces for the
-same execution model.
+**Code equivalent:** None — this is a property of data formats, not code.
+Temporal workflows are tied to their SDK language (Python, Go, Java, TS).
+Airflow DAGs are Python-only. The YAML's runtime-independence is a
+structural advantage of choosing a data format over a programming language.
+
+**Honest caveat:** "Write once, run anywhere" requires each runtime to
+implement the full decorator chain identically. Behavioural parity across
+runtimes is hard to maintain — subtle differences in concurrency, timing,
+or error handling can cause the same YAML to behave differently. This is
+the classic portability problem, not a solved one.
 
 ### Use Case 7.2: UI-Generated Playbooks
 
@@ -856,10 +922,15 @@ A drag-and-drop workflow builder generates YAML. The user never writes
 YAML directly — they connect visual blocks. The YAML is the serialisation
 format between the UI and the runtime.
 
-**Why this doesn't work with code:** You can't drag-and-drop Python. Code
-generation from UIs produces unmaintainable code that nobody reads. YAML
-generation produces readable, editable, reviewable playbooks that a human
-can modify after the UI generates them.
+**Code equivalent:** Tools like Node-RED and n8n generate workflows from
+visual builders using JSON, not code. AWS Step Functions uses a JSON DSL
+(Amazon States Language) for the same purpose. So YAML is not unique
+here — any data-format DSL supports UI generation.
+
+**YAML advantage over JSON DSLs:** YAML is human-editable. A user can
+open the generated file, read it, modify it, and commit it. JSON/ASL
+is technically editable but practically hostile to hand-editing. The
+YAML sits at the sweet spot: machine-generatable AND human-readable.
 
 ### Use Case 7.3: LLM-Generated Playbooks
 
@@ -883,10 +954,39 @@ An LLM can generate valid YAML playbooks from natural language:
   background: true
 ```
 
-**Advantage:** The constrained grammar means the LLM can reliably
-generate correct playbooks. JSON Schema provides the contract. Generating
-correct Python/Lua from natural language is unreliable because the
-output space is unbounded.
+**What an LLM generates for the same prompt in Python:**
+```python
+import asyncio
+import aiohttp
+
+async def monitor_sensors(sensors, threshold=80):
+    alert_semaphore = asyncio.Semaphore(1)  # rate limit? not really
+    last_alert_time = 0
+
+    async def read_sensor(sensor):
+        async with aiohttp.ClientSession() as session:
+            # Which endpoint? What auth? What timeout?
+            resp = await session.get(sensor.url)
+            return await resp.json()
+
+    while True:
+        tasks = [read_sensor(s) for s in sensors]
+        readings = await asyncio.gather(*tasks)
+        for reading in readings:
+            if reading["temperature"] > threshold:
+                now = time.time()
+                if now - last_alert_time >= 60:  # rate limit
+                    await send_alert(reading)
+                    last_alert_time = now
+        await asyncio.sleep(30)
+```
+
+**Honest assessment:** The Python is plausible but fragile — an LLM might
+forget the rate limit, use the wrong async pattern, or leave the session
+open. The YAML has a constrained output space (JSON Schema contract), so
+correctness is verifiable. The Python output space is unbounded — the LLM
+can generate syntactically valid Python that is semantically wrong in ways
+a schema can't catch.
 
 ---
 
@@ -1048,22 +1148,73 @@ steps:
     # MiFID II RTS 28 execution report
 ```
 
-**Why this matters for compliance:**
+**Python equivalent (FIX protocol, typical quant desk):**
+```python
+import asyncio
+from typing import List
+
+async def best_execution(order, venues: List[Venue]):
+    # Query all venues in parallel
+    price_tasks = [venue.query_price(order) for venue in venues]
+    prices = await asyncio.gather(*price_tasks, return_exceptions=True)
+    # But: what if one venue times out? asyncio.gather with
+    # return_exceptions returns the exception object — the caller
+    # must filter successes from failures manually.
+
+    successful = [(v, p) for v, p in zip(venues, prices)
+                   if not isinstance(p, Exception)]
+
+    if not successful:
+        # All venues failed — is this logged? Retried?
+        raise NoVenueAvailableError()
+
+    # Best execution selection
+    best = min(successful, key=lambda vp: vp[1].price)
+    venue, price = best
+
+    # Execute — retry on timeout
+    for attempt in range(3):
+        try:
+            result = await asyncio.wait_for(
+                venue.execute(order, price), timeout=5)
+            break
+        except asyncio.TimeoutError:
+            if attempt == 2:
+                raise
+        except OrderRejectedException:
+            raise  # don't retry rejections — but is this documented?
+
+    # Compliance record — but if execute() throws, this never runs
+    try:
+        await record_execution_report(order, venue, result)
+    except Exception:
+        logger.error("Failed to record execution report")
+        # REGULATORY VIOLATION: MiFID II RTS 28 report not filed
+```
+
+**Why the YAML is better for compliance:**
 
 1. **The price discovery is provably parallel and complete** — `forEach`
    with `collect: all` and `parallel: true` means every venue was queried.
-   A reviewer can see this in the YAML without reading code.
+   A reviewer can see this in the YAML without reading code. The Python
+   uses `asyncio.gather` which mixes exceptions with results — the
+   filtering logic is manual and easy to get wrong.
 
 2. **The best execution selection is a single, named step** — the
    algorithm lives in the plugin, but the FACT that it was called and
    its output determined the venue is visible in the playbook structure.
+   In Python, it's `min(successful, key=...)` — one line buried in a
+   50-line function.
 
 3. **Retry policy is venue-appropriate** — `retry: { on: [TIMEOUT] }`
-   means we retry connectivity issues, not rejections. A rejected
-   order at Venue A doesn't get retried (which would be wrong).
+   means we retry connectivity issues, not rejections. The Python version
+   catches `OrderRejectedException` separately but only because the
+   developer remembered to — the language doesn't enforce it.
 
 4. **The execution report always runs** — it's a subsequent step, not
-   inside a try/catch that might be skipped.
+   inside a try/catch that might be skipped. The Python has the report
+   in a `try` that swallows its own failure with a log — a regulatory
+   violation hidden behind `logger.error`.
 
 ### Use Case 8.3: AML Transaction Monitoring
 
@@ -1157,6 +1308,47 @@ steps:
     retry: { max: 2, on: [TIMEOUT] }
 ```
 
+**Python equivalent (typical pre-trade risk check):**
+```python
+class PreTradeRiskChecker:
+    def __init__(self, limits: RiskLimits):
+        self.limits = limits
+
+    async def check(self, order: Order, portfolio: Portfolio,
+                     daily: DailyStats, market: MarketData):
+        # Order size
+        if order.notional > self.limits.max_order_size:
+            raise RiskLimitBreached("Order size exceeds limit")
+
+        # Position limit
+        if portfolio.exposure + order.notional > self.limits.max_position:
+            raise RiskLimitBreached("Position limit exceeded")
+
+        # Daily volume
+        if daily.traded_volume + order.quantity > self.limits.max_daily_volume:
+            raise RiskLimitBreached("Daily volume exceeded")
+
+        # Fat finger — but what are the thresholds?
+        # They're hardcoded here. Or in a config. Or in a database.
+        # The compliance doc says 10%. Does the code match?
+        if order.price < market.price * 0.9:
+            raise RiskLimitBreached("Price too low (fat finger)")
+        if order.price > market.price * 1.1:
+            raise RiskLimitBreached("Price too high (fat finger)")
+
+    async def route_order(self, order, portfolio, daily, market):
+        await self.check(order, portfolio, daily, market)
+        # But: what if someone calls exchange.create_order()
+        # WITHOUT calling check() first? Nothing enforces the gate.
+        for attempt in range(3):
+            try:
+                return await exchange.create_order(order)
+            except TimeoutError:
+                continue
+            except Exception:
+                raise
+```
+
 **Advantage:** The YAML IS the documentation. Each risk check is a
 named step with a visible condition. A compliance officer reads the
 YAML and sees exactly what checks run before an order is routed. The
@@ -1165,10 +1357,19 @@ policy says "max order size $10M" and the YAML says
 `${limits.max-order-size}`, the auditor checks the config, not the
 code.
 
-In Python, the risk checks are buried in if-statements inside methods
-inside classes. The documentation is a separate Word document that
-drifts from the implementation within weeks. The YAML eliminates this
-drift — the playbook IS the policy, executable.
+The Python version has two critical compliance gaps:
+
+1. **The gate is not enforced.** `check()` is a method that must be
+   called before `route_order()`. Nothing in the language prevents
+   calling `exchange.create_order()` directly, bypassing all risk
+   checks. In the YAML, the steps are sequential — you can't skip
+   to `route-order` without passing through the check steps.
+
+2. **The thresholds are opaque.** The fat-finger threshold (10%) is
+   hardcoded in a method buried in a class. A compliance officer
+   auditing the Python must find the class, find the method, find the
+   line, and verify the number. In the YAML, the condition is on the
+   step — visible, diffable, reviewable without code literacy.
 
 ---
 
