@@ -222,13 +222,82 @@ const buildOrder = async () => {
 Promise.all([probeLoop(), buildOrder()]);
 ```
 
+**Lua equivalent:**
+```lua
+-- Priority resource contention in Lua
+local minerals_queue = {}  -- manual priority queue
+local minerals_held = false
+
+local function acquire_minerals(priority, thread)
+    if not minerals_held then
+        minerals_held = true
+        return true
+    end
+    table.insert(minerals_queue, { priority = priority, thread = thread })
+    table.sort(minerals_queue, function(a, b)
+        return a.priority > b.priority
+    end)
+    coroutine.yield()  -- block until released
+    return true
+end
+
+local function release_minerals()
+    if #minerals_queue > 0 then
+        local next = table.remove(minerals_queue, 1)
+        minerals_held = true
+        coroutine.resume(next.thread)  -- wake highest priority
+    else
+        minerals_held = false
+    end
+end
+
+-- Background probe production
+local probe_loop = coroutine.create(function()
+    while true do
+        acquire_minerals(0, coroutine.running())  -- BACKGROUND = 0
+        train_unit("PROBE")
+        release_minerals()
+        coroutine.yield()  -- yield to scheduler
+    end
+end)
+
+-- Main build order
+local build_order = coroutine.create(function()
+    while supply < 14 do
+        coroutine.yield()  -- poll supply
+    end
+    acquire_minerals(2, coroutine.running())  -- HIGH = 2
+    build_structure("PYLON")
+    release_minerals()
+end)
+
+-- Manual scheduler — must be written by the user
+local function run_scheduler()
+    while true do
+        if coroutine.status(probe_loop) ~= "dead" then
+            coroutine.resume(probe_loop)
+        end
+        if coroutine.status(build_order) ~= "dead" then
+            coroutine.resume(build_order)
+        end
+        if coroutine.status(build_order) == "dead" then break end
+    end
+end
+
+run_scheduler()
+```
+
 **Advantage:** The YAML expresses "PROBE yields to PYLON when both
-need minerals" as `priority: background` vs `priority: high`. No mutex
-management, no manual yielding, no custom priority queue implementation.
-The TypeScript version doesn't even solve the problem — standard Mutex
+need minerals" as `priority: background` vs `priority: high`. The Lua
+version requires building a priority queue, a coroutine scheduler, and
+manual yield/resume management — 60+ lines of infrastructure code before
+the first unit is trained. The YAML user doesn't know PriorityOrcSemaphore
+exists — they just wrote `priority: high`. The Lua user must implement
+the entire priority scheduling mechanism themselves.
+
+The TypeScript version (above) has the same problem — standard Mutex
 doesn't support priority, so you'd need to build `PriorityMutex` from
-scratch. The YAML user doesn't know PriorityOrcSemaphore exists — they
-just wrote `priority: high`.
+scratch.
 
 ### Use Case 3.2: Cancellable Background Group
 
@@ -251,11 +320,155 @@ just wrote `priority: high`.
   signal: army-phase
 ```
 
+**TypeScript equivalent:**
+```typescript
+const controller = new AbortController();
+let running = true;
+
+const probeLoop = async () => {
+  while (running) {
+    if (controller.signal.aborted) break;
+    await acquireResource("nexus");
+    try {
+      await trainUnit("PROBE");
+    } finally {
+      releaseResource("nexus");
+    }
+  }
+};
+
+const pylonLoop = async () => {
+  while (running) {
+    if (controller.signal.aborted) break;
+    await waitUntil(() => isSupplyBlocked());
+    await buildStructure("PYLON");
+  }
+};
+
+// Cancellation watcher
+const cancelWatcher = async () => {
+  await waitUntil(() => workerCount >= 22);
+  controller.abort();  // signal both loops
+  running = false;
+};
+
+// Must compose manually — and AbortController doesn't
+// interrupt in-progress async operations (only checked between awaits)
+await Promise.race([
+  Promise.all([probeLoop(), pylonLoop()]),
+  cancelWatcher(),
+]);
+// Are resources cleaned up? Depends on whether the loops
+// were between awaits when abort fired.
+```
+
+**Python equivalent:**
+```python
+import asyncio
+
+class ProductionGroup:
+    def __init__(self):
+        self.cancel_event = asyncio.Event()
+        self._tasks: list[asyncio.Task] = []
+
+    async def probe_loop(self):
+        while not self.cancel_event.is_set():
+            # No priority concept — asyncio has no built-in priority
+            await train_unit("PROBE")
+            await asyncio.sleep(0)  # yield
+
+    async def pylon_loop(self):
+        while not self.cancel_event.is_set():
+            if is_supply_blocked():
+                await build_structure("PYLON")
+            await asyncio.sleep(0.1)  # poll
+
+    async def cancel_watcher(self):
+        while worker_count < 22:
+            await asyncio.sleep(0.1)  # poll — no event-driven threshold
+        self.cancel_event.set()
+        for task in self._tasks:
+            task.cancel()  # cancels, but CancelledError must be caught
+            # If task is mid-build, what happens to the half-built pylon?
+
+    async def run(self):
+        self._tasks = [
+            asyncio.create_task(self.probe_loop()),
+            asyncio.create_task(self.pylon_loop()),
+        ]
+        cancel_task = asyncio.create_task(self.cancel_watcher())
+        try:
+            await asyncio.gather(*self._tasks, cancel_task)
+        except asyncio.CancelledError:
+            pass  # swallowed — is this logged? audited?
+```
+
+**Lua equivalent:**
+```lua
+local cancel_token = false
+local production_coroutines = {}
+
+local probe_loop = coroutine.create(function()
+    while not cancel_token do
+        if nexus_available() then
+            train_unit("PROBE")
+        end
+        coroutine.yield()
+    end
+    -- cleanup? what cleanup? coroutine just stops.
+    -- if we were mid-train, the unit is in an undefined state.
+end)
+
+local pylon_loop = coroutine.create(function()
+    while not cancel_token do
+        if is_supply_blocked() then
+            build_structure("PYLON")
+        end
+        coroutine.yield()
+    end
+end)
+
+table.insert(production_coroutines, probe_loop)
+table.insert(production_coroutines, pylon_loop)
+
+-- Cancellation watcher — separate coroutine
+local cancel_watcher = coroutine.create(function()
+    while true do
+        if worker_count >= 22 then
+            cancel_token = true  -- signal all loops to stop
+            -- But they only check on next iteration.
+            -- If probe_loop is mid-train, it finishes first.
+            -- No cascading scope close. No guaranteed cleanup.
+            break
+        end
+        coroutine.yield()
+    end
+end)
+
+-- Scheduler must run all of these
+local function run()
+    while true do
+        for _, co in ipairs(production_coroutines) do
+            if coroutine.status(co) ~= "dead" then
+                coroutine.resume(co)
+            end
+        end
+        coroutine.resume(cancel_watcher)
+        if cancel_token then break end
+    end
+end
+```
+
 **Advantage:** An entire production group cancelled by a single signal.
-The `cancel:` on the block cascades to all children. In imperative code,
-you'd need a shared cancellation token, manual propagation to each
-coroutine, and cleanup logic. The YAML expresses "stop all of this when
-that happens" in one line.
+The `cancel:` on the block cascades to all children — the runtime
+interrupts spawned tasks, releases resources in finally blocks, and
+closes child scopes. The Lua version uses a shared mutable boolean
+(`cancel_token`) that each coroutine must check manually. If a coroutine
+is mid-operation when the token flips, it finishes that operation before
+checking — no immediate cancellation. No resource cleanup guarantees.
+No cascading scope close. The YAML expresses "stop all of this when
+that happens" in one line; the Lua requires 50+ lines of manual
+coordination.
 
 ---
 
