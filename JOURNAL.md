@@ -1,1 +1,1 @@
-# Design Journal — issue-563-playbook-orchestration-extensions
+# Design Journal — issue-561-human-in-the-loop-confirmation

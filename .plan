@@ -1,0 +1,15 @@
+# Work Plan — issue-561-human-in-the-loop-confirmation
+
+## State
+branch: issue-561-human-in-the-loop-confirmation
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 561
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#561 — Issue #561 ← active
