@@ -205,6 +205,87 @@ cross-process notification. Options:
   a notification. Remote processes subscribe and fire their local
   `at:` decorator listeners.
 
+## Consistency Under Crash and Restart
+
+The core problem: SWF checkpoints at task boundaries. CaseHub-side
+execution happens WITHIN a task. If the process crashes mid-task, SWF
+re-executes the entire task. Each CaseHub feature must handle this
+correctly.
+
+### Per-Feature Crash Analysis
+
+**`at:` (threshold gate):**
+Crash while blocked → SWF re-executes → decorator re-checks counter.
+If counter is durable, value is preserved — correct behaviour. If
+counter is ephemeral, value is zero — blocks forever. **Rule:** any
+counter referenced by `at:` MUST use a durable primitive in durable
+mode.
+
+**`resource:/priority:` (contention):**
+Crash while holding semaphore → semaphore never released → deadlock.
+**Solution:** durable semaphores use lease-based TTL. The lock expires
+automatically on crash. On restart, SWF re-executes → decorator
+re-acquires fresh. Lease renewal heartbeat prevents premature expiry
+during legitimately long steps. **Rule:** durable
+`PriorityOrcSemaphore` uses lease + heartbeat, not permanent locks.
+
+**`background:` (spawn):**
+Crash after spawn returned success → SWF sees task completed → skips
+on restart. But spawned task is gone. **Solution:** in durable mode,
+`background:` persists the task definition BEFORE returning success.
+On recovery, the runtime reads persisted definitions and re-spawns.
+**Rule:** background task registration and SWF checkpoint must be
+atomic (same transaction).
+
+**`cancel:` (signal-triggered):**
+Crash after signal fired but before step responded → on restart, SWF
+re-executes → decorator re-registers watcher. If signal is durable,
+`isSignalled()` returns true → immediate cancellation (correct). If
+signal is ephemeral → forgotten → step runs uncancelled. **Rule:**
+signals used with `cancel:` MUST be durable.
+
+**`from:` (channel read):**
+Crash after reading message but before step completed → message
+consumed, result not checkpointed → message lost on restart.
+**Solution:** two-phase read — read without acknowledgment, process
+step, acknowledge + SWF checkpoint in same transaction. Requires
+channel backend to support transactional acknowledgment (Kafka
+consumer offsets, Redis XACK). **Rule:** `from:` in durable mode
+needs at-least-once delivery. Steps must be idempotent, OR channel
+and SWF persistence share a transaction.
+
+**`forEach: { collect: all }`:**
+Crash mid-iteration → SWF re-executes entire task → all iterations
+re-run. **Better approach:** compile `forEach` to SWF's native `for:`
+construct in durable mode (SDK's `ForExecutor` checkpoints per
+iteration). **Rule:** in durable mode, `forEach` compiles to SWF
+`for:`, not the CaseHub decorator.
+
+### The Consistency Boundary
+
+**SWF checkpoint and durable primitive mutations must be in the same
+transaction.**
+
+```
+┌─ Transaction ─────────────────────────────────────────┐
+│  1. CaseHub step executes (inside CallableTask)       │
+│  2. Primitive mutations (counter++, flag set)         │
+│  3. SWF checkpoint (task completed, position advances) │
+│  4. Channel message acknowledged                      │
+│  5. Background task definition persisted               │
+│  COMMIT                                               │
+└───────────────────────────────────────────────────────┘
+```
+
+If ALL of these use the same PostgreSQL database, this is a single
+ACID transaction. If primitives are in Redis, atomicity is lost and
+compensating mechanisms are needed (reconciliation on recovery).
+
+**Recommendation:** Phase 1 uses PostgreSQL for everything — SWF
+persistence AND durable primitives. Same database, same transaction,
+exact consistency. Redis is a Phase 3 optimisation for high-throughput
+channels where PostgreSQL latency is unacceptable.
+
 ## Recovery: What Happens on Crash
 
 1. **SWF persistence restores the workflow position.** Completed tasks
