@@ -1,0 +1,15 @@
+# Work Plan — issue-573-inmem-cascade-relationship-cleanup
+
+## State
+branch: issue-573-inmem-cascade-relationship-cleanup
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 573
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#573 — Issue #573 ← active
