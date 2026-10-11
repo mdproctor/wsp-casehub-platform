@@ -1,2 +1,9 @@
 delete_progress=done
 report_render=done
+checkout_main=done
+cleanup_stack=done
+cleanup=done
+report_scaffold=done
+promote_plan_next=done
+cleanup_pass=done
+_final_gate_attempt=1
