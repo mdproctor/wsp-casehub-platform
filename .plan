@@ -1,7 +1,7 @@
 # Work Plan — issue-573-inmem-cascade-relationship-cleanup
 
 ## State
-branch: issue-577-jpa-cascade-enforcement-tests
+branch: issue-579-extract-cascade-grace-elapsed
 state: active
 project-sha: 
 date: 
