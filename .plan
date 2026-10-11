@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-573-inmem-cascade-relationship-cleanup
-state: closing:review
+state: closing:verified
 project-sha: 
 date: 
 issue-repo: casehubio/platform
@@ -10,7 +10,7 @@ covers: 573
 design-repo: 
 design-section-hashes: 
 flyway-next-v: 
-
 evidence-era: true
+
 ## Queue
-- [ ] casehubio/platform#573 — Issue #573 ← active
+- [x] casehubio/platform#573 — Issue #573
