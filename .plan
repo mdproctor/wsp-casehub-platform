@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-573-inmem-cascade-relationship-cleanup
-state: closing:merged
+state: closing:stamped
 project-sha: 
 date: 
 issue-repo: casehubio/platform
