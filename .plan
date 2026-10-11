@@ -2,11 +2,11 @@
 
 ## State
 branch: main
-state: drained
+state: active
 project-sha: 
 date: 
 issue-repo: casehubio/platform
-covers: 573
+covers: 574,576,577,579,578,580,581,570,582
 design-repo: 
 design-section-hashes: 
 flyway-next-v: 
