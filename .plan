@@ -1,7 +1,7 @@
 # Work Plan — issue-573-inmem-cascade-relationship-cleanup
 
 ## State
-branch: main
+branch: issue-576-cascade-on-tick-idempotency
 state: active
 project-sha: 
 date: 
@@ -14,3 +14,11 @@ evidence-era: true
 
 ## Queue
 - [x] casehubio/platform#573 — Issue #573
+- [ ] casehubio/platform#576 — test cascade-on-tick idempotency
+- [ ] casehubio/platform#577 — test JPA cascade enforcement
+- [ ] casehubio/platform#579 — refactor applyCascadeIfGraceElapsed to CascadeEngine
+- [ ] casehubio/platform#578 — fix RegistryClient discover URL-encoding
+- [ ] casehubio/platform#580 — fix RegistryClient deregister void to CascadeResult
+- [ ] casehubio/platform#581 — chore registry-client cleanup
+- [ ] casehubio/platform#570 — feat registry-client Quarkus wiring
+- [ ] casehubio/platform#582 — chore move CascadeEngine to registry-common
