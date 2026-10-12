@@ -1,49 +1,101 @@
-# HANDOFF — casehub-platform
+# HANDOFF — Slot 198
 
 ## Status
 
-**Platform #428 (YamlMappers standardisation):** CLOSED. 119 sites migrated across 15 repos.
-**Epic #520 (Playbook naming unification):** CLOSED. All 11 issues done.
-**Epic #502 (YAML cross-repo parity):** Batches 1-4 closed. Batch 5 (pages#502 ops sub-epic) open.
+**Branch:** issue-564-from-decorator (platform only — yaml-core changes)
+**Active issue:** platform#564 — Playbook streams: from: decorator
+**State:** Scaffolded — branch, .plan, and task breakdown created. No implementation yet.
 
-## This Session
+## Queue
 
-Standardised YAML parsing across the entire casehub ecosystem:
-- Migrated 119 `new ObjectMapper(new YAMLFactory())` sites to `YamlMappers.create()` (YAML 1.2 Core Schema with `PARSE_BOOLEAN_LIKE_WORDS_AS_STRINGS`).
-- 36 production sites + 83 test sites across 15 repos.
-- Added `casehub-platform-yaml-jackson` dependency to 11 repos that didn't have it.
-- All changes landed on main, pushed to mdproctor and casehubio remotes.
+1. casehubio/platform#564 — Playbook streams: from: decorator (M/Med) ← active
 
-**Repos modified:** platform, engine, work, desiredstate, pages, examples, connectors, ops, iot, claudony, eidos, neocortex, scaffold, fsitrading, blocks
+## Context
 
-**Excluded (intentionally not migrated):**
-- `YamlMappers.java` itself (platform yaml-jackson — IS the factory)
-- `ContentResolver(new YAMLFactory())` (platform yaml-codegen, engine codegen — jsonschema2pojo API)
-- `CaseHubSchemaGenerator` (engine — custom YAML output features: WRITE_DOC_START_MARKER, MINIMIZE_QUOTES)
-- `CognitiveSchemaGenerator` (neocortex — same custom output features)
-- `JsonMapper.builder(new YAMLFactory())` (platform yaml-jackson tests — testing builder-specific behaviour)
+### What this issue adds
 
-## Key Decisions
+One new decorator (`from:`) for the playbook YAML language. It reads one item from an `OrcChannel` per step invocation, enabling stream processing patterns without a stream DSL.
 
-- YAML output sites (CaseHubSchemaGenerator, CognitiveSchemaGenerator) left as-is — they configure YAMLGenerator features for output formatting, not parsing. A future `YamlMappers.createForWriting()` could cover these.
-- Engine dependencyManagement was missing yaml-jackson entry — added it as part of this migration (pre-existing gap).
-- `.findAndRegisterModules()` chains preserved — only the ObjectMapper creation was replaced.
+**Syntax variants:**
+```yaml
+# Simple — read from named channel
+from: channel-name
 
-## Next Action — Pages Post-Rename Cleanup
+# Full — channel + alias + pre-filter
+from: { channel: raw-readings, as: reading, filter: "${reading.value} > ${threshold}" }
 
-**Larger goal:** The Scenario→Playbook rename (#520) and YamlMappers standardisation (#428) are landed. But the rename left behind dead code, stale types, and broken references in casehub-pages. These cleanup issues complete the rename's tail work and move platform#502 (YAML cross-repo parity) closer to closure.
+# Fan-in — merge multiple channels
+from: { channels: [fire-alerts, flood-alerts], as: alert }
+```
 
-**.plan queue (4 issues, all casehubio/casehub-pages):**
+Plus a minor extension: `publish:` accepts a list with per-channel conditions for fan-out.
 
-1. **#528** — ScenarioLibraryGraphQL breaks SmallRye. Likely already resolved by the playbook rename (#525 landed 241 files). Verify the class is gone or renamed with proper GraphQL annotations, then close. XS/Low.
-2. **#514** — Delete remaining Format A types. Old flat-step parser types (`ScenarioParser`, `ScenarioStep` sealed interface, `AriaStep`/`GraphQLStep`/`SimulatedStep`) are dead code after the hierarchical parser migration. Pure deletion. M/Low.
-3. **#390** — Scenario format refinements (cleanup items ONLY). Delete `ScenarioParser.java` (Format A parser) and consolidate TS `types.ts`. Skip the new-feature items in this issue (actor, delay, REST/GraphQL wiring). M/Med.
-4. **#519** — Annotate historical spec docs with post-unification type names. Docs sweep. S/Low.
+### Prerequisites (both landed)
 
-**Scope guard:** chores and cleanup only. No new features, no examples, no new capabilities.
+- #562 — at:, on-complete:, resource:/priority: decorators (CLOSED)
+- #563 — loop continuous, cancel, background, forEach collect, conditional retry (CLOSED)
+
+### Key files
+
+| File | Purpose |
+|------|---------|
+| `yaml-core/.../orchestration/OrcChannel.java` | Channel primitive — the from: decorator reads from this |
+| `yaml-step-runtime/.../eval/DecoratorChain.java` | Decorator ordering — from: goes at position 7 |
+| `yaml-step-runtime/.../catalog/StepSchemaComposer.java` | Schema composition — needs from: added |
+| Issue body (platform#564) | Full design spec with decorator chain position, syntax, patterns |
+
+### DecoratorChain position
+
+The from: decorator sits at position 7 in the chain:
+```
+5. loop        ← repetition (wraps from:)
+6. on-error    ← error handling
+7. from        ← NEW: read one item from channel
+8. timeout     ← per-item timeout
+9. at          ← threshold gate
+```
+
+### Task breakdown
+
+**Batch 1: Core from: decorator**
+- Task 1: `FromDecorator` — blocking read from OrcChannel, inject as `${from.*}`
+- Task 2: Filter support — `from: { channel: x, filter: expr }` pre-filter
+- Task 3: Alias support — `from: { channel: x, as: alias }` injects as `${alias.*}`
+
+**Batch 2: Fan-in and fan-out**
+- Task 4: Fan-in — `from: { channels: [a, b] }` reads from whichever has data first
+- Task 5: `publish:` list extension — `[{channel: x, if: expr}]` conditional fan-out
+
+**Batch 3: Integration**
+- Task 6: DecoratorChain position — insert at slot 7
+- Task 7: StepSchemaComposer update — add from: to JSON schema
+- Task 8: ADR-0011 keyword registration
+
+**Batch 4: Testing**
+- Task 9: Unit tests — channel read, filter, alias, fan-in, backpressure
+- Task 10: Integration test — pipeline pattern (source → filter → sink)
+
+### Design notes from the issue
+
+- `from:` reads one item per invocation via blocking `OrcChannel.receive()`
+- Filter pre-filters inside the decorator — items failing filter are discarded and next item read
+- Fan-in uses whichever channel has data first (select semantics)
+- `publish: [{channel: x, if: expr}]` — list form with per-channel conditions
+- Backpressure via bounded channel capacity (existing OrcChannel behaviour)
+- No explicit yield keyword — virtual threads yield automatically
+- Windowed aggregation is a plugin concern, not a language primitive
+
+## Prior Work (landed this session)
+
+- engine#1214 — SSE broadcasters SseEmitter bridge (platform generators + engine broadcasters)
+- engine#1215 — Scope extractor, rest-core extraction, integration-test mocks
+- workers#29 — Script + Camel Spring auto-configs
+- workers#30 — spring-generator verify drift detection for 7 worker modules
+- Commented on engine#1222 re: @PlatformStream generator fix overlap
 
 ## References
 
-- GitHub issue: casehubio/platform#428 (closed)
-- `YamlMappers.java`: platform/yaml-jackson/src/main/java/io/casehub/yaml/jackson/YamlMappers.java
-- `YamlMappersTest.java`: platform/yaml-jackson/src/test/java/io/casehub/yaml/jackson/YamlMappersTest.java
+- Issue: casehubio/platform#564 (full design spec in issue body)
+- OrcChannel: `yaml-core/src/main/java/io/casehub/yaml/core/orchestration/OrcChannel.java`
+- DecoratorChain: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/DecoratorChain.java`
+- StepSchemaComposer: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/catalog/StepSchemaComposer.java`
