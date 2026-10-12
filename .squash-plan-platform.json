@@ -1,0 +1,9 @@
+{
+  "repo": "platform",
+  "commits": [
+    {"sha": "5ba5b104bf39e82dd56b616c7eddb04bc36ce652", "message": "fix(drift-detection): add registry-client modules to spring-parity-exceptions", "action": "keep"}
+  ],
+  "strategy": "single-commit",
+  "verified": true,
+  "message": "fix(drift-detection): add registry-client modules to spring-parity-exceptions\n\nRefs #575\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
+}
