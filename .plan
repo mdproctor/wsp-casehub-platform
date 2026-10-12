@@ -13,3 +13,8 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/platform#509 — Issue #509 ← active
+  - [x] Batch 1: Consent tier types
+    - [x] Task 1: ConsentTier and ConsentOutcome enums
+    - [x] Task 2: Evolve AuthorizationDecision
+    - [x] Task 3: Add defaultTier to WorkerAction
+    - [x] Task 4: Full build verification and CLAUDE.md
