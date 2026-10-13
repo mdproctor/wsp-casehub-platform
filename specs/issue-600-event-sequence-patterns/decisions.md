@@ -9,3 +9,14 @@
 **Sources:** StructuralStepEvaluator.java (SelectStep/ParallelStep patterns), DecoratorChain.java, ResolvedStep.java
 **Exploration:** quick
 **Status:** captured
+
+## D2: Named consumer handle mechanism
+
+**Choice:** Dedicated ConsumerHandle type extending OrcPrimitive — `stop()`, `start()`, `isRunning()`. Registered in ExecutionScope by name when from: specifies `name:`. Cached by from: at setup time (one lookup). ControlStep resolves handle and calls stop()/start().
+**Alternatives:**
+- Reuse OrcFlag — zero new types, but limits future growth (no listener hooks, no metrics, no pause/resume) and no semantic clarity
+**Rationale:** Handle can grow (metrics, listeners, LockSupport pause/resume) without touching from: or ControlStep. Cached lookup avoids per-receive scope resolution. Semantically clear — ConsumerHandle communicates intent.
+**Trade-offs:** One new type in orchestration package
+**Sources:** OrcFlag.java (existing boolean primitive), ExecutionScope.java (primitive registration pattern)
+**Exploration:** quick
+**Status:** captured
