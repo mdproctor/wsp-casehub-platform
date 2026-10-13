@@ -32,3 +32,16 @@
 **Sources:** DecoratorChain.java:453-488 (wrapFromSingleChannel)
 **Exploration:** quick
 **Status:** captured
+
+## D4: stop/start vs pause/resume
+
+**Choice:** Single pair of operations — stop() blocks the consumer thread (via j.u.c Condition), start() wakes it. No separate pause/resume concept.
+**Alternatives:**
+- stop/start as non-blocking flag + separate pause/resume with LockSupport — false distinction; non-blocking stop causes busy-spin inside loop: continuous
+- Defer pause/resume — unnecessary because stop must block to be correct
+**Rationale:** If stop just sets a flag and returns, and from: is inside loop: continuous, the loop re-enters from: immediately → busy spin. Stop must block the thread, which IS pause. One concept, not two.
+**Trade-offs:** None — eliminates unnecessary complexity
+**Depends on:** D2 (ConsumerHandle type)
+**Sources:** DecoratorChain.java (wrapLoop + wrapFrom interaction), issue #602
+**Exploration:** quick
+**Status:** captured
