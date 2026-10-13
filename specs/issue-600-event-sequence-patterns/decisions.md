@@ -20,3 +20,15 @@
 **Sources:** OrcFlag.java (existing boolean primitive), ExecutionScope.java (primitive registration pattern)
 **Exploration:** quick
 **Status:** captured
+
+## D3: from: hardening scope
+
+**Choice:** Combined from: hardening — #601 (until + channel close) and #602 (named consumers + stop/start) designed and implemented as a single pass on the from: receive loop
+**Alternatives:**
+- Separate passes (#601 first, then #602) — smaller PRs but rewrites the same method twice
+**Rationale:** Both modify wrapFromSingleChannel. The receive loop has natural layering (conditions → receive → error handling → filter) that accommodates both cleanly in one pass. Avoids refactor-then-refactor-again.
+**Trade-offs:** Larger single change to the from: decorator; two issues close together
+**Depends on:** D2 (ConsumerHandle type used in the receive loop)
+**Sources:** DecoratorChain.java:453-488 (wrapFromSingleChannel)
+**Exploration:** quick
+**Status:** captured
