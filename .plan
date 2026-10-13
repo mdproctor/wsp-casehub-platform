@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-564-from-decorator
-state: active
+state: closing:review
 project-sha: 
 date: 
 issue-repo: casehubio/platform
@@ -11,19 +11,6 @@ design-repo:
 design-section-hashes: 
 flyway-next-v: 
 
+evidence-era: true
 ## Queue
-- [ ] casehubio/platform#564 — Playbook streams: from: decorator for channel-connected pipeline stages <- active
-  - [ ] Batch 1: Core from: decorator
-    - [ ] Task 1: FromDecorator — reads one item from OrcChannel, injects as ${from.*}
-    - [ ] Task 2: Filter support — from: { channel: x, filter: expr } pre-filter inside decorator
-    - [ ] Task 3: Alias support — from: { channel: x, as: alias } injects as ${alias.*}
-  - [ ] Batch 2: Fan-in and fan-out
-    - [ ] Task 4: Fan-in — from: { channels: [a, b], as: item } merges multiple channels
-    - [ ] Task 5: Publish list extension — publish: [{channel: x, if: expr}] conditional fan-out
-  - [ ] Batch 3: Integration
-    - [ ] Task 6: DecoratorChain position — slot 7 between on-error and timeout
-    - [ ] Task 7: StepSchemaComposer update — add from: to schema
-    - [ ] Task 8: ADR-0011 keyword registration
-  - [ ] Batch 4: Testing
-    - [ ] Task 9: Unit tests — channel read, caseId filter, alias, fan-in, backpressure
-    - [ ] Task 10: Integration test — pipeline pattern (source -> filter -> sink)
+- [x] casehubio/platform#564 — Playbook streams: from: decorator for channel-connected pipeline stages
