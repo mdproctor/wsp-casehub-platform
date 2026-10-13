@@ -2,100 +2,68 @@
 
 ## Status
 
-**Branch:** issue-564-from-decorator (platform only — yaml-core changes)
-**Active issue:** platform#564 — Playbook streams: from: decorator
-**State:** Scaffolded — branch, .plan, and task breakdown created. No implementation yet.
+**Branch:** issue-609-playbook-yaml-examples
+**Active issue:** casehubio/platform#609 — Playbook YAML examples for event sequence patterns
+**State:** Branch created, no implementation yet.
 
 ## Queue
 
-1. casehubio/platform#564 — Playbook streams: from: decorator (M/Med) ← active
+1. casehubio/platform#609 — Playbook YAML examples (M/Med) <- active
+2. casehubio/platform#610 — Pages: event sequence pattern playbooks (M/Med)
 
-## Context
+## What was completed this session
 
-### What this issue adds
+### Epic #600 — Event sequence patterns (LANDED)
 
-One new decorator (`from:`) for the playbook YAML language. It reads one item from an `OrcChannel` per step invocation, enabling stream processing patterns without a stream DSL.
+Full design-brainstorm-implement-audit-review-close cycle for composable event sequence matching in the playbook language. Landed as `910dd74e` on main.
 
-**Syntax variants:**
-```yaml
-# Simple — read from named channel
-from: channel-name
+**What shipped:**
+- **ConsumerHandle** — new OrcPrimitive with LockSupport-based pause/resume
+- **from: hardening** — `until:` condition, channel close detection (`isClosed()`), named consumers with pause/resume
+- **ControlStep** — `pause:`/`resume:` as built-in ResolvedStep variant
+- **RaceStep** — `race:` first-to-complete alternation with CAS + cancellation
+- **Walker fixes** — decorator-only step fallback (empty BlockStep), RESERVED_KEYS parity with DECORATOR_KEYS
+- **Integration tests** — temporal patterns (absence, heartbeat) + recursive composition `((A then B) or (A then C))*`
 
-# Full — channel + alias + pre-filter
-from: { channel: raw-readings, as: reading, filter: "${reading.value} > ${threshold}" }
+**Issues closed:** #600, #601, #602, #603, #604, #605
+**Issue filed:** #608 (Walker RESERVED_KEYS parity — systemic fix)
+**Test coverage:** 1,253 tests pass (807 yaml-core + 446 yaml-step-runtime)
 
-# Fan-in — merge multiple channels
-from: { channels: [fire-alerts, flood-alerts], as: alert }
-```
+### Repo sync
 
-Plus a minor extension: `publish:` accepts a list with per-channel conditions for fan-out.
+All repos in slot 198 synced to both mdproctor and casehubio remotes. Engine mdproctor origin has diverged SHAs (casehubio is canonical and in sync) — will reconcile naturally on next work-end.
 
-### Prerequisites (both landed)
+## What #609 needs
 
-- #562 — at:, on-complete:, resource:/priority: decorators (CLOSED)
-- #563 — loop continuous, cancel, background, forEach collect, conditional retry (CLOSED)
+Create 9 playbook YAML examples + manifest.json covering the #600 features. Mirror pages repo's `manifest.json`-driven structure.
 
-### Key files
+### New playbooks
 
-| File | Purpose |
-|------|---------|
-| `yaml-core/.../orchestration/OrcChannel.java` | Channel primitive — the from: decorator reads from this |
-| `yaml-step-runtime/.../eval/DecoratorChain.java` | Decorator ordering — from: goes at position 7 |
-| `yaml-step-runtime/.../catalog/StepSchemaComposer.java` | Schema composition — needs from: added |
-| Issue body (platform#564) | Full design spec with decorator chain position, syntax, patterns |
+| Category (key) | File | Title |
+|----------------|------|-------|
+| Control Flow (step-workflows) | `step-workflows/race.playbook.yaml` | Race |
+| Step Modifiers (flow-control) | `flow-control/pause-resume.playbook.yaml` | Pause / Resume |
+| Step Modifiers (flow-control) | `flow-control/from-until.playbook.yaml` | From Until |
+| Step Modifiers (flow-control) | `flow-control/from-channel-close.playbook.yaml` | From Channel Close |
+| Concurrency Patterns (concurrency-patterns) | `concurrency-patterns/named-consumer.playbook.yaml` | Named Consumer |
+| Composition (composition) | `composition/timed-absence.playbook.yaml` | Timed Absence |
+| Composition (composition) | `composition/delayed-sequence.playbook.yaml` | Delayed Sequence |
+| Composition (composition) | `composition/heartbeat-monitor.playbook.yaml` | Heartbeat Monitor |
+| Composition (composition) | `composition/recursive-pattern.playbook.yaml` | Recursive Pattern |
 
-### DecoratorChain position
+### Existing playbook to revise
 
-The from: decorator sits at position 7 in the chain:
-```
-5. loop        ← repetition (wraps from:)
-6. on-error    ← error handling
-7. from        ← NEW: read one item from channel
-8. timeout     ← per-item timeout
-9. at          ← threshold gate
-```
+- `step-workflows/select.playbook.yaml` — update description to focus on channel/signal multiplexing (race: now owns "first-to-complete" for arbitrary blocks)
 
-### Task breakdown
+### Key design constraints from #600
 
-**Batch 1: Core from: decorator**
-- Task 1: `FromDecorator` — blocking read from OrcChannel, inject as `${from.*}`
-- Task 2: Filter support — `from: { channel: x, filter: expr }` pre-filter
-- Task 3: Alias support — `from: { channel: x, as: alias }` injects as `${alias.*}`
+- **race: is for independent channels** — branches sharing a channel have competing-consumer semantics. For single-stream alternation, use sequential from: + match:/cases:
+- **Decorator ordering** — from: (4.5) is outer to timeout: (5). Timed absence needs nested block: timeout/on-error on outer, from: on inner
+- **Decorator-only steps** — standalone `- from: { channel: events }` desugars to empty BlockStep with decorators (Walker fallback)
+- **pause/resume not stop/start** — communicates continuity, leaves room for begin/end lifecycle
 
-**Batch 2: Fan-in and fan-out**
-- Task 4: Fan-in — `from: { channels: [a, b] }` reads from whichever has data first
-- Task 5: `publish:` list extension — `[{channel: x, if: expr}]` conditional fan-out
+### Reference files
 
-**Batch 3: Integration**
-- Task 6: DecoratorChain position — insert at slot 7
-- Task 7: StepSchemaComposer update — add from: to JSON schema
-- Task 8: ADR-0011 keyword registration
-
-**Batch 4: Testing**
-- Task 9: Unit tests — channel read, filter, alias, fan-in, backpressure
-- Task 10: Integration test — pipeline pattern (source → filter → sink)
-
-### Design notes from the issue
-
-- `from:` reads one item per invocation via blocking `OrcChannel.receive()`
-- Filter pre-filters inside the decorator — items failing filter are discarded and next item read
-- Fan-in uses whichever channel has data first (select semantics)
-- `publish: [{channel: x, if: expr}]` — list form with per-channel conditions
-- Backpressure via bounded channel capacity (existing OrcChannel behaviour)
-- No explicit yield keyword — virtual threads yield automatically
-- Windowed aggregation is a plugin concern, not a language primitive
-
-## Prior Work (landed this session)
-
-- engine#1214 — SSE broadcasters SseEmitter bridge (platform generators + engine broadcasters)
-- engine#1215 — Scope extractor, rest-core extraction, integration-test mocks
-- workers#29 — Script + Camel Spring auto-configs
-- workers#30 — spring-generator verify drift detection for 7 worker modules
-- Commented on engine#1222 re: @PlatformStream generator fix overlap
-
-## References
-
-- Issue: casehubio/platform#564 (full design spec in issue body)
-- OrcChannel: `yaml-core/src/main/java/io/casehub/yaml/core/orchestration/OrcChannel.java`
-- DecoratorChain: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/DecoratorChain.java`
-- StepSchemaComposer: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/catalog/StepSchemaComposer.java`
+- Design spec: `wsp-casehub-platform/specs/issue-600-event-sequence-patterns/2026-10-13-event-sequence-patterns-design.md`
+- Pages manifest: `/Users/mdproctor/claude/casehub/pages/playbooks/manifest.json` (7 categories, 48 playbooks)
+- Pages Scenarios: `/Users/mdproctor/claude/casehub/pages/examples/samples/Scenarios/` (13 themed pages, 5-act narrative from #541)
