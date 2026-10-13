@@ -1,38 +1,101 @@
-# HANDOFF — casehub-platform
+# HANDOFF — Slot 198
 
 ## Status
 
-**Issue #530 (Link social login to service connection):** CLOSED. Landed as 18b51b72 on main.
-**Epic #502 (YAML cross-repo parity):** Batches 1-4 closed. Batch 5 (pages#502 ops sub-epic) open.
+**Branch:** issue-564-from-decorator (platform only — yaml-core changes)
+**Active issue:** platform#564 — Playbook streams: from: decorator
+**State:** Scaffolded — branch, .plan, and task breakdown created. No implementation yet.
 
-## This Session
+## Queue
 
-Added `ServiceConnectionProvider` SPI — a derived-view facade over OAuthTokenStore + ScopeRegistry + OAuthTokenManagerCore. No new persistence. One consent screen for identity + service scopes via `ScopeMergingLoginCustomizer`.
+1. casehubio/platform#564 — Playbook streams: from: decorator (M/Med) ← active
 
-**Changes landed on main:**
-- `ServiceConnectionProvider` SPI in platform-api (5 methods: getConnection, listConnections, getAccessToken, disconnect, missingScopes)
-- `ServiceConnectionProviderCore` in authn-social-core (86 lines of composition)
-- `ScopeMergingLoginCustomizer` in authn-core (integrates into AuthenticationRouterCore)
-- `NoOpServiceConnectionProvider` @DefaultBean in platform/
-- Quarkus + Spring wiring with `casehub.authn.merge-service-scopes` config (default true)
-- `ScopeRegistry.registeredProviders()` default method added
-- 33 tests across 5 test classes
+## Context
 
-**Issues filed this session:**
-- connectors#157 — ConnectionPlatform SPI (M/Med)
-- connectors#158 — Google service connection: register scopes + consume SPI (S/Med)
-- connectors#159 — Connection status UI (S/Low)
-- platform#550 — access_type=offline for Google refresh tokens (S/Med, critical for production)
-- platform#551 — Doc sync: add SPI to consumer/contributor guides (XS/Low)
+### What this issue adds
 
-## Key Decisions
+One new decorator (`from:`) for the playbook YAML language. It reads one item from an `OrcChannel` per step invocation, enabling stream processing patterns without a stream DSL.
 
-- ServiceConnectionProvider is a derived view, not a persisted entity — connection status computed from existing OAuthTokenStore + ScopeRegistry data
-- ScopeMergingLoginCustomizer lives in authn-core (not authn-social-core) to avoid circular dependency — it only depends on platform-api types
-- access_type=offline deferred to #550 — modifying AbstractOAuthAuthenticationProvider.buildAuthorizationUrl() is a broader change
-- All new types in io.casehub.platform.api.authn package (not identity) — consistent with existing authn SPIs
+**Syntax variants:**
+```yaml
+# Simple — read from named channel
+from: channel-name
 
-## Open Items
+# Full — channel + alias + pre-filter
+from: { channel: raw-readings, as: reading, filter: "${reading.value} > ${threshold}" }
 
-- **platform#550 is critical for production use** — without access_type=offline, Google service connections die after ~1 hour when the access token expires. The SPI works correctly but transparent refresh won't have a refresh token to use.
-- **Paused branch:** epic-502-yaml-parity still on the stack (Batch 5 remaining)
+# Fan-in — merge multiple channels
+from: { channels: [fire-alerts, flood-alerts], as: alert }
+```
+
+Plus a minor extension: `publish:` accepts a list with per-channel conditions for fan-out.
+
+### Prerequisites (both landed)
+
+- #562 — at:, on-complete:, resource:/priority: decorators (CLOSED)
+- #563 — loop continuous, cancel, background, forEach collect, conditional retry (CLOSED)
+
+### Key files
+
+| File | Purpose |
+|------|---------|
+| `yaml-core/.../orchestration/OrcChannel.java` | Channel primitive — the from: decorator reads from this |
+| `yaml-step-runtime/.../eval/DecoratorChain.java` | Decorator ordering — from: goes at position 7 |
+| `yaml-step-runtime/.../catalog/StepSchemaComposer.java` | Schema composition — needs from: added |
+| Issue body (platform#564) | Full design spec with decorator chain position, syntax, patterns |
+
+### DecoratorChain position
+
+The from: decorator sits at position 7 in the chain:
+```
+5. loop        ← repetition (wraps from:)
+6. on-error    ← error handling
+7. from        ← NEW: read one item from channel
+8. timeout     ← per-item timeout
+9. at          ← threshold gate
+```
+
+### Task breakdown
+
+**Batch 1: Core from: decorator**
+- Task 1: `FromDecorator` — blocking read from OrcChannel, inject as `${from.*}`
+- Task 2: Filter support — `from: { channel: x, filter: expr }` pre-filter
+- Task 3: Alias support — `from: { channel: x, as: alias }` injects as `${alias.*}`
+
+**Batch 2: Fan-in and fan-out**
+- Task 4: Fan-in — `from: { channels: [a, b] }` reads from whichever has data first
+- Task 5: `publish:` list extension — `[{channel: x, if: expr}]` conditional fan-out
+
+**Batch 3: Integration**
+- Task 6: DecoratorChain position — insert at slot 7
+- Task 7: StepSchemaComposer update — add from: to JSON schema
+- Task 8: ADR-0011 keyword registration
+
+**Batch 4: Testing**
+- Task 9: Unit tests — channel read, filter, alias, fan-in, backpressure
+- Task 10: Integration test — pipeline pattern (source → filter → sink)
+
+### Design notes from the issue
+
+- `from:` reads one item per invocation via blocking `OrcChannel.receive()`
+- Filter pre-filters inside the decorator — items failing filter are discarded and next item read
+- Fan-in uses whichever channel has data first (select semantics)
+- `publish: [{channel: x, if: expr}]` — list form with per-channel conditions
+- Backpressure via bounded channel capacity (existing OrcChannel behaviour)
+- No explicit yield keyword — virtual threads yield automatically
+- Windowed aggregation is a plugin concern, not a language primitive
+
+## Prior Work (landed this session)
+
+- engine#1214 — SSE broadcasters SseEmitter bridge (platform generators + engine broadcasters)
+- engine#1215 — Scope extractor, rest-core extraction, integration-test mocks
+- workers#29 — Script + Camel Spring auto-configs
+- workers#30 — spring-generator verify drift detection for 7 worker modules
+- Commented on engine#1222 re: @PlatformStream generator fix overlap
+
+## References
+
+- Issue: casehubio/platform#564 (full design spec in issue body)
+- OrcChannel: `yaml-core/src/main/java/io/casehub/yaml/core/orchestration/OrcChannel.java`
+- DecoratorChain: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/DecoratorChain.java`
+- StepSchemaComposer: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/catalog/StepSchemaComposer.java`
