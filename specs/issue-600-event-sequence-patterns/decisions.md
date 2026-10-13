@@ -12,10 +12,10 @@
 
 ## D2: Named consumer handle mechanism
 
-**Choice:** Dedicated ConsumerHandle type extending OrcPrimitive — `stop()`, `start()`, `isRunning()`. Registered in ExecutionScope by name when from: specifies `name:`. Cached by from: at setup time (one lookup). ControlStep resolves handle and calls stop()/start().
+**Choice:** Dedicated ConsumerHandle type extending OrcPrimitive — `pause()`, `resume()`, `isRunning()`. Registered in ExecutionScope by name when from: specifies `name:`. Cached by from: at setup time (one lookup). ControlStep resolves handle and calls pause()/resume().
 **Alternatives:**
-- Reuse OrcFlag — zero new types, but limits future growth (no listener hooks, no metrics, no pause/resume) and no semantic clarity
-**Rationale:** Handle can grow (metrics, listeners, LockSupport pause/resume) without touching from: or ControlStep. Cached lookup avoids per-receive scope resolution. Semantically clear — ConsumerHandle communicates intent.
+- Reuse OrcFlag — zero new types, but limits future growth (no listener hooks, no metrics) and no semantic clarity
+**Rationale:** Handle can grow (metrics, listeners, begin/end lifecycle) without touching from: or ControlStep. Cached lookup avoids per-receive scope resolution. Semantically clear — ConsumerHandle communicates intent.
 **Trade-offs:** One new type in orchestration package
 **Sources:** OrcFlag.java (existing boolean primitive), ExecutionScope.java (primitive registration pattern)
 **Exploration:** quick
@@ -23,7 +23,7 @@
 
 ## D3: from: hardening scope
 
-**Choice:** Combined from: hardening — #601 (until + channel close) and #602 (named consumers + stop/start) designed and implemented as a single pass on the from: receive loop
+**Choice:** Combined from: hardening — #601 (until + channel close) and #602 (named consumers + pause/resume) designed and implemented as a single pass on the from: receive loop
 **Alternatives:**
 - Separate passes (#601 first, then #602) — smaller PRs but rewrites the same method twice
 **Rationale:** Both modify wrapFromSingleChannel. The receive loop has natural layering (conditions → receive → error handling → filter) that accommodates both cleanly in one pass. Avoids refactor-then-refactor-again.
@@ -33,15 +33,15 @@
 **Exploration:** quick
 **Status:** captured
 
-## D4: stop/start vs pause/resume
+## D4: pause/resume semantics (revised from pause/resume)
 
-**Choice:** Single pair of operations — stop() blocks the consumer thread (via j.u.c Condition), start() wakes it. No separate pause/resume concept.
+**Choice:** Use pause/resume instead of pause/resume. ConsumerHandle exposes `pause()` (blocks consumer thread via j.u.c Condition) and `resume()` (wakes it). YAML syntax: `pause: enricher` / `resume: enricher`. Leaves room for begin/end lifecycle boundaries if needed later.
 **Alternatives:**
-- stop/start as non-blocking flag + separate pause/resume with LockSupport — false distinction; non-blocking stop causes busy-spin inside loop: continuous
-- Defer pause/resume — unnecessary because stop must block to be correct
-**Rationale:** If stop just sets a flag and returns, and from: is inside loop: continuous, the loop re-enters from: immediately → busy spin. Stop must block the thread, which IS pause. One concept, not two.
-**Trade-offs:** None — eliminates unnecessary complexity
+- pause/resume naming — implies hard lifecycle boundary, collides with future begin/end. "start" is ambiguous: does it mean "create" or "resume"?
+- Non-blocking flag without blocking — causes busy-spin inside loop: continuous
+**Rationale:** pause/resume communicates continuity — the consumer is suspended, not destroyed. Aligns with serverless workflow / BPMN lifecycle (Created → Active → Suspended → Active → Completed). begin/end can layer on top later without naming collision. Implicit begin via `from: { name: X }`, implicit end via scope close.
+**Trade-offs:** None — same implementation complexity as pause/resume, better semantics
 **Depends on:** D2 (ConsumerHandle type)
-**Sources:** DecoratorChain.java (wrapLoop + wrapFrom interaction), issue #602
+**Sources:** DecoratorChain.java (wrapLoop + wrapFrom interaction), issue #602, serverless workflow spec lifecycle model
 **Exploration:** quick
 **Status:** captured
