@@ -372,10 +372,35 @@ Wrapping race: with `loop:`, `timeout:`, `background:` etc. composes naturally.
   respectively. Value is a string (the target consumer name). They are structural
   keywords (like `block:`, `select:`), NOT decorators — they produce a distinct
   step type, not a wrapper around an inner execution.
-- **`StepSchemaComposer.DECORATOR_KEYS`:** already contains `race` for schema
-  generation. `pause` and `resume` are **not** added to DECORATOR_KEYS — they
-  are structural keywords, not decorators. The schema should represent them as
-  step-type alternatives (like `block:`, `parallel:`).
+- **Walker `resolveOne()` — decorator-only steps:** Before the terminal
+  `throw new IllegalArgumentException("no step type identified")`, add a fallback:
+  when no structural keyword, action, or invoke is found but decorators are
+  non-empty, create a `BlockStep` with an empty step list and the decorators.
+
+  ```java
+  // Before the final throw:
+  if (!decorators.isEmpty()) {
+      return new ResolvedStep.BlockStep(stepName, List.of(), decorators);
+  }
+  ```
+
+  This desugars decorator-only steps (e.g., `- from: { channel: events }`,
+  `- delay: 15s`, `- publish: { channel: out, data: "x" }`) to empty blocks
+  wrapped by their decorators. `evaluateBlock` returns `Result.of(Map.of())`
+  for an empty block; the decorators execute around it. Without this change,
+  every `from:`-only step in the temporal and recursive patterns fails at
+  parse time with "no step type identified."
+
+- **`StepSchemaComposer`:** already contains `race` in `DECORATOR_KEYS` for
+  schema generation. `pause` and `resume` are **not** added to `DECORATOR_KEYS` —
+  they are structural keywords, not decorators. The schema must represent them
+  as step-type alternatives in the `oneOf` array (like `block:`, `parallel:`):
+
+  | Keyword | Schema variant |
+  |---------|---------------|
+  | `race:` | `{ "type": "array", "items": { "$ref": "#/definitions/step" } }` — list of child steps, mirroring `parallel:` |
+  | `pause:` | `{ "type": "string" }` — target consumer name |
+  | `resume:` | `{ "type": "string" }` — target consumer name |
 
 ## Temporal Pattern Composition
 
@@ -426,7 +451,7 @@ acceleration.
 ### Periodic Absence (Heartbeat) — "every N, check signal arrived"
 
 ```yaml
-- action: heartbeat-monitor
+- step: heartbeat-monitor
   loop: continuous
   background: true
   delay: 10s
@@ -436,6 +461,10 @@ acceleration.
       timeout: 10s
       on-error: agent-unresponsive
 ```
+
+Uses `step:` (not `action:`) to name the step. `action` is not a Walker reserved
+key — it would be resolved against the plugin registry, causing either "unknown
+key" or a structural-keyword ambiguity with `block:`.
 
 ### Recursive Sub-Pattern — `((A then B) or (A then C))*`
 
@@ -453,8 +482,8 @@ alternation on a single event stream:
   background: true
   block:
     - from: { channel: events, filter: "type == A" }
-    - from: { channel: events, as: followup, filter: "type == B or type == C" }
-    - match: followup.type
+    - match: from.type
+      from: { channel: events, filter: "type == B or type == C" }
       cases:
         - pattern: B
           publish: { channel: matched, data: "AB" }
@@ -462,10 +491,26 @@ alternation on a single event stream:
           publish: { channel: matched, data: "AC" }
 ```
 
-A single consumer reads sequentially: first A (discards non-A events via filter),
-then the next B or C event (discards interleaved events that match neither).
-The `match:` dispatches based on the event type. Deterministic, single-consumer,
-no event loss.
+**Step 1** (`from:` only): A decorator-only step — desugars to an empty block
+with the `from:` decorator. Reads and consumes event A from the channel (the
+event data is discarded — we only need to advance past A).
+
+**Step 2** (`match:` + `from:` on the same step): The `from:` decorator reads
+the next B or C event and injects it into the scoped resolver as `from` (the
+default alias). The `match:` structural keyword then evaluates `from.type`
+against the scoped resolver. Because `from:` is a decorator wrapping the match
+dispatch, the variable is visible to match's scrutinee evaluation.
+
+**Variable scoping constraint:** The `from:` decorator injects variables into a
+scoped `VariableResolver` that is local to its inner execution — not to sibling
+steps in a block. `evaluateBlock` passes the same unmodified `ctx` to every step.
+Therefore `from:` and `match:` must be on the **same** step for the injected
+variable to be visible to match. Placing them on separate sequential steps would
+cause `match: followup.type` to resolve against the outer (unscoped) resolver and
+fail.
+
+Each `cases:` entry (`publish: { channel: matched, data: "AB" }`) is also a
+decorator-only step — the `publish:` decorator wraps an empty block.
 
 Inject event sequence [A, B, A, C, A, B] → matched channel receives [AB, AC, AB].
 
@@ -538,9 +583,10 @@ All interface and class changes required by this spec:
 | `ResolvedStep.ControlStep` (new record) | With compact constructor validating non-blank `target` |
 | `ResolvedStep.RaceStep` (new record) | With compact constructor validating `branches.size() >= 2` |
 | `Walker.RESERVED_KEYS` | Add `"pause"`, `"resume"` |
-| `Walker.resolveOne()` | Add structural keyword handling for `race:`, `pause:`, `resume:` |
+| `Walker.resolveOne()` | Add structural keyword handling for `race:`, `pause:`, `resume:`; add decorator-only step fallback (empty `BlockStep`) |
 | `StructuralStepEvaluator.dispatchStep()` | Add `case ControlStep` and `case RaceStep` |
 | `DecoratorChain.wrapFrom()` | Add `until:`, `name:`, channel-close handling to receive loop |
+| `StepSchemaComposer.compose()` | Add `oneOf` schema variants for `race:`, `pause:`, `resume:` |
 
 The `permits` clause change on `ResolvedStep` is a sealed-interface modification
 that requires recompilation of all `switch` expressions over `ResolvedStep`
