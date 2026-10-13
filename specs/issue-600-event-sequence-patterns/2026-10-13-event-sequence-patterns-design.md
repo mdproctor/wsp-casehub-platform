@@ -136,6 +136,11 @@ loop:
 Plain `from:` (no name, no until) retains the current blocking receive — zero
 overhead for the common case.
 
+**Fan-in:** `wrapFromFanIn` receives the same treatment — until:, name:, and
+channel close handling apply to the fan-in polling loop. The ConsumerHandle
+is shared across all channels in a fan-in group (one handle per consumer,
+not per channel).
+
 **Backpressure:** When a consumer is paused, its channel continues to buffer.
 Bounded channels (`channel(name, capacity)`) may block producers. This is
 expected — pause intentionally creates upstream backpressure.
