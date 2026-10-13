@@ -13,12 +13,12 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/platform#600 — Issue #600 ← active
-  - [ ] Batch 1: Foundation
-    - [ ] Task 1: ConsumerHandle + isClosed
-    - [ ] Task 2: from: hardening
-    - [ ] Task 3: ControlStep + Walker + Schema
-  - [ ] Batch 2: RaceStep
-    - [ ] Task 4: RaceStep + evaluator + Walker
-  - [ ] Batch 3: Integration
-    - [ ] Task 5: Temporal pattern tests
-    - [ ] Task 6: Recursive composition test
+  - [x] Batch 1: Foundation
+    - [x] Task 1: ConsumerHandle + isClosed
+    - [x] Task 2: from: hardening
+    - [x] Task 3: ControlStep + Walker + Schema
+  - [x] Batch 2: RaceStep
+    - [x] Task 4: RaceStep + evaluator + Walker
+  - [x] Batch 3: Integration
+    - [x] Task 5: Temporal pattern tests
+    - [x] Task 6: Recursive composition test
