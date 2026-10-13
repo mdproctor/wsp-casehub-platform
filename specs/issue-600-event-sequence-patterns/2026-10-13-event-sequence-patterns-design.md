@@ -29,11 +29,11 @@ regular-recursive.
 | Repetition | `A*` / `A{n}` | `loop:` wrapping a pattern group |
 | Temporal window | `A B[5m]` | `timeout:` on a block |
 | Negation/absence | `(?!B)` | `timeout:` as success path |
-| Timed absence | `A then !B[5m]` | Sequence: from: A, then timeout: on from: B — timeout = match |
+| Timed absence | `A then !B[5m]` | Nested `block:` with `timeout:` outer to `from:` |
 | Delayed trigger | `A then delay(30s) then B` | Sequence with `delay:` between from: reads |
 | Periodic check | `every 10s: check` | `loop: continuous` + `delay: 10s` |
 | Sub-pattern | `(A B)` | `block:` as a group |
-| Recursive | `((A B) \| (A C))*` | `loop: { race: [ block: [...], block: [...] ] }` |
+| Recursive | `((A B) \| (A C))*` | `loop:` + sequential `from:` + `match:`/`cases:` |
 
 ## Architecture
 
@@ -56,19 +56,32 @@ public interface ConsumerHandle extends OrcPrimitive {
     void pause();
     void resume();
     boolean isRunning();
+    boolean isReleased();
+    void registerThread(Thread thread);
 }
 ```
 
 **Implementation (`DefaultConsumerHandle`):**
 - `volatile boolean running = true` (starts running)
+- `volatile boolean released = false` (scope cleanup flag)
+- `volatile Thread consumerThread` (for `LockSupport.unpark()`)
 - `pause()` sets `running = false`
-- `resume()` sets `running = true`
+- `resume()` sets `running = true`, calls `LockSupport.unpark(consumerThread)`
 - `isRunning()` returns `running` (single volatile read)
-- `releaseForClose()` sets `running = false` (scope cleanup unblocks paused consumers via timed-receive wakeup)
+- `isReleased()` returns `released`
+- `registerThread(Thread)` stores the consumer's thread reference
+- `releaseForClose()` sets `released = true`, calls `LockSupport.unpark(consumerThread)`
+
+Pause uses `LockSupport.park()` instead of `Thread.sleep()`: zero CPU waste
+while paused, instant resume via `unpark()`, and clean termination via
+`Thread.interrupt()` (which breaks `park()`). The consumer thread registers
+itself via `handle.registerThread(Thread.currentThread())` on first loop entry.
 
 **Registration in ExecutionScope:**
 - Add `ConsumerHandle consumerHandle(String name)` to `ExecutionScope`
-- `DefaultExecutionScope` registers via `getOrCreate(name, ConsumerHandle.class, DefaultConsumerHandle::new)`
+- `DefaultExecutionScope` registers via `getOrCreate(name, ConsumerHandle.class, () -> factory.createConsumerHandle(name))`
+- Add `ConsumerHandle createConsumerHandle(String name)` to `PrimitiveFactory`
+- `DefaultPrimitiveFactory` implements: `return new DefaultConsumerHandle(name)`
 
 **Why not OrcFlag:** User requirement — "I can see more being needed." ConsumerHandle
 is architecturally positioned for future lifecycle extensions (begin/end, metrics,
@@ -81,9 +94,17 @@ Modify `DecoratorChain.wrapFromSingleChannel()` to add three capabilities:
 
 #### 2a. Channel close handling
 
-After `channel.receive()`:
-- Null return → `Result.of(Map.of("from.stream-ended", true))` (graceful exit)
-- `channel.isErrorClosed()` → `Result.failed("channel closed: " + channel.closeError().getMessage())`
+**New method on `OrcChannel` interface:** `boolean isClosed()` — returns `true` when
+the channel has been cleanly closed (via `close()`) or error-closed (via
+`close(Throwable)`). `DefaultOrcChannel` exposes the existing `volatile boolean closed`
+field through this method. Without `isClosed()`, the from: receive loop cannot
+distinguish a timed-receive null (timeout, continue polling) from a clean-close
+null (channel done, exit).
+
+After null return from timed `channel.receive(100ms)`:
+1. `channel.isErrorClosed()` → `Result.failed("channel closed: " + channel.closeError().getMessage())`
+2. `channel.isClosed()` → `Result.of(Map.of("from.stream-ended", true))` (graceful exit)
+3. Neither → continue (timed-receive timeout, re-check conditions)
 
 Channel close is a coordination signal: closing a channel implicitly tells all
 consumers to exit. This is intentional (CSP pattern) and must be documented.
@@ -112,25 +133,46 @@ ConsumerHandle handle = scope.consumerHandle(handleName);
 
 // In the returned lambda (may run on background thread):
 return ctx -> {
+    handle.registerThread(Thread.currentThread());
     while (true) {
-        if (!handle.isRunning()) { Thread.sleep(100); continue; }
+        if (handle.isReleased()) {
+            return Result.of(Map.of("from.stream-ended", true));
+        }
+        if (!handle.isRunning()) {
+            LockSupport.park();
+            if (Thread.interrupted()) {
+                return Result.of(Map.of("from.stream-ended", true));
+            }
+            continue;
+        }
         // ... receive logic
     }
 };
 ```
 
+The pause loop uses `LockSupport.park()` instead of `Thread.sleep(100)`:
+- **Zero CPU while paused** — park suspends without polling
+- **Instant resume** — `unpark()` wakes immediately (no 100ms latency)
+- **Clean scope shutdown** — `Thread.interrupt()` breaks park, the consumer
+  checks the interrupt flag and returns stream-ended. `releaseForClose()` sets
+  `released = true` and calls `unpark()`, ensuring the consumer exits even if
+  paused. `DefaultExecutionScope.close()` interrupts spawned tasks, which
+  reliably breaks both `park()` and `channel.receive()`.
+
 **Receive loop** (unified, when `name:` or `until:` is present):
 
 ```
 loop:
-  1. Check handle.isRunning() → if paused, sleep 100ms, continue
-  2. Check until condition → if true, return stream-ended success
-  3. Timed receive (100ms) from channel
-  4. If null (timeout) → continue (re-check conditions)
-  5. If null (channel closed) → return stream-ended success
-  6. If error-closed → return failure
-  7. Apply filter → if rejected, continue
-  8. Inject into scope, execute inner step
+  1. Check handle.isReleased() → if released, return stream-ended success
+  2. Check handle.isRunning() → if paused, LockSupport.park(), check interrupt, continue
+  3. Check until condition → if true, return stream-ended success
+  4. Timed receive (100ms) from channel
+  5. If null → check channel.isClosed()
+     5a. If error-closed → return failure
+     5b. If closed → return stream-ended success
+     5c. Not closed (timeout) → continue (re-check conditions)
+  6. Apply filter → if rejected, continue
+  7. Inject into scope, execute inner step
 ```
 
 Plain `from:` (no name, no until) retains the current blocking receive — zero
@@ -155,7 +197,15 @@ record ControlStep(
     String target,
     boolean activate,
     Map<String, Object> decorators
-) implements ResolvedStep
+) implements ResolvedStep {
+    public ControlStep {
+        if (target == null || target.isBlank()) {
+            throw new IllegalArgumentException(
+                "pause/resume requires a non-blank target consumer name");
+        }
+        decorators = Map.copyOf(decorators);
+    }
+}
 ```
 
 - `pause: enricher` → `ControlStep(null, "enricher", false, Map.of())`
@@ -180,6 +230,13 @@ private Result evaluateControl(ResolvedStep.ControlStep control) {
 **Naming semantics:** pause/resume instead of stop/start. Communicates continuity —
 the consumer is suspended, not destroyed. Leaves room for begin/end lifecycle
 boundaries if needed (serverless workflow alignment).
+
+**Design decision:** Issue #602 proposed `stop:`/`start:` as the primary keywords
+with `pause:`/`resume:` as an optional alternative. This spec **supersedes**
+`stop:`/`start:` with `pause:`/`resume:` exclusively. Rationale: `stop` implies
+destruction (handle discarded, re-registration required), while `pause` accurately
+describes the suspension semantics. The `stop:`/`start:` keywords are not
+implemented. Issue #602's title should be updated to reflect this decision.
 
 ### 4. RaceStep — First-to-Complete Alternation
 
@@ -224,11 +281,13 @@ private Result evaluateRace(ResolvedStep.RaceStep race, StepContext ctx, StepRun
     int branchCount = race.branches().size();
     var winnerResult = new AtomicReference<Result>();
     var winnerIndex = new AtomicInteger(-1);
+    var branchFailures = new AtomicReference[branchCount];
     Future<?>[] futures = new Future<?>[branchCount];
 
     try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
         for (int i = 0; i < branchCount; i++) {
             int idx = i;
+            branchFailures[idx] = new AtomicReference<String>();
             ResolvedStep branch = race.branches().get(i);
             futures[i] = executor.submit(() -> {
                 Result result = evaluateInternal(branch, ctx, runner);
@@ -237,12 +296,21 @@ private Result evaluateRace(ResolvedStep.RaceStep race, StepContext ctx, StepRun
                     for (int j = 0; j < branchCount; j++) {
                         if (j != idx && futures[j] != null) futures[j].cancel(true);
                     }
+                } else if (!result.isSuccess()) {
+                    String msg = result instanceof Result.Failure f ? f.message() : "unknown";
+                    branchFailures[idx].set("branch " + idx + ": " + msg);
                 }
             });
         }
-        for (Future<?> f : futures) {
-            try { f.get(); }
-            catch (ExecutionException | CancellationException e) { /* expected */ }
+        try {
+            for (Future<?> f : futures) {
+                try { f.get(); }
+                catch (ExecutionException | CancellationException e) { /* expected */ }
+            }
+        } finally {
+            for (Future<?> f : futures) {
+                if (f != null) f.cancel(true);
+            }
         }
     } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
@@ -250,9 +318,20 @@ private Result evaluateRace(ResolvedStep.RaceStep race, StepContext ctx, StepRun
     }
 
     Result result = winnerResult.get();
-    return result != null ? result : Result.failed("No race branch completed successfully");
+    if (result != null) return result;
+
+    var failures = new ArrayList<String>();
+    for (var ref : branchFailures) {
+        Object msg = ref.get();
+        if (msg != null) failures.add((String) msg);
+    }
+    return Result.failed("All race branches failed: " + String.join("; ", failures));
 }
 ```
+
+**All-fail diagnostics:** When no branch succeeds, the error message includes
+each branch's failure reason. This surfaces filter mismatches, timeouts, and
+execution errors that would otherwise be opaque.
 
 **Cancellation:** `future.cancel(true)` interrupts the branch thread. `from:`
 decorators already handle `InterruptedException` cleanly (return failure + set
@@ -260,19 +339,43 @@ interrupt flag). Nested `channel.receive()`, `signal.await()`, `Thread.sleep()`
 all throw `InterruptedException` — the interrupt propagates through the entire
 branch stack.
 
+**Executor hang prevention:** The `finally` block inside the try-with-resources
+cancels all branch futures before `executor.close()` runs. Without this, an
+external interruption (e.g., timeout decorator cancelling the race) would cause
+`executor.close()` to hang: `shutdown()` doesn't interrupt running tasks, and
+`awaitTermination()` would block indefinitely on branches stuck in
+`channel.receive()`. This is the same pattern that exists in `evaluateSelect`
+and should be retrofitted there as well.
+
+**Channel semantics in race:** Race branches sharing the same channel have
+competing-consumer semantics — each event is delivered to exactly one branch.
+`DefaultOrcChannel` uses `LinkedBlockingQueue`; `receive()` calls `queue.poll()`
+which removes the item. An event consumed and rejected by one branch's filter
+is permanently lost to other branches. For event pattern matching on a shared
+stream, use sequential `from:` reads with `match:`/`cases:` (see Recursive
+Sub-Pattern below). Race is designed for independent channels/signals where
+branches wait on separate data sources.
+
 **Decorator support:** RaceStep has `decorators()` like all ResolvedStep variants.
 Wrapping race: with `loop:`, `timeout:`, `background:` etc. composes naturally.
 `loop: continuous` + `race:` = `(pattern)*` repetition.
 
 ### 5. Walker / StepSchemaComposer Changes
 
-- `StepSchemaComposer.DECORATOR_KEYS` already contains `race` — used for keyword
-  recognition during parsing. No change needed.
-- **Walker:** Add `race:` → `RaceStep` parsing alongside `block:`/`parallel:`.
-  Parse `race:` value as a list of child steps (same as `parallel:`).
-- **Walker:** Add `pause:` → `ControlStep(target, false)` and `resume:` →
-  `ControlStep(target, true)` parsing. Value is a string (the target consumer name).
-- Add `pause` and `resume` to `DECORATOR_KEYS` for keyword recognition.
+- **Walker `RESERVED_KEYS`:** Add `pause` and `resume`. Without them, the Walker
+  falls through to `registry.resolve("pause")`, which fails with "unknown key."
+- **Walker `resolveOne()`:** Add `race:` → `RaceStep` parsing alongside
+  `block:`/`parallel:` in the structural-keyword branch. Parse `race:` value as
+  a list of child steps (same as `parallel:`), validated to have `size() >= 2`.
+- **Walker `resolveOne()`:** Add `pause:` and `resume:` to the structural-keyword
+  branch. These produce `ControlStep(target, false)` and `ControlStep(target, true)`
+  respectively. Value is a string (the target consumer name). They are structural
+  keywords (like `block:`, `select:`), NOT decorators — they produce a distinct
+  step type, not a wrapper around an inner execution.
+- **`StepSchemaComposer.DECORATOR_KEYS`:** already contains `race` for schema
+  generation. `pause` and `resume` are **not** added to DECORATOR_KEYS — they
+  are structural keywords, not decorators. The schema should represent them as
+  step-type alternatives (like `block:`, `parallel:`).
 
 ## Temporal Pattern Composition
 
@@ -284,14 +387,25 @@ and tests verifying the composition works correctly.
 ```yaml
 - block:
     - from: { channel: events, filter: "type == EXPANSION_STARTED" }
-    - action: watch-for-defense
-      from: { channel: events, filter: "type == ARMY_MOVED_TO_NATURAL" }
+    - block:
+        - from: { channel: events, filter: "type == ARMY_MOVED_TO_NATURAL" }
       timeout: 30s
       on-error: greedy-build-detected   # timeout = absence = pattern matched
 ```
 
-Decorator ordering: `on-error` (4) wraps `from` (4.5) wraps `timeout` (5).
-Timeout fires → from: interrupted → on-error catches → returns fallback step name.
+**Decorator ordering constraint:** `from:` (4.5) is outer to `timeout:` (5) in
+the decorator chain. When both appear on the same step, `from:` blocks for the
+event indefinitely — `timeout:` never fires because it's inner and hasn't been
+entered. The nested-block approach solves this: `timeout:` and `on-error:` are
+decorators on the outer step (the wrapping `block:`), while `from:` is on the
+inner step. The timeout decorator runs the block on a virtual thread with
+`future.get(30s)`. The inner `from:` blocks for the event. If timeout expires,
+`future.cancel(true)` interrupts the `from:` thread. The `from:` returns failure
+(interrupted), the timeout returns `Result.failed()`, and `on-error` catches it.
+
+The inner `from:` also sees the deadline via `ctx.deadline().remainingTime()`
+(propagated from the outer `timeout:` decorator's `deadlineCtx`), so it uses
+timed receive and exits cleanly at deadline expiry.
 
 ### Delayed Sequence — "wait N after A before checking for B"
 
@@ -299,12 +413,15 @@ Timeout fires → from: interrupted → on-error catches → returns fallback st
 - block:
     - from: { channel: events, filter: "type == SCOUT_SPOTTED" }
     - delay: 15s
-    - from: { channel: events, filter: "type == COUNTER_PREPARED" }
+    - block:
+        - from: { channel: events, filter: "type == COUNTER_PREPARED" }
       timeout: 45s
       on-error: unprepared-alert
 ```
 
-`delay:` respects `speedMultiplier` for simulation time acceleration.
+Same nested-block pattern as Timed Absence — `timeout:` and `on-error:` must be
+outer to `from:`. `delay:` respects `speedMultiplier` for simulation time
+acceleration.
 
 ### Periodic Absence (Heartbeat) — "every N, check signal arrived"
 
@@ -314,28 +431,60 @@ Timeout fires → from: interrupted → on-error catches → returns fallback st
   background: true
   delay: 10s
   block:
-    - from: { channel: heartbeats, filter: "source == agent-7" }
+    - block:
+        - from: { channel: heartbeats, filter: "source == agent-7" }
       timeout: 10s
       on-error: agent-unresponsive
 ```
 
 ### Recursive Sub-Pattern — `((A then B) or (A then C))*`
 
+**Note on channel semantics in race:** `OrcChannel` uses `LinkedBlockingQueue` —
+each event is consumed by exactly one reader. When race branches share a channel,
+they compete for events. An event consumed and rejected by one branch's filter is
+permanently lost to other branches. This makes race over a shared channel
+non-deterministic and potentially deadlock-prone for pattern matching.
+
+The correct approach uses sequential `from:` reads with `match:`/`cases:` for
+alternation on a single event stream:
+
 ```yaml
 - loop: continuous
   background: true
-  race:
-    - block:
-        - from: { channel: events, filter: "type == A" }
-        - from: { channel: events, filter: "type == B" }
-        - publish: { channel: matched, data: "AB" }
-    - block:
-        - from: { channel: events, filter: "type == A" }
-        - from: { channel: events, filter: "type == C" }
-        - publish: { channel: matched, data: "AC" }
+  block:
+    - from: { channel: events, filter: "type == A" }
+    - from: { channel: events, as: followup, filter: "type == B or type == C" }
+    - match: followup.type
+      cases:
+        - pattern: B
+          publish: { channel: matched, data: "AB" }
+        - pattern: C
+          publish: { channel: matched, data: "AC" }
 ```
 
+A single consumer reads sequentially: first A (discards non-A events via filter),
+then the next B or C event (discards interleaved events that match neither).
+The `match:` dispatches based on the event type. Deterministic, single-consumer,
+no event loss.
+
 Inject event sequence [A, B, A, C, A, B] → matched channel receives [AB, AC, AB].
+
+**When race IS appropriate:** race branches waiting on **independent** channels or
+signals (like `select:`). Each branch has its own data source — no competing
+consumption:
+
+```yaml
+- race:
+    - block:
+        - from: { channel: login-events }
+        - from: { channel: mfa-events }
+    - block:
+        - from: { channel: login-events }
+        - from: { channel: sso-events }
+```
+
+Even here, the `login-events` channel is shared — consider whether the competing-
+consumer semantics are acceptable for the use case.
 
 ## Implementation Order
 
@@ -370,6 +519,32 @@ Temporal pattern tests (#604)              RaceStep (#603)
 | Delayed sequence | Integration | delay respects speedMultiplier, timeout after delay |
 | Periodic heartbeat | Integration | heartbeat arrives (ok), heartbeat missing (alert) |
 | Recursive composition | Integration | [A,B,A,C,A,B] → [AB,AC,AB], three-level nesting |
+
+## Complete API Surface
+
+All interface and class changes required by this spec:
+
+| File | Change |
+|------|--------|
+| `OrcChannel` (interface) | Add `boolean isClosed()` |
+| `DefaultOrcChannel` | Implement `isClosed()` — expose existing `volatile boolean closed` |
+| `ConsumerHandle` (new interface) | `pause()`, `resume()`, `isRunning()`, `isReleased()`, `registerThread(Thread)` |
+| `DefaultConsumerHandle` (new class) | Implementation with `LockSupport.park()`/`unpark()` |
+| `PrimitiveFactory` (interface) | Add `ConsumerHandle createConsumerHandle(String name)` |
+| `DefaultPrimitiveFactory` | Implement `createConsumerHandle()` |
+| `ExecutionScope` (interface) | Add `ConsumerHandle consumerHandle(String name)` |
+| `DefaultExecutionScope` | Implement via `getOrCreate(name, ConsumerHandle.class, () -> factory.createConsumerHandle(name))` |
+| `ResolvedStep` (sealed interface) | Add `ControlStep` and `RaceStep` to `permits` clause |
+| `ResolvedStep.ControlStep` (new record) | With compact constructor validating non-blank `target` |
+| `ResolvedStep.RaceStep` (new record) | With compact constructor validating `branches.size() >= 2` |
+| `Walker.RESERVED_KEYS` | Add `"pause"`, `"resume"` |
+| `Walker.resolveOne()` | Add structural keyword handling for `race:`, `pause:`, `resume:` |
+| `StructuralStepEvaluator.dispatchStep()` | Add `case ControlStep` and `case RaceStep` |
+| `DecoratorChain.wrapFrom()` | Add `until:`, `name:`, channel-close handling to receive loop |
+
+The `permits` clause change on `ResolvedStep` is a sealed-interface modification
+that requires recompilation of all `switch` expressions over `ResolvedStep`
+(Walker, StructuralStepEvaluator, and any test pattern matches).
 
 ## Out of Scope
 
