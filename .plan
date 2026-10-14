@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-609-playbook-yaml-examples
-state: closing:verified
+state: closing:promoted
 project-sha: 
 date: 
 issue-repo: casehubio/platform
