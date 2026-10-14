@@ -4,7 +4,7 @@
 
 **Branch:** issue-609-playbook-yaml-examples
 **Active issue:** casehubio/platform#609 — Playbook YAML examples for event sequence patterns
-**State:** Implementation complete, ready for review.
+**State:** Implementation complete, build verifying.
 
 ## Queue
 
@@ -13,40 +13,41 @@
 
 ## What was completed this session
 
-### Epic #600 — Event sequence patterns (LANDED — prior session)
+### #609 — Shared playbook examples (DONE)
 
-Full design-brainstorm-implement-audit-review-close cycle for composable event sequence matching in the playbook language. Landed as `910dd74e` on main.
+Platform is now the canonical home for all 57 playbook YAML examples, copied from pages after pages completed its parity work (#545, #546, #547).
 
-### #609 — Playbook YAML examples (IN PROGRESS)
+**What shipped:**
 
-Created 9 new playbook YAML examples + manifest in `playbooks/` directory, covering all #600 features:
+1. **57 playbook YAML files** in `playbooks/` — full set from pages covering all language features:
+   - Step Modifiers (12): sequential, concurrent, delay, loop, when, retry, timeout, from-until, from-channel-close, pause-resume
+   - Control Flow (9): block, parallel, if-else, match-cases, try-catch, barrier, quorum, select, race
+   - Concurrency Patterns (8): channel, semaphore, concurrent-map, spawned-task, correlation, deadline, combined-pipeline, named-consumer
+   - Shared State (6): counter, flag, gauge, accumulator, latch, state-machine
+   - Composition (9): data-trigger, time-trigger, orchestration-block, modules, forEach, timed-absence, delayed-sequence, heartbeat-monitor, recursive-pattern
+   - External Calls (6): REST, GraphQL, MCP, Script, Agent, Process
+   - Data Injection (3): simulated, mixed, graphql-operation
+   - Synchronization (4): signal-await, mutex, barrier, signal-handshake
 
-**New playbooks:**
-- `step-workflows/race.playbook.yaml` — first-to-complete with independent channels
-- `flow-control/pause-resume.playbook.yaml` — named consumer pause/resume lifecycle
-- `flow-control/from-until.playbook.yaml` — exit condition on channel consumer
-- `flow-control/from-channel-close.playbook.yaml` — graceful stream close detection
-- `concurrency-patterns/named-consumer.playbook.yaml` — background from: with ConsumerHandle
-- `composition/timed-absence.playbook.yaml` — A then !B[window] absence detection
-- `composition/delayed-sequence.playbook.yaml` — sequential from: with timeout
-- `composition/heartbeat-monitor.playbook.yaml` — loop + from: + timeout periodic check
-- `composition/recursive-pattern.playbook.yaml` — ((A then B) or (A then C))* via match/cases
+2. **PlaybookParsingTest** — parameterised test (57 dynamic tests) that loads every manifest entry and parses through the Walker with 37 stub action registrations for TS-runtime actions. Page-composition playbooks (forEach, modules) detected and skipped.
 
-**Updated playbook (pages repo):**
-- `step-workflows/select.playbook.yaml` — description updated from "first-to-complete" to "channel/signal multiplexing" (race: now owns first-to-complete)
+3. **Walker bugfix** — `String.valueOf(ifValue)` instead of `(String) ifValue` for YAML boolean conditions (`if: true`).
 
-**Created:**
-- `playbooks/manifest.json` — 4 categories, 9 scenarios, mirrors pages structure
+4. **Pages select playbook updated** — description changed from "first-to-complete" to "channel/signal multiplexing" since race: now owns that semantic.
 
-All YAML files validated. All manifest entries cross-checked against disk.
+### Design decisions
+
+- Platform is the canonical home for playbook YAML files
+- Pages will reference platform's copy (follow-up issue needed for the reference mechanism)
+- TS runtime migration to platform is a separate future epic, informed by the J2CL transpilation story
 
 ### Commits
 
-- Platform: `6ae704ec` — feat(#609): add 9 playbook YAML examples
-- Pages: `7bad20e7` — fix: update select playbook description
+- Platform: `6ae704ec` — initial 9 playbooks
+- Platform: `1323dda8` — all 57 from pages + Walker parsing test + Walker bugfix
+- Pages: `7bad20e7` — select playbook description update
 
-## What remains for #609
+## Follow-up issues needed
 
-- Review playbook content against runtime implementation for accuracy
-- Verify build passes with new directory
-- work-end
+- Shared playbook module — `package.json` for TS consumption, pages switches to importing from platform
+- TS runtime migration — extract playbook execution runtime from pages into platform TS module (depends on J2CL story)
