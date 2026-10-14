@@ -2,100 +2,52 @@
 
 ## Status
 
-**Branch:** issue-564-from-decorator (platform only — yaml-core changes)
-**Active issue:** platform#564 — Playbook streams: from: decorator
-**State:** Scaffolded — branch, .plan, and task breakdown created. No implementation yet.
+**Branch:** issue-609-playbook-yaml-examples
+**Active issue:** casehubio/platform#609 — Playbook YAML examples for event sequence patterns
+**State:** Implementation complete, build verifying.
 
 ## Queue
 
-1. casehubio/platform#564 — Playbook streams: from: decorator (M/Med) ← active
+1. casehubio/platform#609 — Playbook YAML examples (M/Med) <- active
+2. casehubio/platform#610 — Pages: event sequence pattern playbooks (M/Med)
 
-## Context
+## What was completed this session
 
-### What this issue adds
+### #609 — Shared playbook examples (DONE)
 
-One new decorator (`from:`) for the playbook YAML language. It reads one item from an `OrcChannel` per step invocation, enabling stream processing patterns without a stream DSL.
+Platform is now the canonical home for all 57 playbook YAML examples, copied from pages after pages completed its parity work (#545, #546, #547).
 
-**Syntax variants:**
-```yaml
-# Simple — read from named channel
-from: channel-name
+**What shipped:**
 
-# Full — channel + alias + pre-filter
-from: { channel: raw-readings, as: reading, filter: "${reading.value} > ${threshold}" }
+1. **57 playbook YAML files** in `playbooks/` — full set from pages covering all language features:
+   - Step Modifiers (12): sequential, concurrent, delay, loop, when, retry, timeout, from-until, from-channel-close, pause-resume
+   - Control Flow (9): block, parallel, if-else, match-cases, try-catch, barrier, quorum, select, race
+   - Concurrency Patterns (8): channel, semaphore, concurrent-map, spawned-task, correlation, deadline, combined-pipeline, named-consumer
+   - Shared State (6): counter, flag, gauge, accumulator, latch, state-machine
+   - Composition (9): data-trigger, time-trigger, orchestration-block, modules, forEach, timed-absence, delayed-sequence, heartbeat-monitor, recursive-pattern
+   - External Calls (6): REST, GraphQL, MCP, Script, Agent, Process
+   - Data Injection (3): simulated, mixed, graphql-operation
+   - Synchronization (4): signal-await, mutex, barrier, signal-handshake
 
-# Fan-in — merge multiple channels
-from: { channels: [fire-alerts, flood-alerts], as: alert }
-```
+2. **PlaybookParsingTest** — parameterised test (57 dynamic tests) that loads every manifest entry and parses through the Walker with 37 stub action registrations for TS-runtime actions. Page-composition playbooks (forEach, modules) detected and skipped.
 
-Plus a minor extension: `publish:` accepts a list with per-channel conditions for fan-out.
+3. **Walker bugfix** — `String.valueOf(ifValue)` instead of `(String) ifValue` for YAML boolean conditions (`if: true`).
 
-### Prerequisites (both landed)
+4. **Pages select playbook updated** — description changed from "first-to-complete" to "channel/signal multiplexing" since race: now owns that semantic.
 
-- #562 — at:, on-complete:, resource:/priority: decorators (CLOSED)
-- #563 — loop continuous, cancel, background, forEach collect, conditional retry (CLOSED)
+### Design decisions
 
-### Key files
+- Platform is the canonical home for playbook YAML files
+- Pages will reference platform's copy (follow-up issue needed for the reference mechanism)
+- TS runtime migration to platform is a separate future epic, informed by the J2CL transpilation story
 
-| File | Purpose |
-|------|---------|
-| `yaml-core/.../orchestration/OrcChannel.java` | Channel primitive — the from: decorator reads from this |
-| `yaml-step-runtime/.../eval/DecoratorChain.java` | Decorator ordering — from: goes at position 7 |
-| `yaml-step-runtime/.../catalog/StepSchemaComposer.java` | Schema composition — needs from: added |
-| Issue body (platform#564) | Full design spec with decorator chain position, syntax, patterns |
+### Commits
 
-### DecoratorChain position
+- Platform: `6ae704ec` — initial 9 playbooks
+- Platform: `1323dda8` — all 57 from pages + Walker parsing test + Walker bugfix
+- Pages: `7bad20e7` — select playbook description update
 
-The from: decorator sits at position 7 in the chain:
-```
-5. loop        ← repetition (wraps from:)
-6. on-error    ← error handling
-7. from        ← NEW: read one item from channel
-8. timeout     ← per-item timeout
-9. at          ← threshold gate
-```
+## Follow-up issues needed
 
-### Task breakdown
-
-**Batch 1: Core from: decorator**
-- Task 1: `FromDecorator` — blocking read from OrcChannel, inject as `${from.*}`
-- Task 2: Filter support — `from: { channel: x, filter: expr }` pre-filter
-- Task 3: Alias support — `from: { channel: x, as: alias }` injects as `${alias.*}`
-
-**Batch 2: Fan-in and fan-out**
-- Task 4: Fan-in — `from: { channels: [a, b] }` reads from whichever has data first
-- Task 5: `publish:` list extension — `[{channel: x, if: expr}]` conditional fan-out
-
-**Batch 3: Integration**
-- Task 6: DecoratorChain position — insert at slot 7
-- Task 7: StepSchemaComposer update — add from: to JSON schema
-- Task 8: ADR-0011 keyword registration
-
-**Batch 4: Testing**
-- Task 9: Unit tests — channel read, filter, alias, fan-in, backpressure
-- Task 10: Integration test — pipeline pattern (source → filter → sink)
-
-### Design notes from the issue
-
-- `from:` reads one item per invocation via blocking `OrcChannel.receive()`
-- Filter pre-filters inside the decorator — items failing filter are discarded and next item read
-- Fan-in uses whichever channel has data first (select semantics)
-- `publish: [{channel: x, if: expr}]` — list form with per-channel conditions
-- Backpressure via bounded channel capacity (existing OrcChannel behaviour)
-- No explicit yield keyword — virtual threads yield automatically
-- Windowed aggregation is a plugin concern, not a language primitive
-
-## Prior Work (landed this session)
-
-- engine#1214 — SSE broadcasters SseEmitter bridge (platform generators + engine broadcasters)
-- engine#1215 — Scope extractor, rest-core extraction, integration-test mocks
-- workers#29 — Script + Camel Spring auto-configs
-- workers#30 — spring-generator verify drift detection for 7 worker modules
-- Commented on engine#1222 re: @PlatformStream generator fix overlap
-
-## References
-
-- Issue: casehubio/platform#564 (full design spec in issue body)
-- OrcChannel: `yaml-core/src/main/java/io/casehub/yaml/core/orchestration/OrcChannel.java`
-- DecoratorChain: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/DecoratorChain.java`
-- StepSchemaComposer: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/catalog/StepSchemaComposer.java`
+- Shared playbook module — `package.json` for TS consumption, pages switches to importing from platform
+- TS runtime migration — extract playbook execution runtime from pages into platform TS module (depends on J2CL story)
