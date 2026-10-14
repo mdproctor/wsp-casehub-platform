@@ -1,0 +1,15 @@
+# Work Plan — issue-615-healthstatus-suspended
+
+## State
+branch: issue-615-healthstatus-suspended
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 615
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#615 — Issue #615 ← active
