@@ -1,1 +1,1 @@
-# Design Journal — issue-623-manifest-model-chains
+# Design Journal — issue-624-aria-invoke-handler
