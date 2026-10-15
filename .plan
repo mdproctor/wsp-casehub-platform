@@ -1,13 +1,15 @@
-# Plan: issue-623-manifest-model-chains
-
-branch: issue-623-manifest-model-chains
-base: main
-repo: casehubio/platform
-
-## Queue
-
-- [x] casehubio/platform#623 — feat: manifest-driven model chains (M / Med) **active**
+# Work Plan — issue-623-manifest-model-chains
 
 ## State
+branch: issue-623-manifest-model-chains
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 624
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
 
-state: active
+## Queue
+- [ ] casehubio/platform#624 — Issue #624 ← active
