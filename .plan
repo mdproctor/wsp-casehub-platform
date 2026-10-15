@@ -1,0 +1,13 @@
+# Plan: issue-623-manifest-model-chains
+
+branch: issue-623-manifest-model-chains
+base: main
+repo: casehubio/platform
+
+## Queue
+
+- [x] casehubio/platform#623 — feat: manifest-driven model chains (M / Med) **active**
+
+## State
+
+state: active
