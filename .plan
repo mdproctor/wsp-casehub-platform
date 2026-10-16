@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-627-match-policy
-state: closing:promoted
+state: closing:pushed
 project-sha: 002d4dc7
 date: 2026-10-16
 issue-repo: casehubio/platform
