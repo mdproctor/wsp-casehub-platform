@@ -63,3 +63,6 @@ report_verify=done
 close_issues=done
 report_close_issues=done
 upstream_push=done
+checkout_main=done
+cleanup_stack=done
+cleanup_mechanical_attempt=1
