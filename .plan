@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-627-match-policy
-state: active
+state: closing:review
 project-sha: 002d4dc7
 date: 2026-10-16
 issue-repo: casehubio/platform
@@ -11,6 +11,7 @@ design-repo: project
 design-section-hashes: 
 flyway-next-v: unknown
 
+evidence-era: true
 ## Queue
 - [ ] casehubio/platform#627 — Issue #627 ← active
   - [x] Batch 1: API Foundation
