@@ -13,11 +13,11 @@ flyway-next-v: unknown
 
 ## Queue
 - [ ] casehubio/platform#627 — Issue #627 ← active
-  - [ ] Batch 1: API Foundation
-    - [ ] Task 1: Add MatchPolicy enum and CLAMP and lookupAllByKey
-  - [ ] Batch 2: Strategy Enhancement
-    - [ ] Task 2: Override lookupAllByKey in InMemorySimulationCorpus
-    - [ ] Task 3: Enhance KeyLookupStrategy with MatchPolicy
-    - [ ] Task 4: Add CLAMP to SequentialStrategy
-  - [ ] Batch 3: Config Wiring
-    - [ ] Task 5: Wire MatchPolicy through config and runtime
+  - [x] Batch 1: API Foundation
+    - [x] Task 1: Add MatchPolicy enum and CLAMP and lookupAllByKey
+  - [x] Batch 2: Strategy Enhancement
+    - [x] Task 2: Override lookupAllByKey in InMemorySimulationCorpus
+    - [x] Task 3: Enhance KeyLookupStrategy with MatchPolicy
+    - [x] Task 4: Add CLAMP to SequentialStrategy
+  - [x] Batch 3: Config Wiring
+    - [x] Task 5: Wire MatchPolicy through config and runtime

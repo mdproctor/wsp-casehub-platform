@@ -69,4 +69,6 @@ commit_scaffold=done
 garden_search=done
 load_specs=done
 check_intellij=done
-brainstorm_offer_attempt=1
+brainstorm_offer_attempt=2
+brainstorm_offer=done
+brainstorm_offer_produced=N
