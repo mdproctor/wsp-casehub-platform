@@ -1,0 +1,23 @@
+# Work Plan — issue-627-match-policy
+
+## State
+branch: issue-627-match-policy
+state: scaffolded
+project-sha: 002d4dc7
+date: 2026-10-16
+issue-repo: casehubio/platform
+covers: 627
+design-repo: project
+design-section-hashes: 
+flyway-next-v: unknown
+
+## Queue
+- [ ] casehubio/platform#627 — Issue #627 ← active
+  - [ ] Batch 1: API Foundation
+    - [ ] Task 1: Add MatchPolicy enum and CLAMP and lookupAllByKey
+  - [ ] Batch 2: Strategy Enhancement
+    - [ ] Task 2: Override lookupAllByKey in InMemorySimulationCorpus
+    - [ ] Task 3: Enhance KeyLookupStrategy with MatchPolicy
+    - [ ] Task 4: Add CLAMP to SequentialStrategy
+  - [ ] Batch 3: Config Wiring
+    - [ ] Task 5: Wire MatchPolicy through config and runtime
