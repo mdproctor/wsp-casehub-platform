@@ -106,6 +106,11 @@ public static RoutingAgentProvider discover(Path projectDir, String profile) {
 }
 ```
 
+Unresolvable providers (manifest declares a vendor with no matching
+`BackendProvider` on the classpath) are logged at WARN and skipped.
+The provider starts with whatever backends ARE available. This matches
+CDI behavior — missing optional modules don't prevent startup.
+
 Existing `create()` and constructor APIs remain unchanged — platform-internal
 building blocks for CDI wiring and advanced composition.
 
