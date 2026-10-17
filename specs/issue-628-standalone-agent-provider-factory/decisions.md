@@ -58,3 +58,16 @@
 **Sources:** ModelRegistry.java (platform-api), ManifestResult.java (agent-config-core)
 **Exploration:** quick
 **Status:** captured
+
+## D6: Backend convenience constructors
+
+**Choice:** Add direct-parameter constructors to backend core classes (starting with `OllamaAgentBackend`) alongside existing properties-interface constructors
+**Alternatives:**
+- Inline record implementing the properties interface — adds a type for each backend just to satisfy construction
+- Require consumers to implement the properties interface — defeats the purpose of standalone ergonomics
+**Rationale:** Backend `-core` classes currently take properties interfaces (e.g., `OllamaAgentProperties`) designed for Quarkus `@ConfigMapping` binding. Programmatic construction needs direct parameters: `new OllamaAgentBackend(host, model, timeout, maxSessions)`. The properties-interface constructor stays for CDI wiring; the direct constructor delegates to it via an anonymous/inner implementation.
+**Trade-offs:** Two constructors per backend core class. Acceptable — one is the CDI path, one is the standalone path. Both are stable APIs.
+**Depends on:** D2 (convenience factories show backends being constructed inline)
+**Sources:** OllamaAgentBackend.java (agent-ollama-core), OllamaAgentProperties.java (agent-ollama-core)
+**Exploration:** quick
+**Status:** captured
