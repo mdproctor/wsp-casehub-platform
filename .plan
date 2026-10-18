@@ -2,7 +2,7 @@
 
 ## State
 branch: 
-state: closing:verified
+state: closing:promoted
 issue-repo: casehubio/platform
 covers: casehubio/platform#636
 Current: casehubio/platform#636 — AgentSessionConfig.responseFormat — structured JSON output support
