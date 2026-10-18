@@ -10,9 +10,5 @@ date: 2026-10-18
 
 ## Queue
 - [x] casehubio/platform#636 — AgentSessionConfig.responseFormat — structured JSON output support
-- [ ] casehubio/platform#637 — AgentProvider.invokeBlocking() — blocking convenience API with result record ← active
-  - [ ] Batch 1: invokeBlocking
-    - [ ] Task 1: AgentInvocationResult record
-    - [ ] Task 2: Default methods on AgentProvider
-    - [ ] Task 3: Build verification
-- [ ] casehubio/platform#638 — Deprecate and remove agent-langchain4j-core module
+- [x] casehubio/platform#637 — AgentProvider.invokeBlocking() — blocking convenience API with result record
+- [ ] casehubio/platform#638 — Deprecate and remove agent-langchain4j-core module ← active
