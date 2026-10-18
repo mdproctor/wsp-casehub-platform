@@ -2,12 +2,13 @@
 
 ## State
 branch: 
-state: active
+state: closing:review
 issue-repo: casehubio/platform
 covers: casehubio/platform#636
 Current: casehubio/platform#636 — AgentSessionConfig.responseFormat — structured JSON output support
 date: 2026-10-18
 
+evidence-era: true
 ## Queue
 - [x] casehubio/platform#636 — AgentSessionConfig.responseFormat — structured JSON output support
 - [x] casehubio/platform#637 — AgentProvider.invokeBlocking() — blocking convenience API with result record
