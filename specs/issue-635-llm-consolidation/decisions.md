@@ -61,3 +61,18 @@
 **Sources:** AgentProviderChatModel.java:prependSchema()
 **Exploration:** quick
 **Status:** captured
+
+---
+
+# Decisions — #637 AgentProvider.invokeBlocking()
+
+## D6: invokeBlocking placement
+
+**Choice:** Default method on `AgentProvider` interface
+**Alternatives:**
+- Static utility class `AgentInvocation.blocking(provider, config, timeout)` — keeps SPI slim
+**Rationale:** AgentProvider already depends on Mutiny. Default method is the most ergonomic API — callers just call `provider.invokeBlocking()` without extra class imports.
+**Trade-offs:** Slightly wider SPI surface, but no new implementations needed (default method)
+**Sources:** AgentProvider.java
+**Exploration:** quick
+**Status:** captured
