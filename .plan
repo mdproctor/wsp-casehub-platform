@@ -1,0 +1,25 @@
+# Work Plan — issue-635-llm-consolidation
+
+## State
+branch: issue-635-llm-consolidation
+state: active
+issue-repo: casehubio/platform
+covers: casehubio/platform#636
+Current: casehubio/platform#636 — AgentSessionConfig.responseFormat — structured JSON output support
+date: 2026-10-18
+
+## Queue
+- [ ] casehubio/platform#636 — AgentSessionConfig.responseFormat — structured JSON output support ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: ResponseFormat type
+    - [ ] Task 2: Config record changes
+  - [ ] Batch 2: Backend wiring
+    - [ ] Task 3: OpenAI+Ollama
+    - [ ] Task 4: Claude
+  - [ ] Batch 3: Backend+Bridge
+    - [ ] Task 5: Gemini
+    - [ ] Task 6: LangChain4j bridge
+  - [ ] Batch 4: Verification
+    - [ ] Task 7: Build + CLAUDE.md
+- [ ] casehubio/platform#637 — AgentProvider.invokeBlocking() — blocking convenience API with result record
+- [ ] casehubio/platform#638 — Deprecate and remove agent-langchain4j-core module
