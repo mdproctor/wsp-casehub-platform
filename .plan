@@ -1,8 +1,8 @@
-# Work Plan — main
+# Work Plan — issue-643-react-tool-use-loop
 
 ## State
-branch: main
-state: drained
+branch: issue-643-react-tool-use-loop
+state: scaffolded
 project-sha: 
 date: 
 issue-repo: casehubio/platform
@@ -10,9 +10,6 @@ covers: 642
 design-repo: 
 design-section-hashes: 
 flyway-next-v: 
-evidence-era: true
 
 ## Queue
-- [x] casehubio/platform#642 — Issue #642
-- [ ] casehubio/platform#643 — ReAct tool-use loop to platform
-- [ ] casehubio/platform#644 — Bump LangChain4j to 1.19.0
+- [ ] casehubio/platform#643 — Issue #643 ← active
