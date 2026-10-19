@@ -2,15 +2,14 @@
 
 ## State
 branch: main
-state: drained
+state: scaffolded
 project-sha: 
 date: 
 issue-repo: casehubio/platform
-covers: 641
+covers: 642
 design-repo: 
 design-section-hashes: 
 flyway-next-v: 
-evidence-era: true
 
 ## Queue
-- [x] casehubio/platform#641 — Issue #641
+- [ ] casehubio/platform#642 — Issue #642 ← active
