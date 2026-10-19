@@ -2,24 +2,26 @@
 
 ## Last Session
 
-Closed **platform#641** — Gemini and Ollama native ChatModel implementations. Landed on main.
+Closed **platform#641** and **platform#642** in sequence. Both landed on main.
 
-**What was built:**
-- `GeminiNativeChatModel` + `LangChain4jGeminiMapper` using Google GenAI SDK (system instruction extraction, tool-use via FunctionDeclaration, structured output via responseMimeType)
-- Ollama ChatModel via reused `OpenAiNativeChatModel` (OpenAI-compatible `/v1/` endpoint)
-- CDI `ChatModelBackend` producers in `GeminiBeans` and `OllamaBeans`
-- Spring `@AutoConfiguration` — `GeminiChatModelManualConfig` and `OllamaChatModelManualConfig`
-- 13 mapper tests for Gemini
+**#641 — Gemini/Ollama native ChatModel (S/Low):**
+- `GeminiNativeChatModel` + `LangChain4jGeminiMapper` (Google GenAI SDK)
+- Ollama ChatModel via reused `OpenAiNativeChatModel`
+- CDI + Spring wiring for both backends
+- 13 mapper tests
 
-Platform ChatModel routing now covers all 4 backends: Claude, OpenAI, Gemini, Ollama.
+**#642 — EmbeddingModel platform abstraction (M/Med):**
+- `EmbeddingModelBackend` SPI + `RoutingEmbeddingModel` in agent-router-core (3 routing tests)
+- `OpenAiNativeEmbeddingModel` + mapper (2 tests) — batch embedding, configurable dimensions
+- `GeminiNativeEmbeddingModel` + mapper (3 tests) — taskType mapping (QUERY/DOCUMENT)
+- Ollama reuses OpenAI embedding model via `/v1/`
+- CDI producers in OpenAiBeans, GeminiBeans, OllamaBeans, RouterBeans
+- 4 Spring auto-configs + EmbeddingModelRouterManualConfig
 
-**Prior session:** Closed #640 — LangChain4j ChatModel reconciliation (native Anthropic + OpenAI ChatModel, RoutingChatModel).
-
-## Follow-on Issues
-
-- **#642** — EmbeddingModel platform abstraction (M, Med — needs design)
+Platform now has full ChatModel + EmbeddingModel routing across all 4 backends (Claude ChatModel only — no embedding; OpenAI, Gemini, Ollama for both).
 
 ## References
 
 - Slot 214 has engine, neocortex, platform
 - Pause stack depth: 2 (pages#528, registry#569)
+- Engine compilation errors from commit 302888636 (#1235) — expects AgentInvocationResult, ResponseFormat, invokeBlocking() in platform agent-api (version mismatch, not a platform bug)
