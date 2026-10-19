@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-641-gemini-ollama-chatmodel
-state: active
+state: closing:review
 project-sha: 
 date: 
 issue-repo: casehubio/platform
@@ -11,5 +11,6 @@ design-repo:
 design-section-hashes: 
 flyway-next-v: 
 
+evidence-era: true
 ## Queue
 - [ ] casehubio/platform#641 — Issue #641 ← active
