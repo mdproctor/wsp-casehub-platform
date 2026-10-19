@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-642-embedding-model
-state: active
+state: closing:review
 project-sha: 
 date: 
 issue-repo: casehubio/platform
@@ -11,6 +11,7 @@ design-repo:
 design-section-hashes: 
 flyway-next-v: 
 
+evidence-era: true
 ## Queue
 - [ ] casehubio/platform#642 — Issue #642 ← active
   - [ ] Batch 1: Foundation
