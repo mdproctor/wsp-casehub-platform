@@ -14,3 +14,5 @@ evidence-era: true
 
 ## Queue
 - [x] casehubio/platform#642 — Issue #642
+- [ ] casehubio/platform#643 — ReAct tool-use loop to platform
+- [ ] casehubio/platform#644 — Bump LangChain4j to 1.19.0
