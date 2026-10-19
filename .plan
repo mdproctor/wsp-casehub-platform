@@ -1,0 +1,15 @@
+# Work Plan — main
+
+## State
+branch: main
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 641
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#641 — Issue #641 ← active
