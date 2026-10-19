@@ -13,3 +13,10 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/platform#642 — Issue #642 ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: SPI + RoutingEmbeddingModel
+  - [ ] Batch 2: Native
+    - [ ] Task 2: OpenAI EmbeddingModel
+    - [ ] Task 3: Gemini EmbeddingModel
+  - [ ] Batch 3: Wiring
+    - [ ] Task 4: CDI + Spring + CLAUDE.md
