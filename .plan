@@ -1,12 +1,12 @@
 # Work Plan — main
 
 ## State
-branch: main
-state: active
+branch: issue-655-elastic-session-pool
+state: drained
 project-sha: 
 date: 
 issue-repo: casehubio/platform
-covers: 642
+covers: 655
 design-repo: 
 design-section-hashes: 
 flyway-next-v: 
