@@ -1,6 +1,21 @@
 # HANDOFF — casehub-platform
 
-## Last Session
+## Last Session (2026-10-22)
+
+Closed **platform#654** (AimdAdmissionStrategy consolidation deadlock). Landed on branch `issue-650-elastic-session-scheduler` (fast-forward merge from `issue-654-aimd-consolidation-deadlock`).
+
+**#654 — Consolidation deadlock fix (S/Med):**
+- `AimdAdmissionStrategy.availablePermits()` — missing accessor
+- `SessionPipeline.companionAdmission(name, ceiling)` — independent AIMD strategies per execution context
+- `ParallelLlmExecutor` extracted from neocortex to `agent-session-core` — companion admission baked in, prevents deadlock by design
+- `isCapacityError` made public for cross-class access
+- 14 new tests (6 deadlock + 8 executor), 172 total pass
+
+**Follow-ups filed on neocortex:**
+- neocortex#618 — migrate to platform's ParallelLlmExecutor (delete neocortex copy)
+- neocortex#619 — BeliefRevisionPhase: replace agentProvider.invoke() with SessionPipeline
+
+## Previous Session
 
 Completed **platform#643** (ReAct tool-use loop) and **platform#645** (integration tests). Both landed on main as `e5a4bf00`.
 
