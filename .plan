@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-659-agent-gate-unresolvable-config
-state: active
+state: closing:review
 project-sha: 
 date: 
 issue-repo: casehubio/platform
