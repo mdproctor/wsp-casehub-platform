@@ -1,19 +1,15 @@
-# Work Plan — main
+# Work Plan — issue-660-datarealism-response-metadata
 
 ## State
-branch: main
-state: drained
-project-sha: 
-date: 
+branch: issue-660-datarealism-response-metadata
+state: scaffolded
+project-sha: 723d95edcbd2376b77ffc2cc4e942b26ebf39a41
+date: 2026-10-26
 issue-repo: casehubio/platform
-covers: 655
-design-repo: 
+covers: 660
+design-repo: project
 design-section-hashes: 
-flyway-next-v: 
-evidence-era: true
+flyway-next-v: unknown
 
 ## Queue
-- [x] casehubio/platform#642 — Issue #642
-- [ ] casehubio/platform#643 — ReAct tool-use loop to platform
-- [ ] casehubio/platform#644 — Bump LangChain4j to 1.19.0
-- [ ] casehubio/platform#655 — SessionPool semaphore gates session existence instead of prompt execution
+- [ ] casehubio/platform#660 — Issue #660 ← active
