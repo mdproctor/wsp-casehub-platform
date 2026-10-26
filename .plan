@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-660-datarealism-response-metadata
-state: active
+state: closing:review
 project-sha: 723d95edcbd2376b77ffc2cc4e942b26ebf39a41
 date: 2026-10-26
 issue-repo: casehubio/platform
@@ -11,6 +11,7 @@ design-repo: project
 design-section-hashes: 
 flyway-next-v: unknown
 
+evidence-era: true
 ## Queue
 - [ ] casehubio/platform#660 — Issue #660 ← active
   - [x] Batch 1: Context+CDI
