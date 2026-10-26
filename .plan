@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-660-datarealism-response-metadata
-state: closing:verified
+state: closing:promoted
 project-sha: 723d95edcbd2376b77ffc2cc4e942b26ebf39a41
 date: 2026-10-26
 issue-repo: casehubio/platform
