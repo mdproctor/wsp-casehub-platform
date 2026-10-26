@@ -93,3 +93,5 @@ _exec_ok:design_routing=yes
 design_routing=done
 _exec_ok:scaffold=yes
 scaffold=done
+_exec_ok:flyway_scan=yes
+flyway_scan=done
