@@ -13,9 +13,9 @@ flyway-next-v: unknown
 
 ## Queue
 - [ ] casehubio/platform#660 — Issue #660 ← active
-  - [ ] Batch 1: Context+CDI
-    - [ ] Task 1: DataRealismContext POJO+test
-    - [ ] Task 2: CDI RequestScoped producer
-  - [ ] Batch 2: Generator+E2E
-    - [ ] Task 3: Update SimulationDecoratorProcessor
-    - [ ] Task 4: Update DataRealismEndToEndTest
+  - [x] Batch 1: Context+CDI
+    - [x] Task 1: DataRealismContext POJO+test
+    - [x] Task 2: CDI RequestScoped producer
+  - [x] Batch 2: Generator+E2E
+    - [x] Task 3: Update SimulationDecoratorProcessor
+    - [x] Task 4: Update DataRealismEndToEndTest
