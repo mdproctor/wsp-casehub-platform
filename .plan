@@ -14,4 +14,4 @@ evidence-era: true
 
 ## Queue
 - [x] casehubio/platform#664 — Java type renames (StepWalker StepDefinitionParser StepResult)
-- [ ] casehubio/platform#665 — Java 3-document YAML parser support ← active
+- [x] casehubio/platform#665 — Java 3-document YAML parser support
