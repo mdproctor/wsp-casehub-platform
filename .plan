@@ -13,7 +13,5 @@ flyway-next-v:
 evidence-era: true
 
 ## Queue
-- [x] casehubio/platform#642 — Issue #642
-- [ ] casehubio/platform#643 — ReAct tool-use loop to platform
-- [ ] casehubio/platform#644 — Bump LangChain4j to 1.19.0
-- [ ] casehubio/platform#655 — SessionPool semaphore gates session existence instead of prompt execution
+- [ ] casehubio/platform#664 — Java type renames (StepWalker StepDefinitionParser StepResult)
+- [ ] casehubio/platform#665 — Java 3-document YAML parser support
