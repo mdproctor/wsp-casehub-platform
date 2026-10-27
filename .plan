@@ -13,5 +13,5 @@ flyway-next-v:
 evidence-era: true
 
 ## Queue
-- [ ] casehubio/platform#664 — Java type renames (StepWalker StepDefinitionParser StepResult)
-- [ ] casehubio/platform#665 — Java 3-document YAML parser support
+- [x] casehubio/platform#664 — Java type renames (StepWalker StepDefinitionParser StepResult)
+- [ ] casehubio/platform#665 — Java 3-document YAML parser support ← active
