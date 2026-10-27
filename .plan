@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-664-type-renames-and-yaml-parser
-state: closing:verified
+state: closing:promoted
 project-sha: 
 date: 
 issue-repo: casehubio/platform
