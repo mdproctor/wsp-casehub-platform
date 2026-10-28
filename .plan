@@ -13,3 +13,9 @@ flyway-next-v: unknown
 
 ## Queue
 - [ ] casehubio/platform#673 — Issue #673 ← active
+  - [ ] Batch 1: SPI+NoOp
+    - [ ] Task 1: Triage SPI types in platform-api
+    - [ ] Task 2: NoOpTriageHandler in governance-core
+  - [ ] Batch 2: CDI+Spring
+    - [ ] Task 3: Quarkus DefaultBean + Spring AutoConfig
+    - [ ] Task 4: CLAUDE.md update + final verification
