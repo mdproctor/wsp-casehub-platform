@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-673-triage-handler-spi
-state: scaffolded
+state: active
 project-sha: f17a88842959c97c5641307c02b004cfaa41c0ca
 date: 2026-10-28
 issue-repo: casehubio/platform
