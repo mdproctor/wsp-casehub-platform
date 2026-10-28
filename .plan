@@ -1,19 +1,15 @@
-# Work Plan — main
+# Work Plan — issue-673-triage-handler-spi
 
 ## State
-branch: main
-state: drained
-project-sha: 
-date: 
+branch: issue-673-triage-handler-spi
+state: scaffolded
+project-sha: f17a88842959c97c5641307c02b004cfaa41c0ca
+date: 2026-10-28
 issue-repo: casehubio/platform
-covers: 655
-design-repo: 
+covers: 673
+design-repo: project
 design-section-hashes: 
-flyway-next-v: 
-evidence-era: true
+flyway-next-v: unknown
 
 ## Queue
-- [x] casehubio/platform#642 — Issue #642
-- [ ] casehubio/platform#643 — ReAct tool-use loop to platform
-- [ ] casehubio/platform#644 — Bump LangChain4j to 1.19.0
-- [ ] casehubio/platform#655 — SessionPool semaphore gates session existence instead of prompt execution
+- [ ] casehubio/platform#673 — Issue #673 ← active
