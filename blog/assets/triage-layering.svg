@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 340" font-family="Inter, -apple-system, system-ui, sans-serif">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 7" refX="9" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-auto">
+      <path d="M 0 0 L 10 3.5 L 0 7 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="720" height="340" fill="#0f172a" rx="8"/>
+
+  <!-- Title -->
+  <text x="360" y="28" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="600">Cross-Repo Layering — Each Repo Extends Its Own Domain</text>
+
+  <!-- Platform layer -->
+  <rect x="30" y="50" width="660" height="56" rx="6" fill="#172554" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="50" y="72" fill="#93c5fd" font-size="12" font-weight="600">platform</text>
+  <text x="50" y="90" fill="#64748b" font-size="10">TriageHandler SPI · TriageContext · TriageDecision · CoordinationExhaustedEvent · @DefaultBean NoOp</text>
+  <text x="630" y="82" text-anchor="end" fill="#475569" font-size="10">governance</text>
+
+  <!-- Neocortex layer -->
+  <rect x="30" y="120" width="320" height="56" rx="6" fill="#1a2e05" stroke="#84cc16" stroke-width="1.5"/>
+  <text x="50" y="142" fill="#bef264" font-size="12" font-weight="600">neocortex</text>
+  <text x="50" y="160" fill="#64748b" font-size="10">CbrRecordStore · executionChainId</text>
+  <text x="300" y="152" text-anchor="end" fill="#475569" font-size="10">storage</text>
+
+  <!-- Engine layer -->
+  <rect x="30" y="190" width="660" height="56" rx="6" fill="#451a03" stroke="#f97316" stroke-width="1.5"/>
+  <text x="50" y="212" fill="#fdba74" font-size="12" font-weight="600">engine</text>
+  <text x="50" y="230" fill="#64748b" font-size="10">PlaybookExecutionResult · RecoveryCoordinator → TriageHandler · PlaybookOutcomeRecorder → CBR</text>
+  <text x="630" y="222" text-anchor="end" fill="#475569" font-size="10">execution</text>
+
+  <!-- Agency layer -->
+  <rect x="370" y="120" width="320" height="56" rx="6" fill="#4a1d96" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="390" y="142" fill="#c4b5fd" font-size="12" font-weight="600">agency</text>
+  <text x="390" y="160" fill="#64748b" font-size="10">LlmTriageHandler implements TriageHandler</text>
+  <text x="640" y="152" text-anchor="end" fill="#475569" font-size="10">intelligent</text>
+
+  <!-- Apps layer -->
+  <rect x="30" y="260" width="660" height="56" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="1"/>
+  <text x="50" y="282" fill="#94a3b8" font-size="12" font-weight="600">apps</text>
+  <text x="50" y="300" fill="#64748b" font-size="10">life · aml · iot · clinical — domain-specific TriageHandler observers, feature extraction, fallback config</text>
+
+  <!-- Dependency arrows -->
+  <line x1="190" y1="106" x2="190" y2="118" stroke="#64748b" stroke-width="1" marker-end="url(#arw)"/>
+  <line x1="530" y1="106" x2="530" y2="118" stroke="#64748b" stroke-width="1" marker-end="url(#arw)"/>
+  <line x1="190" y1="176" x2="190" y2="188" stroke="#64748b" stroke-width="1" marker-end="url(#arw)"/>
+  <line x1="530" y1="176" x2="530" y2="188" stroke="#64748b" stroke-width="1" marker-end="url(#arw)"/>
+  <line x1="360" y1="246" x2="360" y2="258" stroke="#64748b" stroke-width="1" marker-end="url(#arw)"/>
+</svg>
