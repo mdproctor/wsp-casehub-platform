@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-673-triage-handler-spi
-state: active
+state: closing:review
 project-sha: f17a88842959c97c5641307c02b004cfaa41c0ca
 date: 2026-10-28
 issue-repo: casehubio/platform
@@ -11,6 +11,7 @@ design-repo: project
 design-section-hashes: 
 flyway-next-v: unknown
 
+evidence-era: true
 ## Queue
 - [ ] casehubio/platform#673 — Issue #673 ← active
   - [x] Batch 1: SPI+NoOp
