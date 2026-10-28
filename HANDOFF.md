@@ -1,47 +1,34 @@
-# HANDOFF — casehub-platform
+# HANDOFF — issue-296-generator-nested-paths-enum
 
-## Last Session (2026-10-22)
+**Branch:** `issue-296-generator-nested-paths-enum`
+**Covers:** #296 (generator enhancements), #297 (batch 2 migration)
+**Progress:** All 4 tasks complete. Ready for work-end.
 
-Closed **platform#654** (AimdAdmissionStrategy consolidation deadlock). Landed on branch `issue-650-elastic-session-scheduler` (fast-forward merge from `issue-654-aimd-consolidation-deadlock`).
+## What Happened
 
-**#654 — Consolidation deadlock fix (S/Med):**
-- `AimdAdmissionStrategy.availablePermits()` — missing accessor
-- `SessionPipeline.companionAdmission(name, ceiling)` — independent AIMD strategies per execution context
-- `ParallelLlmExecutor` extracted from neocortex to `agent-session-core` — companion admission baked in, prevents deadlock by design
-- `isCapacityError` made public for cross-class access
-- 14 new tests (6 deadlock + 8 executor), 172 total pass
+1. Designed and reviewed spec for @RestPath annotation + simple type detection + batch 2 endpoint migration
+2. Implemented @RestPath annotation in platform-api and generator support (resolveRestPath, Jandex-based enum/fromString/valueOf detection)
+3. Migrated AclResource → AclApi SPI + AclService. 21 tests pass.
+4. Migrated PreferenceResource → PreferenceApi SPI + PreferenceService. PreferenceSchemaResource stays hand-written for ETag. 27 tests pass.
+5. Migrated NotificationResource + SuppressionResource → NotificationApi + NotificationSuppressionApi SPIs + services. 40 tests pass.
 
-**Follow-ups filed on neocortex:**
-- neocortex#618 — migrate to platform's ParallelLlmExecutor (delete neocortex copy)
-- neocortex#619 — BeliefRevisionPhase: replace agentProvider.invoke() with SessionPipeline
+## Key Decisions
 
-## Previous Session
+- D7 (RoundEnvironment scanning) dropped — SPIs go in dependency modules (platform-api, preferences-editor-core) following batch 1 pattern
+- Batch DELETE endpoints changed to POST (DELETE with body is non-standard HTTP)
+- registerParent uses String params (ResourceId fromString detection unreliable in APT context)
+- Stale annotationProcessorPaths JAR: always `mvn install -pl graphql-generator` before building modules that use the APT, and `rm -rf target/` on the consuming module to force clean generation
+- addMute/activateSnooze return 200 (was 201) — generator wraps non-void returns in Response.ok()
+- Preference SPIs placed in preferences-editor-core (not platform-api) — requires jandex-maven-plugin addition
+- PreferenceSchemaResource annotated with @McpDomain for documentation/future skip detection
 
-Completed **platform#643** (ReAct tool-use loop) and **platform#645** (integration tests). Both landed on main as `e5a4bf00`.
+## Commits
 
-**#643 — agent-react-core module (M/Med):**
-- `ToolUseLoop` — blocking loop over ChatModel (observe-think-act cycle)
-- `Tool` record with `Builder` — hides LangChain4j schema types from consumers
-- `ToolExecutor`, `ToolUseConfig`, `ToolUseResult`, `ToolUseListener` (per-cycle observability)
-- Error-as-result for LLM self-correction, 0-based cycleIndex
+1. `10f1cf0e` feat(#296): @RestPath annotation + simple type detection via Jandex
+2. `527bc868` feat(#297): migrate AclResource to generated @McpDomain approach
+3. `bdcbf631` feat(#297): migrate PreferenceResource to generated @McpDomain approach
+4. `eb6be20d` feat(#297): migrate notification + suppression endpoints to generated @McpDomain
 
-**#645 — Integration tests (S/Low):**
-- Anthropic mock test (full type chain through AnthropicNativeChatModel + mapper)
-- Ollama live IT (real qwen3:8b, end-to-end tool call verified)
+## Next Action
 
-**Cross-repo: engine#1245** — migrated engine's ReActWorkerFunctionHandler to use platform's ToolUseLoop. Branch `issue-1245-react-platform-migration` pushed, 604 tests pass. Engine's LangChain4j footprint reduced to 2 stable interfaces (ChatModel + EmbeddingModel). Redundant langchain4j-core dep removed.
-
-**Architecture decision:** LangChain4j types (ChatModel, EmbeddingModel) are the shared interface vocabulary. Implementation details (ToolSpecification, JsonObjectSchema, ChatRequest, etc.) are hidden inside platform. Consumers use `Tool.Builder` to define tools declaratively.
-
-## Follow-on Issues
-
-- **engine#1245** — branch pushed, needs merge to main (604 tests green)
-- **engine#1252** — AiServices test fixture cleanup in flow module (XS/Low)
-- **platform#644** — LangChain4j version alignment across repos (XS/Low)
-- **neocortex#611** — Consume platform's RoutingEmbeddingModel and RoutingChatModel (S/Low)
-
-## References
-
-- Slot 214 has engine, neocortex, platform
-- Design spec: `wsp-casehub-platform/specs/issue-643-react-tool-use-loop/`
-- Decisions: D1 (LangChain4j lingua franca), D2 (blocking loop), D3 (callback observability), D4 (error-as-result), D5 (single loop both frameworks)
+Run `work end` to close the branch — all tasks and both issues are complete.
