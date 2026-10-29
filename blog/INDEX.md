@@ -30,3 +30,4 @@
 | [2026-10-13-mdp01-the-language-crossed-a-line.md](2026-10-13-mdp01-the-language-crossed-a-line.md) | 2026-10-13 | 12 issues in 2 weeks transformed the playbook language from a step runner into a coordination language — decorators for streams, resources, cancellation, and fan-in/fan-out |
 | [2026-10-28-mdp01-the-gap-between-retry-and-give-up.md](2026-10-28-mdp01-the-gap-between-retry-and-give-up.md) | 2026-10-28 | Cross-repo design: how tracing the dependency graph revealed a governance lifecycle gap between mechanical retry and abandonment |
 | [2026-10-28-mdp02-agent-rest-endpoint.md](2026-10-28-mdp02-agent-rest-endpoint.md) | 2026-10-28 | Structured HTTP agent invocation endpoint — design decisions, module structure, and the sidecar agent question |
+| [2026-10-29-mdp02-when-playbooks-fail.md](2026-10-29-mdp02-when-playbooks-fail.md) | 2026-10-29 | Four-layer playbook feedback loop — triage, CBR retention, fallback across platform/engine/agency/neocortex |
