@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" font-family="Inter, system-ui, sans-serif">
+
+  <!-- Nodes -->
+  <rect x="20" y="120" width="120" height="50" rx="6" fill="#3182ce"/>
+  <text x="80" y="150" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">Execute</text>
+
+  <rect x="190" y="120" width="120" height="50" rx="6" fill="#e53e3e"/>
+  <text x="250" y="150" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">Failure</text>
+
+  <rect x="360" y="120" width="120" height="50" rx="6" fill="#805ad5"/>
+  <text x="420" y="150" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">Triage</text>
+
+  <!-- Retry path (loops back up) -->
+  <rect x="360" y="30" width="120" height="44" rx="6" fill="#38a169"/>
+  <text x="420" y="48" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">Retry</text>
+  <text x="420" y="64" text-anchor="middle" fill="#c6f6d5" font-size="10">+ modifications</text>
+
+  <!-- Abandon path -->
+  <rect x="530" y="120" width="120" height="50" rx="6" fill="#dd6b20"/>
+  <text x="590" y="140" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">Abandon</text>
+  <text x="590" y="158" text-anchor="middle" fill="#fed7aa" font-size="10">fall back to LLM</text>
+
+  <!-- CBR Record -->
+  <rect x="360" y="230" width="120" height="50" rx="6" fill="#2d3748"/>
+  <text x="420" y="250" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">CBR Record</text>
+  <text x="420" y="266" text-anchor="middle" fill="#a0aec0" font-size="10">outcome + chain</text>
+
+  <!-- Future Selection -->
+  <rect x="190" y="230" width="120" height="50" rx="6" fill="#2d3748"/>
+  <text x="250" y="250" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="600">Future</text>
+  <text x="250" y="266" text-anchor="middle" fill="#a0aec0" font-size="10">playbook selection</text>
+
+  <!-- Arrow: Execute → Failure -->
+  <line x1="140" y1="145" x2="182" y2="145" stroke="#4a5568" stroke-width="2"/>
+  <polygon points="182,139 190,145 182,151" fill="#4a5568"/>
+
+  <!-- Arrow: Failure → Triage -->
+  <line x1="310" y1="145" x2="352" y2="145" stroke="#e53e3e" stroke-width="2"/>
+  <polygon points="352,139 360,145 352,151" fill="#e53e3e"/>
+
+  <!-- Arrow: Triage → Retry (up) -->
+  <line x1="420" y1="120" x2="420" y2="82" stroke="#38a169" stroke-width="2"/>
+  <polygon points="414,82 420,74 426,82" fill="#38a169"/>
+
+  <!-- Arrow: Retry → Execute (loop back left and down) -->
+  <polyline points="360,52 80,52 80,112" stroke="#38a169" stroke-width="2" fill="none"/>
+  <polygon points="74,112 80,120 86,112" fill="#38a169"/>
+
+  <!-- Arrow: Triage → Abandon -->
+  <line x1="480" y1="145" x2="522" y2="145" stroke="#4a5568" stroke-width="2"/>
+  <polygon points="522,139 530,145 522,151" fill="#4a5568"/>
+
+  <!-- Dashed: Triage → CBR Record -->
+  <line x1="420" y1="170" x2="420" y2="222" stroke="#4a5568" stroke-width="1.5" stroke-dasharray="4"/>
+  <polygon points="414,222 420,230 426,222" fill="#4a5568"/>
+
+  <!-- Dashed: Abandon → CBR Record -->
+  <polyline points="590,170 590,255 484,255" stroke="#4a5568" stroke-width="1.5" stroke-dasharray="4" fill="none"/>
+  <polygon points="484,249 476,255 484,261" fill="#4a5568"/>
+
+  <!-- Dashed: CBR → Future Selection -->
+  <line x1="360" y1="255" x2="318" y2="255" stroke="#4a5568" stroke-width="1.5" stroke-dasharray="4"/>
+  <polygon points="318,249 310,255 318,261" fill="#4a5568"/>
+
+  <!-- Dashed: Future → Execute (feeds back) -->
+  <polyline points="190,255 80,255 80,178" stroke="#4a5568" stroke-width="1.5" stroke-dasharray="4" fill="none"/>
+  <polygon points="74,178 80,170 86,178" fill="#4a5568"/>
+
+  <!-- Labels on paths -->
+  <text x="163" y="137" text-anchor="middle" fill="#718096" font-size="10">steps fail</text>
+  <text x="335" y="137" text-anchor="middle" fill="#718096" font-size="10">retries</text>
+  <text x="335" y="148" text-anchor="middle" fill="#718096" font-size="10">exhausted</text>
+  <text x="450" y="98" text-anchor="start" fill="#38a169" font-size="10">modified</text>
+  <text x="505" y="137" text-anchor="middle" fill="#718096" font-size="10">cap hit</text>
+
+  <!-- Legend -->
+  <text x="680" y="255" text-anchor="middle" fill="#718096" font-size="10" font-style="italic">all outcomes</text>
+  <text x="680" y="268" text-anchor="middle" fill="#718096" font-size="10" font-style="italic">feed CBR</text>
+</svg>

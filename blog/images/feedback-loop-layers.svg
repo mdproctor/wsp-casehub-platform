@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" font-family="Inter, system-ui, sans-serif">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2d3748"/>
+      <stop offset="100%" stop-color="#1a202c"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3182ce"/>
+      <stop offset="100%" stop-color="#2b6cb0"/>
+    </linearGradient>
+    <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#38a169"/>
+      <stop offset="100%" stop-color="#2f855a"/>
+    </linearGradient>
+    <linearGradient id="g4" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#805ad5"/>
+      <stop offset="100%" stop-color="#6b46c1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Domain Apps -->
+  <rect x="40" y="20" width="640" height="75" rx="8" fill="url(#g1)" opacity="0.85"/>
+  <text x="360" y="48" text-anchor="middle" fill="#e2e8f0" font-size="15" font-weight="600">Domain Apps</text>
+  <text x="360" y="72" text-anchor="middle" fill="#a0aec0" font-size="12">life, trading, aml, clinical — domain-specific feature extraction</text>
+
+  <!-- Agency -->
+  <rect x="40" y="115" width="640" height="75" rx="8" fill="url(#g4)" opacity="0.85"/>
+  <text x="360" y="143" text-anchor="middle" fill="#e9d8fd" font-size="15" font-weight="600">Agency</text>
+  <text x="360" y="167" text-anchor="middle" fill="#d6bcfa" font-size="12">LlmTriageHandler — LLM-backed failure analysis and modification decisions</text>
+
+  <!-- Engine -->
+  <rect x="40" y="210" width="640" height="75" rx="8" fill="url(#g3)" opacity="0.85"/>
+  <text x="360" y="238" text-anchor="middle" fill="#c6f6d5" font-size="15" font-weight="600">Engine</text>
+  <text x="360" y="262" text-anchor="middle" fill="#9ae6b4" font-size="12">PlaybookExecutionResult, RecoveryCoordinator, StepExecutionCbrBridge</text>
+
+  <!-- Platform -->
+  <rect x="40" y="305" width="640" height="75" rx="8" fill="url(#g2)" opacity="0.85"/>
+  <text x="360" y="333" text-anchor="middle" fill="#bee3f8" font-size="15" font-weight="600">Platform</text>
+  <text x="360" y="357" text-anchor="middle" fill="#90cdf4" font-size="12">TriageHandler SPI, TriageContext, TriageDecision, CoordinationExhaustedEvent</text>
+
+  <!-- Arrows between layers (line + triangle polygon) -->
+  <line x1="360" y1="95" x2="360" y2="108" stroke="#a0aec0" stroke-width="2"/>
+  <polygon points="352,108 360,115 368,108" fill="#a0aec0"/>
+
+  <line x1="360" y1="190" x2="360" y2="203" stroke="#a0aec0" stroke-width="2"/>
+  <polygon points="352,203 360,210 368,203" fill="#a0aec0"/>
+
+  <line x1="360" y1="285" x2="360" y2="298" stroke="#a0aec0" stroke-width="2"/>
+  <polygon points="352,298 360,305 368,298" fill="#a0aec0"/>
+
+  <!-- Side labels -->
+  <text x="18" y="252" text-anchor="middle" fill="#718096" font-size="11" transform="rotate(-90 18 252)">publishes first</text>
+  <text x="702" y="252" text-anchor="middle" fill="#718096" font-size="11" transform="rotate(90 702 252)">consumes</text>
+
+  <!-- Neocortex sidebar -->
+  <rect x="40" y="395" width="300" height="20" rx="4" fill="#ed8936" opacity="0.7"/>
+  <text x="190" y="410" text-anchor="middle" fill="#fff" font-size="11" font-weight="500">Neocortex — CaseMemoryStore, CbrOutcomeData, executionChainId</text>
+</svg>
