@@ -1,19 +1,15 @@
-# Work Plan — main
+# Work Plan — issue-676-677-agent-http-followups
 
 ## State
-branch: main
-state: drained
+branch: issue-676-677-agent-http-followups
+state: scaffolded
 project-sha: 
 date: 
 issue-repo: casehubio/platform
-covers: 655
+covers: 676,677
 design-repo: 
 design-section-hashes: 
 flyway-next-v: 
-evidence-era: true
 
 ## Queue
-- [x] casehubio/platform#642 — Issue #642
-- [ ] casehubio/platform#643 — ReAct tool-use loop to platform
-- [ ] casehubio/platform#644 — Bump LangChain4j to 1.19.0
-- [ ] casehubio/platform#655 — SessionPool semaphore gates session existence instead of prompt execution
+- [ ] casehubio/platform#676 — Issue #676 ← active
