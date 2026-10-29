@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 320" style="font-family:'Segoe UI',system-ui,sans-serif">
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="none" stroke="#475569" stroke-width="1.2"/>
+    </marker>
+  </defs>
+  <!-- Column headers -->
+  <text x="100" y="28" text-anchor="middle" font-size="13" font-weight="600" fill="#1e293b">Pattern</text>
+  <text x="280" y="28" text-anchor="middle" font-size="13" font-weight="600" fill="#1e293b">Request</text>
+  <text x="460" y="28" text-anchor="middle" font-size="13" font-weight="600" fill="#1e293b">Response</text>
+  <text x="600" y="28" text-anchor="middle" font-size="13" font-weight="600" fill="#1e293b">Verb</text>
+  <line x1="20" y1="38" x2="660" y2="38" stroke="#cbd5e1" stroke-width="1"/>
+
+  <!-- Row 1: Query -->
+  <text x="100" y="68" text-anchor="middle" font-size="12" fill="#334155">Query</text>
+  <rect x="210" y="52" width="140" height="24" rx="4" fill="#dbeafe" stroke="#93c5fd"/>
+  <text x="280" y="68" text-anchor="middle" font-size="11" fill="#1e40af">query params</text>
+  <rect x="390" y="52" width="140" height="24" rx="4" fill="#dbeafe" stroke="#93c5fd"/>
+  <text x="460" y="68" text-anchor="middle" font-size="11" fill="#1e40af">JSON body</text>
+  <text x="600" y="68" text-anchor="middle" font-size="12" font-weight="600" fill="#3b82f6">GET</text>
+
+  <!-- Row 2: Mutation -->
+  <text x="100" y="118" text-anchor="middle" font-size="12" fill="#334155">Mutation</text>
+  <rect x="210" y="102" width="140" height="24" rx="4" fill="#dcfce7" stroke="#86efac"/>
+  <text x="280" y="118" text-anchor="middle" font-size="11" fill="#166534">JSON body</text>
+  <rect x="390" y="102" width="140" height="24" rx="4" fill="#dcfce7" stroke="#86efac"/>
+  <text x="460" y="118" text-anchor="middle" font-size="11" fill="#166534">JSON body</text>
+  <text x="600" y="118" text-anchor="middle" font-size="12" font-weight="600" fill="#22c55e">POST</text>
+
+  <!-- Row 3: Stream -->
+  <text x="100" y="168" text-anchor="middle" font-size="12" fill="#334155">Stream</text>
+  <rect x="210" y="152" width="140" height="24" rx="4" fill="#fef3c7" stroke="#fcd34d"/>
+  <text x="280" y="168" text-anchor="middle" font-size="11" fill="#92400e">query params</text>
+  <rect x="390" y="152" width="140" height="24" rx="4" fill="#fef3c7" stroke="#fcd34d"/>
+  <text x="460" y="168" text-anchor="middle" font-size="11" fill="#92400e">SSE events</text>
+  <text x="600" y="168" text-anchor="middle" font-size="12" font-weight="600" fill="#eab308">GET</text>
+
+  <!-- Divider -->
+  <line x1="20" y1="198" x2="660" y2="198" stroke="#475569" stroke-width="1" stroke-dasharray="4,4"/>
+
+  <!-- Row 4: Streaming Mutation -->
+  <rect x="20" y="212" width="640" height="40" rx="6" fill="#faf5ff" stroke="#c084fc" stroke-width="1.5"/>
+  <text x="100" y="237" text-anchor="middle" font-size="12" font-weight="600" fill="#7c3aed">Streaming Mut.</text>
+  <rect x="210" y="222" width="140" height="24" rx="4" fill="#ede9fe" stroke="#a78bfa"/>
+  <text x="280" y="238" text-anchor="middle" font-size="11" fill="#5b21b6">JSON body</text>
+  <rect x="390" y="222" width="140" height="24" rx="4" fill="#ede9fe" stroke="#a78bfa"/>
+  <text x="460" y="238" text-anchor="middle" font-size="11" fill="#5b21b6">SSE events</text>
+  <text x="600" y="237" text-anchor="middle" font-size="12" font-weight="600" fill="#7c3aed">POST</text>
+
+  <!-- Caption -->
+  <text x="340" y="290" text-anchor="middle" font-size="11" fill="#64748b" font-style="italic">The fourth pattern combines POST's request body with SSE's event stream.</text>
+</svg>
