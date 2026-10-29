@@ -1,8 +1,8 @@
-# Work Plan — main
+# Work Plan — issue-668-playbook-execution-feedback
 
 ## State
-branch: main
-state: drained
+branch: issue-668-playbook-execution-feedback
+state: scaffolded
 project-sha: 
 date: 
 issue-repo: casehubio/platform
@@ -10,10 +10,6 @@ covers: 655
 design-repo: 
 design-section-hashes: 
 flyway-next-v: 
-evidence-era: true
 
 ## Queue
-- [x] casehubio/platform#642 — Issue #642
-- [ ] casehubio/platform#643 — ReAct tool-use loop to platform
-- [ ] casehubio/platform#644 — Bump LangChain4j to 1.19.0
-- [ ] casehubio/platform#655 — SessionPool semaphore gates session existence instead of prompt execution
+- [ ] casehubio/platform#668 — Issue #668 ← active
