@@ -11,11 +11,17 @@ with compatible types, the compiler fuses them into a single execution chain —
 data flows through via `Function.andThen()` composition at Java speed, without
 materializing to `Map<String, Object>` at each step boundary.
 
-Two stream kinds are supported with the same API shape:
+Two data kinds are supported with the same 1:1 transform API shape:
 - **Byte streams**: continuous binary data (`InputStream`, `byte[]`) for audio,
-  images, documents
-- **Event streams**: sequences of timestamped objects with properties, processed
-  as a typed pipeline
+  images, documents — laziness comes from `InputStream`'s read model
+- **Typed transforms**: domain objects processed as a typed pipeline (e.g.,
+  `SensorEvent → AnnotatedEvent`), each `apply()` call processes one input
+
+The "streaming" in `StreamingStep` refers to data flowing through the chain
+without materialization to `Map<String, Object>` at step boundaries — not to
+reactive-streams backpressure or flow control. The framework enables zero-copy
+data flow; the types themselves determine whether processing is lazy
+(`InputStream`) or eager (domain objects).
 
 ## Motivation
 
@@ -36,27 +42,43 @@ wires them into a direct Java function chain.
 
 ```java
 public interface StreamingStep<I, O> {
+    String OUTPUT_KEY = "output";
+
     Class<I> inputType();
     Class<O> outputType();
     O apply(I input);
 
     default Result materialize(Map<String, Object> params, ServiceRegistry services) {
-        throw new UnsupportedOperationException("APT-generated override");
+        throw new UnsupportedOperationException(
+            getClass().getName() + " must override materialize() for standalone execution");
     }
 }
 ```
 
+- `OUTPUT_KEY` — contract constant for the key used when wrapping typed output
+  in a `Result` map. The APT-generated `materialize()` uses
+  `Result.of(Map.of(OUTPUT_KEY, result))`. The merge data path uses the same
+  key for extraction. All implementations must use this constant
 - `inputType()` / `outputType()` — runtime type tokens compensating for generic
   erasure. The fusion pass uses these for type compatibility checks via
-  `isAssignableFrom()`
+  `isAssignableFrom()`. **Constraint:** type tokens must be non-generic concrete
+  classes (`InputStream`, `String`, `SensorEvent`). Parameterized types
+  (`List<SensorEvent>`, `Map<String, Object>`) are not supported — Java generic
+  erasure makes `isAssignableFrom()` unsound for parameterized types. If
+  parameterized type support is needed in future, a `TypeToken` mechanism can
+  be added
 - `apply(I) → O` — the streaming transform. Composed via `Function.andThen()`
   in fused chains
 - `materialize()` — bridges streaming to non-streaming execution. The APT
   generates this: extract typed `I` from params, call `apply()`, wrap output in
-  `Result.of(Map.of("output", result))`. This is the boundary between the
+  `Result.of(Map.of(OUTPUT_KEY, result))`. This is the boundary between the
   streaming and `Action`-compatible worlds. Hand-written `StreamingStep`
   implementations (not using `@StreamPlugin`) must override `materialize()`
-  themselves — the default throws to catch missing overrides at development time
+  themselves — the default throws to catch missing overrides at development time.
+  The throw is intentional: within fused chains, `materialize()` is never called
+  (the chain uses `apply()` directly). It only fires when a step is used
+  standalone outside a fused chain, which is the exact scenario where the
+  override is needed
 
 ### StreamingMerge Interface (yaml-plugin-api)
 
@@ -79,6 +101,7 @@ or a multiplexing implementation that interleaves reads.
 public record StreamingTypeInfo(
     Class<?> inputType,
     Class<?> outputType,
+    String inputKey,
     StreamingStepFactory<?, ?> factory
 ) {}
 
@@ -92,6 +115,37 @@ Carried by the `Definition` record in `PluginRegistry`. The fusion pass reads
 type metadata from here; the factory creates configured step instances at
 execution time (per-invocation construction, matching the existing
 `BinderEmitter` pattern).
+
+- `inputKey` — the YAML key (kebab-case) that provides the first step's typed
+  input when the step appears at the head of a fused chain. For
+  `@StreamPlugin`-annotated steps, the APT derives this from the `@Execute`
+  method parameter name (e.g., `apply(String url)` → `inputKey = "url"`). For
+  mid-chain steps, `inputKey` is unused — the input comes from the previous
+  step's output. For hand-written `StreamingStep` implementations, the author
+  sets `inputKey` in the `StreamingTypeInfo` passed to the `Definition`
+
+### Definition Record Change
+
+The `Definition` record gains an 8th component:
+`Optional<StreamingTypeInfo> streamingType`. This is a breaking change to the
+canonical constructor — all existing callers (`PluginScanner.scanAndRegister()`,
+`Definition.Builder.build()`, APT-generated code) require migration.
+
+A secondary constructor preserves ergonomics for non-streaming steps:
+
+```java
+public Definition(String name, String description,
+    Map<String, Parameter> inputs, Map<String, Parameter> outputs,
+    Portability portability, Action action, String capability) {
+    this(name, description, inputs, outputs, portability, action,
+         capability, Optional.empty());
+}
+```
+
+The `Builder` gains a `streamingType(StreamingTypeInfo info)` method, defaulting
+to `Optional.empty()` when not called. The secondary constructor is not a
+backward-compatibility shim — it's API ergonomics for the common case where
+streaming metadata is absent.
 
 ### @StreamPlugin Annotation (yaml-plugin-api)
 
@@ -160,7 +214,15 @@ The fusion pass receives the resolved step list and `PluginRegistry`:
    assignable from the current step's `outputType()`, extend the chain
 5. Validate no intermediate step's `name()` is referenced by
    `${result.<name>}` in any downstream step outside the chain (referenced
-   steps become fusion boundaries)
+   steps become fusion boundaries). The scan is **syntactic**: a regex for
+   `${result.<name>}` patterns applied to both step parameter values AND
+   decorator parameter values. Limitations:
+   - Nested variable resolution (`${result.${dynamic}.field}`) is not detected
+   - JQ expressions referencing step names via `JQEvaluator` are not detected
+   - **Conservative strategy**: when uncertain, do not fuse. This is safe
+     (preserves correct semantics) but limits optimization. A false negative
+     (failing to detect a reference) would cause a correctness bug — so the
+     scan errs on the side of breaking fusion
 6. Check each step's `decorators()` for chain-compatible decorators (see
    Decorator Classification below)
 7. Collapse valid sequences (length ≥ 2) into `FusedPipelineStep`
@@ -172,16 +234,43 @@ as a new sealed variant case. At execution time:
 1. For each stage: resolve YAML params via `VariableResolver`, call
    `factory.create(resolvedParams, services)` to get a configured
    `StreamingStep` instance
-2. Compose `apply()` methods (with inline fusible decorator wrappers per D3)
-3. Execute: feed first step's typed input, pipe through `apply()` chain
-4. Wrap final output: `Result.of(Map.of("output", finalOutput))`
+2. Compose `apply()` methods (with inline fusible decorator wrappers)
+3. Extract the first step's typed input: read
+   `resolvedParams.get(streamingTypeInfo.inputKey())` and cast to the step's
+   `inputType()`. This extracts the streaming input from the resolved YAML
+   params — e.g., for `StreamingStep<String, InputStream>` with
+   `inputKey = "url"`, the evaluator reads `resolvedParams.get("url")` after
+   variable resolution (so `"${result.trigger.mediaUrl}"` is already resolved
+   to the actual URL string)
+4. Pipe through `apply()` chain
+5. Wrap final output: `Result.of(Map.of(StreamingStep.OUTPUT_KEY, finalOutput))`
 
-**SWF compiler path**: The `PlaybookCompiler` handles `FusedPipelineStep` by
-emitting a single compound `TaskItem` that wraps the entire chain as one
-callable task. The SWF SDK's `CallableTaskBuilder` delegates to the same
-chain-assembly logic. **Constraint**: non-serializable types (`InputStream`,
-`Reader`) are rejected — the SWF path validates that all types in a fusible
-chain implement `Serializable`. `byte[]` is serializable and valid.
+**SWF compiler path**: The `PlaybookCompiler` operates on raw
+`Map<String, Object>` YAML — it never sees `ResolvedStep` objects (which live
+in `yaml-step-runtime`). Fusion for the SWF path therefore uses a different
+mechanism:
+
+The compiler receives an optional `PluginRegistry` reference. When present, it
+performs streaming-aware compilation:
+
+1. For each step, look up the action name in the registry and check for
+   `Definition.streamingType()`
+2. Accumulate consecutive streaming-compatible steps (same type-compatibility
+   check as the evaluator path, using `StreamingTypeInfo.inputType()` /
+   `outputType()`)
+3. Group fusible sequences into a single compound `TaskItem` — a
+   `CaseHubCallableTask` that wraps the chain-assembly logic
+4. The `CaseHubCallableTaskBuilder` (registered via ServiceLoader) instantiates
+   and executes the fused chain at runtime, using the same
+   `StreamingStepFactory`-based chain assembly as the evaluator path
+
+When the `PluginRegistry` is absent (e.g., static compilation without runtime
+metadata), the compiler passes streaming steps through as individual callable
+tasks — no fusion, correct but unoptimized.
+
+**Constraint**: non-serializable types (`InputStream`, `Reader`) are rejected —
+the SWF path validates that all types in a fusible chain implement
+`Serializable`. `byte[]` is serializable and valid.
 
 ## Decorator Classification
 
@@ -198,10 +287,9 @@ no decorators.
 |-----------|----------------|
 | `timeout` | Wraps `apply()` with deadline via virtual-thread executor |
 | `retry` | Catches exceptions from `apply()`, re-invokes with backoff |
-| `on-error` | Catches exceptions, maps to fallback output |
 | `delay` | Pauses before `apply()` invocation |
-| `when` | Conditionally skips `apply()` (pass-through) |
 | `transform` | Post-processes individual step output |
+| `semaphore` / `mutex` | Acquires before `apply()`, releases in `finally` — structurally identical to `timeout` (acquire/try/finally/release). The `ExecutionScope` reference is available to inline wrappers through the evaluator |
 
 These require **new inline wrapper implementations** operating on the
 exception-based error model (exceptions propagate through `Function.andThen()`),
@@ -211,20 +299,22 @@ separate from the existing `DecoratorChain` methods which operate on
 ### Chain-Breaking Decorators
 
 Force a fusion boundary. The step executes independently via the standard
-`StepRunner` path.
+`StepRunner` path. Each decorator's architectural reason for breaking the chain
+is documented.
 
 | Decorator | Why it breaks the chain |
 |-----------|----------------------|
-| `from` | Changes input origin (reads from `OrcChannel`) |
-| `background` | Spawns async execution |
-| `semaphore` / `mutex` | Concurrency control (`OrcSemaphore`) |
-| `wait` | Blocks on `OrcSignal` |
-| `at` | Threshold gate |
-| `forEach` | Changes cardinality |
-| `cancel` | Signal-triggered cancellation |
-| `loop` | Iteration control |
-| `transition` | State machine side effect |
-| `signal` / `publish` | Post-execution side effects |
+| `from` | Changes input origin — reads from `OrcChannel`, bypassing the typed pipeline input |
+| `background` | Spawns async execution — returns immediately, decouples from the synchronous chain |
+| `when` | Conditionally skips execution — returns `Result.of(Map.of())` when false. For heterogeneous-typed steps (`I ≠ O`), skipping breaks the type chain (downstream expects `O`, but only `I` is available). Even for identity-typed steps, the `when` semantics (produce empty result, not pass-through) are incompatible with function composition |
+| `on-error` | Fallback output must be typed `O` — the existing `on-error` produces metadata (`Map.of("on-error.caught", message, "on-error.fallback", step)`), which is incompatible with typed streaming output. Defining typed fallback values in YAML for arbitrary `O` types adds complexity with no clear benefit |
+| `wait` | Blocks on `OrcSignal` — suspends execution until an external signal fires, incompatible with synchronous function chain |
+| `at` | Threshold gate — blocks until a numeric primitive meets a condition. Same suspension semantics as `wait` |
+| `forEach` | Changes cardinality — one input produces N executions, incompatible with 1:1 `apply()` model |
+| `cancel` | Signal-triggered cancellation — registers a watcher that can interrupt mid-execution. Interruption within a fused chain leaves intermediate state undefined |
+| `loop` | Iteration control — re-executes the step N times, producing multiple results |
+| `transition` | State machine side effect — fires mid-chain, with ordering implications for state machine consumers that observe the transition before the chain completes |
+| `signal` / `publish` | Post-execution side effects with ordering implications — these fire when the step completes, but in a fused chain, the step's result is not yet recorded in the `StepResultStore`. Other steps waiting on the signal would see stale state |
 
 ### Chain-Level Decorators
 
@@ -240,13 +330,27 @@ type. This preserves natural exception propagation for composed functions while
 maintaining `Result` semantics for the evaluator, decorator chain, and step
 result recording.
 
+**Chain failure diagnostics**: when a step within the fused chain throws, the
+exception is wrapped in a `FusedChainException` that records:
+- `failedStepName` — the `actionName` of the step that threw
+- `failedStepIndex` — zero-based position in the chain
+- `chainName` — the `FusedPipelineStep.name()` (outer step name)
+- Original exception as the cause
+
+The `Result.Failure` produced at the boundary includes the failing step's
+identity in the message (e.g., `"Fused chain 'audio-pipeline' failed at step 2
+(denoise): ..."`) and the category. Per-step timing is recorded via lightweight
+`System.nanoTime()` instrumentation in the chain wrapper for diagnostics — this
+feeds the existing `ActionExecutionEvent` mechanism.
+
 ## Merge: Parallel-to-Merge Data Path
 
 When a `ParallelStep` is followed by a merge step:
 
 1. Evaluator executes parallel branches, each producing a `Result`
 2. For streaming branches, typed output is extracted from
-   `Result.output().get("output")`
+   `Result.output().get(StreamingStep.OUTPUT_KEY)` — the contract constant
+   ensures all streaming steps use the same key
 3. Extracted outputs collected into `List<T>`
 4. Merge step's `apply(List<T>)` called with collected list
 5. Returns `T`, wrapped in `Result` by the evaluator
@@ -259,8 +363,19 @@ pass does not fuse across parallel boundaries.
 | Type | StructuralStepEvaluator | SWF path |
 |------|------------------------|----------|
 | `InputStream`, `Reader` | Supported | Rejected (non-serializable) |
-| `byte[]` | Supported | Supported (serializable, size-limit aware) |
+| `byte[]` | Supported | Supported (serializable, size-limit enforced) |
 | Serializable objects | Supported | Supported |
+
+**`byte[]` size limit on the SWF path**: configurable, default 256 KB. Enforced
+at runtime when the chain wrapper produces the final `byte[]` output — if
+`byte[].length` exceeds the limit, the chain fails with
+`Result.Failure("Fused chain output exceeds SWF size limit: <actual> > <limit> bytes", "SIZE_LIMIT")`.
+The limit is configurable via `PlaybookRuntime.Builder.maxSerializedPayloadBytes(int)`.
+For the motivating use case (WhatsApp voice notes, up to 16 MB), the chain
+should produce a processed result smaller than the raw input (e.g., a
+transcription `String`, not the full `byte[]` audio). If large `byte[]` payloads
+must flow through the SWF path, use external storage (S3, blob store) with a
+reference URI instead of inline serialization.
 
 Non-durable chains (`InputStream`-based) restart from the beginning on failure.
 This requires data sources to be replayable (idempotent fetch). Non-replayable
@@ -272,8 +387,9 @@ buffer to a replayable store as the first step before entering the fused chain.
 Streaming steps are `Portability.JAVA` initially. The `Portability` enum already
 tracks cross-language compatibility. A TypeScript runtime encountering a streaming
 step falls back to the `Action` adapter (via `materialize()`). TypeScript parity
-is deferred — TypeScript's structural typing would define an equivalent interface
-as a future additive change.
+is deferred to a separate issue — TypeScript's structural typing would define an
+equivalent interface as a future additive change. Tracked as a GitHub issue to be
+filed before implementation begins.
 
 ## YAML Surface
 
@@ -305,25 +421,24 @@ steps:
 The compiler fuses download → denoise → transcribe into a single chain.
 text-cleanup runs as a standard step on the materialized string output.
 
-### Event Stream Example
+### Typed Transform Example
 
 ```yaml
 steps:
   - sensor-ingest:
       topic: iot-temperature
     step: ingest
-    # StreamingStep<Map<String,Object>, SensorEvent>
+    # StreamingStep<Map<String,Object>, SensorEvent> — parses raw map to typed event
 
   - anomaly-detect:
       threshold: 2.5
-      window: 30s
     step: detect
-    # StreamingStep<SensorEvent, AnnotatedEvent>
+    # StreamingStep<SensorEvent, AnnotatedEvent> — per-event anomaly scoring (1:1)
 
   - alert-format:
       template: high-temp
     step: format
-    # StreamingStep<AnnotatedEvent, AlertPayload>
+    # StreamingStep<AnnotatedEvent, AlertPayload> — formats for notification
 
   - notify:
       channel: ops-alerts
@@ -331,8 +446,10 @@ steps:
     # Regular Action step — reads AlertPayload from result map
 ```
 
-The compiler fuses ingest → detect → format into a single chain. send runs
-as a standard step.
+The compiler fuses ingest → detect → format into a single chain. Each
+`apply()` call processes one event (1:1 transform). Windowed or batched
+processing (N:1, 1:N) is out of scope for `StreamingStep` — the `apply(I) → O`
+signature is strictly one-input-one-output. send runs as a standard step.
 
 ### Per-Step Decorator Example
 
@@ -402,12 +519,12 @@ No new Maven modules. The `Definition` record in yaml-plugin-api gains
 
 ## Testing Requirements
 
-Unit tests must demonstrate both stream kinds via YAML:
+Unit tests must demonstrate both data kinds via YAML:
 
 1. **Byte stream pipeline**: download → transform → transcribe chain with
    `InputStream`-typed steps, verifying fused execution and materialization
-2. **Event stream pipeline**: ingest → detect → format chain with typed event
-   objects, verifying type-compatible fusion
+2. **Typed transform pipeline**: ingest → detect → format chain with typed
+   domain objects, verifying type-compatible fusion
 3. **Mixed pipeline**: streaming chain followed by standard Action steps,
    verifying materialization boundary
 4. **Per-step decorators**: timeout and retry on individual steps within a
