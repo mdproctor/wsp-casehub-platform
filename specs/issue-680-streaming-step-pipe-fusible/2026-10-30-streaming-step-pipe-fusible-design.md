@@ -232,6 +232,7 @@ record FusedPipelineStep(
 ) implements ResolvedStep {}
 
 record FusedStageDescriptor(
+    String stepName,
     String actionName,
     Map<String, Object> params,
     Map<String, Object> decorators,
@@ -342,8 +343,13 @@ no decorators.
 | `timeout` | Wraps `apply()` with deadline via virtual-thread executor |
 | `retry` | Catches exceptions from `apply()`, re-invokes with backoff |
 | `delay` | Pauses before `apply()` invocation |
-| `transform` | Post-processes individual step output |
 | `semaphore` / `mutex` | Acquires before `apply()`, releases in `finally` — structurally identical to `timeout` (acquire/try/finally/release). The `ExecutionScope` reference is available to inline wrappers through the evaluator |
+
+Note: `transform` is not classified. The existing `DecoratorChain.wrapTransform()`
+is a no-op (reads the decorator value but returns the result unchanged). Until
+`transform` has defined semantics, it is excluded from both tables. If a step
+within a candidate fused chain has a `transform` decorator, the fusion pass
+treats it as chain-breaking (conservative strategy).
 
 These require **new inline wrapper implementations** operating on the
 exception-based error model (exceptions propagate through `Function.andThen()`),
@@ -386,16 +392,52 @@ result recording.
 
 **Chain failure diagnostics**: when a step within the fused chain throws, the
 exception is wrapped in a `FusedChainException` that records:
-- `failedStepName` — the `actionName` of the step that threw
+- `failedStepName` — the YAML `step:` name from `FusedStageDescriptor.stepName()`
+  (e.g., `"denoise"`)
+- `failedActionName` — the plugin action name from
+  `FusedStageDescriptor.actionName()` (e.g., `"audio-denoise"`)
 - `failedStepIndex` — zero-based position in the chain
 - `chainName` — the `FusedPipelineStep.name()` (outer step name)
 - Original exception as the cause
 
-The `Result.Failure` produced at the boundary includes the failing step's
-identity in the message (e.g., `"Fused chain 'audio-pipeline' failed at step 2
-(denoise): ..."`) and the category. Per-step timing is recorded via lightweight
-`System.nanoTime()` instrumentation in the chain wrapper for diagnostics — this
-feeds the existing `ActionExecutionEvent` mechanism.
+The `Result.Failure` produced at the boundary includes both identifiers in the
+message (e.g., `"Fused chain 'transcript' failed at step 1 (denoise /
+audio-denoise): ..."`) and the category. Per-step timing is recorded via
+lightweight `System.nanoTime()` instrumentation in the chain wrapper — the
+chain wrapper emits per-stage `ActionExecutionEvent` records using
+`FusedStageDescriptor.actionName()` (matching the existing event's
+`actionName` field) so that fused chain stages are observable in the same event
+stream as non-fused steps.
+
+### Resource Lifecycle
+
+For `InputStream`-based chains, resource cleanup on failure requires explicit
+specification. In the non-fused case, each step's `Action.execute()` can manage
+resources independently (try-with-resources). In a fused chain,
+`Function.andThen()` composition provides no resource tracking — intermediate
+values are inaccessible after an exception propagates.
+
+**Step author contract**: `InputStream`-returning steps that wrap an upstream
+input must cascade `close()` to that input. This is the standard Java wrapping
+pattern — `FilterInputStream`, `BufferedInputStream`, and custom stream wrappers
+already do this. A `DenoisedInputStream(upstream)` must close `upstream` when
+itself closed. This is not a new requirement imposed by fusion — it is standard
+`InputStream` contract behavior.
+
+**Chain wrapper responsibility**: the chain wrapper tracks the last successfully
+produced intermediate value. On exception:
+1. If the last intermediate implements `AutoCloseable`, close it. Since wrapping
+   streams cascade `close()`, this propagates through all upstream intermediates
+2. If the first input (extracted via `inputKey`) implements `AutoCloseable` and
+   was not yet consumed by a wrapping stream (i.e., the failure occurred before
+   the first step produced output), close it directly
+
+The chain wrapper uses try-finally to ensure cleanup runs regardless of
+exception type.
+
+**On success**: the final output is wrapped in `Result` and ownership transfers
+to the consumer (evaluator, downstream step). The chain does not close the final
+output — the consumer owns its lifecycle.
 
 ## Merge: Parallel-to-Merge Data Path
 
@@ -594,6 +636,9 @@ Unit tests must demonstrate both data kinds via YAML:
 9. **@StreamPlugin APT**: verify that the first `@Execute` parameter is treated
    as streaming input (not a service dependency), and that the return type
    determines `outputType()` (not `Result`)
+10. **Resource cleanup on failure**: verify that `InputStream`-based fused chains
+    close intermediate streams on mid-chain exception — the last intermediate
+    and all upstream inputs should be closed via cascading `close()`
 
 ## References
 
