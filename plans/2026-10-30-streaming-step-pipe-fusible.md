@@ -10,7 +10,15 @@
 
 **Goal:** Add `StreamingStep<I,O>` to the playbook step engine so the compiler can fuse type-compatible consecutive steps into a single `Function.andThen()` chain at Java speed.
 
-**Architecture:** New types in yaml-plugin-api (`StreamingStep`, `StreamingMerge`, `@StreamPlugin`, `StreamingTypeInfo`). The `Definition` record gains an 8th component. A new APT in yaml-plugin-processor generates code from `@StreamPlugin`. In yaml-step-runtime, a fusion pass detects consecutive streaming steps and collapses them into `FusedPipelineStep` (new `ResolvedStep` variant). The `StructuralStepEvaluator` dispatches fused chains via composed `Function.andThen()`. The playbook-compiler handles SWF-path fusion with serializable-type validation.
+**Architecture:** New types in yaml-plugin-api (`StreamingStep`, `StreamingTypeInfo`). `@Plugin` gains a `streaming()` attribute (default false). The `Definition` record gains an 8th component. The existing APT in yaml-plugin-processor is extended to generate streaming artifacts when `streaming = true`. In yaml-step-runtime, a fusion pass detects consecutive streaming steps and collapses them into `FusedPipelineStep` (new `ResolvedStep` variant). `FusedStageDescriptor` is a nested record inside `FusedPipelineStep` (in the `catalog` package — no circular dependency). The `StructuralStepEvaluator` dispatches fused chains via composed `Function.andThen()`. The playbook-compiler handles SWF-path fusion with serializable-type validation. `StreamingMerge<T>` is defined as an API type but runtime wiring is deferred to a follow-up issue.
+
+**Review amendments (from light plan review):**
+- R1-02: `FusedStageDescriptor` nested inside `FusedPipelineStep` in `catalog` package (no circular dep)
+- R1-03: `@Plugin(streaming = true)` instead of separate `@Plugin(streaming = true)` annotation (no APT fragmentation)
+- R1-04: Shared `computeDelay` utility, `SpeedMultiplier` passed to inline wrappers
+- R1-05: Fusion pass scans barrier `await:` and quorum `of:` references too
+- R1-06: `StreamingMerge` runtime wiring deferred to follow-up issue
+- R1-07/R1-08: Package paths and builder API corrected for actual codebase
 
 **Tech Stack:** Java 21, yaml-plugin-api (zero-dep), yaml-plugin-processor (Jandex + JavaPoet APT), yaml-step-runtime (Quarkus), playbook-compiler (SWF SDK)
 
@@ -27,21 +35,21 @@
 
 ## Batch 1: API Foundation (yaml-plugin-api)
 
-### Task 1: StreamingStep interface, StreamingMerge, StreamingTypeInfo, @StreamPlugin, Definition change
+### Task 1: StreamingStep interface, StreamingMerge, StreamingTypeInfo, @Plugin streaming attribute, Definition change
 
 **Files:**
 - Create: `yaml-plugin-api/src/main/java/io/casehub/yaml/plugin/api/StreamingStep.java`
 - Create: `yaml-plugin-api/src/main/java/io/casehub/yaml/plugin/api/StreamingMerge.java`
 - Create: `yaml-plugin-api/src/main/java/io/casehub/yaml/plugin/api/StreamingTypeInfo.java`
 - Create: `yaml-plugin-api/src/main/java/io/casehub/yaml/plugin/api/StreamingStepFactory.java`
-- Create: `yaml-plugin-api/src/main/java/io/casehub/yaml/plugin/api/StreamPlugin.java`
+- Modify: `yaml-plugin-api/src/main/java/io/casehub/yaml/plugin/api/Plugin.java` — add `boolean streaming() default false`
 - Modify: `yaml-plugin-api/src/main/java/io/casehub/yaml/plugin/api/Definition.java` — add 8th component
 - Test: `yaml-plugin-api/src/test/java/io/casehub/yaml/plugin/api/StreamingStepTest.java`
 - Test: `yaml-plugin-api/src/test/java/io/casehub/yaml/plugin/api/DefinitionTest.java`
 
 **Interfaces:**
 - Consumes: `Result`, `Action`, `ServiceRegistry`, `Portability` — existing types
-- Produces: `StreamingStep<I,O>` (interface: `inputType()`, `outputType()`, `apply(I)→O`, `materialize()`), `StreamingMerge<T>` (interface: `mergeType()`, `merge(List<T>)→T`), `StreamingTypeInfo` (record: `inputType`, `outputType`, `inputKey`, `factory`), `StreamingStepFactory<I,O>` (functional interface: `create(Map, ServiceRegistry)→StreamingStep`), `@StreamPlugin(name)` annotation, `Definition` with 8th `Optional<StreamingTypeInfo> streamingType` component
+- Produces: `StreamingStep<I,O>` (interface: `inputType()`, `outputType()`, `apply(I)→O`, `materialize()`), `StreamingMerge<T>` (interface: `mergeType()`, `merge(List<T>)→T`, API only — runtime wiring deferred), `StreamingTypeInfo` (record: `inputType`, `outputType`, `inputKey`, `factory`), `StreamingStepFactory<I,O>` (functional interface: `create(Map, ServiceRegistry)→StreamingStep`), `@Plugin(streaming = true)` attribute, `Definition` with 8th `Optional<StreamingTypeInfo> streamingType` component
 
 - [ ] **Step 1: Write failing tests for StreamingStep interface**
 
@@ -232,7 +240,7 @@ public record StreamingTypeInfo(
 }
 ```
 
-- [ ] **Step 8: Create @StreamPlugin annotation**
+- [ ] **Step 8: Create @Plugin(streaming = true) annotation**
 
 ```java
 package io.casehub.yaml.plugin.api;
@@ -343,7 +351,7 @@ git add yaml-plugin-api/src/main/java/io/casehub/yaml/plugin/api/StreamingStep.j
        yaml-plugin-api/src/test/java/io/casehub/yaml/plugin/api/StreamingStepTest.java \
        yaml-plugin-api/src/test/java/io/casehub/yaml/plugin/api/StreamingMergeTest.java \
        yaml-plugin-api/src/test/java/io/casehub/yaml/plugin/api/DefinitionStreamingTest.java
-git commit -m "feat(api): add StreamingStep, StreamingMerge, @StreamPlugin and Definition streaming support
+git commit -m "feat(api): add StreamingStep, StreamingMerge, @Plugin(streaming = true) and Definition streaming support
 
 Refs #680"
 ```
@@ -352,21 +360,21 @@ Refs #680"
 
 ## Batch 2: APT Code Generation (yaml-plugin-processor)
 
-### Task 2: @StreamPlugin annotation processor
+### Task 2: Extend existing APT for @Plugin(streaming = true)
 
 **Files:**
-- Create: `yaml-plugin-processor/src/main/java/io/casehub/yaml/plugin/processor/StreamPluginProcessor.java`
+- Modify: `yaml-plugin-processor/src/main/java/io/casehub/yaml/plugin/processor/StepPluginProcessor.java` — detect `streaming = true`, branch to streaming emitter
 - Create: `yaml-plugin-processor/src/main/java/io/casehub/yaml/plugin/processor/StreamBinderEmitter.java`
-- Modify: `yaml-plugin-processor/src/main/resources/META-INF/services/javax.annotation.processing.Processor` — add StreamPluginProcessor
-- Test: `yaml-plugin-processor/src/test/java/io/casehub/yaml/plugin/processor/StreamPluginProcessorTest.java`
+- Modify: `yaml-plugin-processor/src/main/java/io/casehub/yaml/plugin/processor/RegistryEmitter.java` — emit streaming metadata in manifest
+- Test: `yaml-plugin-processor/src/test/java/io/casehub/yaml/plugin/processor/StreamingPluginProcessorTest.java`
 
 **Interfaces:**
-- Consumes: `StreamingStep<I,O>`, `StreamingStepFactory<I,O>`, `StreamingTypeInfo`, `@StreamPlugin`, `@Execute`, `Result`, `Action`, `ServiceRegistry`, `Definition`, `Portability` from yaml-plugin-api
-- Produces: APT that generates from `@StreamPlugin` records: (1) `<Name>StreamingStep implements StreamingStep<I,O>` with `apply()`, `materialize()`, type tokens; (2) `<Name>Action implements Action` delegating through `materialize()`; (3) JSON manifest `META-INF/yaml-plugins/<name>.json` with streaming type metadata
+- Consumes: `StreamingStep<I,O>`, `StreamingStepFactory<I,O>`, `StreamingTypeInfo`, `@Plugin(streaming = true)`, `@Execute`, `Result`, `Action`, `ServiceRegistry`, `Definition`, `Portability` from yaml-plugin-api
+- Produces: Extended APT that, when `streaming = true`, generates from `@Plugin` records: (1) `<Name>StreamingStep implements StreamingStep<I,O>` with `apply()`, `materialize()`, type tokens; (2) `<Name>Action implements Action` delegating through `materialize()`; (3) JSON manifest `META-INF/yaml-plugins/<name>.json` with streaming type metadata. No new processor — same `StepPluginProcessor`, new branch.
 
 - [ ] **Step 1: Write failing test for StreamPluginProcessor**
 
-Create a test that compiles a `@StreamPlugin` record and verifies the generated source files exist:
+Create a test that compiles a `@Plugin(streaming = true)` record and verifies the generated source files exist:
 
 ```java
 package io.casehub.yaml.plugin.processor;
@@ -392,7 +400,7 @@ class StreamPluginProcessorTest {
             import java.io.InputStream;
             import java.io.ByteArrayInputStream;
 
-            @StreamPlugin(name = "uppercase")
+            @Plugin(streaming = true)(name = "uppercase")
             public record UppercasePlugin() {
                 @Execute
                 public String apply(String input) {
@@ -426,14 +434,14 @@ class StreamPluginProcessorTest {
 
     @Test
     void generatedStreamingStepHasCorrectTypeTokens() throws Exception {
-        // Compile @StreamPlugin with InputStream input, String output
+        // Compile @Plugin(streaming = true) with InputStream input, String output
         // Verify generated code has inputType()=InputStream.class, outputType()=String.class
         String source = """
             package test;
             import io.casehub.yaml.plugin.api.*;
             import java.io.InputStream;
 
-            @StreamPlugin(name = "transcribe")
+            @Plugin(streaming = true)(name = "transcribe")
             public record TranscribePlugin(@Optional String language) {
                 @Execute
                 public String apply(InputStream audio) {
@@ -474,7 +482,7 @@ class StreamPluginProcessorTest {
             package test;
             import io.casehub.yaml.plugin.api.*;
 
-            @StreamPlugin(name = "bad")
+            @Plugin(streaming = true)(name = "bad")
             public record BadPlugin() {
                 @Execute
                 public void apply(String input) {}
@@ -515,7 +523,7 @@ Expected: compilation failure (StreamPluginProcessor doesn't exist)
 - [ ] **Step 3: Implement StreamPluginProcessor**
 
 Create `StreamPluginProcessor.java` — an `AbstractProcessor` that:
-1. Reads `@StreamPlugin` annotation on records
+1. Reads `@Plugin(streaming = true)` annotation on records
 2. Finds the `@Execute` method
 3. Validates: at least 1 param, non-void return, non-Result return, first param is non-generic concrete class
 4. Infers `I` (first param type) and `O` (return type), `inputKey` (first param name, kebab-cased)
@@ -591,7 +599,7 @@ Expected: all tests PASS
 
 ```bash
 git add yaml-plugin-processor/
-git commit -m "feat(apt): @StreamPlugin annotation processor generates StreamingStep + Action
+git commit -m "feat(apt): @Plugin(streaming = true) annotation processor generates StreamingStep + Action
 
 Refs #680"
 ```
@@ -604,7 +612,7 @@ Refs #680"
 
 **Files:**
 - Modify: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/catalog/ResolvedStep.java` — add 13th variant
-- Create: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/FusedStageDescriptor.java`
+- Note: `FusedStageDescriptor` is a nested record inside `ResolvedStep.FusedPipelineStep` (catalog package, no circular dep)
 - Create: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/FusedChainException.java`
 - Create: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/InlineDecoratorWrappers.java`
 - Test: `yaml-step-runtime/src/test/java/io/casehub/yaml/step/eval/InlineDecoratorWrappersTest.java`
@@ -826,6 +834,9 @@ import java.util.function.Function;
 public final class InlineDecoratorWrappers {
 
     private InlineDecoratorWrappers() {}
+
+    // SpeedMultiplier applied to all delays/timeouts for simulation consistency
+    // computeDelay() extracted to shared utility (reused by DecoratorChain)
 
     public static <I, O> Function<I, O> withTimeout(Function<I, O> inner, Duration timeout) {
         return input -> {
@@ -1182,6 +1193,9 @@ public final class FusionPass {
     private static final Pattern RESULT_REF = Pattern.compile(
         "\\$\\{result\\.([a-zA-Z0-9_-]+)");
 
+    // Also scan barrier await: and quorum of: lists for step name references
+    // Steps referenced by barriers/quorums must not be fused away
+
     private FusionPass() {}
 
     public static List<ResolvedStep> fuse(List<ResolvedStep> steps, PluginRegistry registry) {
@@ -1363,11 +1377,11 @@ Refs #680"
 
 - [ ] **Step 1: Create test streaming step implementations**
 
-Create test-only `@StreamPlugin` records for both stream kinds:
+Create test-only `@Plugin(streaming = true)` records for both stream kinds:
 
 ```java
 // Byte stream steps
-@StreamPlugin(name = "test-download")
+@Plugin(streaming = true)(name = "test-download")
 public record TestDownloadPlugin() {
     @Execute
     public InputStream apply(String url) {
@@ -1375,7 +1389,7 @@ public record TestDownloadPlugin() {
     }
 }
 
-@StreamPlugin(name = "test-transform-bytes")
+@Plugin(streaming = true)(name = "test-transform-bytes")
 public record TestTransformBytesPlugin() {
     @Execute
     public InputStream apply(InputStream input) {
@@ -1384,7 +1398,7 @@ public record TestTransformBytesPlugin() {
     }
 }
 
-@StreamPlugin(name = "test-transcribe")
+@Plugin(streaming = true)(name = "test-transcribe")
 public record TestTranscribePlugin() {
     @Execute
     public String apply(InputStream audio) {
@@ -1397,7 +1411,7 @@ public record SensorEvent(String sensorId, double temperature, long timestamp) {
 public record AnnotatedEvent(SensorEvent event, boolean anomaly) {}
 public record AlertPayload(String message, String severity) {}
 
-@StreamPlugin(name = "test-ingest")
+@Plugin(streaming = true)(name = "test-ingest")
 public record TestIngestPlugin() {
     @Execute
     public SensorEvent apply(String rawPayload) {
@@ -1405,7 +1419,7 @@ public record TestIngestPlugin() {
     }
 }
 
-@StreamPlugin(name = "test-detect")
+@Plugin(streaming = true)(name = "test-detect")
 public record TestDetectPlugin(@Optional Double threshold) {
     @Execute
     public AnnotatedEvent apply(SensorEvent event) {
@@ -1414,7 +1428,7 @@ public record TestDetectPlugin(@Optional Double threshold) {
     }
 }
 
-@StreamPlugin(name = "test-format")
+@Plugin(streaming = true)(name = "test-format")
 public record TestFormatPlugin() {
     @Execute
     public AlertPayload apply(AnnotatedEvent event) {
