@@ -26,13 +26,13 @@ public interface StreamingStep<I, O> {
 
 **Error model:** Within a fused chain, errors propagate as exceptions through the `Function.andThen()` composition. The chain wrapper catches exceptions at the boundary and converts to `Result.Failure(message, category)` where category is derived from the exception type. This preserves natural exception propagation for composed functions while maintaining `Result` semantics for the evaluator, decorator chain (`wrapOnError`, `wrapRetry`), and step result recording.
 
-**Service access:** Streaming steps access platform services through constructor injection, not per-invocation lookup. The `@StreamPlugin` APT resolves `@Execute` method service parameters at step construction time and binds them as final fields on the generated implementation — the same service types currently extracted via `services.lookup(Class)` in `BinderEmitter`-generated code. This is more efficient than per-call lookup and preserves the pure-function semantics of `apply(I) → O`.
+**Service access and step lifecycle:** Streaming steps are constructed per-invocation, matching the existing `BinderEmitter` pattern where `Action.execute()` constructs a new record instance from the params Map each time (lines 62-71). The `@StreamPlugin` APT generates a factory: `(Map<String,Object> resolvedParams, ServiceRegistry services) → StreamingStep<I,O>` that (1) constructs the `@StreamPlugin` record from resolved YAML params using kebab-case extraction, (2) looks up `@Execute` method service dependencies via `services.lookup(Class)`, and (3) returns a configured `StreamingStep` instance. Config params and services are available inside `apply()` as record fields and final fields respectively. Each YAML step usage (even of the same action with different params) gets its own step instance.
 
 **Trade-offs:** Steps that want streaming execution implement `StreamingStep<I,O>` via `@StreamPlugin`. The generated `materialize()` provides the `Action`-compatible fallback path. Dual interface implementation (`StreamingStep` + `Action`) is handled entirely by the APT — step authors write one `@StreamPlugin` record with one `@Execute` method.
 
 **Sources:** yaml-plugin-api Result.java, Action.java, ServiceRegistry.java — current contracts are Map<String,Object> only; BinderEmitter.java — service parameter injection pattern
 **Exploration:** quick → revised after adversarial review
-**Status:** revised — R1-02 (error model), R1-03 (service access), R1-04 (type tokens), R1-05 (materialize boundary) addressed
+**Status:** revised — R1-02 (error model), R1-03 (service access), R1-04 (type tokens), R1-05 (materialize boundary), R2-01 (per-invocation construction) addressed
 
 ## D2: Fusion detection and chain compilation
 
@@ -45,13 +45,19 @@ public interface StreamingStep<I, O> {
 **Rationale:** Fits both execution paths (StructuralStepEvaluator and SWF compiler). The fusion pass:
 
 1. Receives the resolved step list AND the `PluginRegistry`
-2. For each consecutive `PluginStep`, queries `registry.resolve(actionName)` to obtain the `Definition`, which carries optional streaming metadata: `Optional<StreamingTypeInfo> streamingType()` where `StreamingTypeInfo(Class<?> inputType, Class<?> outputType, StreamingStep<?,?> step)`
+2. For each consecutive `PluginStep`, queries `registry.resolve(actionName)` to obtain the `Definition`, which carries optional streaming metadata: `Optional<StreamingTypeInfo> streamingType()` where `StreamingTypeInfo(Class<?> inputType, Class<?> outputType, StreamingStepFactory<?,?> factory)`. The factory produces configured step instances per-invocation — `StreamingTypeInfo` carries type metadata for the fusion pass, not a pre-configured singleton (see D1 service access)
 3. Detects fusible sequences where `outputType` is assignable to the next step's `inputType` via `isAssignableFrom()`
 4. Validates that no intermediate step's `name()` is referenced by `${results.<name>}` in any downstream step outside the chain — referenced steps become fusion boundaries
 5. Checks each step's `decorators()` map for chain-compatible decorators per D3 — chain-breaking decorators force fusion boundaries
-6. Collapses valid sequences into `FusedPipelineStep`
+6. Collapses valid sequences into `FusedPipelineStep` — a data record carrying per-step action names, param maps, decorator maps, and references to the `StreamingStepFactory` from each step's `StreamingTypeInfo`. The chain is NOT pre-composed at fusion time; step instances are constructed and composed at execution time.
 
-The `Definition` record is extended with `Optional<StreamingTypeInfo> streamingType()` (default `Optional.empty()` for non-streaming actions). The `@StreamPlugin` APT's `RegistryEmitter` populates this from the generated `StreamingStep` implementation.
+The `Definition` record is extended with `Optional<StreamingTypeInfo> streamingType()` (default `Optional.empty()` for non-streaming actions). The `@StreamPlugin` APT's `RegistryEmitter` populates this from the generated factory.
+
+**Execution-time chain assembly:** When the evaluator processes a `FusedPipelineStep`:
+1. For each step in the chain: resolve YAML params via `VariableResolver`, then call `factory.create(resolvedParams, services)` to get a configured `StreamingStep` instance
+2. Compose the `apply()` methods from those instances (with inline fusible decorator wrappers per D3)
+3. Execute the composed chain: feed the first step's typed input (extracted from its resolved params), pipe through successive `apply()` calls
+4. Wrap the final output in `Result.of(Map.of("output", finalOutput))`
 
 **Pass ordering:** resolve steps → fusion pass (reads `decorators()` maps from `ResolvedStep` records + queries `PluginRegistry` for streaming metadata) → compile fused chains. No circular dependency with decorator resolution — decorator data is already present in `ResolvedStep.PluginStep.decorators()` as raw `Map<String, Object>` after step resolution.
 
@@ -62,7 +68,7 @@ The `Definition` record is extended with `Optional<StreamingTypeInfo> streamingT
 **Sources:** ResolvedStep.java (sealed hierarchy), StructuralStepEvaluator.java (dispatch model), PluginRegistry.java (resolve by name), Definition.java (action + metadata), CatalogStepRunner.java (existing registry→action lookup pattern)
 **Exploration:** quick → revised after adversarial review
 **Depends on:** D1 (StreamingStep interface provides inputType/outputType)
-**Status:** revised — R1-08 (registry type metadata), R1-09 (Result wrapping + variable references), R1-10 (ordering clarification) addressed
+**Status:** revised — R1-08 (registry type metadata), R1-09 (Result wrapping + variable references), R1-10 (ordering clarification), R2-01 (factory pattern, execution-time chain assembly) addressed
 
 ## D3: Decorator application on fused chains
 
@@ -98,12 +104,20 @@ The `Definition` record is extended with `Optional<StreamingTypeInfo> streamingT
 
 The fusion pass refuses to fuse a step carrying a chain-breaking decorator. At compile time, the YAML-to-executor pass validates decorator compatibility — a chain-breaking decorator on a step that would otherwise be fused produces a compile-time diagnostic explaining why the chain is broken at that point.
 
-**Trade-offs:** The composed function is more complex when per-step decorators exist (each decorated step is a mini-wrapper within the chain). But this is compile-time complexity, not runtime cost. YAML authors use explicit block wrappers for chain-level behavior.
+**Inline wrapper implementations:** Fusible decorators within fused chains require NEW inline wrapper implementations that operate on the exception-based error model (D1), separate from the existing `DecoratorChain` methods which operate on `DecoratedExecution → Result`. Specifically:
+- `retry` inline: catches exceptions from `apply()` and re-invokes, deriving retry category from exception type — vs. `DecoratorChain.wrapRetry()` (lines 243-296) which checks `Result.isSuccess()` and inspects `Result.Failure.category()`
+- `on-error` inline: catches exceptions and maps to fallback output — vs. `wrapOnError()` (lines 188-212) which inspects `Result.Failure`
+- `timeout` inline: wraps `apply()` in a virtual-thread executor with deadline — structurally similar to `wrapTimeout()` but returns the typed output or throws
+- `delay`, `when`, `transform`: simpler wrappers that are structurally similar to their `DecoratorChain` counterparts
 
-**Sources:** DecoratorChain.java (18 decorator types, apply() model), StructuralStepEvaluator.java (evaluateInternal decorator wrapping)
+The existing `DecoratorChain` methods remain authoritative for the standard `Result`-based execution path (standalone steps, chain-level decorators on enclosing blocks). The inline wrappers are a parallel code path for the exception-based model within fused chains.
+
+**Trade-offs:** The composed function is more complex when per-step decorators exist (each decorated step is a mini-wrapper within the chain). The inline wrappers are additional implementation effort beyond the existing `DecoratorChain`. But this is compile-time complexity, not runtime cost. YAML authors use explicit block wrappers for chain-level behavior.
+
+**Sources:** DecoratorChain.java (18 decorator types, apply() model — standard Result-based path), StructuralStepEvaluator.java (evaluateInternal decorator wrapping)
 **Exploration:** quick → revised after adversarial review
 **Depends on:** D2 (fusion pass identifies chains and their per-step decorator sets)
-**Status:** revised — R1-12 (decorator classification), R1-13 (chain-level scoping from blocks, not positional rule) addressed
+**Status:** revised — R1-12 (decorator classification), R1-13 (chain-level scoping from blocks, not positional rule), R2-02 (inline wrapper implementations for exception model) addressed
 
 ## D4: SWF durability constraint for byte streams
 
