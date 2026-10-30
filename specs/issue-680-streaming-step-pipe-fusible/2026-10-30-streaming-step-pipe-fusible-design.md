@@ -157,10 +157,32 @@ public @interface StreamPlugin {
 }
 ```
 
-Parallel to `@Plugin`. Applied to Java records. The APT infers `I` and `O` from
-the `@Execute` method signature. Generates:
+Parallel to `@Plugin`. Applied to Java records. The `@Execute` method signature
+defines the streaming contract:
+
+- **First parameter**: the streaming input (`I`). Its type determines
+  `inputType()`, its name (kebab-cased) determines `inputKey` in
+  `StreamingTypeInfo`. For `apply(InputStream audio)`, `I = InputStream` and
+  `inputKey = "audio"`
+- **Return type**: the streaming output (`O`). Determines `outputType()`. Unlike
+  `@Plugin` (which requires `Result`), `@StreamPlugin` returns the typed output
+  directly
+- **Remaining parameters**: service dependencies resolved via
+  `ServiceRegistry.lookup()`, identical to `@Plugin` semantics
+
+The APT validates:
+- The `@Execute` method has at least one parameter (the streaming input)
+- The return type is not `void` and not `Result` (which would indicate a
+  `@Plugin`-style method, not a streaming transform)
+- The first parameter type is a non-generic concrete class (per the type token
+  constraint)
+
+Generates:
 1. A `StreamingStep<I,O>` implementation with type tokens, `apply()`, and
-   `materialize()`
+   `materialize()` — the generated `materialize()` extracts `I` from
+   `resolvedParams` using `inputKey`, calls `apply(input, services.lookup(...))`
+   for any service params, and wraps the output in
+   `Result.of(Map.of(OUTPUT_KEY, result))`
 2. An `Action` adapter delegating through `materialize()` for standalone/fallback
    execution
 3. Registry manifest with `StreamingTypeInfo` metadata
@@ -175,6 +197,21 @@ public record DenoisePlugin(@Optional String model) {
         // denoise the audio stream using the configured model
         return new DenoisedInputStream(audio, model != null ? model : "gtcrn");
     }
+}
+```
+
+Here, `audio` (first parameter) is the streaming input → `I = InputStream`,
+`inputKey = "audio"`. The return type `InputStream` → `O = InputStream`. The
+record component `model` is a YAML config param (baked into the factory via the
+record constructor). If the method had additional parameters beyond `audio`, they
+would be service dependencies:
+
+```java
+@Execute
+public InputStream apply(InputStream audio, NoiseProfileService profiles) {
+    // 'audio' is the streaming input (I)
+    // 'profiles' is a service dependency resolved via ServiceRegistry.lookup()
+    return new DenoisedInputStream(audio, profiles.getProfile(model));
 }
 ```
 
@@ -202,6 +239,14 @@ record FusedStageDescriptor(
 ) {}
 ```
 
+**`name()` assignment**: the fusion pass sets `FusedPipelineStep.name()` to the
+**last stage's step name**. The chain's output represents the last stage's
+output, and the evaluator records the result via `recordResult(step.name(),
+result)`. Downstream steps reference this via `${result.<lastStepName>.field}`.
+For example, fusing download → denoise → transcript produces a
+`FusedPipelineStep` with `name = "transcript"`, so `${result.transcript.output}`
+resolves correctly.
+
 ### Fusion Algorithm
 
 The fusion pass receives the resolved step list and `PluginRegistry`:
@@ -212,11 +257,14 @@ The fusion pass receives the resolved step list and `PluginRegistry`:
 3. If present, start accumulating a candidate chain
 4. Check the next step — if it's also a streaming step and its `inputType()` is
    assignable from the current step's `outputType()`, extend the chain
-5. Validate no intermediate step's `name()` is referenced by
-   `${result.<name>}` in any downstream step outside the chain (referenced
-   steps become fusion boundaries). The scan is **syntactic**: a regex for
-   `${result.<name>}` patterns applied to both step parameter values AND
-   decorator parameter values. Limitations:
+5. Validate no step in the chain other than the last stage's `name()` is
+   referenced by `${result.<name>}` in any downstream step outside the chain.
+   After fusion, only the last stage's name is recorded (as
+   `FusedPipelineStep.name()`) — all other individual step results are lost.
+   A reference to any non-last step (first or intermediate) would resolve to
+   null after fusion. Referenced steps become fusion boundaries. The scan is
+   **syntactic**: a regex for `${result.<name>}` patterns applied to both
+   step parameter values AND decorator parameter values. Limitations:
    - Nested variable resolution (`${result.${dynamic}.field}`) is not detected
    - JQ expressions referencing step names via `JQEvaluator` are not detected
    - **Conservative strategy**: when uncertain, do not fuse. This is safe
@@ -253,11 +301,16 @@ mechanism:
 The compiler receives an optional `PluginRegistry` reference. When present, it
 performs streaming-aware compilation:
 
-1. For each step, look up the action name in the registry and check for
-   `Definition.streamingType()`
-2. Accumulate consecutive streaming-compatible steps (same type-compatibility
-   check as the evaluator path, using `StreamingTypeInfo.inputType()` /
-   `outputType()`)
+1. **Plugin step identification**: the compiler's `compileStep()` method iterates
+   YAML map keys against its `StepCompiler` registry (structural types: `block`,
+   `if`, `parallel`, etc.). Keys that don't match any registered `StepCompiler`
+   or known structural/decorator keyword are resolved via
+   `pluginRegistry.resolve(key)` — mirroring the `Walker`'s fallback resolution
+   logic. This is the mechanism by which the compiler discovers which steps are
+   plugin actions and can query their `Definition.streamingType()`
+2. For identified plugin steps with `streamingType().isPresent()`, accumulate
+   consecutive streaming-compatible steps (same type-compatibility check as the
+   evaluator path, using `StreamingTypeInfo.inputType()` / `outputType()`)
 3. Group fusible sequences into a single compound `TaskItem` — a
    `CaseHubCallableTask` that wraps the chain-assembly logic
 4. The `CaseHubCallableTaskBuilder` (registered via ServiceLoader) instantiates
@@ -265,8 +318,9 @@ performs streaming-aware compilation:
    `StreamingStepFactory`-based chain assembly as the evaluator path
 
 When the `PluginRegistry` is absent (e.g., static compilation without runtime
-metadata), the compiler passes streaming steps through as individual callable
-tasks — no fusion, correct but unoptimized.
+metadata), the compiler passes all steps through its existing `StepCompiler`
+registry — plugin steps that are not registered as `StepCompiler` instances
+produce an ERROR diagnostic (the current behavior). No fusion occurs.
 
 **Constraint**: non-serializable types (`InputStream`, `Reader`) are rejected —
 the SWF path validates that all types in a fusible chain implement
@@ -428,7 +482,7 @@ steps:
   - sensor-ingest:
       topic: iot-temperature
     step: ingest
-    # StreamingStep<Map<String,Object>, SensorEvent> — parses raw map to typed event
+    # StreamingStep<RawSensorPayload, SensorEvent> — parses raw payload to typed event
 
   - anomaly-detect:
       threshold: 2.5
@@ -534,8 +588,12 @@ Unit tests must demonstrate both data kinds via YAML:
 6. **Union merge**: parallel branches feeding into `StreamingMerge` step
 7. **SWF path**: verify serializable types work, non-serializable types are
    rejected at compile time
-8. **Variable reference boundary**: verify that `${result.midStep.field}`
-   prevents fusion of `midStep`
+8. **Variable reference boundary**: verify that `${result.<name>.field}`
+   prevents fusion for ANY non-last step in the chain — including the first
+   step, not just intermediate steps
+9. **@StreamPlugin APT**: verify that the first `@Execute` parameter is treated
+   as streaming input (not a service dependency), and that the return type
+   determines `outputType()` (not `Result`)
 
 ## References
 
