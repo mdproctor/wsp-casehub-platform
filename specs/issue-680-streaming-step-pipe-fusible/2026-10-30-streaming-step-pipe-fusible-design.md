@@ -54,7 +54,9 @@ public interface StreamingStep<I, O> {
 - `materialize()` — bridges streaming to non-streaming execution. The APT
   generates this: extract typed `I` from params, call `apply()`, wrap output in
   `Result.of(Map.of("output", result))`. This is the boundary between the
-  streaming and `Action`-compatible worlds
+  streaming and `Action`-compatible worlds. Hand-written `StreamingStep`
+  implementations (not using `@StreamPlugin`) must override `materialize()`
+  themselves — the default throws to catch missing overrides at development time
 
 ### StreamingMerge Interface (yaml-plugin-api)
 
