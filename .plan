@@ -13,3 +13,14 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/platform#680 — Issue #680 ← active
+  - [ ] Batch 1: API Foundation
+    - [ ] Task 1: StreamingStep StreamingMerge StreamingTypeInfo @StreamPlugin Definition change
+  - [ ] Batch 2: APT Code Generation
+    - [ ] Task 2: @StreamPlugin annotation processor
+  - [ ] Batch 3: Fusion Engine
+    - [ ] Task 3: FusedPipelineStep FusedChainException inline decorators
+    - [ ] Task 4: Fusion pass algorithm evaluator dispatch merge path
+  - [ ] Batch 4: SWF Compiler
+    - [ ] Task 5: PlaybookCompiler streaming-aware compilation
+  - [ ] Batch 5: Integration Tests
+    - [ ] Task 6: YAML byte stream typed transform merge tests
