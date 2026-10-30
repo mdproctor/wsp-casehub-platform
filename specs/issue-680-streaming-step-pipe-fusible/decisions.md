@@ -49,3 +49,28 @@
 **Sources:** 2026-10-09-durable-playbook-execution-swf-integration.md spec, user clarification
 **Exploration:** quick
 **Status:** captured
+
+## D5: Union merge model
+
+**Choice:** Explicit `StreamingMerge<T>` interface — merge is a special streaming step type
+**Alternatives:**
+- Implicit merge via parallel block — compiler auto-inserts merge, but behavior is implicit and merge strategy unclear
+- Channel-based via from decorator — reuses OrcChannel fan-in but byte streams don't map to channels
+**Rationale:** Merge step accepts `List<T>` from N upstream branches, produces single `T` downstream. Author controls merge strategy (concatenation, multiplex, collect). Compiler validates all upstream output types match merge input type. For byte streams: `StreamingMerge<InputStream>` produces a `SequenceInputStream`. For event streams: collects/interleaves events.
+**Trade-offs:** Explicit merge step required in YAML — more verbose than implicit detection. But merge strategy is always clear and the step is independently testable.
+**Sources:** datasource-alpha AlphaDataSource.java (fan-out pattern, no fan-in exists yet)
+**Exploration:** quick
+**Status:** captured
+
+## D6: Plugin system integration
+
+**Choice:** New `@StreamPlugin` annotation on records, parallel to `@Plugin`
+**Alternatives:**
+- Manual implementation only — no APT support, more boilerplate for plugin authors
+- Extend @Plugin itself — overloads semantics, type inference ambiguity when @Execute takes Map vs typed param
+**Rationale:** Consistent authoring pattern with `@Plugin`. APT infers `I` and `O` from `@Execute` method signature (parameter type = input, return type = output). Generates `StreamingStep<I,O>` implementation, JSON Schema, and registry manifest. Record fields are configuration parameters (same as @Plugin).
+**Trade-offs:** New annotation + APT logic. But the APT infrastructure from yaml-plugin-processor is reusable — the streaming variant is structurally identical except for the generated interface.
+**Sources:** yaml-plugin-processor APT (generates Action from @Plugin), yaml-plugin-api @Plugin/@Execute annotations
+**Exploration:** quick
+**Depends on:** D1 (StreamingStep interface)
+**Status:** captured
