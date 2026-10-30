@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 320">
+  <defs>
+    <style>
+      .step { fill: #e3f2fd; stroke: #1565c0; stroke-width: 1.5; rx: 6; }
+      .step-normal { fill: #f3e5f5; stroke: #7b1fa2; stroke-width: 1.5; rx: 6; }
+      .fused { fill: #e8f5e9; stroke: #2e7d32; stroke-width: 2; rx: 8; stroke-dasharray: none; }
+      .label { font-family: -apple-system, sans-serif; font-size: 11px; fill: #212529; text-anchor: middle; }
+      .label-type { font-family: monospace; font-size: 9px; fill: #6c757d; text-anchor: middle; }
+      .label-check { font-family: monospace; font-size: 9px; fill: #2e7d32; text-anchor: start; }
+      .arrow { stroke: #495057; stroke-width: 1.5; fill: none; marker-end: url(#ah3); }
+      .arrow-down { stroke: #9e9e9e; stroke-width: 1; fill: none; marker-end: url(#ah3g); }
+      .title { font-family: -apple-system, sans-serif; font-size: 14px; font-weight: 600; fill: #212529; }
+      .phase { font-family: -apple-system, sans-serif; font-size: 11px; font-weight: 600; fill: #757575; }
+      .note { font-family: -apple-system, sans-serif; font-size: 10px; fill: #757575; }
+    </style>
+    <marker id="ah3" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#495057"/>
+    </marker>
+    <marker id="ah3g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#9e9e9e"/>
+    </marker>
+  </defs>
+
+  <text x="360" y="24" class="title" text-anchor="middle">Fusion Pass: How the Compiler Detects Pipe-Compatible Chains</text>
+
+  <!-- Input: resolved steps -->
+  <text x="40" y="55" class="phase">Input: Resolved Steps</text>
+
+  <rect x="20" y="65" width="110" height="40" class="step"/>
+  <text x="75" y="82" class="label">download</text>
+  <text x="75" y="95" class="label-type">String → IS</text>
+
+  <rect x="145" y="65" width="110" height="40" class="step"/>
+  <text x="200" y="82" class="label">denoise</text>
+  <text x="200" y="95" class="label-type">IS → IS</text>
+
+  <rect x="270" y="65" width="110" height="40" class="step"/>
+  <text x="325" y="82" class="label">transcribe</text>
+  <text x="325" y="95" class="label-type">IS → String</text>
+
+  <rect x="395" y="65" width="110" height="40" class="step-normal"/>
+  <text x="450" y="82" class="label">cleanup</text>
+  <text x="450" y="95" class="label-type">Map → Map</text>
+
+  <rect x="520" y="65" width="110" height="40" class="step"/>
+  <text x="575" y="82" class="label">compress</text>
+  <text x="575" y="95" class="label-type">String → byte[]</text>
+
+  <line x1="130" y1="85" x2="145" y2="85" class="arrow"/>
+  <line x1="255" y1="85" x2="270" y2="85" class="arrow"/>
+  <line x1="380" y1="85" x2="395" y2="85" class="arrow"/>
+  <line x1="505" y1="85" x2="520" y2="85" class="arrow"/>
+
+  <!-- Checks -->
+  <text x="40" y="135" class="phase">Checks per step pair:</text>
+  <text x="40" y="152" class="label-check">✓ outputType assignable to next inputType?</text>
+  <text x="40" y="166" class="label-check">✓ no chain-breaking decorators?</text>
+  <text x="40" y="180" class="label-check">✓ no ${result.name} refs to non-last step?</text>
+  <text x="40" y="194" class="label-check">✓ no barrier/quorum await on non-last step?</text>
+
+  <text x="420" y="152" class="note">IS = InputStream</text>
+  <text x="420" y="166" class="note">cleanup is not a StreamingStep → chain breaks</text>
+  <text x="420" y="180" class="note">compress is StreamingStep but alone → no fusion</text>
+
+  <!-- Output -->
+  <text x="40" y="225" class="phase">Output: Optimized Steps</text>
+
+  <rect x="20" y="235" width="370" height="55" class="fused"/>
+  <text x="205" y="252" class="label" fill="#2e7d32" font-weight="600">FusedPipelineStep</text>
+
+  <rect x="35" y="258" width="95" height="25" rx="3" fill="#c8e6c9" stroke="#388e3c"/>
+  <text x="82" y="275" class="label-type" fill="#2e7d32">download</text>
+  <rect x="145" y="258" width="95" height="25" rx="3" fill="#c8e6c9" stroke="#388e3c"/>
+  <text x="192" y="275" class="label-type" fill="#2e7d32">denoise</text>
+  <rect x="255" y="258" width="95" height="25" rx="3" fill="#c8e6c9" stroke="#388e3c"/>
+  <text x="302" y="275" class="label-type" fill="#2e7d32">transcribe</text>
+
+  <rect x="410" y="240" width="110" height="40" class="step-normal"/>
+  <text x="465" y="257" class="label">cleanup</text>
+  <text x="465" y="270" class="label-type">Map → Map</text>
+
+  <rect x="540" y="240" width="110" height="40" class="step"/>
+  <text x="595" y="257" class="label">compress</text>
+  <text x="595" y="270" class="label-type">String → byte[]</text>
+
+  <line x1="390" y1="262" x2="410" y2="262" class="arrow"/>
+  <line x1="520" y1="262" x2="540" y2="262" class="arrow"/>
+
+  <text x="360" y="310" class="note">5 steps → 3 execution units. The fused chain runs as a single Function&lt;String, String&gt;.</text>
+</svg>

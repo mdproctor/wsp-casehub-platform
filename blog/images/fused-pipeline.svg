@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 200">
+  <defs>
+    <style>
+      .box { fill: #f8f9fa; stroke: #343a40; stroke-width: 1.5; rx: 6; }
+      .box-fused { fill: #e8f5e9; stroke: #2e7d32; stroke-width: 2; rx: 6; }
+      .box-stage { fill: #c8e6c9; stroke: #388e3c; stroke-width: 1; rx: 4; }
+      .box-normal { fill: #f3e5f5; stroke: #7b1fa2; stroke-width: 1.5; rx: 6; }
+      .label { font-family: -apple-system, sans-serif; font-size: 12px; fill: #212529; text-anchor: middle; }
+      .label-sm { font-family: monospace; font-size: 10px; fill: #6c757d; text-anchor: middle; }
+      .label-fn { font-family: monospace; font-size: 10px; fill: #2e7d32; text-anchor: middle; }
+      .arrow { stroke: #495057; stroke-width: 1.5; fill: none; marker-end: url(#ah2); }
+      .arrow-fn { stroke: #2e7d32; stroke-width: 1.5; fill: none; marker-end: url(#ah2g); }
+      .title { font-family: -apple-system, sans-serif; font-size: 14px; font-weight: 600; fill: #212529; }
+    </style>
+    <marker id="ah2" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#495057"/>
+    </marker>
+    <marker id="ah2g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#2e7d32"/>
+    </marker>
+  </defs>
+
+  <text x="360" y="24" class="title" text-anchor="middle">After: Fused Chain — Zero Materialization</text>
+
+  <!-- Fused chain container -->
+  <rect x="20" y="40" width="500" height="80" class="box-fused" fill-opacity="0.15"/>
+  <text x="270" y="58" class="label-fn">Function.andThen() composition</text>
+
+  <!-- Stage 1 -->
+  <rect x="35" y="66" width="120" height="40" class="box-stage"/>
+  <text x="95" y="83" class="label">download</text>
+  <text x="95" y="96" class="label-sm">apply()</text>
+
+  <!-- Arrow between stages -->
+  <line x1="155" y1="86" x2="185" y2="86" class="arrow-fn"/>
+
+  <!-- Stage 2 -->
+  <rect x="185" y="66" width="120" height="40" class="box-stage"/>
+  <text x="245" y="83" class="label">denoise</text>
+  <text x="245" y="96" class="label-sm">apply()</text>
+
+  <!-- Arrow -->
+  <line x1="305" y1="86" x2="335" y2="86" class="arrow-fn"/>
+
+  <!-- Stage 3 -->
+  <rect x="335" y="66" width="120" height="40" class="box-stage"/>
+  <text x="395" y="83" class="label">transcribe</text>
+  <text x="395" y="96" class="label-sm">apply()</text>
+
+  <!-- Materialization point -->
+  <line x1="520" y1="86" x2="560" y2="86" class="arrow"/>
+
+  <!-- Normal step -->
+  <rect x="560" y="66" width="130" height="40" class="box-normal"/>
+  <text x="625" y="83" class="label">text-cleanup</text>
+  <text x="625" y="96" class="label-sm">Action.execute()</text>
+
+  <!-- Benefit boxes -->
+  <rect x="120" y="145" width="200" height="30" rx="4" fill="#e8f5e9" stroke="#2e7d32"/>
+  <text x="220" y="165" class="label" fill="#2e7d32">Memory: 1 live reference</text>
+  <rect x="400" y="145" width="200" height="30" rx="4" fill="#e8f5e9" stroke="#2e7d32"/>
+  <text x="500" y="165" class="label" fill="#2e7d32">Latency: direct method calls</text>
+</svg>
