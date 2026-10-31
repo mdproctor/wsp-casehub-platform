@@ -11,8 +11,11 @@ This issue explicitly revises epic #525's Decision D11 ("Pre-existing SCIM ident
 required"). D11 stated: "Keeps platform as infrastructure, not a user registration
 system." This issue introduces a second user identity model — self-managed users via
 `UserStore` — alongside the existing directory-managed model (SCIM). The two are
-mutually exclusive per deployment, selected by classpath presence. SCIM remains
-read-only; UserStore handles self-signup.
+mutually exclusive per deployment, selected by classpath presence — deploying both
+`registration/` and a SCIM-backed `UserResolver` simultaneously is a configuration
+error (no composite resolver is defined; hybrid deployments are a future concern).
+SCIM remains read-only; UserStore handles self-signup. `IdentityBindingStore` is
+identity-source-agnostic and works correctly with both SCIM and UserStore actorIds.
 
 ## Problem
 
@@ -120,7 +123,7 @@ public record UserRecord(
     String displayName,
     String tenancyId,
     UserStatus status,
-    String registrationMethod,   // "google", "github", "apple", "password", "invitation"
+    String registrationMethod,   // matches AuthenticationProvider.method(): "google", "github", "apple", "password"
     Instant createdAt,
     Instant activatedAt
 ) {
@@ -168,6 +171,7 @@ public interface PasswordCredentialStore {
     void store(PasswordCredential credential);
     Optional<PasswordCredential> findByActorId(String actorId, String tenancyId);
     void updatePassword(String actorId, String tenancyId, String hashedPassword);
+    void updateLastUsed(String actorId, String tenancyId);
     void delete(String actorId, String tenancyId);
 }
 ```
@@ -186,14 +190,17 @@ public record PasswordCredential(
 
 ### InvitationStore — `io.casehub.platform.registration`
 
+All methods accepting `rawToken` hash it (SHA-256) before database lookup.
+Raw tokens are returned only at creation time and never stored.
+
 ```java
 public interface InvitationStore {
     InvitationRecord store(InvitationRecord invitation);
-    Optional<InvitationRecord> findByToken(String token);
+    Optional<InvitationRecord> findByTokenHash(String tokenHash);
     Optional<InvitationRecord> findByEmail(String email, String tenancyId);
-    void consume(String token);
+    void consume(String tokenHash);
     List<InvitationRecord> findByTenancy(String tenancyId);
-    void delete(String token);
+    void delete(String tokenHash);
 }
 ```
 
@@ -201,7 +208,7 @@ public interface InvitationStore {
 
 ```java
 public record InvitationRecord(
-    String token,
+    String tokenHash,     // SHA-256 hex of raw token — raw never stored
     String email,
     String tenancyId,
     Set<String> assignedGroups,
@@ -218,14 +225,17 @@ public record InvitationRecord(
 
 ### EmailVerificationStore — `io.casehub.platform.registration`
 
+Same hashing pattern — raw tokens never stored. Callers pass raw tokens;
+store implementations hash before lookup.
+
 ```java
 public interface EmailVerificationStore {
     void store(EmailVerificationToken token);
-    Optional<EmailVerificationToken> consume(String token);
+    Optional<EmailVerificationToken> consume(String rawToken);
 }
 
 public record EmailVerificationToken(
-    String token,
+    String tokenHash,     // SHA-256 hex of raw token
     String userId,
     String tenancyId,
     Instant expiresAt,
@@ -252,12 +262,13 @@ The default implementation (`UserStoreProvisioner`) in `registration-core`:
 3. If `emailVerified` is false, returns empty (unverified social emails cannot
    auto-register)
 4. Creates `UserRecord` with status `ACTIVE` (if `OPEN`) or `PENDING_APPROVAL`
-5. Fires `UserRegistered` CDI event
+5. Calls `registrationEventListener.onUserRegistered(...)` (framework-neutral callback)
 6. Returns `PrincipalId.human(user.id())`
 
-`NoOpUserProvisioner @DefaultBean` returns `Optional.empty()` — social login falls
-back to the existing `externalId` behavior when registration module is not on
-classpath.
+`NoOpUserProvisioner @DefaultBean` returns `Optional.empty()` — social login throws
+`UnknownIdentityException` when registration module is not on classpath. This is the
+correct fail-fast behavior: the old `externalId` fallback was the root bug this spec
+fixes.
 
 ### EmailSender — `io.casehub.platform.registration`
 
@@ -270,6 +281,84 @@ public interface EmailSender {
 No-op default. Deployers provide an implementation backed by SMTP (Jakarta Mail),
 a notification delivery channel, or any external email service. The registration
 module never depends on `casehub-connectors` — email delivery is pluggable via SPI.
+
+### RegistrationEventListener — `io.casehub.platform.api.authn`
+
+Framework-neutral callback SPI following the `AuthenticationEventListener` pattern
+from epic #525. Lives in `platform-api` so `registration-core` (pure Java) can call
+it without CDI. The Quarkus module provides `RegistrationCdiEventBridge` which
+implements this listener and fires CDI events; Spring gets an equivalent bridge.
+
+```java
+public interface RegistrationEventListener {
+    default void onUserRegistered(UserRegistered event)           {}
+    default void onUserActivated(UserActivated event)             {}
+    default void onRegistrationApproved(RegistrationApproved event) {}
+    default void onRegistrationRejected(RegistrationRejected event) {}
+    default void onInvitationCreated(InvitationCreated event)     {}
+}
+```
+
+`NoOpRegistrationEventListener @DefaultBean` in `platform/` — silent no-op when
+no registration module is on the classpath.
+
+### PasswordRegistrationRequest — `io.casehub.platform.registration`
+
+```java
+public record PasswordRegistrationRequest(
+    String email,
+    String password,
+    String displayName,
+    String tenancyId,
+    String invitationToken   // nullable — set when registering via invitation link
+) {
+    public PasswordRegistrationRequest {
+        Objects.requireNonNull(email, "email");
+        Objects.requireNonNull(password, "password");
+        Objects.requireNonNull(tenancyId, "tenancyId");
+    }
+}
+```
+
+### AccountNotActiveException — `io.casehub.platform.api.authn`
+
+New exception for lifecycle-based access denial. Distinct from `AccountLockedException`
+(HTTP 429 — rate limiting) per the epic #525 exception hierarchy.
+
+```java
+public class AccountNotActiveException extends AuthenticationException {
+    private final UserStatus status;
+
+    public AccountNotActiveException(String method, UserStatus status) {
+        super(method, "Account is " + status.name().toLowerCase());
+        this.status = status;
+    }
+
+    public UserStatus status() { return status; }
+}
+```
+
+| Exception | Meaning | HTTP Status |
+|-----------|---------|-------------|
+| `AccountNotActiveException` | User exists but is not ACTIVE (pending verification/approval, rejected, suspended) | 403 |
+| `AccountLockedException` | Rate limit exceeded, account temporarily locked | 429 |
+
+### UserStatusResolver — `io.casehub.platform.api.authn`
+
+Optional SPI for re-evaluating user status during token refresh. Lives in
+`platform-api` so `JwtIssuer` (in `authn-core`) can call it without depending
+on `registration-api`.
+
+```java
+public interface UserStatusResolver {
+    Optional<String> resolveStatus(String actorId, String tenancyId);
+}
+```
+
+`NoOpUserStatusResolver @DefaultBean` returns `Optional.empty()` — no status
+enforcement when registration module is absent. `UserStoreUserStatusResolver`
+in `registration-core` queries `UserStore.findById()` and returns
+`user.status().name()`.
 
 ### RegistrationPolicy — `io.casehub.platform.registration`
 
@@ -301,7 +390,7 @@ public interface RegistrationService {
 
     RegistrationResult rejectRegistration(String userId, String tenancyId, String reason);
 
-    InvitationRecord createInvitation(InvitationRequest request);
+    InvitationCreationResult createInvitation(InvitationRequest request);
 
     void revokeInvitation(String token);
 }
@@ -321,23 +410,47 @@ public sealed interface RegistrationResult {
 }
 ```
 
+### InvitationCreationResult
+
+```java
+public record InvitationCreationResult(
+    String rawToken,          // returned to caller for email delivery — never stored
+    InvitationRecord record   // stored record with tokenHash
+) {}
+```
+
 ### CDI Events — `io.casehub.platform.registration`
 
 ```java
 public record UserRegistered(String userId, String tenancyId,
-                              String email, String registrationMethod) {}
+                              String email, String registrationMethod)
+        implements SubscribableEvent {
+    @Override public String type() { return "io.casehub.registration.user.registered"; }
+}
 
 public record UserActivated(String userId, String tenancyId,
-                             String email) {}
+                             String email)
+        implements SubscribableEvent {
+    @Override public String type() { return "io.casehub.registration.user.activated"; }
+}
 
 public record RegistrationApproved(String userId, String tenancyId,
-                                    String approvedBy) {}
+                                    String approvedBy)
+        implements SubscribableEvent {
+    @Override public String type() { return "io.casehub.registration.approved"; }
+}
 
 public record RegistrationRejected(String userId, String tenancyId,
-                                    String reason, String rejectedBy) {}
+                                    String reason, String rejectedBy)
+        implements SubscribableEvent {
+    @Override public String type() { return "io.casehub.registration.rejected"; }
+}
 
 public record InvitationCreated(String token, String email,
-                                 String tenancyId, String createdBy) {}
+                                 String tenancyId, String createdBy)
+        implements SubscribableEvent {
+    @Override public String type() { return "io.casehub.registration.invitation.created"; }
+}
 ```
 
 These events integrate with the existing notification/subscription pipeline:
@@ -468,13 +581,21 @@ Following the platform's `-core` / Quarkus / `-spring` / `-inmem` / `-jpa` patte
 |--------|----------|---------|
 | `registration-api/` | `casehub-platform-registration-api` | Pure Java SPIs — UserStore, UserRecord, UserStatus, PasswordCredentialStore, InvitationStore, EmailVerificationStore, RegistrationService, RegistrationPolicy, UserProvisioner, EmailSender, CDI events. Zero deps (follows `agent-api` pattern — SPIs not in `platform-api` because only the registration modules consume them). |
 | `registration-core/` | `casehub-platform-registration-core` | Framework-neutral RegistrationServiceCore, UserStoreProvisioner, PasswordAuthenticationProviderCore, EmailVerificationServiceCore, InvitationServiceCore, Argon2PasswordHasher. Depends on registration-api + argon2-jvm. Pure Java — no CDI, no Spring. |
-| `registration/` | `casehub-platform-registration` | Quarkus CDI wiring — RegistrationBeans (`@Produces` all core beans), REST endpoints via `@McpDomain("registration")` on RegistrationService + `@McpDomain("invitations")` on InvitationService. `NoOp` defaults for all SPIs. |
+| `registration/` | `casehub-platform-registration` | Quarkus CDI wiring — RegistrationBeans (`@Produces` all core beans), CDI event bridge (`RegistrationCdiEventBridge implements RegistrationEventListener`). REST endpoints: `RegistrationEndpoint` (`@McpDomain("registration")`) delegates to `RegistrationService`; `InvitationEndpoint` (`@McpDomain("invitations")`) delegates to `InvitationService`. `@McpDomain` annotations live on these endpoint classes in `registration/`, NOT on the SPI interfaces in `registration-api/` (which is zero-dep). `NoOp` defaults for all SPIs. |
 | `registration-spring/` | `casehub-platform-registration-spring` | Spring Boot auto-configuration — generated from Quarkus `@Produces` via spring-generator. |
 | `user-inmem-core/` | `casehub-platform-user-inmem-core` | Framework-neutral InMemoryUserStore + InMemoryPasswordCredentialStore + InMemoryInvitationStore + InMemoryEmailVerificationStore. ConcurrentHashMap. |
 | `user-inmem/` | `casehub-platform-user-inmem` | Quarkus CDI wiring — `@Produces @Alternative @Priority(100)`. Test scope. |
 | `user-jpa-common/` | `casehub-platform-user-jpa-common` | JPA entities — UserEntity, PasswordCredentialEntity, InvitationEntity, EmailVerificationEntity. Flyway migrations. Framework-neutral. |
 | `user-jpa/` | `casehub-platform-user-jpa` | Quarkus `@ApplicationScoped` JPA stores. Hibernate ORM, `@Transactional`. |
 | `user-spring-jpa/` | `casehub-platform-user-spring-jpa` | Spring Data JPA stores — shares entities via user-jpa-common. |
+
+### platform-api additions (`io.casehub.platform.api.authn`)
+
+- `RegistrationEventListener` — framework-neutral callback SPI
+- `AccountNotActiveException` — lifecycle-based access denial (HTTP 403)
+- `UserStatusResolver` — optional status re-evaluation for token refresh
+- `NoOpRegistrationEventListener @DefaultBean` (in `platform/`)
+- `NoOpUserStatusResolver @DefaultBean` (in `platform/`)
 
 ### registration-api contents
 
@@ -488,13 +609,13 @@ New package `io.casehub.platform.registration`:
 - `UserProvisioner`
 - `EmailSender`
 - `PasswordRegistrationRequest`
-- CDI events: `UserRegistered`, `UserActivated`, `RegistrationApproved`,
-  `RegistrationRejected`, `InvitationCreated`
+- CDI events (implementing `SubscribableEvent`): `UserRegistered`, `UserActivated`,
+  `RegistrationApproved`, `RegistrationRejected`, `InvitationCreated`
 
 ### platform/ additions
 
 - `NoOpUserProvisioner @DefaultBean` — returns `Optional.empty()` (social login
-  falls back to `externalId` behavior when registration module absent)
+  throws `UnknownIdentityException` when registration module absent)
 - `PreferenceRegistrationPolicy @DefaultBean` — reads `casehub.registration.mode`
   from PreferenceProvider (default: `OPEN`)
 
@@ -536,8 +657,7 @@ public class PasswordAuthenticationProviderCore implements AuthenticationProvide
             .orElseThrow(() -> new UnknownIdentityException("password", "Unknown email"));
 
         if (user.status() != UserStatus.ACTIVE) {
-            throw new AccountLockedException("password",
-                "Account is " + user.status().name().toLowerCase());
+            throw new AccountNotActiveException("password", user.status());
         }
 
         var credential = credentialStore.findByActorId(user.id(), challenge.tenancyId())
@@ -588,7 +708,6 @@ private String resolveOrCreateActorId(OAuthIdentity identity, String tenancyId) 
             return resolved.get().id();
         }
     }
-    // NEW: delegate to UserProvisioner instead of falling back to externalId
     if (identity.email() != null) {
         var provisioned = userProvisioner.provisionFromSocialLogin(
             identity.email(), tenancyId, method(), identity.emailVerified());
@@ -596,7 +715,8 @@ private String resolveOrCreateActorId(OAuthIdentity identity, String tenancyId) 
             return provisioned.get().id();
         }
     }
-    return identity.externalId(); // final fallback (backward-compatible)
+    throw new UnknownIdentityException(method(),
+        "No identity resolved and provisioning denied for " + identity.email());
 }
 ```
 
@@ -610,10 +730,49 @@ When the tenant policy is `APPROVAL_REQUIRED`, the provisioner creates the user 
 session/JWT. The JWT includes the user's status in its claims (`ust` claim).
 Application-layer access control checks `UserStatus` before granting access to
 protected resources — a `PENDING_APPROVAL` user can see a "waiting for approval"
-page but cannot access tenant data. This mirrors how `AccountLockedException`
-already gates access for suspended accounts. The `RegistrationApproved` event
+page but cannot access tenant data. This mirrors how `AccountNotActiveException`
+gates access for non-active lifecycle states. The `RegistrationApproved` event
 triggers a notification to the user, who can then refresh their session to get an
 updated JWT with `ACTIVE` status.
+
+### PENDING_APPROVAL Enforcement Chain
+
+When `UserProvisioner` creates a user in `PENDING_APPROVAL`, the status must flow
+through to the client and be enforced:
+
+1. **AuthenticationResult.metadata convention:** `UserStoreProvisioner` sets
+   `metadata.put("userStatus", status.name())` on the `AuthenticationResult`.
+   This carries the status without changing the `AuthenticationResult` record
+   structure.
+
+2. **JWT `ust` claim:** `JwtIssuer.issue()` reads the `userStatus` key from
+   `AuthenticationResult.metadata()` and, if present, adds a `ust` claim to the
+   JWT. This extends the JWT claims table from epic #525:
+
+   | Claim | Value |
+   |-------|-------|
+   | `ust` | `UserStatus.name()` (e.g. `"PENDING_APPROVAL"`, `"ACTIVE"`) |
+
+3. **CurrentPrincipal.userStatus():** New default method on `CurrentPrincipal`:
+
+   ```java
+   default Optional<String> userStatus() { return Optional.empty(); }
+   ```
+
+   `SecurityIdentityCurrentPrincipal` (Quarkus) and `SpringSecurityCurrentPrincipal`
+   (Spring) read the `ust` claim from JWT and return it. When no `ust` claim is
+   present (legacy JWTs, non-registration flows), returns `Optional.empty()`.
+
+4. **Refresh re-evaluation:** `JwtIssuer.refresh()` calls
+   `UserStatusResolver.resolveStatus(actorId, tenancyId)` before issuing a new JWT.
+   If the status changed (e.g. admin approved → `ACTIVE`), the new JWT reflects
+   the updated status. Default JWT TTL is 15 minutes (from epic #525), so status
+   changes propagate within one refresh cycle.
+
+5. **Application-layer enforcement:** The platform provides the data (status in
+   JWT, accessor on `CurrentPrincipal`). Access restriction based on status
+   (interceptor, middleware, page routing) is application-tier — each consumer
+   defines its own access policy for non-ACTIVE users.
 
 ### Account-Takeover Mitigation
 
@@ -623,6 +782,36 @@ If `UserStore.findByEmail(email, tenancyId)` returns a user, provisioning return
 link the social identity from account settings (a future issue). This prevents the
 attack where an attacker creates a Google account with a victim's email and gains
 access to the victim's existing email/password account.
+
+### Social Login Identity Reconciliation (PENDING_VERIFICATION users)
+
+When a user registers with email/password (status: `PENDING_VERIFICATION`) and
+then tries social login with the same email:
+
+1. `UserResolver.resolveByEmail()` finds the existing user
+2. `UserStoreUserResolver` returns the `PrincipalId` for all non-terminal statuses
+   (ACTIVE, PENDING_VERIFICATION, PENDING_APPROVAL) — only REJECTED and SUSPENDED
+   return empty
+3. Social login completes — the user authenticates with their existing UserRecord
+4. The `AuthenticationEventListener.onSocialLoginCompleted()` handler in
+   `registration-core` checks: if user is `PENDING_VERIFICATION` AND the social
+   provider verified the email (`emailVerified = true`), transition the user to
+   `ACTIVE` (or `PENDING_APPROVAL` if tenant requires approval)
+
+This is correct because social provider email verification is equivalent to
+email verification — Google/Apple have already verified the user owns that email
+address. The user is not split into two identities; the existing UserRecord is
+reused and activated.
+
+`SocialLoginCompleted` gains an `emailVerified` field to carry this signal:
+
+```java
+public record SocialLoginCompleted(
+    String provider, String actorId, String tenancyId,
+    Set<String> grantedScopes, boolean firstLogin,
+    boolean emailVerified
+) {}
+```
 
 ### Tenant Enumeration Mitigation
 
@@ -634,7 +823,7 @@ server-side during the registration ceremony, not at the URL routing layer.
 ## REST API Surface
 
 All endpoints generated by `graphql-generator` APT from `@McpDomain` annotations on
-the SPI interfaces.
+the endpoint classes in `registration/` (Quarkus module).
 
 | Method | Path | Purpose | Auth |
 |--------|------|---------|------|
@@ -649,7 +838,12 @@ the SPI interfaces.
 
 ## Flyway Migrations
 
-Namespace: `V9000` — registration schema.
+**Range allocation:** V9000–V9999 claimed for `user-jpa-common/` (registration
+tables). Per `docs/protocols/casehub/flyway-version-range-allocation.md`, this
+block is non-overlapping with existing allocations (V1–V999 persistence-jpa,
+V1000–V1999 memory-jpa, V2000–V2999 digest-jpa, V3000–V3999 delivery-tracking-jpa,
+V4000–V4999 datasource-jpa, V5000–V5999 platform-view-jpa). Classpath location:
+`classpath:db/registration/migration`.
 
 ```sql
 -- V9000__registration_user.sql
@@ -678,7 +872,7 @@ CREATE TABLE registration_password_credential (
 
 -- V9002__registration_invitation.sql
 CREATE TABLE registration_invitation (
-    token         VARCHAR(255) NOT NULL,
+    token_hash    VARCHAR(64)  NOT NULL,  -- SHA-256 hex of raw token
     email         VARCHAR(255) NOT NULL,
     tenancy_id    VARCHAR(255) NOT NULL,
     assigned_groups TEXT,          -- JSON array
@@ -686,17 +880,17 @@ CREATE TABLE registration_invitation (
     created_by    VARCHAR(255) NOT NULL,
     created_at    TIMESTAMP    NOT NULL,
     consumed      BOOLEAN      NOT NULL DEFAULT FALSE,
-    PRIMARY KEY (token)
+    PRIMARY KEY (token_hash)
 );
 
 -- V9003__registration_email_verification.sql
 CREATE TABLE registration_email_verification (
-    token         VARCHAR(255) NOT NULL,
+    token_hash    VARCHAR(64)  NOT NULL,  -- SHA-256 hex of raw token
     user_id       VARCHAR(255) NOT NULL,
     tenancy_id    VARCHAR(255) NOT NULL,
     expires_at    TIMESTAMP    NOT NULL,
     created_at    TIMESTAMP    NOT NULL,
-    PRIMARY KEY (token)
+    PRIMARY KEY (token_hash)
 );
 ```
 
@@ -710,6 +904,10 @@ CREATE TABLE registration_email_verification (
   base64url-encoded. Single-use (consumed on verification). Default TTL: 24 hours.
 - **Invitation tokens:** Same generation as verification tokens. Single-use. Bound to
   specific email — invitation link only works for the invited email address.
+- **Token storage:** Invitation and email verification tokens are stored as SHA-256
+  hashes (hex-encoded, 64 chars). Raw token returned only at creation time. This
+  follows the refresh token precedent from epic #525 — credentials are never stored
+  in cleartext. Store implementations hash the raw token before database lookup.
 - **Timing attacks:** `PasswordHasher.verify()` uses bcrypt's constant-time comparison.
   Login for non-existent emails performs a dummy bcrypt hash to prevent timing
   side-channels.
