@@ -115,16 +115,16 @@
 
 ## D10: Password hashing
 
-**Choice:** bcrypt via jBCrypt (org.mindrot)
+**Choice:** Argon2id via argon2-jvm (de.mkammerer, Apache 2.0, wraps libsodium)
 **Alternatives:**
-- Argon2 via Bouncy Castle — memory-hard but large dependency
+- bcrypt via jBCrypt — CPU-hard only, 72-byte password truncation, OWASP's second choice
 - PBKDF2 via JCA — built-in but no memory-hardness
-**Rationale:** Industry standard, adaptive cost factor, zero-dependency library, widely audited. Default cost factor 12 (tunable per deployment).
-**Trade-offs:** No memory-hardness (bcrypt is CPU-hard only)
+**Rationale:** OWASP's primary recommendation for new systems. Memory-hard (resists GPU/ASIC attacks). No 72-byte truncation. argon2-jvm is ~50KB + native lib — no Bouncy Castle. Parameters: memory 64 MiB, iterations 3, parallelism 1.
+**Trade-offs:** Native library dependency (libsodium) may complicate some deployment environments
 **Depends on:** D6 (email/password provider in scope)
-**Sources:** OWASP Password Storage Cheat Sheet
+**Sources:** OWASP Password Storage Cheat Sheet (Argon2id primary recommendation)
 **Exploration:** quick
-**Status:** captured
+**Status:** revised (R1-03: bcrypt is OWASP's second choice; argon2-jvm eliminates the Bouncy Castle concern)
 
 ## D11: Invitation flow
 
@@ -141,13 +141,14 @@
 
 ## D12: Social login registration integration
 
-**Choice:** UserStoreUserResolver creates on miss — when resolveByEmail returns empty AND tenant policy allows self-signup, creates UserRecord in UserStore and returns new PrincipalId. Social login flow works unchanged.
+**Choice:** New UserProvisioner SPI — called from `resolveOrCreateActorId()` when UserResolver returns empty. UserResolver stays read-only (CQS-compliant). UserProvisioner checks tenant policy, validates email_verified, creates UserRecord, returns PrincipalId. Account-takeover mitigation: never auto-links to existing accounts.
 **Alternatives:**
-- Throw + catch at router — explicit but changes existing flow, requires new error handling in AuthenticationRouterCore
+- UserStoreUserResolver creates on miss — violates CQS, turns query into command
+- Throw + catch at router — explicit but changes existing flow
 - Pre-registration check in initiate() — requires modifying initiate to check registration policy
-**Rationale:** Minimal change to existing code. UserResolver's contract (resolve email → PrincipalId) naturally extends to "resolve or create." Tenant policy check prevents creation when invitation-only.
-**Trade-offs:** UserResolver's name suggests read-only semantics — creating users in a "resolver" is slightly surprising. The alternative is renaming to UserProvider or similar.
+**Rationale:** Clean separation of concerns: UserResolver resolves (query), UserProvisioner creates (command). NoOpUserProvisioner @DefaultBean returns empty when registration module absent — backward-compatible.
+**Trade-offs:** Requires modifying AbstractOAuthAuthenticationProvider to accept UserProvisioner (new constructor parameter)
 **Depends on:** D4 (UserStore), D5 (trust social email_verified), D8 (ceremony architecture)
 **Sources:** authn-social-core AbstractOAuthAuthenticationProvider.resolveOrCreateActorId() lines 154-161
 **Exploration:** quick
-**Status:** captured
+**Status:** revised (R1-01: CQS violation fixed; R1-06: account-takeover mitigation added)
