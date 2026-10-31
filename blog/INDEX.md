@@ -32,3 +32,4 @@
 | [2026-10-28-mdp02-agent-rest-endpoint.md](2026-10-28-mdp02-agent-rest-endpoint.md) | 2026-10-28 | Structured HTTP agent invocation endpoint — design decisions, module structure, and the sidecar agent question |
 | [2026-10-29-mdp02-when-playbooks-fail.md](2026-10-29-mdp02-when-playbooks-fail.md) | 2026-10-29 | Four-layer playbook feedback loop — triage, CBR retention, fallback across platform/engine/agency/neocortex |
 | [2026-10-30-mdp01-when-playbooks-talk-back.md](2026-10-30-mdp01-when-playbooks-talk-back.md) | 2026-10-30 | Advisory step type — how protocol playbooks communicate evaluation results through the compiler |
+| [2026-10-31-mdp01-when-agents-share-a-runway.md](2026-10-31-mdp01-when-agents-share-a-runway.md) | 2026-10-31 | Salience-based scheduling for shared LLM pools — why flat semaphores violate voice SLAs and how priority with guaranteed minimums fixes it |
