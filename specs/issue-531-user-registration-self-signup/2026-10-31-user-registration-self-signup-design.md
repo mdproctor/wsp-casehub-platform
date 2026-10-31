@@ -1,0 +1,709 @@
+# User Registration / Self-Signup Authentication Flow — Design Spec
+
+**Issue:** casehubio/platform#531
+**Date:** 2026-10-31
+**Status:** Draft
+**Epic:** #525 (Identity Authentication)
+
+## Problem
+
+The authentication subsystem (epic #525, Decision D11) requires pre-existing SCIM
+identity — users must exist in the SCIM directory before they can authenticate via
+WebAuthn or social login. There is no path from "unknown person" to "authenticated
+user with a platform identity."
+
+The current social login fallback (`AbstractOAuthAuthenticationProvider.resolveOrCreateActorId()`)
+silently uses the raw OAuth `externalId` as the `actorId` when no SCIM identity
+exists. This creates an identity binding without a proper user record — no groups,
+no lifecycle status, no admin visibility.
+
+## Goals
+
+1. Enable self-signup through social login (Google/GitHub/Apple), email/password, and
+   admin-initiated invitations
+2. Introduce a `UserStore` SPI for local user identity management, keeping SCIM
+   read-only for directory-managed deployments
+3. Support configurable tenant registration policies (auto-approve, require approval,
+   invitation-only)
+4. Email verification for email/password signups; trust social provider's
+   `email_verified` claim
+5. Implement the email/password `AuthenticationProvider` (password hashing, credential
+   storage) — the signup path for #531, with #532 covering subsequent password logins
+
+## Scope Exclusions
+
+| Concern | Rationale | Tracked As |
+|---------|-----------|------------|
+| MFA / step-up authentication | Requires AuthenticationResult evolution | #533 |
+| Password reset / forgot-password | Post-signup lifecycle concern | New issue |
+| User profile management | UserRecord is minimal identity, not a profile | New issue |
+| SCIM write-back | UserStore and SCIM are independent stores | New issue |
+| Account deletion / GDPR right-to-erasure | Separate lifecycle concern | New issue |
+
+## Architecture Overview
+
+Registration is a **stateless ceremony** — a short-lived interaction that creates
+a user identity, mirrors the `AuthenticationProvider` challenge-response pattern but
+serves a different purpose (identity creation vs identity proof).
+
+```
+┌──────────────┐     ┌──────────────────┐     ┌──────────────┐
+│  Entry Paths │     │ RegistrationSvc  │     │  UserStore   │
+├──────────────┤     ├──────────────────┤     ├──────────────┤
+│ Social login ├────►│ Policy check     ├────►│ UserRecord   │
+│ Email/pass   │     │ Email verify     │     │ (CRUD)       │
+│ Invitation   │     │ Create user      │     └──────────────┘
+└──────────────┘     │ Apply groups     │     ┌──────────────┐
+                     │ Fire events      │     │ Password     │
+                     └──────────────────┘     │ Credential   │
+                                              │ Store        │
+                                              └──────────────┘
+                                              ┌──────────────┐
+                                              │ Invitation   │
+                                              │ Store        │
+                                              └──────────────┘
+```
+
+### Three Entry Paths
+
+**Social login:** User clicks "Sign in with Google" on a tenant's signup page.
+The existing `AbstractOAuthAuthenticationProvider` flow calls `UserResolver.resolveByEmail()`.
+A new `UserStoreUserResolver` implementation creates a `UserRecord` when no existing
+user is found and tenant policy allows self-signup. The social login flow works
+unchanged — only the `UserResolver` implementation changes.
+
+**Email/password:** User submits email + password on a signup form. The
+`RegistrationService.registerWithPassword()` method creates a `UserRecord` in
+`PENDING_VERIFICATION` status, stores a hashed password in `PasswordCredentialStore`,
+and sends an email verification token. On verification, the user transitions to
+`ACTIVE` (or `PENDING_APPROVAL` if tenant requires approval).
+
+**Invitation:** Admin creates an invitation via `InvitationService.create()`. The
+invited user receives a link with a token, which pre-fills the signup form with
+tenant and email. On registration (social or email/password), the invitation's
+pre-assigned groups are applied and the invitation is consumed.
+
+## SPI Definitions
+
+### UserStore — `io.casehub.platform.api.registration`
+
+```java
+public interface UserStore {
+    UserRecord create(UserRecord user);
+    Optional<UserRecord> findById(String id, String tenancyId);
+    Optional<UserRecord> findByEmail(String email, String tenancyId);
+    UserRecord updateStatus(String id, String tenancyId, UserStatus newStatus);
+    void delete(String id, String tenancyId);
+}
+```
+
+### UserRecord
+
+```java
+public record UserRecord(
+    String id,
+    String email,
+    String displayName,
+    String tenancyId,
+    UserStatus status,
+    String registrationMethod,   // "google", "github", "apple", "password", "invitation"
+    Instant createdAt,
+    Instant activatedAt
+) {
+    public UserRecord {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(email, "email");
+        Objects.requireNonNull(tenancyId, "tenancyId");
+        Objects.requireNonNull(status, "status");
+        Objects.requireNonNull(registrationMethod, "registrationMethod");
+    }
+}
+```
+
+### UserStatus
+
+```java
+public enum UserStatus {
+    PENDING_VERIFICATION,  // email not yet verified (email/password path)
+    PENDING_APPROVAL,      // verified but awaiting admin approval
+    ACTIVE,                // fully active
+    SUSPENDED              // admin-suspended
+}
+```
+
+### PasswordCredentialStore — `io.casehub.platform.api.registration`
+
+```java
+public interface PasswordCredentialStore {
+    void store(PasswordCredential credential);
+    Optional<PasswordCredential> findByActorId(String actorId, String tenancyId);
+    void updatePassword(String actorId, String tenancyId, String hashedPassword);
+    void delete(String actorId, String tenancyId);
+}
+```
+
+### PasswordCredential
+
+```java
+public record PasswordCredential(
+    String actorId,
+    String tenancyId,
+    String hashedPassword,  // bcrypt hash
+    Instant createdAt,
+    Instant lastUsedAt
+) {}
+```
+
+### InvitationStore — `io.casehub.platform.api.registration`
+
+```java
+public interface InvitationStore {
+    InvitationRecord store(InvitationRecord invitation);
+    Optional<InvitationRecord> findByToken(String token);
+    Optional<InvitationRecord> findByEmail(String email, String tenancyId);
+    void consume(String token);
+    List<InvitationRecord> findByTenancy(String tenancyId);
+    void delete(String token);
+}
+```
+
+### InvitationRecord
+
+```java
+public record InvitationRecord(
+    String token,
+    String email,
+    String tenancyId,
+    Set<String> assignedGroups,
+    Instant expiresAt,
+    String createdBy,
+    Instant createdAt,
+    boolean consumed
+) {
+    public boolean isExpired() {
+        return expiresAt != null && expiresAt.isBefore(Instant.now());
+    }
+}
+```
+
+### EmailVerificationStore — `io.casehub.platform.api.registration`
+
+```java
+public interface EmailVerificationStore {
+    void store(EmailVerificationToken token);
+    Optional<EmailVerificationToken> consume(String token);
+}
+
+public record EmailVerificationToken(
+    String token,
+    String userId,
+    String tenancyId,
+    Instant expiresAt,
+    Instant createdAt
+) {}
+```
+
+### RegistrationPolicy — `io.casehub.platform.api.registration`
+
+```java
+public interface RegistrationPolicy {
+    RegistrationMode getMode(String tenancyId);
+}
+
+public enum RegistrationMode {
+    OPEN,             // auto-approve after verification
+    APPROVAL_REQUIRED, // admin must approve
+    INVITATION_ONLY   // no self-signup, invitations only
+}
+```
+
+Default implementation reads from `PreferenceProvider` using a new preference key
+`casehub.registration.mode` (default: `OPEN`).
+
+### RegistrationService — `io.casehub.platform.api.registration`
+
+```java
+public interface RegistrationService {
+
+    RegistrationResult registerWithPassword(PasswordRegistrationRequest request);
+
+    RegistrationResult verifyEmail(String token);
+
+    RegistrationResult approveRegistration(String userId, String tenancyId);
+
+    RegistrationResult rejectRegistration(String userId, String tenancyId, String reason);
+
+    InvitationRecord createInvitation(InvitationRequest request);
+
+    void revokeInvitation(String token);
+}
+```
+
+### RegistrationResult
+
+```java
+public sealed interface RegistrationResult {
+    record Created(UserRecord user) implements RegistrationResult {}
+    record PendingVerification(String userId, String email) implements RegistrationResult {}
+    record PendingApproval(String userId) implements RegistrationResult {}
+    record Activated(UserRecord user) implements RegistrationResult {}
+    record Rejected(String userId, String reason) implements RegistrationResult {}
+    record AlreadyExists(String email) implements RegistrationResult {}
+    record PolicyDenied(RegistrationMode mode) implements RegistrationResult {}
+}
+```
+
+### CDI Events — `io.casehub.platform.api.registration`
+
+```java
+public record UserRegistered(String userId, String tenancyId,
+                              String email, String registrationMethod) {}
+
+public record UserActivated(String userId, String tenancyId,
+                             String email) {}
+
+public record RegistrationApproved(String userId, String tenancyId,
+                                    String approvedBy) {}
+
+public record RegistrationRejected(String userId, String tenancyId,
+                                    String reason, String rejectedBy) {}
+
+public record InvitationCreated(String token, String email,
+                                 String tenancyId, String createdBy) {}
+```
+
+These events integrate with the existing notification/subscription pipeline:
+`UserRegistered` can trigger admin notifications when approval is required;
+`UserActivated` can trigger welcome notifications to the user.
+
+## Registration Ceremony Flows
+
+### Email/Password Registration
+
+```
+Client                    RegistrationService             Stores
+  │                              │                          │
+  │ POST /register/password      │                          │
+  │  {email, password,           │                          │
+  │   displayName, tenancyId}    │                          │
+  ├─────────────────────────────►│                          │
+  │                              │ check RegistrationPolicy │
+  │                              │  → OPEN or APPROVAL_REQ  │
+  │                              │ check UserStore.findByEmail │
+  │                              │  → must not exist         │
+  │                              │ create UserRecord         │
+  │                              │  status=PENDING_VERIF.   │
+  │                              ├─────────────────────────►│
+  │                              │ hash password (bcrypt)    │
+  │                              │ store PasswordCredential │
+  │                              ├─────────────────────────►│
+  │                              │ create verification token │
+  │                              │ store EmailVerifToken    │
+  │                              ├─────────────────────────►│
+  │                              │ fire UserRegistered      │
+  │  PendingVerification         │                          │
+  │◄─────────────────────────────┤                          │
+  │                              │                          │
+  │ GET /register/verify?token=  │                          │
+  ├─────────────────────────────►│                          │
+  │                              │ consume token            │
+  │                              │ if OPEN: status→ACTIVE   │
+  │                              │ if APPROVAL: status→     │
+  │                              │   PENDING_APPROVAL       │
+  │                              │ fire UserActivated or    │
+  │                              │   RegistrationPending    │
+  │  Activated or PendingApproval│                          │
+  │◄─────────────────────────────┤                          │
+```
+
+### Social Login Registration (via UserStoreUserResolver)
+
+```
+Client          AuthenticationRouter    AbstractOAuth...    UserStoreUserResolver
+  │                    │                      │                     │
+  │ POST /auth/initiate│                      │                     │
+  │  {method:"google"} │                      │                     │
+  ├───────────────────►│                      │                     │
+  │                    │ initiate(ctx)        │                     │
+  │                    ├─────────────────────►│                     │
+  │  OAuth redirect    │                      │                     │
+  │◄───────────────────┤                      │                     │
+  │                    │                      │                     │
+  │ POST /auth/verify  │                      │                     │
+  │  {code, state}     │                      │                     │
+  ├───────────────────►│                      │                     │
+  │                    │ verify(challenge,data)│                     │
+  │                    ├─────────────────────►│                     │
+  │                    │                      │ resolveOrCreateActorId │
+  │                    │                      │ resolveByEmail(email)│
+  │                    │                      ├────────────────────►│
+  │                    │                      │                     │ findByEmail → empty
+  │                    │                      │                     │ check policy → OPEN
+  │                    │                      │                     │ check email_verified
+  │                    │                      │                     │ create UserRecord
+  │                    │                      │                     │  status=ACTIVE
+  │                    │                      │                     │ fire UserRegistered
+  │                    │                      │  PrincipalId        │ + UserActivated
+  │                    │                      │◄────────────────────┤
+  │                    │  AuthenticationResult│                     │
+  │                    │◄─────────────────────┤                     │
+  │  session/JWT       │                      │                     │
+  │◄───────────────────┤                      │                     │
+```
+
+### Invitation Flow
+
+```
+Admin                   InvitationService          InvitationStore
+  │                            │                        │
+  │ POST /register/invitations │                        │
+  │  {email, tenancyId,        │                        │
+  │   assignedGroups}          │                        │
+  ├───────────────────────────►│                        │
+  │                            │ generate token         │
+  │                            │ store InvitationRecord │
+  │                            ├───────────────────────►│
+  │                            │ fire InvitationCreated │
+  │  InvitationRecord          │                        │
+  │◄───────────────────────────┤                        │
+  │                            │                        │
+  │  (email sent to invitee    │                        │
+  │   with link: /signup/      │                        │
+  │   {tenancyId}?invite=token)│                        │
+
+Invitee                 RegistrationService         Stores
+  │                            │                      │
+  │ (clicks invite link)       │                      │
+  │ POST /register/password    │                      │
+  │  {email, password,         │                      │
+  │   invitationToken}         │                      │
+  ├───────────────────────────►│                      │
+  │                            │ validate invitation   │
+  │                            │  (token, email match) │
+  │                            │ create UserRecord     │
+  │                            │  status=ACTIVE        │
+  │                            │  (invitation bypasses │
+  │                            │   approval)           │
+  │                            │ apply assignedGroups  │
+  │                            │ consume invitation    │
+  │  Activated(user)           │                      │
+  │◄───────────────────────────┤                      │
+```
+
+## Module Structure
+
+Following the platform's `-core` / Quarkus / `-spring` / `-inmem` / `-jpa` pattern:
+
+| Module | Artifact | Purpose |
+|--------|----------|---------|
+| `registration-core/` | `casehub-platform-registration-core` | Framework-neutral RegistrationServiceCore, UserStoreUserResolver, PasswordAuthenticationProviderCore, EmailVerificationServiceCore, InvitationServiceCore, BcryptPasswordHasher. Pure Java — no CDI, no Spring. |
+| `registration/` | `casehub-platform-registration` | Quarkus CDI wiring — RegistrationBeans (`@Produces` all core beans), REST endpoints via `@McpDomain("registration")` on RegistrationService + `@McpDomain("invitations")` on InvitationService. |
+| `registration-spring/` | `casehub-platform-registration-spring` | Spring Boot auto-configuration — generated from Quarkus `@Produces` via spring-generator. |
+| `user-inmem-core/` | `casehub-platform-user-inmem-core` | Framework-neutral InMemoryUserStore + InMemoryPasswordCredentialStore + InMemoryInvitationStore + InMemoryEmailVerificationStore. ConcurrentHashMap. |
+| `user-inmem/` | `casehub-platform-user-inmem` | Quarkus CDI wiring — `@Produces @Alternative @Priority(100)`. Test scope. |
+| `user-jpa-common/` | `casehub-platform-user-jpa-common` | JPA entities — UserEntity, PasswordCredentialEntity, InvitationEntity, EmailVerificationEntity. Flyway migrations. Framework-neutral. |
+| `user-jpa/` | `casehub-platform-user-jpa` | Quarkus `@ApplicationScoped` JPA stores. Hibernate ORM, `@Transactional`. |
+| `user-spring-jpa/` | `casehub-platform-user-spring-jpa` | Spring Data JPA stores — shares entities via user-jpa-common. |
+
+### platform-api additions
+
+New package `io.casehub.platform.api.registration`:
+- `UserStore`, `UserRecord`, `UserStatus`
+- `PasswordCredentialStore`, `PasswordCredential`
+- `InvitationStore`, `InvitationRecord`
+- `EmailVerificationStore`, `EmailVerificationToken`
+- `RegistrationService`, `RegistrationResult` (sealed)
+- `RegistrationPolicy`, `RegistrationMode`
+- `PasswordRegistrationRequest`
+- CDI events: `UserRegistered`, `UserActivated`, `RegistrationApproved`,
+  `RegistrationRejected`, `InvitationCreated`
+
+### platform/ additions (DefaultBeans)
+
+- `NoOpUserStore @DefaultBean` — throws `UnsupportedOperationException` on all methods
+  (fail-fast: registration module must be on classpath for registration to work)
+- `NoOpPasswordCredentialStore @DefaultBean` — same pattern
+- `NoOpInvitationStore @DefaultBean` — same pattern
+- `NoOpEmailVerificationStore @DefaultBean` — same pattern
+- `NoOpRegistrationService @DefaultBean` — same pattern
+- `PreferenceRegistrationPolicy @DefaultBean` — reads `casehub.registration.mode`
+  from PreferenceProvider (default: `OPEN`)
+
+## PasswordAuthenticationProvider
+
+New `AuthenticationProvider` implementation for email/password login. Lives in
+`registration-core/`, wired by `registration/` (Quarkus) and `registration-spring/`
+(Spring).
+
+```java
+public class PasswordAuthenticationProviderCore implements AuthenticationProvider {
+    private final PasswordCredentialStore credentialStore;
+    private final UserStore userStore;
+    private final PasswordHasher passwordHasher;
+
+    @Override
+    public String method() { return "password"; }
+
+    @Override
+    public ChallengeResponse initiate(AuthenticationContext context) {
+        // No challenge needed for password auth — return a no-op challenge
+        // that simply indicates readiness to accept credentials
+    }
+
+    @Override
+    public AuthenticationResult verify(ChallengeRecord challenge, Map<String, Object> data) {
+        String email = (String) data.get("email");
+        String password = (String) data.get("password");
+
+        var user = userStore.findByEmail(email, challenge.tenancyId())
+            .orElseThrow(() -> new UnknownIdentityException("password", "Unknown email"));
+
+        if (user.status() != UserStatus.ACTIVE) {
+            throw new AccountLockedException("password",
+                "Account is " + user.status().name().toLowerCase());
+        }
+
+        var credential = credentialStore.findByActorId(user.id(), challenge.tenancyId())
+            .orElseThrow(() -> new InvalidCredentialException("password", "No password set"));
+
+        if (!passwordHasher.verify(password, credential.hashedPassword())) {
+            throw new InvalidCredentialException("password", "Invalid password");
+        }
+
+        credentialStore.updateLastUsed(user.id(), challenge.tenancyId());
+
+        return new AuthenticationResult(
+            PrincipalId.human(user.id()),
+            challenge.tenancyId(),
+            Set.of(),
+            "password",
+            Map.of());
+    }
+}
+```
+
+### PasswordHasher
+
+```java
+public interface PasswordHasher {
+    String hash(String plaintext);
+    boolean verify(String plaintext, String hashed);
+}
+```
+
+`BcryptPasswordHasher` implements this using jBCrypt with configurable cost factor
+(default 12).
+
+## UserStoreUserResolver
+
+Bridges the existing `UserResolver` SPI to `UserStore`, enabling social login
+registration without changing `AbstractOAuthAuthenticationProvider`:
+
+```java
+public class UserStoreUserResolver implements UserResolver {
+    private final UserStore userStore;
+    private final RegistrationPolicy registrationPolicy;
+
+    @Override
+    public Optional<PrincipalId> resolveByEmail(String email, String tenancyId) {
+        // 1. Check for existing user
+        var existing = userStore.findByEmail(email, tenancyId);
+        if (existing.isPresent()) {
+            var user = existing.get();
+            if (user.status() == UserStatus.ACTIVE) {
+                return Optional.of(PrincipalId.human(user.id()));
+            }
+            return Optional.empty(); // non-active users can't authenticate
+        }
+
+        // 2. Check registration policy
+        var mode = registrationPolicy.getMode(tenancyId);
+        if (mode == RegistrationMode.INVITATION_ONLY) {
+            return Optional.empty(); // no auto-creation
+        }
+
+        // 3. Create new user (social provider verified the email)
+        var user = userStore.create(new UserRecord(
+            UUIDv7.generate().toString(),
+            email,
+            email, // displayName defaults to email
+            tenancyId,
+            mode == RegistrationMode.OPEN
+                ? UserStatus.ACTIVE
+                : UserStatus.PENDING_APPROVAL,
+            "social", // will be overridden with specific provider in metadata
+            Instant.now(),
+            mode == RegistrationMode.OPEN ? Instant.now() : null
+        ));
+
+        // 4. Fire events
+        // (event firing handled by caller or CDI observer)
+
+        return Optional.of(PrincipalId.human(user.id()));
+    }
+}
+```
+
+When the tenant policy is `APPROVAL_REQUIRED`, the user is created in
+`PENDING_APPROVAL` status. The `UserStoreUserResolver` returns the `PrincipalId`,
+so the social login flow completes and the user receives a session/JWT. The JWT
+includes the user's status in its claims (`ust` claim). Application-layer access
+control checks `UserStatus` before granting access to protected resources — a
+`PENDING_APPROVAL` user can see a "waiting for approval" page but cannot access
+tenant data. This mirrors how `AccountLockedException` already gates access for
+suspended accounts. The `RegistrationApproved` event triggers a notification to
+the user, who can then refresh their session to get an updated JWT with `ACTIVE`
+status.
+
+## REST API Surface
+
+All endpoints generated by `graphql-generator` APT from `@McpDomain` annotations on
+the SPI interfaces.
+
+| Method | Path | Purpose | Auth |
+|--------|------|---------|------|
+| POST | `/register/password` | Email/password signup | No |
+| GET | `/register/verify` | Email verification callback | No |
+| POST | `/register/invitations` | Create invitation | Admin |
+| DELETE | `/register/invitations/{token}` | Revoke invitation | Admin |
+| GET | `/register/invitations` | List tenant invitations | Admin |
+| POST | `/register/approve/{userId}` | Approve pending registration | Admin |
+| POST | `/register/reject/{userId}` | Reject pending registration | Admin |
+| GET | `/register/policy/{tenancyId}` | Get registration policy | No |
+
+## Flyway Migrations
+
+Namespace: `V9000` — registration schema.
+
+```sql
+-- V9000__registration_user.sql
+CREATE TABLE registration_user (
+    id            VARCHAR(255) NOT NULL,
+    email         VARCHAR(255) NOT NULL,
+    display_name  VARCHAR(255),
+    tenancy_id    VARCHAR(255) NOT NULL,
+    status        VARCHAR(50)  NOT NULL,
+    registration_method VARCHAR(50) NOT NULL,
+    created_at    TIMESTAMP    NOT NULL,
+    activated_at  TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE (email, tenancy_id)
+);
+
+-- V9001__registration_password_credential.sql
+CREATE TABLE registration_password_credential (
+    actor_id      VARCHAR(255) NOT NULL,
+    tenancy_id    VARCHAR(255) NOT NULL,
+    hashed_password VARCHAR(255) NOT NULL,
+    created_at    TIMESTAMP    NOT NULL,
+    last_used_at  TIMESTAMP,
+    PRIMARY KEY (actor_id, tenancy_id)
+);
+
+-- V9002__registration_invitation.sql
+CREATE TABLE registration_invitation (
+    token         VARCHAR(255) NOT NULL,
+    email         VARCHAR(255) NOT NULL,
+    tenancy_id    VARCHAR(255) NOT NULL,
+    assigned_groups TEXT,          -- JSON array
+    expires_at    TIMESTAMP,
+    created_by    VARCHAR(255) NOT NULL,
+    created_at    TIMESTAMP    NOT NULL,
+    consumed      BOOLEAN      NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (token)
+);
+
+-- V9003__registration_email_verification.sql
+CREATE TABLE registration_email_verification (
+    token         VARCHAR(255) NOT NULL,
+    user_id       VARCHAR(255) NOT NULL,
+    tenancy_id    VARCHAR(255) NOT NULL,
+    expires_at    TIMESTAMP    NOT NULL,
+    created_at    TIMESTAMP    NOT NULL,
+    PRIMARY KEY (token)
+);
+```
+
+## Security Considerations
+
+- **Password storage:** bcrypt with cost factor 12 (configurable via
+  `casehub.registration.bcrypt.cost`). Passwords never stored or logged in plaintext.
+- **Email verification tokens:** Cryptographically random (SecureRandom), 32 bytes,
+  base64url-encoded. Single-use (consumed on verification). Default TTL: 24 hours.
+- **Invitation tokens:** Same generation as verification tokens. Single-use. Bound to
+  specific email — invitation link only works for the invited email address.
+- **Timing attacks:** `PasswordHasher.verify()` uses bcrypt's constant-time comparison.
+  Login for non-existent emails performs a dummy bcrypt hash to prevent timing
+  side-channels.
+- **Rate limiting:** Registration endpoints should be rate-limited per IP/tenant.
+  Not implemented in this issue — deferred to the existing `agent-gate` or a
+  future HTTP rate-limiting module.
+- **Enumeration protection:** `POST /register/password` returns the same response
+  whether the email already exists or is newly registered (prevents email
+  enumeration). The `AlreadyExists` result is only visible server-side.
+
+## Notification Integration
+
+Registration events integrate with the existing subscription/notification pipeline:
+
+- `UserRegistered` with `status=PENDING_APPROVAL` → admin notification via
+  `SubscriptionEngine` (subscribable: `registration.user.pending`)
+- `UserActivated` → welcome notification to the user
+- `RegistrationRejected` → rejection notice to the user
+- `InvitationCreated` → email delivery to invitee (via `NotificationDispatcher`)
+
+Events implement `SubscribableEvent` so tenants can create custom subscriptions
+for registration events.
+
+## Testing Strategy
+
+- **Unit tests (registration-core):**
+  - `RegistrationServiceCoreTest` — all ceremony flows (email/password, invitation,
+    approval, rejection, policy checks)
+  - `UserStoreUserResolverTest` — resolution + auto-creation + policy enforcement
+  - `PasswordAuthenticationProviderCoreTest` — login with valid/invalid credentials,
+    locked accounts, missing credentials
+  - `BcryptPasswordHasherTest` — hash + verify roundtrip, cost factor
+  - `EmailVerificationServiceCoreTest` — token generation, consumption, expiry
+
+- **Integration tests (user-jpa):**
+  - JPA store tests with `@QuarkusTest` + `@TestTransaction`
+  - Unique constraint enforcement (email + tenancy)
+  - Concurrent registration (same email) → exactly one succeeds
+
+- **In-memory tests (user-inmem-core):**
+  - All store contracts verified with in-memory implementations
+  - Used by registration-core tests for isolation
+
+## Documentation Updates
+
+### Consumer guide (`docs/guides/consumer-guide.md`)
+
+New section "User Registration" covering:
+- Three registration paths and when to use each
+- Tenant registration policy configuration
+- Invitation API
+- How to listen for registration events
+
+### CLAUDE.md module table
+
+New entries for all 8 modules.
+
+## References
+
+- casehubio/platform#531 — this issue
+- casehubio/platform#525 — parent epic (Identity Authentication)
+- Epic #525 spec: `docs/specs/epic-525-identity-auth/2026-10-06-identity-authentication-design.md`
+  — Decision D11 (pre-existing SCIM identity), authentication flows, SPI definitions
+- Issue #271 spec: `specs/issue-271-principal-identity-model/2026-09-03-principal-identity-model-design.md`
+  — PrincipalId identity types
+- `platform-api/src/main/java/io/casehub/platform/api/authn/` — existing authn SPIs
+- `authn-social-core/src/main/java/.../AbstractOAuthAuthenticationProvider.java` —
+  social login flow, `resolveOrCreateActorId()` integration point
+- `authn-webauthn-core/src/main/java/.../WebAuthnAuthenticationProvider.java` —
+  WebAuthn registration requires `existingPrincipal`
+- `platform/src/main/java/.../authn/NoOpUserResolver.java` — current no-op that
+  silently falls through
+- OWASP Password Storage Cheat Sheet — bcrypt recommendation
+- casehubio/platform#532 — password authentication for existing users (future)
+- casehubio/platform#533 — MFA / step-up authentication (future)
