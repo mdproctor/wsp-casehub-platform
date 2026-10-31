@@ -60,8 +60,11 @@ The bottleneck is **active prompts** (concurrent LLM calls in flight), not open 
 - Within the same salience level: fair round-robin
 - Non-preemptive: a prompt in flight always completes; salience only affects which pool gets the next slot
 - When a salient pool gets new work while lower-salience pools are running: current prompts finish, new slots go to the salient pool
+- **Starvation mitigation:** each pool is guaranteed at least 1 prompt slot regardless of salience. A salience-1 pool can use at most `max-active-prompts - N_other_active_pools` slots, ensuring lower-salience pools always have access to at least 1 slot each.
 
 ## Custom Step Types
+
+> **5 custom step types.** Sticky sessions are expressed via `agent-session-open` with a named session ID — using the same name across steps returns the same session (sticky by name). If a sticky session is evicted due to idle timeout, the next `agent-query` transparently recreates it from the pool.
 
 ### `agent-invoke` — Single-shot execution
 
@@ -89,9 +92,10 @@ When `pool` is specified (or implicit), checks out a session, queries, and relea
     model: claude-opus-4                          # optional
     pool: analysis-pool                           # optional, implicit if one pool
     timeout: 60s                                  # default per-query timeout
+    checkout-timeout: 10s                         # optional, how long to wait for pool checkout
 ```
 
-Session persists until explicitly closed. Pool checkout is implicit. Clearing policy comes from the pool config in the manifest. The session name is the sticky ID — using the same name across steps returns the same session.
+Session persists until explicitly closed. Pool checkout is implicit. Clearing policy comes from the pool config in the manifest. The session name is the sticky ID — using the same name across steps returns the same session. If the pool is at capacity, checkout blocks up to `checkout-timeout` (default from pool config) before failing with a clear error.
 
 ### `agent-query` — Query an open session
 
@@ -235,7 +239,11 @@ admission:
 
 ### Default pool behavior
 
-If exactly one pool is declared (either in manifest or inline), steps use it automatically without a `pool:` attribute. Named pool references are required only when multiple pools exist.
+If exactly one pool is declared (either in manifest or inline), steps use it automatically without a `pool:` attribute. When multiple pools exist and a step omits `pool:`, the runtime fails fast with: `"Multiple pools declared; specify pool: attribute"`. This prevents silent breakage when a deployment adds a second pool.
+
+### Two-layer clarification
+
+"Manifest only" (D2) means pool **lifecycle parameters** (clearing, eviction, sizing, salience) cannot be overridden at the step level. Pool **declarations** can live in both the manifest and inline in playbooks (D5) — the declaration location is not a lifecycle override, it's where the pool is defined. Inline pools in playbooks are scoped to that playbook execution.
 
 ### Prompt size budget
 
@@ -448,17 +456,26 @@ steps:
               output: reply
 ```
 
+### Execution path
+
+All YAML agent steps go through `SessionPipeline` (which wraps `SessionLifecycleManager` + AIMD admission), never directly through `SessionPool.checkout()`. This ensures the admission gate always applies to YAML-opened sessions. The `agent-gate` CDI `@Decorator` still applies at the outer `AgentProvider` layer for non-YAML callers.
+
+### Implementation note: SessionPoolRegistry keying
+
+The current `SessionPoolRegistry` keys by `backendKey` (or `backendKey:model`), which prevents multiple pools on the same backend. This must be extended to key by pool name, with `findPool(name)` as the primary lookup for YAML steps. The existing `findPool(backendKey, model)` path remains for backward compatibility with Java API consumers.
+
 ## Implementation Plan Outline
 
-1. **Pool config schema extension** — extend PoolDeclaration with clearing, salience, max-prompt-tokens fields
-2. **Salience-based admission scheduler** — new SalienceScheduler wrapping AimdAdmissionStrategy
-3. **Step type definitions** — InvokeBinding variants for each step type
-4. **Step handlers** — runtime handlers wiring steps to agent-session-core API
-5. **Playbook compiler** — step compilers for each new step type
-6. **Inline pool parsing** — extend playbook parser to handle pools section
-7. **Test infrastructure** — parameterized test harness + 12 playbooks + 16 configs
-8. **Example gallery** — 8 self-contained example playbooks
-9. **Documentation** — consumer-guide and contributor-guide updates
+1. **SessionPoolRegistry name-based keying** — extend registry to support pool name as primary key
+2. **Pool config schema extension** — extend PoolDeclaration with clearing, salience, max-prompt-tokens fields
+3. **Salience-based admission scheduler** — new SalienceScheduler wrapping AimdAdmissionStrategy, with per-pool guaranteed minimum capacity
+4. **Step type definitions** — InvokeBinding variants for each step type
+5. **Step handlers** — runtime handlers wiring steps to SessionPipeline (not direct pool checkout)
+6. **Playbook compiler** — step compilers for each new step type
+7. **Inline pool parsing** — extend playbook parser to handle pools section
+8. **Test infrastructure** — parameterized test harness + 12 playbooks + 16 configs
+9. **Example gallery** — 8 self-contained example playbooks
+10. **Documentation** — consumer-guide and contributor-guide updates
 
 ## References
 
