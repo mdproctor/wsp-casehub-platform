@@ -2,11 +2,23 @@
 
 ## Last Session (2026-10-31)
 
-Designed YAML agent interaction step types for #681. Researched the full Java API surface (agent-api, agent-session-core, agent-gate-core, agent-config-core) and wacky-manor example via 4 parallel forks. Identified 64 valid interaction patterns across invocation mode, pool config, clearing policy, and execution shape. Captured 7 design decisions (full matrix scope, manifest-only pool config, implicit checkout, salience-based scheduling). Ran light decision review (12 findings, all addressed — starvation mitigation added, registry keying gap noted, fail-fast on ambiguous pool). Wrote spec and 6-batch implementation plan (11 tasks).
+Implemented Batches 1-5 (Tasks 1-7) of the YAML agent interaction steps plan (#681). All 7 tasks follow TDD — failing tests first, then implementation, then verification. Full test suite passes across all modified modules (1090+ tests).
+
+### Completed Tasks
+
+| Task | Module | What |
+|------|--------|------|
+| 1 | agent-config-core | PoolDeclaration extended with salience, clearing, maxPromptTokens |
+| 2 | agent-session-core | SessionPoolRegistry name-based keying, SessionPoolConfig clearing fields |
+| 3 | agent-gate-core | SalienceScheduler with guaranteed min capacity |
+| 4 | yaml-core | SessionOpen/Query/Clear/Close InvokeBinding variants + DeclarationParser |
+| 5 | yaml-core | Agent binding extended with pool, modelChain, responseFormat |
+| 6 | yaml-step-runtime | 4 session lifecycle handlers wired to SessionPipeline |
+| 7 | playbook-compiler | AgentSessionStepCompiler + registration for 4 step types |
 
 ## Immediate Next Step
 
-Execute Batch 1 Task 1: extend `PoolDeclaration` with `salience`, `clearing`, `maxPromptTokens` fields. Plan is at `plans/2026-10-31-yaml-agent-interaction-steps.md`.
+Execute Batch 5 Task 8 (inline pool parsing in playbooks), then Batch 6 (Tasks 9-11: test fixtures, parameterized harness, example gallery). Plan at `plans/2026-10-31-yaml-agent-interaction-steps.md`.
 
 ## References
 
