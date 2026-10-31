@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-681-yaml-agent-interaction-steps
-state: closing:verified
+state: closing:promoted
 project-sha: 1ee42f3f
 date: 2026-10-31
 issue-repo: casehubio/platform
