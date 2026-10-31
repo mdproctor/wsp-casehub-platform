@@ -99,3 +99,55 @@
 **Sources:** authn-core AuthenticationRouterCore.java, authn-social-core AbstractOAuthAuthenticationProvider.java
 **Exploration:** quick
 **Status:** captured
+
+## D9: UserRecord data model
+
+**Choice:** Minimal identity + status — UserRecord(id, email, displayName, tenancyId, status, createdAt, activatedAt). Status enum: PENDING_VERIFICATION / PENDING_APPROVAL / ACTIVE / SUSPENDED. Credentials stored separately in PasswordCredentialStore.
+**Alternatives:**
+- Rich profile (firstName, lastName, phone, etc.) — couples identity to profile data
+- Extensible metadata (Map<String, Object>) — flexible but untyped, hard to validate
+**Rationale:** UserStore is about identity lifecycle, not profile data. Groups via existing GroupMembershipProvider. Credentials via dedicated stores (PasswordCredentialStore, WebAuthnCredentialStore, IdentityBindingStore).
+**Trade-offs:** Profile data must be stored elsewhere if needed (preferences or a separate profile SPI)
+**Depends on:** D4 (UserStore SPI), D8 (ceremony architecture)
+**Sources:** platform-api identity types (PrincipalId, ActorType)
+**Exploration:** quick
+**Status:** captured
+
+## D10: Password hashing
+
+**Choice:** bcrypt via jBCrypt (org.mindrot)
+**Alternatives:**
+- Argon2 via Bouncy Castle — memory-hard but large dependency
+- PBKDF2 via JCA — built-in but no memory-hardness
+**Rationale:** Industry standard, adaptive cost factor, zero-dependency library, widely audited. Default cost factor 12 (tunable per deployment).
+**Trade-offs:** No memory-hardness (bcrypt is CPU-hard only)
+**Depends on:** D6 (email/password provider in scope)
+**Sources:** OWASP Password Storage Cheat Sheet
+**Exploration:** quick
+**Status:** captured
+
+## D11: Invitation flow
+
+**Choice:** Token-based invite with pre-assignment — InvitationRecord(token, email, tenancyId, assignedGroups, expiresAt, createdBy). Invited user clicks link → signup form pre-filled with tenant + email. Assigned groups applied on registration. Invitation consumed on use. Stored in InvitationStore SPI.
+**Alternatives:**
+- Email-only invite — simpler but no group pre-assignment
+- Link-only invite — no identity pre-verification
+**Rationale:** Admins need to control who joins and with what permissions. Token binds to a specific email, preventing link sharing. Pre-assigned groups support role-based onboarding.
+**Trade-offs:** Requires InvitationStore SPI and admin API surface
+**Depends on:** D3 (invitation-only is one of the tenant policies)
+**Sources:** platform-api GroupMembershipProvider
+**Exploration:** quick
+**Status:** captured
+
+## D12: Social login registration integration
+
+**Choice:** UserStoreUserResolver creates on miss — when resolveByEmail returns empty AND tenant policy allows self-signup, creates UserRecord in UserStore and returns new PrincipalId. Social login flow works unchanged.
+**Alternatives:**
+- Throw + catch at router — explicit but changes existing flow, requires new error handling in AuthenticationRouterCore
+- Pre-registration check in initiate() — requires modifying initiate to check registration policy
+**Rationale:** Minimal change to existing code. UserResolver's contract (resolve email → PrincipalId) naturally extends to "resolve or create." Tenant policy check prevents creation when invitation-only.
+**Trade-offs:** UserResolver's name suggests read-only semantics — creating users in a "resolver" is slightly surprising. The alternative is renaming to UserProvider or similar.
+**Depends on:** D4 (UserStore), D5 (trust social email_verified), D8 (ceremony architecture)
+**Sources:** authn-social-core AbstractOAuthAuthenticationProvider.resolveOrCreateActorId() lines 154-161
+**Exploration:** quick
+**Status:** captured
