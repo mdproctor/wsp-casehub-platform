@@ -190,7 +190,7 @@ public interface PasswordCredentialStore {
 public record PasswordCredential(
     String actorId,
     String tenancyId,
-    String hashedPassword,  // bcrypt hash
+    String hashedPassword,  // Argon2id hash
     Instant createdAt,
     Instant lastUsedAt
 ) {}
@@ -427,6 +427,23 @@ public sealed interface RegistrationResult {
 }
 ```
 
+### InvitationRequest
+
+```java
+public record InvitationRequest(
+    String email,
+    String tenancyId,
+    Set<String> assignedGroups,
+    Instant expiresAt           // nullable — uses default TTL if absent
+) {
+    public InvitationRequest {
+        Objects.requireNonNull(email, "email");
+        Objects.requireNonNull(tenancyId, "tenancyId");
+        assignedGroups = assignedGroups != null ? Set.copyOf(assignedGroups) : Set.of();
+    }
+}
+```
+
 ### InvitationCreationResult
 
 ```java
@@ -625,7 +642,7 @@ New package `io.casehub.platform.registration`:
 - `RegistrationPolicy`, `RegistrationMode`
 - `UserProvisioner`
 - `EmailSender`
-- `PasswordRegistrationRequest`
+- `PasswordRegistrationRequest`, `InvitationRequest`, `InvitationCreationResult`
 - CDI events (implementing `SubscribableEvent`): `UserRegistered`, `UserActivated`,
   `RegistrationApproved`, `RegistrationRejected`, `InvitationCreated`
 
@@ -670,18 +687,22 @@ public class PasswordAuthenticationProviderCore implements AuthenticationProvide
         String email = (String) data.get("email");
         String password = (String) data.get("password");
 
-        var user = userStore.findByEmail(email, challenge.tenancyId())
-            .orElseThrow(() -> new UnknownIdentityException("password", "Unknown email"));
+        var userOpt = userStore.findByEmail(email, challenge.tenancyId());
+        if (userOpt.isEmpty()) {
+            passwordHasher.hash("timing-equalization-dummy");
+            throw new InvalidCredentialException("password", "Invalid credentials");
+        }
+        var user = userOpt.get();
 
         if (user.status() != UserStatus.ACTIVE) {
             throw new AccountNotActiveException("password", user.status().name());
         }
 
         var credential = credentialStore.findByActorId(user.id(), challenge.tenancyId())
-            .orElseThrow(() -> new InvalidCredentialException("password", "No password set"));
+            .orElseThrow(() -> new InvalidCredentialException("password", "Invalid credentials"));
 
         if (!passwordHasher.verify(password, credential.hashedPassword())) {
-            throw new InvalidCredentialException("password", "Invalid password");
+            throw new InvalidCredentialException("password", "Invalid credentials");
         }
 
         credentialStore.updateLastUsed(user.id(), challenge.tenancyId());
@@ -691,7 +712,7 @@ public class PasswordAuthenticationProviderCore implements AuthenticationProvide
             challenge.tenancyId(),
             Set.of(),
             "password",
-            Map.of());
+            Map.of("userStatus", user.status().name()));
     }
 }
 ```
@@ -711,13 +732,40 @@ Argon2id recommended minimums for interactive logins.
 
 ## Social Login Integration
 
-The existing `AbstractOAuthAuthenticationProvider.resolveOrCreateActorId()` is
-modified to call `UserProvisioner` when `UserResolver` returns empty. `UserResolver`
-remains read-only — it resolves existing users only. `UserProvisioner` handles
+The existing `AbstractOAuthAuthenticationProvider` is modified in two methods:
+
+**Constructor:** gains `UserProvisioner` and `UserStatusResolver` parameters.
+`UserStatusResolver` provides user lifecycle status for the JWT metadata.
+
+**`resolveOrCreateActorId()`:** calls `UserProvisioner` when `UserResolver`
+returns empty. `UserResolver` remains read-only. `UserProvisioner` handles
 identity creation.
 
+**`verify()`:** after resolving/creating the actor ID, calls
+`UserStatusResolver.resolveStatus()` and includes the status in
+`AuthenticationResult.metadata`. This provides the path from user lifecycle
+state to JWT claims for the PENDING_APPROVAL enforcement chain.
+
 ```java
-// Modified resolveOrCreateActorId in AbstractOAuthAuthenticationProvider
+// Modified verify in AbstractOAuthAuthenticationProvider
+@Override
+public AuthenticationResult verify(ChallengeRecord challenge, Map<String, Object> data) {
+    // ... existing code exchange + identity extraction ...
+
+    String actorId = resolveOrCreateActorId(identity, tenancyId);
+
+    // ... existing binding + token storage + event firing ...
+
+    var metadata = new LinkedHashMap<>(Map.of(
+        "externalId", identity.externalId(),
+        "firstLogin", firstLogin));
+    userStatusResolver.resolveStatus(actorId, tenancyId)
+        .ifPresent(status -> metadata.put("userStatus", status));
+
+    return new AuthenticationResult(
+        PrincipalId.human(actorId), tenancyId, Set.of(), method(), metadata);
+}
+
 private String resolveOrCreateActorId(OAuthIdentity identity, String tenancyId) {
     if (identity.email() != null) {
         var resolved = userResolver.resolveByEmail(identity.email(), tenancyId);
@@ -791,10 +839,16 @@ updated JWT with `ACTIVE` status.
 When `UserProvisioner` creates a user in `PENDING_APPROVAL`, the status must flow
 through to the client and be enforced:
 
-1. **AuthenticationResult.metadata convention:** `UserStoreProvisioner` sets
-   `metadata.put("userStatus", status.name())` on the `AuthenticationResult`.
-   This carries the status without changing the `AuthenticationResult` record
-   structure.
+1. **AuthenticationResult.metadata convention:**
+   `AbstractOAuthAuthenticationProvider.verify()` calls
+   `UserStatusResolver.resolveStatus(actorId, tenancyId)` after
+   `resolveOrCreateActorId()` and includes the result in the metadata map.
+   `UserStatusResolver` is injected as a constructor parameter — the
+   `NoOpUserStatusResolver @DefaultBean` returns `Optional.empty()` when
+   registration is absent (no status in JWT, no enforcement). For password
+   login, `PasswordAuthenticationProviderCore.verify()` adds the status
+   directly (it already has the `UserRecord`). This carries the status
+   without changing the `AuthenticationResult` record structure.
 
 2. **JWT `ust` claim:** `JwtIssuer.issue()` reads the `userStatus` key from
    `AuthenticationResult.metadata()` and, if present, adds a `ust` claim to the
