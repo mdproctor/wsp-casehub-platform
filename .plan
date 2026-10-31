@@ -1,0 +1,15 @@
+# Work Plan — issue-531-user-registration-self-signup
+
+## State
+branch: issue-531-user-registration-self-signup
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 531
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#531 — Issue #531 ← active
