@@ -32,17 +32,17 @@
 ### Task 1: SPI types in platform-api
 
 **Files:**
-- Create: `platform-api/src/main/java/io/casehub/platform/api/mcp/McpResourceDescriptor.java`
-- Create: `platform-api/src/main/java/io/casehub/platform/api/mcp/StaticResourceDescriptor.java`
-- Create: `platform-api/src/main/java/io/casehub/platform/api/mcp/TemplateResourceDescriptor.java`
-- Create: `platform-api/src/main/java/io/casehub/platform/api/mcp/McpResourceReadRequest.java`
-- Create: `platform-api/src/main/java/io/casehub/platform/api/mcp/McpResourceContent.java`
-- Create: `platform-api/src/main/java/io/casehub/platform/api/mcp/McpResourceHandler.java`
-- Create: `platform-api/src/main/java/io/casehub/platform/api/mcp/McpResourceHandle.java`
-- Create: `platform-api/src/main/java/io/casehub/platform/api/mcp/McpResourceRegistry.java`
-- Create: `platform-api/src/main/java/io/casehub/platform/api/mcp/McpResourceRegistration.java`
-- Create: `platform-api/src/main/java/io/casehub/platform/api/mcp/McpResourceRegistered.java`
-- Create: `platform-api/src/main/java/io/casehub/platform/api/mcp/McpResourceUpdated.java`
+- Create: `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/McpResourceDescriptor.java`
+- Create: `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/StaticResourceDescriptor.java`
+- Create: `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/TemplateResourceDescriptor.java`
+- Create: `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/McpResourceReadRequest.java`
+- Create: `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/McpResourceContent.java`
+- Create: `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/McpResourceHandler.java`
+- Create: `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/McpResourceHandle.java`
+- Create: `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/McpResourceRegistry.java`
+- Create: `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/McpResourceRegistration.java`
+- Create: `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/McpResourceRegistered.java`
+- Create: `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/McpResourceUpdated.java`
 - Test: `platform-api/src/test/java/io/casehub/platform/api/mcp/McpResourceDescriptorTest.java`
 - Test: `platform-api/src/test/java/io/casehub/platform/api/mcp/McpResourceReadRequestTest.java`
 - Test: `platform-api/src/test/java/io/casehub/platform/api/mcp/McpResourceContentTest.java`

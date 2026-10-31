@@ -30,9 +30,9 @@
 ### Task 1: New annotations in platform-api
 
 **Files:**
-- Create: `platform-api/src/main/java/io/casehub/platform/api/mcp/HttpMethod.java`
-- Create: `platform-api/src/main/java/io/casehub/platform/api/mcp/RestMethod.java`
-- Create: `platform-api/src/main/java/io/casehub/platform/api/mcp/PathParam.java`
+- Create: `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/HttpMethod.java`
+- Create: `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/RestMethod.java`
+- Create: `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/PathParam.java`
 - Test: `platform-api/src/test/java/io/casehub/platform/api/mcp/RestMethodTest.java`
 
 **Interfaces:**
@@ -1392,9 +1392,9 @@ git -C /Users/mdproctor/claude/casehub/platform commit -m "feat(#295): migrate N
 - `/Users/mdproctor/claude/public/casehub/platform/specs/issue-295-unified-api-generation/2026-09-14-unified-api-generation-design.md` — design spec
 - `graphql-generator/src/main/java/io/casehub/platform/graphql/generator/GraphQLResolverProcessor.java` — existing APT (PoC)
 - `graphql-generator/src/test/java/io/casehub/platform/graphql/generator/GraphQLResolverProcessorTest.java` — existing tests
-- `platform-api/src/main/java/io/casehub/platform/api/mcp/McpDomain.java` — domain annotation
-- `platform-api/src/main/java/io/casehub/platform/api/mcp/PlatformQuery.java` — query annotation
-- `platform-api/src/main/java/io/casehub/platform/api/mcp/PlatformMutation.java` — mutation annotation
+- `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/McpDomain.java` — domain annotation
+- `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/PlatformQuery.java` — query annotation
+- `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/PlatformMutation.java` — mutation annotation
 - `callback/src/main/java/io/casehub/platform/callback/CallbackRegistrationResource.java` — migration target
 - `notifications/src/main/java/io/casehub/platform/notification/rest/DeliveryChannelResource.java` — migration target
 - `notifications/src/main/java/io/casehub/platform/notification/rest/DigestStatusResource.java` — migration target

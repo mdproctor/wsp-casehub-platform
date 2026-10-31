@@ -31,7 +31,7 @@
 ### Task 1: @RestPath annotation + simple type detection + tests
 
 **Files:**
-- Create: `platform-api/src/main/java/io/casehub/platform/api/mcp/RestPath.java`
+- Create: `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/RestPath.java`
 - Modify: `graphql-generator/src/main/java/io/casehub/platform/graphql/generator/GraphQLResolverProcessor.java`
 - Test: `graphql-generator/src/test/java/io/casehub/platform/graphql/generator/GraphQLResolverProcessorTest.java`
 
@@ -68,7 +68,7 @@ Expected: FAIL — `resolveRestPath` method does not exist
 
 - [ ] **Step 3: Create @RestPath annotation**
 
-Create `platform-api/src/main/java/io/casehub/platform/api/mcp/RestPath.java`:
+Create `../../../../mcp-api/src/main/java/io/casehub/platform/api/mcp/RestPath.java`:
 
 ```java
 package io.casehub.platform.api.mcp;

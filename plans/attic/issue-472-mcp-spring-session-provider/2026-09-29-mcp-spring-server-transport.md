@@ -184,7 +184,6 @@ import io.modelcontextprotocol.spec.McpSchema;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -198,13 +197,13 @@ public class SpringMcpResourceRegistryBridge implements McpResourceRegistry {
 
     private static final System.Logger LOG = System.getLogger(SpringMcpResourceRegistryBridge.class.getName());
 
-    private final McpSyncServer server;
-    private final ApplicationEventPublisher eventPublisher;
+    private final McpSyncServer                       server;
+    private final ApplicationEventPublisher           eventPublisher;
     private final ConcurrentMap<String, Registration> registrations = new ConcurrentHashMap<>();
 
     public SpringMcpResourceRegistryBridge(McpSyncServer server,
-                                            ApplicationEventPublisher eventPublisher) {
-        this.server = server;
+                                           ApplicationEventPublisher eventPublisher) {
+        this.server         = server;
         this.eventPublisher = eventPublisher;
     }
 
@@ -231,15 +230,15 @@ public class SpringMcpResourceRegistryBridge implements McpResourceRegistry {
     @Override
     public List<McpResourceDescriptor> list() {
         return registrations.values().stream()
-                .map(r -> r.descriptor)
-                .toList();
+                            .map(r -> r.descriptor)
+                            .toList();
     }
 
     @EventListener
     void onResourceUpdated(McpResourceUpdated event) {
         for (Registration reg : registrations.values()) {
             if (reg.descriptor instanceof StaticResourceDescriptor s
-                    && s.uri().equals(event.uri())) {
+                && s.uri().equals(event.uri())) {
                 server.notifyResourcesUpdated();
                 return;
             }
@@ -268,8 +267,8 @@ public class SpringMcpResourceRegistryBridge implements McpResourceRegistry {
 
     private class BridgeRegistration implements McpResourceRegistration {
 
-        private final McpResourceDescriptor descriptor;
-        private McpResourceHandler handler;
+        private final McpResourceDescriptor               descriptor;
+        private       McpResourceHandler                  handler;
         private final Map<String, Supplier<List<String>>> completions = new LinkedHashMap<>();
 
         BridgeRegistration(McpResourceDescriptor descriptor) {
@@ -325,14 +324,14 @@ public class SpringMcpResourceRegistryBridge implements McpResourceRegistry {
 
         private void registerStatic(StaticResourceDescriptor s) {
             var resource = new McpSchema.Resource(s.uri(), s.name(), s.description(),
-                    s.mimeType(), null);
+                                                  s.mimeType(), null);
             server.addResource(new io.modelcontextprotocol.spec.McpServerFeatures.SyncResourceSpecification(
                     resource,
                     (exchange, request) -> {
                         try {
-                            var readRequest = McpResourceReadRequest.of(request.uri());
-                            var content = handler.read(readRequest);
-                            String mime = content.mimeType() != null ? content.mimeType() : s.mimeType();
+                            var    readRequest = McpResourceReadRequest.of(request.uri());
+                            var    content     = handler.read(readRequest);
+                            String mime        = content.mimeType() != null ? content.mimeType() : s.mimeType();
                             return new McpSchema.ReadResourceResult(List.of(
                                     new McpSchema.ResourceContents.TextResourceContents(
                                             content.uri(), mime, content.text())));
@@ -346,14 +345,14 @@ public class SpringMcpResourceRegistryBridge implements McpResourceRegistry {
 
         private void registerTemplate(TemplateResourceDescriptor t) {
             var template = new McpSchema.ResourceTemplate(t.uriTemplate(), t.name(),
-                    t.description(), t.mimeType(), null);
+                                                          t.description(), t.mimeType(), null);
             server.addResourceTemplate(new io.modelcontextprotocol.spec.McpServerFeatures.SyncResourceTemplateSpecification(
                     template,
                     (exchange, request) -> {
                         try {
-                            var readRequest = new McpResourceReadRequest(request.uri(), Map.of());
-                            var content = handler.read(readRequest);
-                            String mime = content.mimeType() != null ? content.mimeType() : t.mimeType();
+                            var    readRequest = new McpResourceReadRequest(request.uri(), Map.of());
+                            var    content     = handler.read(readRequest);
+                            String mime        = content.mimeType() != null ? content.mimeType() : t.mimeType();
                             return new McpSchema.ReadResourceResult(List.of(
                                     new McpSchema.ResourceContents.TextResourceContents(
                                             content.uri(), mime, content.text())));
@@ -368,11 +367,11 @@ public class SpringMcpResourceRegistryBridge implements McpResourceRegistry {
 
     private class BridgeHandle implements McpResourceHandle {
 
-        private final String name;
+        private final String        name;
         private final AtomicBoolean valid;
 
         BridgeHandle(String name, AtomicBoolean valid) {
-            this.name = name;
+            this.name  = name;
             this.valid = valid;
         }
 
