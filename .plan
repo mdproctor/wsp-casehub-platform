@@ -1,24 +1,15 @@
-# Work Plan — casehub-platform auth + generators
+# Work Plan — issue-593-spring-generator-isolation
 
 ## State
-branch: main
+branch: issue-593-spring-generator-isolation
 state: scaffolded
 project-sha: 
-date: 2026-11-01
+date: 
 issue-repo: casehubio/platform
-covers: 543
+covers: 593
 design-repo: 
 design-section-hashes: 
-flyway-next-v: 
+flyway-next-v: none
 
 ## Queue
-- [x] casehubio/platform#532 — Password authentication provider
-- [x] casehubio/platform#545 — ChallengeStore JPA for clustered deployments
-- [ ] casehubio/platform#543 — Authentication hardening ← active
-- [ ] casehubio/platform#593 — Make spring-generator independently publishable
-- [ ] casehubio/platform#594 — Make rest-spring-generator independently publishable
-- [ ] casehubio/platform#595 — Make graphql-spring-generator independently publishable
-- [ ] casehubio/platform#596 — Make mcp-spring-generator independently publishable
-- [ ] casehubio/platform#663 — Propagate @Authenticated/@RolesAllowed to generated REST
-- [ ] casehubio/platform#682 — Wire unused EngagementType values or remove
-- [ ] casehubio/platform#662 — Plugin catalog infrastructure
+- [ ] casehubio/platform#593 — Issue #593 ← active
