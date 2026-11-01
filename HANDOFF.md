@@ -1,47 +1,22 @@
 # HANDOFF — casehub-platform
 
-## Last Session (2026-10-22)
+## Last Session (2026-11-01)
 
-Closed **platform#654** (AimdAdmissionStrategy consolidation deadlock). Landed on branch `issue-650-elastic-session-scheduler` (fast-forward merge from `issue-654-aimd-consolidation-deadlock`).
+Closed **#663** (security annotation propagation in graphql-generator). Also advanced the plan queue past #543, #593–#596 which had been completed in prior sessions but not marked done in the plan.
 
-**#654 — Consolidation deadlock fix (S/Med):**
-- `AimdAdmissionStrategy.availablePermits()` — missing accessor
-- `SessionPipeline.companionAdmission(name, ceiling)` — independent AIMD strategies per execution context
-- `ParallelLlmExecutor` extracted from neocortex to `agent-session-core` — companion admission baked in, prevents deadlock by design
-- `isCapacityError` made public for cross-class access
-- 14 new tests (6 deadlock + 8 executor), 172 total pass
+**#663 — Security annotation propagation (S/Med):**
+- `GraphQLResolverProcessor` now scans class-level `@RolesAllowed`, `@PermitAll`, and `@Authenticated` from `@McpDomain` SPIs and emits them on generated REST resource classes
+- `@Authenticated` scanned by DotName string (`io.quarkus.security.Authenticated`) — no compile dependency on Quarkus security
+- Multi-class domain conflict detection: conflicting class-level annotations across contributing classes produce a WARNING and omit class-level security (method-level still propagates)
+- Also fixed: stream and streaming-mutation REST methods previously had no security annotation emission at all — now consistent with regular and webhook methods
+- Landed as `0fb9cc04` on main, branch stamped
 
-**Follow-ups filed on neocortex:**
-- neocortex#618 — migrate to platform's ParallelLlmExecutor (delete neocortex copy)
-- neocortex#619 — BeliefRevisionPhase: replace agentProvider.invoke() with SessionPipeline
+## Immediate Next Step
 
-## Previous Session
-
-Completed **platform#643** (ReAct tool-use loop) and **platform#645** (integration tests). Both landed on main as `e5a4bf00`.
-
-**#643 — agent-react-core module (M/Med):**
-- `ToolUseLoop` — blocking loop over ChatModel (observe-think-act cycle)
-- `Tool` record with `Builder` — hides LangChain4j schema types from consumers
-- `ToolExecutor`, `ToolUseConfig`, `ToolUseResult`, `ToolUseListener` (per-cycle observability)
-- Error-as-result for LLM self-correction, 0-based cycleIndex
-
-**#645 — Integration tests (S/Low):**
-- Anthropic mock test (full type chain through AnthropicNativeChatModel + mapper)
-- Ollama live IT (real qwen3:8b, end-to-end tool call verified)
-
-**Cross-repo: engine#1245** — migrated engine's ReActWorkerFunctionHandler to use platform's ToolUseLoop. Branch `issue-1245-react-platform-migration` pushed, 604 tests pass. Engine's LangChain4j footprint reduced to 2 stable interfaces (ChatModel + EmbeddingModel). Redundant langchain4j-core dep removed.
-
-**Architecture decision:** LangChain4j types (ChatModel, EmbeddingModel) are the shared interface vocabulary. Implementation details (ToolSpecification, JsonObjectSchema, ChatRequest, etc.) are hidden inside platform. Consumers use `Tool.Builder` to define tools declaratively.
-
-## Follow-on Issues
-
-- **engine#1245** — branch pushed, needs merge to main (604 tests green)
-- **engine#1252** — AiServices test fixture cleanup in flow module (XS/Low)
-- **platform#644** — LangChain4j version alignment across repos (XS/Low)
-- **neocortex#611** — Consume platform's RoutingEmbeddingModel and RoutingChatModel (S/Low)
+#682 — Wire unused EngagementType values (REPLIED, CONVERTED) or remove. Different domain (notification delivery) — fresh session recommended.
 
 ## References
 
-- Slot 214 has engine, neocortex, platform
-- Design spec: `wsp-casehub-platform/specs/issue-643-react-tool-use-loop/`
-- Decisions: D1 (LangChain4j lingua franca), D2 (blocking loop), D3 (callback observability), D4 (error-as-result), D5 (single loop both frameworks)
+- Plan queue: `wsp-casehub-platform/.plan` — position 8/10, #682 active
+- Design spec: `wsp-casehub-platform/specs/issue-663-security-annotations/`
+- Blog entry: `wsp-casehub-platform/blog/2026-11-01-mdp01-generated-code-security-gap.md`
