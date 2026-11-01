@@ -21,8 +21,8 @@ flyway-next-v:
     - [x] Task 4: Argon2 hasher + RegistrationServiceCore
     - [x] Task 5: UserStoreProvisioner + resolvers
     - [x] Task 6: PasswordAuthenticationProviderCore
-  - [ ] Batch 3: Social Integration
-    - [ ] Task 7: authn-social-core UserProvisioner integration
+  - [x] Batch 3: Social Integration
+    - [x] Task 7: authn-social-core UserProvisioner integration
   - [ ] Batch 4: Persistence + Wiring
     - [ ] Task 8: user-jpa-common + user-jpa
     - [ ] Task 9: registration + user-inmem CDI
