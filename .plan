@@ -26,6 +26,6 @@ flyway-next-v:
   - [x] Batch 4: Persistence + Wiring
     - [x] Task 8: user-jpa-common + user-jpa
     - [x] Task 9: registration + user-inmem CDI
-  - [ ] Batch 5: Spring + Docs
-    - [ ] Task 10: Spring modules
-    - [ ] Task 11: Documentation
+  - [x] Batch 5: Spring + Docs
+    - [x] Task 10: Spring modules
+    - [x] Task 11: Documentation
