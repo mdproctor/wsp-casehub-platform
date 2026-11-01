@@ -9,3 +9,15 @@
 **Sources:** `registration-api/` SPI pattern, `PasswordHasher` SPI as precedent, `RegistrationServiceCore.registerWithPassword()` as call site
 **Exploration:** quick
 **Status:** captured
+
+## D2: Password reset flow placement
+
+**Choice:** Extend `RegistrationService` SPI with `requestPasswordReset(email, tenancyId)` and `resetPassword(token, newPassword)`. Implementation in `RegistrationServiceCore`. `PasswordResetToken` + `PasswordResetStore` SPI in `registration-api` mirroring `EmailVerificationToken`/`EmailVerificationStore`. Endpoints in existing `RegistrationEndpoint`.
+**Alternatives:**
+- Separate `PasswordResetService` — new SPI, core class, endpoint class. More types for the same dependency composition. SRP argument doesn't hold when reset shares every dependency with registration.
+**Rationale:** Reset is part of the password credential lifecycle that `RegistrationService` already owns. Same dependencies (TokenGenerator, PasswordHasher, PasswordCredentialStore, EmailSender), same token-store pattern, same module.
+**Trade-offs:** RegistrationService grows from 3 to 5 methods, but all are credential-lifecycle operations.
+**Sources:** `RegistrationService` SPI, `RegistrationServiceCore.verifyEmail()` pattern, `EmailVerificationStore` pattern, `PasswordCredentialStore.updatePassword()` (exists, unused)
+**Depends on:** D1 (password policy validates new password in resetPassword)
+**Exploration:** quick
+**Status:** captured
