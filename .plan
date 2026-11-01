@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-532-password-auth-provider
-state: scaffolded
+state: active
 project-sha: 
 date: 
 issue-repo: casehubio/platform
@@ -13,16 +13,16 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/platform#532 — Issue #532 ← active
-  - [ ] Batch 1: Policy SPIs
-    - [ ] Task 1: Policy SPIs in registration-api
-    - [ ] Task 2: DefaultPasswordPolicy and HIBP detector
-    - [ ] Task 3: Wire policy into registration
-  - [ ] Batch 2: Reset Flow
-    - [ ] Task 4: Reset SPIs and in-memory store
-    - [ ] Task 5: Reset service logic and wiring
-  - [ ] Batch 3: JPA and Docs
-    - [ ] Task 6: JPA persistence for reset tokens
-    - [ ] Task 7: Full build and documentation
+  - [x] Batch 1: Policy SPIs
+    - [x] Task 1: Policy SPIs in registration-api
+    - [x] Task 2: DefaultPasswordPolicy and HIBP detector
+    - [x] Task 3: Wire policy into registration
+  - [x] Batch 2: Reset Flow
+    - [x] Task 4: Reset SPIs and in-memory store
+    - [x] Task 5: Reset service logic and wiring
+  - [x] Batch 3: JPA and Docs
+    - [x] Task 6: JPA persistence for reset tokens
+    - [x] Task 7: Full build and documentation
 - [ ] casehubio/platform#545 — ChallengeStore JPA for clustered deployments
 - [ ] casehubio/platform#543 — Authentication hardening
 - [ ] casehubio/platform#593 — Make spring-generator independently publishable
