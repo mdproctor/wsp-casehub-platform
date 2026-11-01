@@ -75,13 +75,25 @@ The `@Plugin(streaming = true)` annotation and `Definition` streaming support me
 
 ## The protocol evaluation arc
 
-This one's worth telling because the outcome was deletion, not addition.
+Protocol playbooks are governance rules expressed in YAML — the policies that determine whether an agent action should proceed, be modified, or be blocked. A compliance protocol might say: before an agent sends a customer-facing message, check it against the organisation's tone guidelines and regulatory constraints. A safety protocol might gate tool use behind approval when the action involves financial transactions above a threshold. These aren't business logic in the traditional sense — they're the guardrails that sit between "the agent decided to do X" and "X actually happens."
 
-We built a `PlaybookProtocolEvaluator` — a bridge that compiled YAML state machines into `OrcStateMachine` plus `EventRouter` pairs, creating a runtime for channel governance protocols. The idea was that a YAML playbook could declare protocol states (e.g., "when a message arrives on the compliance channel, evaluate these rules") and the protocol evaluator would run them as a specialised subsystem.
+The question was how to execute them. We built a `PlaybookProtocolEvaluator` — a dedicated bridge that compiled YAML state machines into `OrcStateMachine` plus `EventRouter` pairs, creating a specialised runtime for protocol evaluation. The idea was that protocols have different execution semantics from regular playbooks: they're event-triggered rather than step-sequential, they evaluate conditions against a context rather than transforming data, and they need to short-circuit with an advisory result (proceed, modify, deny) rather than producing output.
 
-It worked. Then we realised it shouldn't exist. The standard playbook executor already handles state machines, event routing, and conditional evaluation. The protocol evaluator was reimplementing capabilities the engine already had, with a slightly different entry point. Every bug fix in the main executor would need to be duplicated. Every new feature would need two implementations.
+It worked. Then we realised it shouldn't exist. The standard playbook executor already handles state machines, event routing, and conditional evaluation — those capabilities had been built into the engine for entirely different reasons (durable coordination, case lifecycle). The protocol evaluator was reimplementing them with a slightly different entry point. Every bug fix in the main executor would need to be duplicated. Every new feature would need two implementations.
 
-So we removed it. Protocol evaluation now uses the standard playbook executor — a protocol is just a playbook with a different trigger. The `advisory` step type was registered so that governance evaluation can be invoked as a normal step within any playbook, rather than requiring a separate subsystem.
+So we removed it. Protocol evaluation now uses the standard playbook executor — a protocol is just a playbook with a different trigger. The `advisory` step type was registered so that governance evaluation can be invoked as a normal step within any playbook:
+
+```yaml
+advisory:
+  protocol: compliance-review
+  context:
+    message: ${draft_response}
+    channel: ${channel_id}
+```
+
+The advisory step runs the referenced protocol playbook, gets back a result (proceed, modify with suggestions, or deny with reason), and the calling playbook can branch on it. No separate subsystem, no duplicated execution engine.
+
+This matters because governance is where agent orchestration gets serious. An agent that can open sessions, query models, and stream data is powerful. An agent that does all of that under protocol governance — where every consequential action passes through a policy gate expressed in the same YAML language — is deployable. The protocol doesn't live in application code that a developer maintains; it lives in a YAML file that a compliance team can read and modify.
 
 The lesson is familiar but still worth restating: when a specialised component reimplements general infrastructure, delete the specialisation.
 
