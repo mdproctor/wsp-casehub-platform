@@ -14,8 +14,8 @@ flyway-next-v:
 ## Queue
 - [ ] casehubio/platform#531 — Issue #531 ← active
   - [ ] Batch 1: Foundation
-    - [ ] Task 1: registration-api SPIs and types
-    - [ ] Task 2: platform-api + platform additions
+    - [x] Task 1: registration-api SPIs and types
+    - [x] Task 2: platform-api + platform additions
     - [ ] Task 3: user-inmem-core stores
   - [ ] Batch 2: Core Logic
     - [ ] Task 4: Argon2 hasher + RegistrationServiceCore
