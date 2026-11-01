@@ -1,7 +1,7 @@
 # Work Plan — casehub-platform auth + generators
 
 ## State
-branch: main
+branch: 
 state: scaffolded
 project-sha: 
 date: 2026-11-01
@@ -14,8 +14,8 @@ flyway-next-v:
 ## Queue
 - [x] casehubio/platform#532 — Password authentication provider
 - [x] casehubio/platform#545 — ChallengeStore JPA for clustered deployments
-- [ ] casehubio/platform#543 — Authentication hardening ← active
-- [ ] casehubio/platform#593 — Make spring-generator independently publishable
+- [x] casehubio/platform#543 — Authentication hardening
+- [ ] casehubio/platform#593 — Make spring-generator independently publishable ← active
 - [ ] casehubio/platform#594 — Make rest-spring-generator independently publishable
 - [ ] casehubio/platform#595 — Make graphql-spring-generator independently publishable
 - [ ] casehubio/platform#596 — Make mcp-spring-generator independently publishable
