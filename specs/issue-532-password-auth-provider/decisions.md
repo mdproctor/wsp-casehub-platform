@@ -21,3 +21,16 @@
 **Depends on:** D1 (password policy validates new password in resetPassword)
 **Exploration:** quick
 **Status:** captured
+
+## D3: Breach detection failure policy
+
+**Choice:** Fail-open with warning. When HaveIBeenPwned API is unreachable, password passes policy validation but `PasswordPolicyResult` includes a warning flag. Local rules still protect; breach detection is defense-in-depth, not a hard gate.
+**Alternatives:**
+- Fail-closed — reject password on API error. Safer but creates availability coupling to external service; HIBP outage blocks all registrations and resets.
+- Configurable fail policy — config property for OPEN/CLOSED. Premature; can add later without breaking changes (YAGNI).
+**Rationale:** Registration/reset availability should not depend on a third-party API. Local rules + Argon2id provide strong baseline protection. Warning enables audit logging without blocking users.
+**Trade-offs:** A breached password could be accepted during a HIBP outage. Mitigated by strong local rules and the transient nature of outages.
+**Sources:** HaveIBeenPwned k-anonymity API (range endpoint), platform no-op/graceful-degradation patterns
+**Depends on:** D1 (breach detection is a component of password policy)
+**Exploration:** quick
+**Status:** captured
