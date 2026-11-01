@@ -23,9 +23,9 @@ flyway-next-v:
     - [x] Task 6: PasswordAuthenticationProviderCore
   - [x] Batch 3: Social Integration
     - [x] Task 7: authn-social-core UserProvisioner integration
-  - [ ] Batch 4: Persistence + Wiring
-    - [ ] Task 8: user-jpa-common + user-jpa
-    - [ ] Task 9: registration + user-inmem CDI
+  - [x] Batch 4: Persistence + Wiring
+    - [x] Task 8: user-jpa-common + user-jpa
+    - [x] Task 9: registration + user-inmem CDI
   - [ ] Batch 5: Spring + Docs
     - [ ] Task 10: Spring modules
     - [ ] Task 11: Documentation
