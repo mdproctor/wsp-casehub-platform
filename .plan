@@ -13,3 +13,12 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/platform#532 — Issue #532 ← active
+- [ ] casehubio/platform#545 — ChallengeStore JPA for clustered deployments
+- [ ] casehubio/platform#543 — Authentication hardening
+- [ ] casehubio/platform#593 — Make spring-generator independently publishable
+- [ ] casehubio/platform#594 — Make rest-spring-generator independently publishable
+- [ ] casehubio/platform#595 — Make graphql-spring-generator independently publishable
+- [ ] casehubio/platform#596 — Make mcp-spring-generator independently publishable
+- [ ] casehubio/platform#663 — Propagate @Authenticated/@RolesAllowed to generated REST
+- [ ] casehubio/platform#682 — Wire unused EngagementType values or remove
+- [ ] casehubio/platform#662 — Plugin catalog infrastructure
