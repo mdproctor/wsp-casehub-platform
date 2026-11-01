@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 340" font-family="system-ui, -apple-system, sans-serif" font-size="13">
+  <defs>
+    <marker id="a2" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="none" stroke="#475569" stroke-width="1.5"/>
+    </marker>
+  </defs>
+
+  <text x="350" y="28" text-anchor="middle" font-size="16" font-weight="600" fill="#1e293b">Tenant Registration Policies</text>
+
+  <!-- New user arrives -->
+  <rect x="260" y="50" width="180" height="40" rx="8" fill="#e0e7ff" stroke="#818cf8" stroke-width="1.5"/>
+  <text x="350" y="75" text-anchor="middle" font-weight="500" fill="#3730a3">New user arrives</text>
+
+  <line x1="350" y1="90" x2="350" y2="120" stroke="#475569" stroke-width="1.5" marker-end="url(#a2)"/>
+
+  <!-- Policy check diamond -->
+  <polygon points="350,120 430,160 350,200 270,160" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="350" y="163" text-anchor="middle" font-size="12" font-weight="500" fill="#92400e">Policy?</text>
+
+  <!-- OPEN path (left) -->
+  <line x1="270" y1="160" x2="120" y2="160" stroke="#475569" stroke-width="1.5" marker-end="url(#a2)"/>
+  <text x="195" y="152" text-anchor="middle" font-size="11" fill="#64748b">OPEN</text>
+
+  <rect x="20" y="140" width="100" height="40" rx="8" fill="#dcfce7" stroke="#86efac" stroke-width="1.5"/>
+  <text x="70" y="165" text-anchor="middle" font-weight="500" fill="#166534">Verify</text>
+
+  <line x1="70" y1="180" x2="70" y2="220" stroke="#475569" stroke-width="1.5" marker-end="url(#a2)"/>
+
+  <rect x="20" y="220" width="100" height="40" rx="8" fill="#bbf7d0" stroke="#4ade80" stroke-width="2"/>
+  <text x="70" y="245" text-anchor="middle" font-weight="600" fill="#166534">ACTIVE</text>
+
+  <text x="70" y="285" text-anchor="middle" font-size="11" fill="#64748b">Auto-approved.</text>
+  <text x="70" y="300" text-anchor="middle" font-size="11" fill="#64748b">Immediate access.</text>
+
+  <!-- APPROVAL_REQUIRED path (center) -->
+  <line x1="350" y1="200" x2="350" y2="230" stroke="#475569" stroke-width="1.5" marker-end="url(#a2)"/>
+  <text x="380" y="218" font-size="11" fill="#64748b">APPROVAL</text>
+
+  <rect x="300" y="230" width="100" height="40" rx="8" fill="#fef9c3" stroke="#facc15" stroke-width="1.5"/>
+  <text x="350" y="255" text-anchor="middle" font-weight="500" fill="#854d0e">Pending</text>
+
+  <line x1="350" y1="270" x2="350" y2="300" stroke="#475569" stroke-width="1.5" marker-end="url(#a2)"/>
+  <text x="370" y="288" font-size="10" fill="#64748b">admin</text>
+
+  <rect x="300" y="290" width="100" height="40" rx="8" fill="#bbf7d0" stroke="#4ade80" stroke-width="2"/>
+  <text x="350" y="315" text-anchor="middle" font-weight="600" fill="#166534">ACTIVE</text>
+
+  <!-- INVITATION_ONLY path (right) -->
+  <line x1="430" y1="160" x2="560" y2="160" stroke="#475569" stroke-width="1.5" marker-end="url(#a2)"/>
+  <text x="495" y="152" text-anchor="middle" font-size="11" fill="#64748b">INVITATION</text>
+
+  <rect x="560" y="140" width="120" height="40" rx="8" fill="#fee2e2" stroke="#fca5a5" stroke-width="1.5"/>
+  <text x="620" y="165" text-anchor="middle" font-weight="500" fill="#991b1b">Denied</text>
+
+  <text x="620" y="205" text-anchor="middle" font-size="11" fill="#64748b">No self-signup.</text>
+  <text x="620" y="220" text-anchor="middle" font-size="11" fill="#64748b">Admin must invite.</text>
+
+  <!-- Invitation bypass arrow -->
+  <path d="M620,180 L620,260 Q620,290 590,290 L400,290" fill="none" stroke="#818cf8" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#a2)"/>
+  <text x="530" y="260" font-size="10" fill="#6366f1">with token</text>
+</svg>
