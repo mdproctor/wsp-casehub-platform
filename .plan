@@ -17,10 +17,10 @@ flyway-next-v:
     - [x] Task 1: registration-api SPIs and types
     - [x] Task 2: platform-api + platform additions
     - [x] Task 3: user-inmem-core stores
-  - [ ] Batch 2: Core Logic
-    - [ ] Task 4: Argon2 hasher + RegistrationServiceCore
-    - [ ] Task 5: UserStoreProvisioner + resolvers
-    - [ ] Task 6: PasswordAuthenticationProviderCore
+  - [x] Batch 2: Core Logic
+    - [x] Task 4: Argon2 hasher + RegistrationServiceCore
+    - [x] Task 5: UserStoreProvisioner + resolvers
+    - [x] Task 6: PasswordAuthenticationProviderCore
   - [ ] Batch 3: Social Integration
     - [ ] Task 7: authn-social-core UserProvisioner integration
   - [ ] Batch 4: Persistence + Wiring
