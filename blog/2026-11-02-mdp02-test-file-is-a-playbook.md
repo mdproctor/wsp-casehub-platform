@@ -196,6 +196,89 @@ tutorials/
 
 The full JUnit lifecycle model — and then some — expressed in YAML, with no Java.
 
+## Testing Async Workers
+
+This is where the "test IS a playbook" model really earns its keep. Testing concurrent workers — multiple agents processing in parallel, each needing its result asserted, all needing to complete within a deadline — is one of the hardest problems in test frameworks. Most Java solutions involve `CountDownLatch`, `CompletableFuture.allOf`, custom timeouts, and fragile thread synchronisation. The test code is often harder to understand than the production code it's testing.
+
+The playbook engine already solves this. `parallel:`, `quorum:`, `race:`, `barrier:`, `timeout:` — these are production-grade concurrency primitives with well-defined semantics. Because tests are playbooks, they're available in tests with zero additional work.
+
+Three workers, all must succeed, five-second deadline:
+
+```yaml
+name: All workers respond within deadline
+
+simulate:
+  agent:
+    - prompt: "worker-1"
+      response: "result-1"
+    - prompt: "worker-2"
+      response: "result-2"
+    - prompt: "worker-3"
+      response: "result-3"
+
+steps:
+  - parallel:
+      - agent-invoke:
+          prompt: "worker-1"
+        capture: w1
+      - agent-invoke:
+          prompt: "worker-2"
+        capture: w2
+      - agent-invoke:
+          prompt: "worker-3"
+        capture: w3
+    timeout: 5s
+  - assertThat: ${w1.text}
+    contains: 'result-1'
+  - assertThat: ${w2.text}
+    contains: 'result-2'
+  - assertThat: ${w3.text}
+    contains: 'result-3'
+```
+
+If any worker fails, you see which one. If the deadline expires, the timeout reports which workers hadn't responded. No latches, no futures, no thread pools in the test.
+
+For quorum semantics — "at least 2 of 3 must agree within 10 seconds" — the playbook's `advance-after` policy handles it:
+
+```yaml
+steps:
+  - parallel:
+      advance-after: 2
+      cancel-remaining: true
+      steps:
+        - agent-invoke:
+            prompt: "classify-risk"
+          capture: c1
+        - agent-invoke:
+            prompt: "classify-risk"
+          capture: c2
+        - agent-invoke:
+            prompt: "classify-risk"
+          capture: c3
+    timeout: 10s
+  - assert: ${c1.text} == ${c2.text} || ${c1.text} == ${c3.text} || ${c2.text} == ${c3.text}
+```
+
+For producer-consumer synchronisation — "producer emits data, consumer shouldn't start until it's ready" — `barrier:` with named steps:
+
+```yaml
+steps:
+  - parallel:
+      - block:
+          step: producer
+          - emit-event: data.batch-ready
+            data: { batchId: 1, records: 500 }
+      - block:
+          step: consumer
+          - barrier:
+              await: [producer]
+              timeout: 3s
+          - assertThat: ${events.last('data.batch-ready')}
+            not-null: true
+```
+
+Every concurrency pattern that's hard to test in Java — fan-out/fan-in, race conditions, deadline enforcement, synchronisation barriers — is already a playbook primitive. The test framework doesn't need to reinvent any of it.
+
 ## What Collapses Along the Way
 
 The temporal simulation driver — `TemporalSimulationDriver`, `TimedSequence`, `EventSequenceRunner` — reimplements what the playbook executor already does. A temporal sequence is "fire event A, wait, fire event B." A playbook with `delay:` and `emit-event:` steps does the same thing, but gets retry decorators, error handling, and observability for free. The protocol evaluator was deleted for the same reason — it reimplemented engine capabilities.
