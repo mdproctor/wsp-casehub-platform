@@ -327,8 +327,9 @@ Tests need to assert on events fired during playbook execution. An
 - Query functions: `events.ofType('capacity.pressure')`,
   `events.last('redistribution.decision')`, `events.count('type')`
 
-No explicit start/stop — capture is scoped to the test execution
-(pushed/popped with the simulation overlay).
+Captures CloudEvents only (not arbitrary CDI events). No explicit
+start/stop — capture is scoped to the test execution (pushed/popped
+with the simulation overlay).
 
 ## Test Runner
 
