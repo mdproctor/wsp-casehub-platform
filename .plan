@@ -13,3 +13,15 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/platform#683 — Issue #683 ← active
+  - [x] Batch 1: Walker+Steps
+    - [x] Task 1: Walker sibling absorption
+    - [x] Task 2: assertThat plugin
+    - [x] Task 3: emit-event and agent-invoke
+  - [x] Batch 2: Simulate+Plugins
+    - [x] Task 4: SimulateBlockParser and EventCapture
+    - [x] Task 5: run-playbook and verify-simulation
+  - [ ] Batch 3: TestRunner
+    - [ ] Task 6: YamlTestExecutor and Discovery
+    - [ ] Task 7: JUnit TestEngine and CLI
+  - [ ] Batch 4: Integration
+    - [ ] Task 8: Tutorial test suite
