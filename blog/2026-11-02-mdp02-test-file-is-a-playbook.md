@@ -209,14 +209,12 @@ name: Circuit breaker beats slow backend
 
 steps:
   - race:
-      - block:
-          step: backend
+      - block backend:
           - delay: 3s
           - agent-invoke:
               prompt: "slow query"
             capture: response
-      - block:
-          step: breaker
+      - block breaker:
           - delay: 1s
           - emit-event: circuit.open
             data: { reason: "timeout-threshold" }
@@ -234,13 +232,11 @@ name: Consumer waits for producer handoff
 
 steps:
   - parallel:
-      - block:
-          step: producer
+      - block producer:
           - delay: 500ms
           - emit-event: data.batch-ready
             data: { batchId: 1, records: 500 }
-      - block:
-          step: consumer
+      - block consumer:
           - barrier:
               await: [producer]
               timeout: 3s
