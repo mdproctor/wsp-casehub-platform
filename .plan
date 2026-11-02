@@ -13,3 +13,11 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/platform#692 — Issue #692 ← active
+  - [ ] Batch 1: Fix
+    - [ ] Task 1: Wire sourceId through delivery chain
+  - [ ] Batch 2: Tests
+    - [ ] Task 2: NotificationService trackClick and reply tests
+    - [ ] Task 3: NotificationStore findById contract tests
+    - [ ] Task 4: ReplyHint Jackson round-trip test
+    - [ ] Task 5: TemplateResolver replyHint passthrough test
+    - [ ] Task 6: Integration test — full engagement chain
