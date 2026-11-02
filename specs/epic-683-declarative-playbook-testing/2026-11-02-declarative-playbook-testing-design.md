@@ -385,9 +385,7 @@ AssertionFailed: step 4 of "Verify session example"
 
 Retained for simple boolean truth checks where a subject + matcher
 would be ceremony. Uses the existing `AssertPlugin` with the
-configured expression engine (MVEL3 or JQ). No changes to the
-expression engine are required — the existing boolean evaluation
-handles all `assert:` expressions.
+configured expression engine (MVEL3 or JQ).
 
 ```yaml
 # Expression with message
@@ -398,12 +396,34 @@ handles all `assert:` expressions.
 # Simple check (expression only)
 - assert:
     expression: ${results.succeeded}
+
+# Event query in boolean expression
+- assert:
+    expression: ${events.count('capacity.pressure')} >= 2
 ```
+
+**Expression pre-processing:** After VariableResolver processes the
+params, the expression may contain a mix of resolved values and
+unresolved `${...}` references (deferred prefixes like `events`).
+The `assert:` plugin pre-processes the expression before MVEL
+compilation:
+
+1. Strip remaining `${}` wrappers — turning
+   `${events.count('capacity.pressure')} >= 2` into
+   `events.count('capacity.pressure') >= 2`
+2. Evaluate via MVEL with **test-scoped context variables** (including
+   `events` → EventCapture) instead of the current
+   `compiled.eval(Map.of())`
+
+This is the same two-phase pattern as `assertThat`'s subject
+resolution, applied to the expression string. Both plugins share
+the same MVEL context binding.
 
 `assert:` evaluates a boolean expression via the expression engine.
 `assertThat:` applies matchers to a subject as sibling YAML keys.
 Two step names, two purposes — and two different mechanisms (expression
-engine vs plugin parameter matchers).
+engine vs plugin parameter matchers). Both support event queries via
+the deferred-prefix + MVEL fallback.
 
 ### run-playbook (new @Plugin)
 
@@ -436,6 +456,14 @@ The capture object contains:
 Scalar-or-object polymorphism via `ShorthandModule`:
 - String value → file path (shorthand)
 - Map value → full form with file, vars, capture
+
+**Path resolution:** Relative paths are resolved against the **test
+resource root** (`src/test/resources/`), which is the same base used
+by `YamlTestDiscovery` for test file scanning. This means
+`run-playbook: examples/02-session-conversation.yaml` resolves to
+`src/test/resources/examples/02-session-conversation.yaml` regardless
+of the test file's own location in the directory tree. Absolute paths
+are used as-is.
 
 ### emit-event (new @Plugin)
 
@@ -645,6 +673,17 @@ Captured values are accessed via `${captureName.fieldName}`:
 
 The `VariableResolver` already supports `withObjectScope(prefix,
 source)` — capture is a natural use of this existing mechanism.
+
+### Reserved names
+
+The name `events` is reserved for event capture and cannot be used
+as a `capture:` target. Using `capture: events` would collide with
+the deferred `events` prefix — the VariableResolver checks deferred
+prefixes before ObjectVariableSource (`VariableResolver.java:118`),
+so `${events.xxx}` would be deferred to the expression engine
+(where `events` is bound to EventCapture) rather than resolved via
+the captured output. The step runner validates capture names and
+rejects reserved names with a clear error.
 
 ### Scope
 
