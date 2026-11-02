@@ -2,15 +2,15 @@
 
 ## D1: Assertion model
 
-**Choice:** Extend the existing expression engine with assertion functions
+**Choice:** Dual-step assertThat (subject + matchers) + assert (boolean expression)
 **Alternatives:**
-- Structured assertion vocabulary (contains, equals, hasSize as first-class YAML keys) — more readable but introduces a parallel DSL alongside expressions
-- Both expression + structured sugar — best readability but double the surface area to maintain
-**Rationale:** The existing `AssertPlugin` already uses `ExpressionEngineRegistry` for expression-based assertions. Adding assertion functions (contains(), hasSize(), matches(), allSucceeded()) to the expression engine keeps one syntax for conditions and assertions. Consistent with the four-tier escape model established in prior specs.
-**Trade-offs:** Expression syntax is less immediately readable than structured YAML keys for simple assertions. Mitigated by clear function naming and good error messages.
-**Sources:** yaml-step-runtime AssertPlugin.java, issue-391 spec D14 (four-tier escape model)
-**Exploration:** quick
-**Status:** captured
+- Expression engine only (contains(), hasSize() as expression functions) — one syntax but old-JUnit-style assertTrue, poor error messages, not behavioural
+- Structured assertion vocabulary only — no escape hatch for complex conditions
+**Rationale:** `assertThat:` takes a subject as its scalar value, matchers as sibling YAML keys. Reads as natural English ("assert that response contains equities"). Subject-first design means the framework knows what was checked vs what was expected — structured error messages for free. `assert:` stays for simple boolean truth checks (one-liner). Two step names, two purposes — no nesting, no ceremony.
+**Trade-offs:** Two step names instead of one. Acceptable — they serve distinct purposes (behavioural vs boolean) and the naming makes intent clear.
+**Sources:** yaml-step-runtime AssertPlugin.java, AssertJ/Hamcrest assertThat pattern
+**Exploration:** quick → revised after design review feedback
+**Status:** revised
 
 ## D2: Test runner integration
 

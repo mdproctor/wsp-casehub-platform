@@ -16,7 +16,7 @@ Three workstreams converge:
 
 1. **Simulation alignment** — temporal event sequences become playbook
    steps; corpus/strategy configuration stays as-is
-2. **Declarative testing infrastructure** — expression-based assertions,
+2. **Declarative testing infrastructure** — assertThat matchers,
    run-playbook step, emit-event step, JUnit Platform TestEngine + CLI
 3. **Migration** — rewrite Java integration tests as `.test.yaml` files,
    helpdesk as first 100% YAML app + 100% YAML test target
@@ -57,7 +57,8 @@ steps:
   - agent-invoke:
       prompt: "What's my risk profile?"
       capture: result
-  - assert: ${result.text} contains 'equities'
+  - assertThat: ${result.text}
+    contains: 'equities'
 ```
 
 ### Level 2 — Session with multiple turns
@@ -80,12 +81,14 @@ steps:
       session: ${session}
       prompt: "What's my risk profile?"
       capture: risk
-  - assert: ${risk} contains 'equities'
+  - assertThat: ${risk}
+    contains: 'equities'
   - agent-session-query:
       session: ${session}
       prompt: "How should I rebalance?"
       capture: rebalance
-  - assert: ${rebalance} contains 'bonds'
+  - assertThat: ${rebalance}
+    contains: 'bonds'
   - agent-session-close:
       session: ${session}
 ```
@@ -103,7 +106,8 @@ steps:
   - run-playbook: examples/02-session-conversation.yaml
     capture: results
   - assert: ${results.succeeded}
-  - assert: ${results.output.risk_assessment} contains 'equities'
+  - assertThat: ${results.output.risk_assessment}
+    contains: 'equities'
 ```
 
 ### Level 4 — Temporal events (replacing TemporalSimulationDriver)
@@ -122,8 +126,10 @@ steps:
       actorId: agent-001
       pressure: 0.96
   - delay: 200ms
-  - assert: ${events.last('redistribution.decision')} != null
-  - assert: ${events.last('redistribution.decision').data.reason} contains 'threshold'
+  - assertThat: ${events.last('redistribution.decision')}
+    not-null: true
+  - assertThat: ${events.last('redistribution.decision').data.reason}
+    contains: 'threshold'
 ```
 
 ### Level 5 — Mixed simulation with external corpus
@@ -149,8 +155,10 @@ steps:
   - run-playbook: examples/05-tool-use-patterns.yaml
     capture: results
   - assert: ${results.succeeded}
-  - assert: ${results.stepCount} >= 4
-  - assert: ${results.output.portfolio_summary} contains 'equities'
+  - assertThat: ${results.stepCount}
+    greaterThanOrEqual: 4
+  - assertThat: ${results.output.portfolio_summary}
+    contains: 'equities'
 ```
 
 ## Simulate Block
@@ -224,41 +232,76 @@ No new infrastructure — reuses the overlay stack from feat-294 (D43-47).
 
 ## Step Types
 
-### assert (existing — enhanced)
+### assertThat (new @Plugin — primary test assertion)
 
-Extends the existing `AssertPlugin` with expression functions for
-testing:
+Subject-first behavioural assertions. `assertThat:` takes the subject
+as its scalar value, matchers as sibling YAML keys:
 
 ```yaml
-# Short form — expression as scalar value
-- assert: ${response} contains 'equities'
+# Single matcher
+- assertThat: ${response}
+  contains: 'equities'
 
-# With message
-- assert:
-    expression: ${response} contains 'equities'
-    message: "Risk assessment should mention equities"
+# Multiple matchers on same subject
+- assertThat: ${response}
+  contains: 'equities'
+  startsWith: 'Moderate'
+
+# With custom message
+- assertThat: ${response}
+  contains: 'equities'
+  message: "Risk assessment should mention equities"
 ```
 
-New expression functions added to the expression engine:
+Available matchers:
 
-| Function | Example | Description |
-|----------|---------|-------------|
-| `contains(a, b)` | `${x} contains 'foo'` | String/collection contains |
-| `equals(a, b)` | `${x} equals 'foo'` | Equality check |
-| `matches(a, pattern)` | `${x} matches '\\d+'` | Regex match |
-| `hasSize(a, n)` | `${list} hasSize 3` | Collection size |
-| `isEmpty(a)` | `isEmpty(${list})` | Empty check |
-| `isTrue(a)` | `isTrue(${flag})` | Boolean truth |
-| `startsWith(a, b)` | `${x} startsWith 'prefix'` | String prefix |
+| Matcher | Example | Description |
+|---------|---------|-------------|
+| `contains` | `contains: 'foo'` | String/collection contains |
+| `equals` | `equals: 'foo'` | Equality check |
+| `matches` | `matches: '\\d+'` | Regex match |
+| `hasSize` | `hasSize: 3` | Collection size |
+| `startsWith` | `startsWith: 'prefix'` | String prefix |
+| `endsWith` | `endsWith: 'suffix'` | String suffix |
+| `greaterThan` | `greaterThan: 5` | Numeric comparison |
+| `greaterThanOrEqual` | `greaterThanOrEqual: 4` | Numeric comparison |
+| `lessThan` | `lessThan: 10` | Numeric comparison |
+| `not-null` | `not-null: true` | Non-null check |
+| `not-empty` | `not-empty: true` | Non-empty check |
+| `empty` | `empty: true` | Empty check |
 
-Assertion failures produce structured error messages:
+When multiple matchers are present, ALL must pass. Each failed matcher
+is reported — not just the first.
+
+Assertion failures produce structured error messages with subject
+and expectation separated:
 
 ```
 AssertionFailed: step 4 of "Verify session example"
-  Expression: ${results.output.risk_assessment} contains 'equities'
-  Actual value: "The portfolio is balanced."
-  Expected: to contain 'equities'
+  Subject: ${results.output.risk_assessment}
+  Actual: "The portfolio is balanced."
+  Failed:
+    contains: 'equities' — actual value does not contain 'equities'
+    startsWith: 'Moderate' — actual value starts with 'The'
 ```
+
+### assert (existing — boolean escape hatch)
+
+Retained for simple boolean truth checks where a subject + matcher
+would be ceremony:
+
+```yaml
+# One-liner boolean check
+- assert: ${results.succeeded}
+
+# Expression with message
+- assert:
+    expression: ${results.stepCount} > 0 && ${results.succeeded}
+    message: "Playbook must succeed with at least one step"
+```
+
+`assert:` evaluates a boolean expression. `assertThat:` applies
+matchers to a subject. Two step names, two purposes.
 
 ### run-playbook (new @Plugin)
 
@@ -383,16 +426,18 @@ Test failures include:
 
 1. **Test name and file** — click-to-navigate in IntelliJ
 2. **Step number and name** — which step failed
-3. **Expression and actual value** — what was checked, what was found
+3. **Subject, actual value, and failed matchers** — what was checked, what was found
 4. **Simulation context** — which corpus entries were matched/unmatched
 5. **Stack trace** — for infrastructure errors (not assertion failures)
 
 ```
 FAIL: tutorials/02-sessions/01-context.test.yaml
   "Session preserves conversation context"
-  Step 5: assert: ${rebalance} contains 'bonds'
+  Step 5: assertThat: ${rebalance}
+    Subject: ${rebalance}
     Actual: "I don't have enough context to answer that."
-    Expected: to contain 'bonds'
+    Failed:
+      contains: 'bonds' — actual value does not contain 'bonds'
   Simulation: agent corpus matched 1/2 entries
     ✓ "risk profile" → matched
     ✗ "rebalancing" → no match (closest: "risk profile", score: 0.34)
