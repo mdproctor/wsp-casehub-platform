@@ -100,6 +100,45 @@ Each file is self-contained. A developer opens `01-invoke.test.yaml` and sees: h
 
 The goal is helpdesk as the first 100% YAML application with 100% YAML tests. Every Java assertion gets a YAML equivalent. The tutorials become the onboarding documentation. If a tutorial test fails, either the application is broken or the tutorial is wrong — both worth knowing.
 
+## Lifecycle: setup: and teardown:
+
+Real tests need lifecycle management. JUnit has `@BeforeEach`/`@AfterEach` for per-test setup and `@BeforeAll`/`@AfterAll` for per-class setup. YAML tests need the same — without falling back to Java.
+
+`setup:` and `teardown:` are top-level step lists, siblings of `simulate:` and `steps:`. `teardown:` runs in a finally block — guaranteed even on assertion failure.
+
+```yaml
+name: Session with pre-seeded state
+
+setup:
+  - emit-event: test.seed-data
+    data:
+      portfolio: { total: 150000 }
+
+steps:
+  - agent-invoke:
+      prompt: "portfolio"
+    capture: result
+  - assertThat: ${result.text}
+    contains: 'equities'
+
+teardown:
+  - emit-event: test.clear-data
+```
+
+Variables captured in `setup:` are visible in `steps:`. Variables from `steps:` are NOT visible in `teardown:` — teardown runs in its own scope to avoid depending on state that may have failed partway through.
+
+For directory-scoped lifecycle — the `@BeforeAll`/`@AfterAll` equivalent — convention files handle it: `_setup.test.yaml` runs once before all tests in its directory, `_teardown.test.yaml` runs after the last test completes. Both are normal `.test.yaml` files. The `_` prefix excludes them from the test count.
+
+```
+tutorials/01-basics/
+  _setup.test.yaml           # @BeforeAll — runs once
+  01-invoke.test.yaml
+  02-capture.test.yaml
+  _teardown.test.yaml        # @AfterAll — guaranteed
+```
+
+The full JUnit lifecycle model, expressed in YAML, with no Java.
+
 ## What Collapses Along the Way
 
 The temporal simulation driver — `TemporalSimulationDriver`, `TimedSequence`, `EventSequenceRunner` — reimplements what the playbook executor already does. A temporal sequence is "fire event A, wait, fire event B." A playbook with `delay:` and `emit-event:` steps does the same thing, but gets retry decorators, error handling, and observability for free. The protocol evaluator was deleted for the same reason — it reimplemented engine capabilities.

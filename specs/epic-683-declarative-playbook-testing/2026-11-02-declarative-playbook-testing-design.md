@@ -691,6 +691,74 @@ Captured variables are scoped to the enclosing step block. A capture
 inside a `try:` block is not visible in the `catch:` block. A capture
 inside `run-playbook` is scoped to the nested playbook's execution.
 
+## Test Lifecycle
+
+YAML tests support lifecycle callbacks matching JUnit's model:
+
+### Per-test: setup: and teardown: blocks
+
+`setup:` and `teardown:` are top-level step lists alongside `simulate:`
+and `steps:`. `setup:` runs before the main steps. `teardown:` runs in
+a finally block — guaranteed even on assertion failure or step error.
+
+```yaml
+name: Session with pre-seeded state
+
+simulate:
+  agent:
+    - prompt: "portfolio"
+      response: "60% equities."
+
+setup:
+  - emit-event: test.seed-data
+    data:
+      portfolio: { total: 150000 }
+
+steps:
+  - agent-invoke:
+      prompt: "portfolio"
+    capture: result
+  - assertThat: ${result.text}
+    contains: 'equities'
+
+teardown:
+  - emit-event: test.clear-data
+```
+
+Both are optional. A test with no `setup:` or `teardown:` works
+exactly as before. Variables captured in `setup:` are visible in
+`steps:` (the setup VariableResolver is passed to step execution).
+Variables from `steps:` are NOT visible in `teardown:` — teardown
+runs in its own scope to avoid depending on potentially failed state.
+
+### Per-directory: _setup.test.yaml and _teardown.test.yaml
+
+Convention files that run once per directory — equivalent to JUnit's
+`@BeforeAll` / `@AfterAll`:
+
+```
+tutorials/01-basics/
+  _setup.test.yaml           # runs once before all tests in 01-basics/
+  01-invoke.test.yaml
+  02-capture.test.yaml
+  _teardown.test.yaml        # runs once after all tests in 01-basics/
+```
+
+`_setup.test.yaml` is a normal `.test.yaml` file — it can have its
+own `simulate:` block, steps, and assertions. Its captured variables
+are available to all tests in the directory via a shared
+VariableResolver scope. `_teardown.test.yaml` runs after the last
+test completes (or fails), in a finally block.
+
+The `_` prefix excludes these from the test count — they are
+infrastructure, not tests. The test runner reports them as lifecycle
+steps, not test cases.
+
+| JUnit | YAML equivalent | Scope |
+|-------|----------------|-------|
+| `@BeforeEach` / `@AfterEach` | `setup:` / `teardown:` blocks | Per-test file |
+| `@BeforeAll` / `@AfterAll` | `_setup.test.yaml` / `_teardown.test.yaml` | Per-directory |
+
 ## Walker Integration
 
 Two Walker enhancements are required for the testing step types:

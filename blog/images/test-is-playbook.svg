@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" font-family="system-ui, -apple-system, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" font-family="system-ui, -apple-system, sans-serif">
   <style>
     .box { rx: 8; ry: 8; }
     .label { font-size: 13px; fill: #374151; font-weight: 600; }
@@ -6,6 +6,7 @@
     .arrow { stroke: #9ca3af; stroke-width: 1.5; fill: none; marker-end: url(#arrowhead); }
     .strike { stroke: #ef4444; stroke-width: 2; }
     .highlight { fill: #dbeafe; stroke: #3b82f6; stroke-width: 1.5; }
+    .lifecycle { fill: #fef3c7; stroke: #f59e0b; stroke-width: 1.5; }
     .dim { fill: #f3f4f6; stroke: #d1d5db; stroke-width: 1; opacity: 0.6; }
     .new { fill: #dcfce7; stroke: #22c55e; stroke-width: 1.5; }
     .section-label { font-size: 15px; fill: #111827; font-weight: 700; }
@@ -33,52 +34,75 @@
   <text x="280" y="75" class="label" text-anchor="middle">Hand-coded</text>
   <text x="280" y="92" class="sublabel" text-anchor="middle">CorpusBackend</text>
 
-  <!-- Arrow down to playbook -->
-  <rect x="110" y="140" width="140" height="50" class="box dim"/>
-  <text x="180" y="162" class="label" text-anchor="middle">Playbook</text>
-  <text x="180" y="178" class="sublabel" text-anchor="middle">.yaml (tested)</text>
+  <!-- @Before/@After in Java -->
+  <rect x="30" y="130" width="320" height="40" class="box dim"/>
+  <text x="190" y="147" class="label" text-anchor="middle">@BeforeEach / @AfterEach</text>
+  <text x="190" y="162" class="sublabel" text-anchor="middle">Java lifecycle methods — more boilerplate</text>
 
-  <path d="M 100 110 L 100 140 L 110 155" class="arrow"/>
-  <path d="M 280 110 L 280 140 L 250 155" class="arrow"/>
+  <!-- Arrow down to playbook -->
+  <rect x="110" y="190" width="140" height="50" class="box dim"/>
+  <text x="180" y="212" class="label" text-anchor="middle">Playbook</text>
+  <text x="180" y="228" class="sublabel" text-anchor="middle">.yaml (tested)</text>
+
+  <path d="M 100 110 L 100 130" class="arrow"/>
+  <path d="M 190 170 L 190 190" class="arrow"/>
 
   <!-- Simulation layer -->
-  <rect x="30" y="220" width="320" height="50" class="box dim"/>
-  <text x="190" y="245" class="label" text-anchor="middle">simulation.yaml (separate system)</text>
-  <text x="190" y="260" class="sublabel" text-anchor="middle">strategy + corpus — disconnected from tests</text>
+  <rect x="30" y="260" width="320" height="50" class="box dim"/>
+  <text x="190" y="285" class="label" text-anchor="middle">simulation.yaml (separate system)</text>
+  <text x="190" y="300" class="sublabel" text-anchor="middle">strategy + corpus — disconnected from tests</text>
 
   <!-- Strike through connecting line -->
-  <line x1="20" y1="44" x2="360" y2="280" class="strike" stroke-dasharray="6,4" opacity="0.4"/>
+  <line x1="20" y1="44" x2="360" y2="320" class="strike" stroke-dasharray="6,4" opacity="0.4"/>
 
   <!-- VS divider -->
-  <text x="400" y="170" class="vs-label" text-anchor="middle">vs</text>
-  <line x1="400" y1="40" x2="400" y2="300" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="400" y="200" class="vs-label" text-anchor="middle">vs</text>
+  <line x1="400" y1="40" x2="400" y2="360" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4,4"/>
 
   <!-- Right side: After -->
   <text x="610" y="30" class="section-label" text-anchor="middle">After</text>
 
   <!-- .test.yaml file -->
-  <rect x="460" y="50" width="300" height="240" class="box new"/>
+  <rect x="460" y="50" width="300" height="310" class="box new"/>
   <text x="610" y="78" class="label" text-anchor="middle">.test.yaml</text>
-  <text x="610" y="96" class="sublabel" text-anchor="middle">~25 lines — IS a playbook</text>
+  <text x="610" y="96" class="sublabel" text-anchor="middle">IS a playbook — self-contained</text>
 
   <!-- simulate block -->
-  <rect x="480" y="110" width="260" height="50" class="box highlight"/>
-  <text x="610" y="132" class="label" text-anchor="middle">simulate:</text>
-  <text x="610" y="148" class="sublabel" text-anchor="middle">inline corpus + strategy config</text>
+  <rect x="480" y="108" width="260" height="42" class="box highlight"/>
+  <text x="610" y="128" class="label" text-anchor="middle">simulate:</text>
+  <text x="610" y="142" class="sublabel" text-anchor="middle">inline corpus + strategy config</text>
+
+  <!-- setup block -->
+  <rect x="480" y="158" width="260" height="36" class="box lifecycle"/>
+  <text x="610" y="176" class="label" text-anchor="middle">setup:</text>
+  <text x="610" y="189" class="sublabel" text-anchor="middle">lifecycle — runs before steps</text>
 
   <!-- steps block -->
-  <rect x="480" y="170" width="260" height="50" class="box highlight"/>
-  <text x="610" y="192" class="label" text-anchor="middle">steps:</text>
-  <text x="610" y="208" class="sublabel" text-anchor="middle">real playbook steps + assertions</text>
+  <rect x="480" y="202" width="260" height="42" class="box highlight"/>
+  <text x="610" y="222" class="label" text-anchor="middle">steps:</text>
+  <text x="610" y="236" class="sublabel" text-anchor="middle">real playbook steps + assertThat:</text>
 
-  <!-- assertThat block -->
-  <rect x="480" y="230" width="260" height="40" class="box highlight"/>
-  <text x="610" y="252" class="label" text-anchor="middle">assertThat: ${result}</text>
-  <text x="610" y="265" class="sublabel" text-anchor="middle">behavioural matchers</text>
+  <!-- teardown block -->
+  <rect x="480" y="252" width="260" height="36" class="box lifecycle"/>
+  <text x="610" y="270" class="label" text-anchor="middle">teardown:</text>
+  <text x="610" y="283" class="sublabel" text-anchor="middle">lifecycle — guaranteed finally</text>
+
+  <!-- _setup / _teardown convention -->
+  <rect x="480" y="300" width="260" height="42" class="box lifecycle"/>
+  <text x="610" y="318" class="label" text-anchor="middle">_setup.test.yaml / _teardown.test.yaml</text>
+  <text x="610" y="333" class="sublabel" text-anchor="middle">per-directory — @BeforeAll / @AfterAll</text>
 
   <!-- Bottom labels -->
-  <text x="190" y="330" class="sublabel" text-anchor="middle">3 disconnected systems</text>
-  <text x="610" y="330" class="sublabel" text-anchor="middle">1 self-contained file</text>
-  <text x="190" y="348" class="sublabel" text-anchor="middle">test ≠ playbook ≠ simulation</text>
-  <text x="610" y="348" class="sublabel" text-anchor="middle">test = playbook = tutorial</text>
+  <text x="190" y="380" class="sublabel" text-anchor="middle">4 disconnected systems</text>
+  <text x="610" y="380" class="sublabel" text-anchor="middle">1 self-contained file</text>
+  <text x="190" y="398" class="sublabel" text-anchor="middle">test ≠ playbook ≠ simulation ≠ lifecycle</text>
+  <text x="610" y="398" class="sublabel" text-anchor="middle">test = playbook = tutorial</text>
+
+  <!-- Legend -->
+  <rect x="470" y="420" width="16" height="12" class="box highlight"/>
+  <text x="492" y="430" class="sublabel">content</text>
+  <rect x="550" y="420" width="16" height="12" class="box lifecycle"/>
+  <text x="572" y="430" class="sublabel">lifecycle</text>
+  <rect x="630" y="420" width="16" height="12" class="box new"/>
+  <text x="652" y="430" class="sublabel">file boundary</text>
 </svg>
