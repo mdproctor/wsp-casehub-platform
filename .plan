@@ -25,3 +25,4 @@ flyway-next-v:
     - [ ] Task 7: JUnit TestEngine and CLI
   - [ ] Batch 4: Integration
     - [ ] Task 8: Tutorial test suite
+- [ ] casehubio/platform#698 — reject-verbose-block-step-syntax
