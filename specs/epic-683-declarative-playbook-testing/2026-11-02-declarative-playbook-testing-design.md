@@ -29,10 +29,32 @@ simulated responses. The test runner:
 
 1. Discovers `*.test.yaml` by convention
 2. Parses as `PlaybookDocument` with `simulate:` section
-3. Pushes a `SimulationOverlay` onto `SimulationRuntime`
-4. Compiles and executes the playbook steps
-5. Pops the overlay
-6. Reports pass/fail based on assert step outcomes
+3. Creates an `EventCapture` for the test scope
+4. If `simulate:` is present, pushes a `SimulationOverlay` onto
+   `SimulationRuntime`
+5. Resolves steps via Walker + PluginRegistry (the same step
+   resolution pipeline used by the interactive runtime)
+6. Executes via CatalogStepRunner + StructuralStepEvaluator
+7. If `simulate:` was present, pops the overlay and runs corpus
+   verification
+8. Reports pass/fail based on assert step outcomes
+
+### Execution path
+
+Tests use the **Walker path** exclusively — the same Walker +
+CatalogStepRunner + StructuralStepEvaluator pipeline that handles
+interactive playbook execution. The PlaybookCompiler → Serverless
+Workflow path is for production deployment and is not involved in
+test execution.
+
+This means `@Plugin` steps (assert, assertThat, run-playbook,
+emit-event) resolve through the PluginRegistry, and structural steps
+(parallel, try/catch, race, etc.) resolve through the Walker's
+structural step handling. Both paths are already unified in the Walker.
+
+The `run-playbook` step also uses the Walker path for the target
+playbook — it parses the target file, resolves via Walker, and
+executes within the current simulation context.
 
 Two test styles from one format:
 
@@ -56,7 +78,7 @@ simulate:
 steps:
   - agent-invoke:
       prompt: "What's my risk profile?"
-      capture: result
+    capture: result
   - assertThat: ${result.text}
     contains: 'equities'
 ```
@@ -68,25 +90,25 @@ name: Session preserves conversation context
 
 simulate:
   agent:
-    - prompt: "risk profile"
+    - prompt: "What's my risk profile?"
       response: "Moderate risk: 60% equities."
-    - prompt: "rebalancing"
+    - prompt: "How should I rebalance?"
       response: "Shift 10% equities to bonds."
 
 steps:
   - agent-session-open:
       pool: financial-advisor
-      capture: session
-  - agent-session-query:
+    capture: session
+  - agent-query:
       session: ${session}
       prompt: "What's my risk profile?"
-      capture: risk
+    capture: risk
   - assertThat: ${risk}
     contains: 'equities'
-  - agent-session-query:
+  - agent-query:
       session: ${session}
       prompt: "How should I rebalance?"
-      capture: rebalance
+    capture: rebalance
   - assertThat: ${rebalance}
     contains: 'bonds'
   - agent-session-close:
@@ -105,7 +127,8 @@ simulate:
 steps:
   - run-playbook: examples/02-session-conversation.yaml
     capture: results
-  - assert: ${results.succeeded}
+  - assert:
+      expression: ${results.succeeded}
   - assertThat: ${results.output.risk_assessment}
     contains: 'equities'
 ```
@@ -144,17 +167,18 @@ simulate:
   agent:
     strategy: nearest-match
     corpus-file: corpora/tool-use-scenarios.yaml
-  rest:
-    - url: /api/portfolio
-      method: GET
-      response:
-        status: 200
-        body: { total: 150000, equities: 90000 }
+  portfolio-api.getPortfolio:
+    strategy: key
+    key-extractor: "field:url"
+    corpus:
+      - key: "/api/portfolio"
+        output: { status: 200, body: { total: 150000, equities: 90000 } }
 
 steps:
   - run-playbook: examples/05-tool-use-patterns.yaml
     capture: results
-  - assert: ${results.succeeded}
+  - assert:
+      expression: ${results.succeeded}
   - assertThat: ${results.stepCount}
     greaterThanOrEqual: 4
   - assertThat: ${results.output.portfolio_summary}
@@ -170,8 +194,22 @@ method names with sensible defaults:
 
 | Alias | Resolves to | Default strategy | Default key-extractor |
 |-------|-------------|------------------|-----------------------|
-| `agent` | `agent-provider.invoke` | `key` | `field:user-prompt` |
-| `rest` | REST client simulation | `key` | `field:url` |
+| `agent` | `agent-provider.invoke` (`AgentProviderQN.INVOKE`) | `key` | `field:user-prompt` |
+
+REST clients do not have a generic alias — each `@RegisterRestClient`
+interface generates its own qualified name via
+`RestClientSimulationProcessor` (based on `configKey` or kebab-case of
+the class name). Use the full qualified name syntax:
+
+```yaml
+simulate:
+  portfolio-api.getPortfolio:
+    strategy: key
+    key-extractor: "field:url"
+    corpus:
+      - key: "/api/portfolio"
+        output: { status: 200, body: { total: 150000 } }
+```
 
 Full simulation.yaml method syntax is available for advanced cases:
 
@@ -193,25 +231,32 @@ Domain aliases also normalise corpus field names:
 | Alias | Shorthand fields | Canonical fields |
 |-------|-----------------|------------------|
 | `agent` | `prompt` / `response` | `key` / `output` |
-| `rest` | `url` / `response` | `key` / `output` |
 
 ### Corpus sources
 
-Three modes, combinable:
+Three alternatives (YAML maps cannot have duplicate keys, so only one
+`agent:` block per `simulate:` — pick the form that fits):
 
+**Inline entries** — self-contained, good for tutorials:
 ```yaml
 simulate:
   agent:
-    # Inline entries — self-contained, good for tutorials
     - prompt: "question"
       response: "answer"
+```
 
+**External file** — shared across tests:
+```yaml
+simulate:
   agent:
-    # External file — shared across tests
     corpus-file: corpora/financial-qa.yaml
+```
 
+**Mixed** — external base + test-specific overrides (the combination
+pattern):
+```yaml
+simulate:
   agent:
-    # Mixed — external base + test-specific overrides
     corpus-file: corpora/financial-qa.yaml
     corpus:
       - prompt: "extra test case"
@@ -228,14 +273,38 @@ The simulate block maps directly to `SimulationRuntime`'s overlay stack:
 4. `SimulationRuntime.pushOverlay(overlay)` before step execution
 5. `SimulationRuntime.popOverlay()` after execution (in finally block)
 
-No new infrastructure — reuses the overlay stack from feat-294 (D43-47).
+No new simulation infrastructure — the simulate block reuses the
+existing overlay stack from feat-294 (D43-47). The testing framework
+itself (modules, step types, TestEngine) is new.
 
 ## Step Types
+
+### agent-invoke (new step type — single-call convenience)
+
+Wraps agent-session-open → agent-query → agent-session-close for
+single-turn interactions. Registered in `PlaybookCompiler` with its
+own `StepCompiler`, and in the `PluginRegistry` as a `@Plugin` for
+Walker-path execution.
+
+```yaml
+- agent-invoke:
+    prompt: "What's my risk profile?"
+  capture: result
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `prompt` | String | yes | The user prompt to send |
+| `pool` | String | no | Agent pool name (defaults to system default) |
+
+The capture object contains: `text` (response text), `tokens`
+(token count), `duration` (ms). This step type does not exist in
+the codebase today — it is new for this epic.
 
 ### assertThat (new @Plugin — primary test assertion)
 
 Subject-first behavioural assertions. `assertThat:` takes the subject
-as its scalar value, matchers as sibling YAML keys:
+as its scalar value, matchers as sibling YAML keys.
 
 ```yaml
 # Single matcher
@@ -273,6 +342,16 @@ Available matchers:
 When multiple matchers are present, ALL must pass. Each failed matcher
 is reported — not just the first.
 
+**Walker integration:** `assertThat` is a sibling-absorbing plugin —
+the Walker, after matching `assertThat:` as the action key, collects
+all remaining non-reserved, non-structural keys as plugin parameters
+rather than throwing "unknown key". The matchers (`contains`,
+`equals`, etc.) become entries in the plugin's parameter map alongside
+a `_subject` entry holding the scalar value. This is a general Walker
+enhancement: plugins can opt into sibling absorption via
+`@Plugin(absorbSiblings = true)`. The `emit-event` plugin uses the
+same mechanism for its `data:` sibling key.
+
 Assertion failures produce structured error messages with subject
 and expectation separated:
 
@@ -285,23 +364,29 @@ AssertionFailed: step 4 of "Verify session example"
     startsWith: 'Moderate' — actual value starts with 'The'
 ```
 
-### assert (existing — boolean escape hatch)
+### assert (existing @Plugin — boolean escape hatch)
 
 Retained for simple boolean truth checks where a subject + matcher
-would be ceremony:
+would be ceremony. Uses the existing `AssertPlugin` with the
+configured expression engine (MVEL3 or JQ). No changes to the
+expression engine are required — the existing boolean evaluation
+handles all `assert:` expressions.
 
 ```yaml
-# One-liner boolean check
-- assert: ${results.succeeded}
-
 # Expression with message
 - assert:
     expression: ${results.stepCount} > 0 && ${results.succeeded}
     message: "Playbook must succeed with at least one step"
+
+# Simple check (expression only)
+- assert:
+    expression: ${results.succeeded}
 ```
 
-`assert:` evaluates a boolean expression. `assertThat:` applies
-matchers to a subject. Two step names, two purposes.
+`assert:` evaluates a boolean expression via the expression engine.
+`assertThat:` applies matchers to a subject as sibling YAML keys.
+Two step names, two purposes — and two different mechanisms (expression
+engine vs plugin parameter matchers).
 
 ### run-playbook (new @Plugin)
 
@@ -328,7 +413,7 @@ The capture object contains:
 | `output` | Map | Playbook output variables |
 | `stepCount` | int | Total steps executed |
 | `duration` | long | Execution time in ms |
-| `events` | List | Step execution events |
+| `stepEvents` | List | Step execution events (distinct from `${events}` CloudEvent capture) |
 | `error` | String | Error message if failed (null if succeeded) |
 
 Scalar-or-object polymorphism via `ShorthandModule`:
@@ -357,22 +442,171 @@ Fires a CloudEvent into the system, replacing
 ```
 
 Uses `CloudEventFixtureBuilder.fromMap()` for construction, fires via
-CDI event bus. Scalar-or-object polymorphism: string value → event
-type, map value → full CloudEvent spec.
+CDI event bus (or directly to EventCapture in CLI mode).
+Scalar-or-object polymorphism: string value → event type, map value →
+full CloudEvent spec.
+
+### verify-simulation (new @Plugin — simulation verification)
+
+Explicit assertions on simulation invocation journal, exposing
+`SimulationVerifier`'s capabilities in YAML:
+
+```yaml
+# Verify specific method was called
+- verify-simulation:
+    method: agent-provider.invoke
+    called: 2
+
+# Verify call ordering
+- verify-simulation:
+    inOrder:
+      - agent-provider.invoke
+      - portfolio-api.getPortfolio
+
+# Verify all corpus entries were consumed
+- verify-simulation:
+    exhaustive: true
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `method` | String | Qualified SPI method name |
+| `called` | int | Expected invocation count |
+| `calledAtLeast` | int | Minimum invocation count |
+| `calledAtMost` | int | Maximum invocation count |
+| `neverCalled` | boolean | Assert method was never called |
+| `inOrder` | List | Assert methods were called in this order |
+| `exhaustive` | boolean | All corpus entries must have been matched |
+
+Delegates to `SimulationVerifier.on(overlay)` for the active
+overlay's `InvocationJournal`.
+
+**Automatic corpus verification:** When a test completes and a
+`simulate:` block was active, the test runner reports unmatched
+corpus entries in the error output (as shown in the error reporting
+section). This is diagnostic — not a hard failure — unless the test
+includes an explicit `verify-simulation: { exhaustive: true }` step.
 
 ## Event Capture
 
-Tests need to assert on events fired during playbook execution. An
-`EventCapture` is automatically active during test execution:
+Tests need to assert on events fired during playbook execution.
 
-- Records all CloudEvents fired via the CDI event bus
-- Accessible in expressions via `${events}` variable
-- Query functions: `events.ofType('capacity.pressure')`,
-  `events.last('redistribution.decision')`, `events.count('type')`
+`EventCapture` in `yaml-test-core` is a **POJO collector** — a simple
+list that accumulates `CloudEvent` objects. It has no CDI dependency:
 
-Captures CloudEvents only (not arbitrary CDI events). No explicit
-start/stop — capture is scoped to the test execution (pushed/popped
-with the simulation overlay).
+- `addEvent(CloudEvent)` — push an event
+- `ofType(String)` → List — filter by event type
+- `last(String)` → CloudEvent — last event of type
+- `count(String)` → int — count of events of type
+
+Accessible in expressions via `${events}` variable, registered as
+an `ObjectVariableSource` on the `VariableResolver` at test start.
+
+**Lifecycle:** EventCapture is scoped to the **test execution**, not
+to the simulation overlay. The test runner creates a fresh
+`EventCapture` at the start of each test and discards it at the end.
+This means `${events}` is available in ALL tests — including Level 4
+(temporal events) which has no `simulate:` block.
+
+**Event sources:**
+- `emit-event` plugin steps push events directly to the EventCapture
+- In CDI context (JUnit/Quarkus): `TestEventCapture
+  @ApplicationScoped` observes CDI `CloudEvent` and forwards to
+  EventCapture — this captures events fired by application code, not
+  just test steps
+- In CLI context (no CDI): only `emit-event` step events are captured
+
+## Capture Mechanism
+
+`capture:` is a new **decorator key** added to
+`StepKeywords.DECORATOR_KEYS`. It binds step output to a named
+variable accessible by subsequent steps.
+
+### Syntax
+
+```yaml
+# Decorator on any step — sibling key at step level
+- agent-invoke:
+    prompt: "What's my risk profile?"
+  capture: result
+
+- run-playbook: examples/02-session-conversation.yaml
+  capture: results
+```
+
+### Resolution
+
+1. The Walker extracts `capture:` from the step map as a decorator
+   (alongside `when:`, `timeout:`, `retry:`, etc.)
+2. The step executes and returns a `Result` with an output map
+3. The step execution loop (in `StructuralStepEvaluator`) processes
+   the `capture` decorator: calls
+   `resolver.withObjectScope(captureName, outputMap::get)` to register
+   the captured output as a new variable prefix
+4. The updated `VariableResolver` is passed to subsequent steps
+
+### Variable access
+
+Captured values are accessed via `${captureName.fieldName}`:
+
+- `${result.text}` — field "text" from the capture named "result"
+- `${results.succeeded}` — field "succeeded" from "results"
+- `${results.output.risk_assessment}` — nested field access via
+  `FieldDriller`
+
+The `VariableResolver` already supports `withObjectScope(prefix,
+source)` — capture is a natural use of this existing mechanism.
+
+### Scope
+
+Captured variables are scoped to the enclosing step block. A capture
+inside a `try:` block is not visible in the `catch:` block. A capture
+inside `run-playbook` is scoped to the nested playbook's execution.
+
+## Walker Integration
+
+Two Walker enhancements are required for the testing step types:
+
+### 1. Sibling-absorbing plugins
+
+Plugins can opt into **sibling absorption** via
+`@Plugin(absorbSiblings = true)`. When the Walker matches such a
+plugin as the action key, remaining non-reserved keys become plugin
+parameters (instead of throwing "unknown key").
+
+Used by:
+- `assertThat:` — matchers (`contains`, `equals`, etc.) as siblings
+- `emit-event:` — `data:` as sibling key
+
+The Walker collects these into the plugin's parameter map with a
+`_subject` entry for the scalar value:
+
+```yaml
+- assertThat: ${response}    # _subject = "${response}"
+  contains: 'equities'       # contains = "equities"
+  startsWith: 'Moderate'     # startsWith = "Moderate"
+```
+
+Resolves to `PluginStep("assertThat", {_subject: "${response}",
+contains: "equities", startsWith: "Moderate"}, decorators)`.
+
+### 2. Scalar-or-map polymorphism for plugins
+
+When a plugin's action key has a scalar value (not a Map), the scalar
+is passed as `_subject` in the params map. When it has a Map value,
+the Map becomes the params directly. This is the plugin equivalent of
+`ShorthandModule`'s scalar-or-object pattern:
+
+```yaml
+# Scalar form — _subject = "examples/02.yaml"
+- run-playbook: examples/02.yaml
+
+# Map form — params = {file: "...", vars: {...}}
+- run-playbook:
+    file: examples/02.yaml
+    vars:
+      portfolio: conservative
+```
 
 ## Test Runner
 
@@ -454,16 +688,23 @@ didn't match the prompt (the most common test authoring error).
 Framework-neutral POJO. No CDI, no Spring.
 
 - `YamlTestDiscovery` — finds `*.test.yaml` files, builds test tree
-- `YamlTestExecutor` — overlay push → compile → execute → pop → result
+- `YamlTestExecutor` — overlay push → resolve (Walker) → execute →
+  pop → result
 - `SimulateBlockParser` — parses `simulate:` block, resolves aliases,
   normalises fields, builds `SimulationOverlay`
+- `EventCapture` — POJO CloudEvent collector (not a CDI observer).
+  Receives events pushed to it; provides query methods (`ofType`,
+  `last`, `count`) for assertion expressions
 - `TestResult` — pass/fail/error with structured failure info
 - `TestReport` — JUnit XML generation
 - `YamlTestCli` — standalone CLI entry point
-- `EventCapture` — CDI event recording scoped to test execution
 
-Dependencies: `yaml-core`, `simulation-core`, `simulation-config-core`,
-`playbook-compiler`.
+Dependencies: `yaml-core`, `yaml-step-runtime` (Walker,
+CatalogStepRunner, PluginRegistry), `simulation-core`,
+`simulation-config-core`.
+
+Note: no dependency on `playbook-compiler` — test execution uses the
+Walker path, not the SWF compilation path.
 
 ### yaml-test
 
@@ -472,11 +713,30 @@ Quarkus CDI wiring + JUnit Platform.
 - `YamlTestEngine implements TestEngine` — JUnit Platform integration
 - `YamlTestBeans` — `@Produces` wiring for test executor with CDI
   `SimulationRuntime`, `PluginRegistry`, expression engines
-- `TestEventCapture @ApplicationScoped` — CDI observer that records
-  CloudEvents during test execution
+- `TestEventCapture @ApplicationScoped` — CDI observer (`@Observes
+  CloudEvent`) that forwards events to the test-scoped `EventCapture`
+  POJO. This bridges CDI events from application code into the test
+  capture scope.
 
 Dependencies: `yaml-test-core`, JUnit Platform Engine API, Quarkus
 test framework.
+
+### Relationship with yaml-step-testing
+
+`yaml-step-testing` is an **internal test utility** for the step
+runtime module itself — it provides `FaultInjectingStepRunner` for
+testing the step pipeline's retry/error handling. It serves a
+different purpose from `yaml-test-core`:
+
+| Module | Purpose | Scope |
+|--------|---------|-------|
+| `yaml-step-testing` | Test the step runtime internals | Developer testing of platform code |
+| `yaml-test-core` | Run `.test.yaml` declarative tests | User-facing test framework |
+
+They do not depend on each other. `yaml-step-testing`'s WireMock
+integration is orthogonal to `yaml-test`'s simulation-based approach —
+simulation intercepts at the SPI layer, WireMock intercepts at the
+HTTP layer.
 
 ## Simulation Alignment
 
@@ -509,10 +769,14 @@ The corpus/strategy layer is data, not orchestration:
 1. Build `emit-event:` plugin step
 2. Rewrite temporal profiles as playbook files
 3. Replace `TemporalDriverService` MCP operations with playbook
-   execution
+   execution — tracked in #687
 4. Deprecate `TemporalSimulationDriver`, `TimedSequence`,
-   `EventSequenceRunner`
-5. Remove after consumers migrate
+   `EventSequenceRunner` — tracked in #687
+5. Remove after consumers migrate — tracked in #687
+
+Steps 3-5 are deferred work tracked under #687 (temporal collapse).
+The testing framework (this spec) enables steps 1-2; the deprecation
+and removal phases are scoped to #687's implementation.
 
 ## Tutorials as Tests
 
@@ -558,6 +822,11 @@ Migration validates:
 - Tutorial tests serve as onboarding documentation
 - CI runs YAML tests via `mvn test` with no extra configuration
 
+**Prerequisite for #688:** an inventory of existing Java tests (test
+count, modules, assertion types) must be completed before migration
+begins. The inventory establishes the coverage baseline and identifies
+any Java assertions that need YAML equivalents not yet available.
+
 ## Issue Mapping (revised)
 
 The original epic had 5 child issues. Based on this design:
@@ -565,7 +834,7 @@ The original epic had 5 child issues. Based on this design:
 | Original | Revised scope |
 |----------|--------------|
 | #684 (corpus wiring) | SimulateBlockParser + alias resolution — SimulatedAgentBackend already exists |
-| #685 (assert + run-playbook) | Extend AssertPlugin with expression functions + run-playbook @Plugin + emit-event @Plugin |
+| #685 (assert + run-playbook) | New `assertThat` @Plugin (sibling-key matchers) + `run-playbook` @Plugin + `emit-event` @Plugin + `verify-simulation` @Plugin + Walker sibling-absorption enhancement |
 | #686 (test runner) | YamlTestEngine (JUnit Platform) + YamlTestCli + EventCapture |
 | #687 (temporal collapse) | emit-event plugin + temporal profile migration + TemporalDriverService deprecation |
 | #688 (migration) | Rewrite Java tests + helpdesk migration + coverage audit |
