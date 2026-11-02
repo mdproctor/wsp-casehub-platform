@@ -63,6 +63,91 @@ Two test styles from one format:
 - **Validation style** — the test runs an existing playbook via
   `run-playbook` and asserts on captured outputs
 
+### Single-test vs multi-test files
+
+A `.test.yaml` with a top-level `steps:` key is a single-test file
+(one test per file). A `.test.yaml` with a top-level `tests:` key
+contains multiple tests that share the file-level `simulate:`,
+`setup:`, and `teardown:`.
+
+**Single-test** (simple, self-contained — good for tutorials):
+```yaml
+name: Basic invoke
+simulate:
+  agent:
+    - prompt: "hello"
+      response: "world"
+steps:
+  - agent-invoke:
+      prompt: "hello"
+    capture: result
+  - assertThat: ${result.text}
+    contains: 'world'
+```
+
+**Multi-test** (grouped related tests — good for feature coverage):
+```yaml
+name: Agent session basics
+simulate:
+  agent:
+    - prompt: "risk"
+      response: "moderate"
+    - prompt: "rebalance"
+      response: "shift to bonds"
+
+setup:
+  - emit-event: test.init-pool
+
+tests:
+  - name: Open and close cleanly
+    steps:
+      - agent-session-open:
+          pool: financial-advisor
+        capture: session
+      - agent-session-close:
+          session: ${session}
+
+  - name: Query preserves context
+    setup:
+      - emit-event: test.seed-session
+    steps:
+      - agent-session-open:
+          pool: financial-advisor
+        capture: session
+      - agent-session-query:
+          session: ${session}
+          prompt: "risk"
+        capture: result
+      - assertThat: ${result}
+        contains: 'moderate'
+    teardown:
+      - emit-event: test.clear-session
+
+teardown:
+  - emit-event: test.destroy-pool
+```
+
+The `steps:` and `tests:` keys are mutually exclusive — a file has
+one or the other. Each test entry in a `tests:` list produces its own
+`TestResult` with the same metadata structure (name, file, status,
+duration, failures, simulation context).
+
+### TestEngine descriptor tree
+
+The JUnit Platform TestEngine presents tests hierarchically:
+
+```
+Root (engine: casehub-yaml)
+  Directory (container)
+    multi-test-file.test.yaml (container)
+      Test entry 1 (test)
+      Test entry 2 (test)
+    single-test-file.test.yaml (test — leaf)
+```
+
+IntelliJ renders multi-test files as expandable nodes with
+green/red per test entry. Single-test files are leaf nodes.
+
 ## YAML Format
 
 ### Level 1 — Single agent invocation
@@ -693,71 +778,77 @@ inside `run-playbook` is scoped to the nested playbook's execution.
 
 ## Test Lifecycle
 
-YAML tests support lifecycle callbacks matching JUnit's model:
+Three lifecycle scopes, matching and extending JUnit's model:
 
-### Per-test: setup: and teardown: blocks
+### Per-test: setup: and teardown: inside test entries
 
-`setup:` and `teardown:` are top-level step lists alongside `simulate:`
-and `steps:`. `setup:` runs before the main steps. `teardown:` runs in
-a finally block — guaranteed even on assertion failure or step error.
+In multi-test files, each entry in the `tests:` list can have its own
+`setup:` and `teardown:` step lists. These run before/after that
+specific test. `teardown:` runs in a finally block.
 
-```yaml
-name: Session with pre-seeded state
+In single-test files (top-level `steps:`), file-level `setup:` and
+`teardown:` serve this role — since there's only one test, per-file
+and per-test are the same.
 
-simulate:
-  agent:
-    - prompt: "portfolio"
-      response: "60% equities."
+### Per-file: file-level setup: and teardown:
 
-setup:
-  - emit-event: test.seed-data
-    data:
-      portfolio: { total: 150000 }
+File-level `setup:` and `teardown:` (top-level keys, siblings of
+`simulate:`) run once per file, wrapping all tests:
 
-steps:
-  - agent-invoke:
-      prompt: "portfolio"
-    capture: result
-  - assertThat: ${result.text}
-    contains: 'equities'
+- `setup:` runs once before the first test
+- `teardown:` runs once after the last test (finally block)
+- Variables captured in file-level `setup:` are visible to all tests
+- The file-level `simulate:` overlay is pushed before file-level
+  `setup:` and popped after file-level `teardown:`
 
-teardown:
-  - emit-event: test.clear-data
+Execution order for a multi-test file:
+
 ```
-
-Both are optional. A test with no `setup:` or `teardown:` works
-exactly as before. Variables captured in `setup:` are visible in
-`steps:` (the setup VariableResolver is passed to step execution).
-Variables from `steps:` are NOT visible in `teardown:` — teardown
-runs in its own scope to avoid depending on potentially failed state.
+simulate: overlay push
+file setup:                    (once)
+  test[0] per-test setup:      (per-test)
+  test[0] steps:
+  test[0] per-test teardown:   (per-test, finally)
+  test[1] steps:
+file teardown:                 (once, finally)
+simulate: overlay pop
+```
 
 ### Per-directory: _setup.test.yaml and _teardown.test.yaml
 
-Convention files that run once per directory — equivalent to JUnit's
-`@BeforeAll` / `@AfterAll`:
+Convention files that run once per directory. `_setup.test.yaml`
+runs before all test files in the directory; `_teardown.test.yaml`
+runs after the last file completes (finally block).
 
 ```
-tutorials/01-basics/
-  _setup.test.yaml           # runs once before all tests in 01-basics/
-  01-invoke.test.yaml
-  02-capture.test.yaml
-  _teardown.test.yaml        # runs once after all tests in 01-basics/
+tutorials/
+  _setup.test.yaml                 # root suite setup
+  01-basics/
+    _setup.test.yaml               # level setup
+    01-invoke.test.yaml
+    02-capture.test.yaml
+    _teardown.test.yaml            # level teardown
+  02-sessions/
+    session-tests.test.yaml
+  _teardown.test.yaml              # root suite teardown
 ```
 
-`_setup.test.yaml` is a normal `.test.yaml` file — it can have its
-own `simulate:` block, steps, and assertions. Its captured variables
-are available to all tests in the directory via a shared
-VariableResolver scope. `_teardown.test.yaml` runs after the last
-test completes (or fails), in a finally block.
+Directory lifecycle nests — parent `_setup` runs before any child
+directory's `_setup`. Parent `_teardown` runs after all child
+directories complete. This gives hierarchical suite scoping that
+JUnit 5's `@Suite` does not provide natively.
 
-The `_` prefix excludes these from the test count — they are
-infrastructure, not tests. The test runner reports them as lifecycle
-steps, not test cases.
+The `_` prefix excludes these files from the test count. The test
+runner reports them as lifecycle steps, not test cases.
 
-| JUnit | YAML equivalent | Scope |
-|-------|----------------|-------|
-| `@BeforeEach` / `@AfterEach` | `setup:` / `teardown:` blocks | Per-test file |
-| `@BeforeAll` / `@AfterAll` | `_setup.test.yaml` / `_teardown.test.yaml` | Per-directory |
+### Lifecycle mapping
+
+| Scope | YAML | JUnit equivalent |
+|-------|------|-----------------|
+| Per-test | `setup:`/`teardown:` inside `tests:` entry | `@BeforeEach` / `@AfterEach` |
+| Per-file | File-level `setup:`/`teardown:` | `@BeforeAll` / `@AfterAll` |
+| Per-directory | `_setup.test.yaml` / `_teardown.test.yaml` | No native equivalent (suite extensions) |
+| Nested directories | Parent `_setup` before child `_setup` | No native equivalent |
 
 ## Walker Integration
 

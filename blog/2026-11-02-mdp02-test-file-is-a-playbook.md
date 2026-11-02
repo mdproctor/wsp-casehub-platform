@@ -100,44 +100,101 @@ Each file is self-contained. A developer opens `01-invoke.test.yaml` and sees: h
 
 The goal is helpdesk as the first 100% YAML application with 100% YAML tests. Every Java assertion gets a YAML equivalent. The tutorials become the onboarding documentation. If a tutorial test fails, either the application is broken or the tutorial is wrong — both worth knowing.
 
-## Lifecycle: setup: and teardown:
+## Multiple Tests Per File
 
-Real tests need lifecycle management. JUnit has `@BeforeEach`/`@AfterEach` for per-test setup and `@BeforeAll`/`@AfterAll` for per-class setup. YAML tests need the same — without falling back to Java.
-
-`setup:` and `teardown:` are top-level step lists, siblings of `simulate:` and `steps:`. `teardown:` runs in a finally block — guaranteed even on assertion failure.
+A single-test file is clean for tutorials. But for related tests — the kind of thing that would be methods in one JUnit class — a `tests:` list keeps them together:
 
 ```yaml
-name: Session with pre-seeded state
+name: Agent session basics
 
-setup:
-  - emit-event: test.seed-data
-    data:
-      portfolio: { total: 150000 }
+simulate:
+  agent:
+    - prompt: "risk"
+      response: "moderate risk"
 
-steps:
-  - agent-invoke:
-      prompt: "portfolio"
-    capture: result
-  - assertThat: ${result.text}
-    contains: 'equities'
+tests:
+  - name: Open and close cleanly
+    steps:
+      - agent-session-open:
+          pool: financial-advisor
+        capture: session
+      - agent-session-close:
+          session: ${session}
 
-teardown:
-  - emit-event: test.clear-data
+  - name: Query preserves context
+    steps:
+      - agent-session-open:
+          pool: financial-advisor
+        capture: session
+      - agent-session-query:
+          session: ${session}
+          prompt: "risk"
+        capture: result
+      - assertThat: ${result}
+        contains: 'moderate'
 ```
 
-Variables captured in `setup:` are visible in `steps:`. Variables from `steps:` are NOT visible in `teardown:` — teardown runs in its own scope to avoid depending on state that may have failed partway through.
+Each test entry produces its own result with the same metadata: name, status, duration, failures, simulation context. IntelliJ shows multi-test files as expandable containers with green/red per entry. `steps:` and `tests:` are mutually exclusive — a file has one or the other.
 
-For directory-scoped lifecycle — the `@BeforeAll`/`@AfterAll` equivalent — convention files handle it: `_setup.test.yaml` runs once before all tests in its directory, `_teardown.test.yaml` runs after the last test completes. Both are normal `.test.yaml` files. The `_` prefix excludes them from the test count.
+## Three Lifecycle Scopes
+
+JUnit has `@BeforeEach`/`@AfterEach` (per test) and `@BeforeAll`/`@AfterAll` (per class). JUnit 5's `@Suite` doesn't have native before/after hooks at the suite level. YAML tests cover all three — and add hierarchical directory nesting that JUnit doesn't have.
+
+**Per-test:** `setup:`/`teardown:` inside each `tests:` entry. Runs before/after that specific test.
+
+**Per-file:** File-level `setup:`/`teardown:` (top-level keys). Runs once per file, wrapping all tests. Variables captured in file-level setup are visible to all tests.
+
+**Per-directory:** `_setup.test.yaml`/`_teardown.test.yaml` convention files. Runs once per directory. Nests hierarchically — parent `_setup` runs before child `_setup`.
+
+```yaml
+name: Agent sessions
+
+setup:                              # per-file — once before all tests
+  - emit-event: test.init-pool
+
+tests:
+  - name: Open and close
+    setup:                          # per-test — before THIS test
+      - emit-event: test.seed-session
+    steps:
+      - agent-session-open:
+          pool: financial-advisor
+        capture: session
+      - agent-session-close:
+          session: ${session}
+    teardown:                       # per-test — after THIS test (finally)
+      - emit-event: test.clear-session
+
+  - name: Query context
+    steps:
+      - agent-session-open:
+          pool: financial-advisor
+        capture: session
+      - agent-session-query:
+          session: ${session}
+          prompt: "risk"
+        capture: result
+      - assertThat: ${result}
+        contains: 'moderate'
+
+teardown:                           # per-file — once after all tests (finally)
+  - emit-event: test.destroy-pool
+```
+
+Teardown blocks at every scope run in finally — guaranteed even on failure. Variables from steps are NOT visible in teardown to avoid depending on potentially failed state.
 
 ```
-tutorials/01-basics/
-  _setup.test.yaml           # @BeforeAll — runs once
-  01-invoke.test.yaml
-  02-capture.test.yaml
-  _teardown.test.yaml        # @AfterAll — guaranteed
+tutorials/
+  _setup.test.yaml              # suite setup — before everything
+  01-basics/
+    _setup.test.yaml            # level setup — before this directory
+    01-invoke.test.yaml
+    02-session-tests.test.yaml  # multi-test file
+    _teardown.test.yaml         # level teardown
+  _teardown.test.yaml           # suite teardown — after everything
 ```
 
-The full JUnit lifecycle model, expressed in YAML, with no Java.
+The full JUnit lifecycle model — and then some — expressed in YAML, with no Java.
 
 ## What Collapses Along the Way
 
