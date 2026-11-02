@@ -2,7 +2,7 @@
 
 ## State
 branch: 
-state: scaffolded
+state: active
 project-sha: 
 date: 2026-11-01
 issue-repo: casehubio/platform
@@ -16,8 +16,8 @@ flyway-next-v:
 - [x] casehubio/platform#545 — ChallengeStore JPA for clustered deployments
 - [x] casehubio/platform#543 — Authentication hardening
 - [x] casehubio/platform#593 — Make spring-generator independently publishable
-- [ ] casehubio/platform#594 — Make rest-spring-generator independently publishable ← active
-- [ ] casehubio/platform#595 — Make graphql-spring-generator independently publishable
+- [x] casehubio/platform#594 — Make rest-spring-generator independently publishable
+- [ ] casehubio/platform#595 — Make graphql-spring-generator independently publishable ← active
 - [ ] casehubio/platform#596 — Make mcp-spring-generator independently publishable
 - [ ] casehubio/platform#663 — Propagate @Authenticated/@RolesAllowed to generated REST
 - [ ] casehubio/platform#682 — Wire unused EngagementType values or remove
