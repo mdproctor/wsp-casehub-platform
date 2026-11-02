@@ -352,6 +352,23 @@ enhancement: plugins can opt into sibling absorption via
 `@Plugin(absorbSiblings = true)`. The `emit-event` plugin uses the
 same mechanism for its `data:` sibling key.
 
+**Subject resolution:** The `assertThat` plugin resolves its subject
+using two-phase resolution:
+
+1. **VariableResolver phase** — standard `${...}` resolution. Works
+   for simple captured variables: `${result.text}`,
+   `${results.succeeded}`.
+2. **Expression engine phase** — if the subject still contains
+   unresolved `${...}` after VariableResolver (because the prefix
+   was deferred), the plugin strips the `${}` wrapper and evaluates
+   the inner expression via the expression engine (MVEL3). Works for
+   method-call expressions: `events.last('redistribution.decision')`.
+
+This two-phase approach is localised to the `assertThat` plugin —
+it does not change `VariableResolver`, `ObjectVariableSource`, or
+`FieldDriller`. The `assertThat` plugin already requires access to
+`ExpressionEngineRegistry` (same dependency as `assert`).
+
 Assertion failures produce structured error messages with subject
 and expectation separated:
 
@@ -476,10 +493,28 @@ Explicit assertions on simulation invocation journal, exposing
 | `calledAtMost` | int | Maximum invocation count |
 | `neverCalled` | boolean | Assert method was never called |
 | `inOrder` | List | Assert methods were called in this order |
-| `exhaustive` | boolean | All corpus entries must have been matched |
+| `exhaustive` | boolean | All corpus entries must have been matched (scoped — see below) |
 
 Delegates to `SimulationVerifier.on(overlay)` for the active
 overlay's `InvocationJournal`.
+
+**Exhaustive scope:** `exhaustive: true` checks ALL methods
+configured in the overlay's corpus — not just those that were
+invoked. If the overlay configures both agent and REST simulation
+but the test only exercises the agent path, `exhaustive: true` fails
+because REST corpus entries were not consumed. To verify exhaustive
+consumption for a single method, combine with `method:`:
+
+```yaml
+# Exhaustive for one method only
+- verify-simulation:
+    method: agent-provider.invoke
+    exhaustive: true
+
+# Exhaustive for ALL methods in overlay (strict)
+- verify-simulation:
+    exhaustive: true
+```
 
 **Automatic corpus verification:** When a test completes and a
 `simulate:` block was active, the test runner reports unmatched
@@ -495,12 +530,25 @@ Tests need to assert on events fired during playbook execution.
 list that accumulates `CloudEvent` objects. It has no CDI dependency:
 
 - `addEvent(CloudEvent)` — push an event
-- `ofType(String)` → List — filter by event type
-- `last(String)` → CloudEvent — last event of type
+- `ofType(String)` → `List<CapturedEvent>` — filter by event type
+- `last(String)` → `CapturedEvent` — last event of type
 - `count(String)` → int — count of events of type
 
-Accessible in expressions via `${events}` variable, registered as
-an `ObjectVariableSource` on the `VariableResolver` at test start.
+Query methods return `CapturedEvent` wrappers (not raw `CloudEvent`):
+
+```java
+public record CapturedEvent(CloudEvent event, Map<String, Object> data) {
+    public String type()   { return event.getType(); }
+    public String source() { return event.getSource().toString(); }
+    // data() returns the CloudEvent data payload parsed as a Map,
+    // enabling dot-path access via MVEL: .data.reason, .data.actorId
+}
+```
+
+The `data()` → `Map<String, Object>` accessor is essential: raw
+`CloudEvent.getData()` returns `CloudEventData`, which MVEL cannot
+traverse as properties. The `CapturedEvent` wrapper parses the data
+payload into a Map at capture time.
 
 **Lifecycle:** EventCapture is scoped to the **test execution**, not
 to the simulation overlay. The test runner creates a fresh
@@ -515,6 +563,47 @@ This means `${events}` is available in ALL tests — including Level 4
   EventCapture — this captures events fired by application code, not
   just test steps
 - In CLI context (no CDI): only `emit-event` step events are captured
+
+### Event query resolution
+
+Event queries like `${events.last('redistribution.decision')}` use
+method-call syntax that the `VariableResolver` cannot resolve. The
+`VariableResolver` does naive dot-splitting (`name.indexOf('.')`)
+which corrupts dotted event type names inside parenthesized arguments,
+and `ObjectVariableSource.resolve(String)` takes a simple property
+name — not a method invocation.
+
+The resolution uses **deferred-prefix fallback to the expression
+engine**:
+
+1. The test runner registers `"events"` as a **deferred prefix** in
+   the `VariableResolver`. The VariableResolver already supports
+   deferred prefixes (`VariableResolver.java:118`, `:231`) — when a
+   prefix is deferred, the `${...}` expression passes through
+   unchanged.
+
+2. The `assertThat` plugin detects unresolved `${...}` expressions
+   in its subject and evaluates them via the **expression engine**
+   (MVEL3). MVEL natively supports method invocation on Java objects.
+
+3. `EventCapture` is registered as a named variable (`events`) in
+   the expression engine context. MVEL resolves
+   `events.last('redistribution.decision')` by calling the `last()`
+   method directly.
+
+4. Chained access works naturally:
+   `events.last('redistribution.decision').data.reason` →
+   MVEL calls `last("redistribution.decision")` → `CapturedEvent` →
+   `.data` calls `data()` → `Map` → `.reason` → `Map.get("reason")`
+
+This approach requires no changes to `VariableResolver`,
+`ObjectVariableSource`, or `FieldDriller`. The deferred prefix
+mechanism and expression engine are both existing infrastructure.
+
+For simple captured variables (`${result.text}`,
+`${results.succeeded}`), the VariableResolver handles resolution
+directly — no expression engine involvement. The expression engine
+is only invoked when the VariableResolver defers.
 
 ## Capture Mechanism
 
@@ -653,6 +742,23 @@ casehub-test --report junit-xml --output reports/ .
 
 Shares `YamlTestExecutor` with the TestEngine — both call the same
 core: discover → overlay → execute → report.
+
+### CLI compatibility
+
+The CLI runs tests without a CDI container. This limits which test
+levels are executable:
+
+| Level | CLI | JUnit/Quarkus | Reason |
+|-------|-----|---------------|--------|
+| 1-3 | yes | yes | Simulation-only — no reactive application behaviour |
+| 4 | no | yes | Reactive events require CDI event bus + application handlers |
+| 5 | partial | yes | Agent simulation works; REST simulation requires CDI wiring |
+
+Level 4 tests emit events and assert on events produced **by
+application code in response**. Without CDI, application event
+handlers don't run, so reactive events are never produced. The CLI
+reports these tests as `SKIPPED: requires CDI context` rather than
+failing silently.
 
 ### Error reporting
 
@@ -834,7 +940,7 @@ The original epic had 5 child issues. Based on this design:
 | Original | Revised scope |
 |----------|--------------|
 | #684 (corpus wiring) | SimulateBlockParser + alias resolution — SimulatedAgentBackend already exists |
-| #685 (assert + run-playbook) | New `assertThat` @Plugin (sibling-key matchers) + `run-playbook` @Plugin + `emit-event` @Plugin + `verify-simulation` @Plugin + Walker sibling-absorption enhancement |
+| #685 (assert + run-playbook) | New `assertThat` @Plugin (sibling-key matchers, two-phase subject resolution) + `agent-invoke` step type (@Plugin + StepCompiler) + `run-playbook` @Plugin + `emit-event` @Plugin + `verify-simulation` @Plugin + Walker sibling-absorption enhancement + `capture:` decorator key addition to `StepKeywords.DECORATOR_KEYS` |
 | #686 (test runner) | YamlTestEngine (JUnit Platform) + YamlTestCli + EventCapture |
 | #687 (temporal collapse) | emit-event plugin + temporal profile migration + TemporalDriverService deprecation |
 | #688 (migration) | Rewrite Java tests + helpdesk migration + coverage audit |
