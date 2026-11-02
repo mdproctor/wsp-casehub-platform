@@ -1,24 +1,15 @@
-# Work Plan — casehub-platform auth + generators
+# Work Plan — issue-692-fix-engagement-wiring
 
 ## State
-branch: 
+branch: issue-692-fix-engagement-wiring
 state: scaffolded
 project-sha: 
-date: 2026-11-01
+date: 
 issue-repo: casehubio/platform
-covers: 543
+covers: 692,693
 design-repo: 
 design-section-hashes: 
 flyway-next-v: 
 
 ## Queue
-- [x] casehubio/platform#532 — Password authentication provider
-- [x] casehubio/platform#545 — ChallengeStore JPA for clustered deployments
-- [x] casehubio/platform#543 — Authentication hardening
-- [ ] casehubio/platform#593 — Make spring-generator independently publishable ← active
-- [ ] casehubio/platform#594 — Make rest-spring-generator independently publishable
-- [ ] casehubio/platform#595 — Make graphql-spring-generator independently publishable
-- [ ] casehubio/platform#596 — Make mcp-spring-generator independently publishable
-- [ ] casehubio/platform#663 — Propagate @Authenticated/@RolesAllowed to generated REST
-- [ ] casehubio/platform#682 — Wire unused EngagementType values or remove
-- [ ] casehubio/platform#662 — Plugin catalog infrastructure
+- [ ] casehubio/platform#692 — Issue #692 ← active
