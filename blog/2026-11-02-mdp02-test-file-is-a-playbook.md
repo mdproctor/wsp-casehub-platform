@@ -196,76 +196,47 @@ tutorials/
 
 The full JUnit lifecycle model — and then some — expressed in YAML, with no Java.
 
-## Testing Async Workers
+## Coordination as Test Orchestration
 
-This is where the "test IS a playbook" model really earns its keep. Testing concurrent workers — multiple agents processing in parallel, each needing its result asserted, all needing to complete within a deadline — is one of the hardest problems in test frameworks. Most Java solutions involve `CountDownLatch`, `CompletableFuture.allOf`, custom timeouts, and fragile thread synchronisation. The test code is often harder to understand than the production code it's testing.
+This is where the "test IS a playbook" model earns its real payoff. Testing concurrent systems in Java means fighting the test framework: `CountDownLatch`, `CompletableFuture.allOf`, manual timeout threads, fragile synchronisation. The test code ends up harder to understand than the production code. And it only tests the aggregate outcome — "did everything finish?" — not the coordination behaviour itself.
 
-The playbook engine already solves this. `parallel:`, `quorum:`, `race:`, `barrier:`, `timeout:` — these are production-grade concurrency primitives with well-defined semantics. Because tests are playbooks, they're available in tests with zero additional work.
+Playbooks already have high-level coordination primitives: `race:`, `barrier:`, `quorum:`, `select:`, `parallel:` with advance-after policies, `timeout:` decorators. These aren't just execution utilities — they express coordination semantics. Because tests are playbooks, these become the test's orchestration language. The test doesn't just run concurrent things and check results; it describes the coordination scenario it's verifying.
 
-Three workers, all must succeed, five-second deadline:
+**Race:** Test that a circuit breaker activates before a slow backend responds. The `race:` primitive means "first to complete wins, others are cancelled." The test verifies which branch won — the coordination outcome, not just the final value.
 
 ```yaml
-name: All workers respond within deadline
-
-simulate:
-  agent:
-    - prompt: "worker-1"
-      response: "result-1"
-    - prompt: "worker-2"
-      response: "result-2"
-    - prompt: "worker-3"
-      response: "result-3"
+name: Circuit breaker beats slow backend
 
 steps:
-  - parallel:
-      - agent-invoke:
-          prompt: "worker-1"
-        capture: w1
-      - agent-invoke:
-          prompt: "worker-2"
-        capture: w2
-      - agent-invoke:
-          prompt: "worker-3"
-        capture: w3
-    timeout: 5s
-  - assertThat: ${w1.text}
-    contains: 'result-1'
-  - assertThat: ${w2.text}
-    contains: 'result-2'
-  - assertThat: ${w3.text}
-    contains: 'result-3'
+  - race:
+      - block:
+          step: backend
+          - delay: 3s
+          - agent-invoke:
+              prompt: "slow query"
+            capture: response
+      - block:
+          step: breaker
+          - delay: 1s
+          - emit-event: circuit.open
+            data: { reason: "timeout-threshold" }
+    capture: winner
+  - assertThat: ${winner}
+    equals: 'breaker'
+  - assertThat: ${events.last('circuit.open')}
+    not-null: true
 ```
 
-If any worker fails, you see which one. If the deadline expires, the timeout reports which workers hadn't responded. No latches, no futures, no thread pools in the test.
-
-For quorum semantics — "at least 2 of 3 must agree within 10 seconds" — the playbook's `advance-after` policy handles it:
+**Barrier:** Test that a consumer waits for a producer before processing. The `barrier:` primitive is a named synchronisation point — the test verifies that the handoff happens correctly, not just that both sides eventually finish.
 
 ```yaml
-steps:
-  - parallel:
-      advance-after: 2
-      cancel-remaining: true
-      steps:
-        - agent-invoke:
-            prompt: "classify-risk"
-          capture: c1
-        - agent-invoke:
-            prompt: "classify-risk"
-          capture: c2
-        - agent-invoke:
-            prompt: "classify-risk"
-          capture: c3
-    timeout: 10s
-  - assert: ${c1.text} == ${c2.text} || ${c1.text} == ${c3.text} || ${c2.text} == ${c3.text}
-```
+name: Consumer waits for producer handoff
 
-For producer-consumer synchronisation — "producer emits data, consumer shouldn't start until it's ready" — `barrier:` with named steps:
-
-```yaml
 steps:
   - parallel:
       - block:
           step: producer
+          - delay: 500ms
           - emit-event: data.batch-ready
             data: { batchId: 1, records: 500 }
       - block:
@@ -273,11 +244,67 @@ steps:
           - barrier:
               await: [producer]
               timeout: 3s
-          - assertThat: ${events.last('data.batch-ready')}
-            not-null: true
+          - assertThat: ${events.last('data.batch-ready').data.records}
+            equals: 500
 ```
 
-Every concurrency pattern that's hard to test in Java — fan-out/fan-in, race conditions, deadline enforcement, synchronisation barriers — is already a playbook primitive. The test framework doesn't need to reinvent any of it.
+The `barrier:` here is the assertion mechanism. If the producer never completes, the barrier times out and the test fails with "barrier timed out waiting for [producer]" — a meaningful coordination failure, not a generic timeout.
+
+**Quorum:** Test that a consensus protocol reaches agreement. `advance-after: 2` means "2 of 3 must agree before we proceed." The remaining branch gets cancelled. The test verifies the consensus semantics, not just that two things happened to finish.
+
+```yaml
+name: Quorum consensus within deadline
+
+simulate:
+  agent:
+    strategy: sequential
+    corpus:
+      - key: "classify"
+        output: "high-risk"
+      - key: "classify"
+        output: "high-risk"
+      - key: "classify"
+        output: "low-risk"
+
+steps:
+  - parallel:
+      advance-after: 2
+      cancel-remaining: true
+      steps:
+        - agent-invoke:
+            prompt: "classify"
+          capture: vote1
+        - agent-invoke:
+            prompt: "classify"
+          capture: vote2
+        - agent-invoke:
+            prompt: "classify"
+          capture: vote3
+    timeout: 5s
+  - assertThat: ${vote1.text}
+    equals: 'high-risk'
+  - assertThat: ${vote2.text}
+    equals: 'high-risk'
+```
+
+**Select:** Test that the system responds to the correct event out of multiple possibilities. `select:` waits for one of several event sources — the test verifies which branch activates.
+
+```yaml
+name: Priority escalation triggers before standard routing
+
+steps:
+  - select:
+      - subscribe: priority-channel
+        - assertThat: ${events.last('priority.escalation')}
+          not-null: true
+      - subscribe: standard-channel
+        - assert: false
+          message: "Standard channel should not have activated"
+```
+
+The common thread: every coordination pattern — fan-out/fan-in, race conditions, deadline enforcement, synchronisation barriers, consensus, event selection — is already a playbook primitive with well-defined semantics. The test expresses the coordination scenario declaratively, and the assertion is on the coordination outcome, not just the aggregate result. When a test fails, it fails with coordination-level detail: "barrier timed out waiting for [producer]", "race won by [breaker] not [backend]", "quorum not reached — only 1 of 2 required."
+
+No latches, no futures, no thread pools. The coordination language IS the test language.
 
 ## What Collapses Along the Way
 
