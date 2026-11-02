@@ -2,7 +2,7 @@
 
 ## State
 branch: 
-state: active
+state: closing:review
 project-sha: 
 date: 2026-11-01
 issue-repo: casehubio/platform
@@ -11,6 +11,7 @@ design-repo:
 design-section-hashes: 
 flyway-next-v: 
 
+evidence-era: true
 ## Queue
 - [x] casehubio/platform#532 — Password authentication provider
 - [x] casehubio/platform#545 — ChallengeStore JPA for clustered deployments
