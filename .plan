@@ -1,0 +1,15 @@
+# Work Plan — epic-683-declarative-playbook-testing
+
+## State
+branch: epic-683-declarative-playbook-testing
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 683
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#683 — Issue #683 ← active
