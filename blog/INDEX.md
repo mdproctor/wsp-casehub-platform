@@ -33,3 +33,4 @@
 | [2026-10-29-mdp02-when-playbooks-fail.md](2026-10-29-mdp02-when-playbooks-fail.md) | 2026-10-29 | Four-layer playbook feedback loop — triage, CBR retention, fallback across platform/engine/agency/neocortex |
 | [2026-10-30-mdp01-when-playbooks-talk-back.md](2026-10-30-mdp01-when-playbooks-talk-back.md) | 2026-10-30 | Advisory step type — how protocol playbooks communicate evaluation results through the compiler |
 | [2026-11-01-mdp01-generated-code-security-gap.md](2026-11-01-mdp01-generated-code-security-gap.md) | 2026-11-01 | Why code generators must propagate all security annotations — not just the ones you remembered to handle |
+| [2026-11-02-mdp02-test-file-is-a-playbook.md](2026-11-02-mdp02-test-file-is-a-playbook.md) | 2026-11-02 | Why .test.yaml files that ARE playbooks change everything for 100% YAML applications |
