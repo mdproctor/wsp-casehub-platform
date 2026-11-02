@@ -1,50 +1,16 @@
 # HANDOFF — casehub-platform
 
-## Last Session (2026-11-02)
+## Last Session
 
-Closed **#682** (wire engagement types), **#692** (sourceId linkage fix), and **#693** (engagement test coverage). Also wrote a blog entry.
-
-**#682 — Wire unused EngagementType values (M/Med):**
-- New types: `ReplyType`, `ReplyHint`, `ReplyRequest`, `ReplyHintResolver` SPI, `NotificationClicked`, `NotificationReplied` CDI events
-- `Notification`, `NotificationInput`, `NotificationTemplate` gain nullable `replyHint` field
-- `NotificationApi` gains `trackClick(id)` and `reply(id, ReplyRequest)` — mirror existing `markRead`/`dismiss` pattern
-- `NotificationService` fires CDI events via `fireAsync()`; `InAppEngagementBridge` observes and records engagement
-- `ReplyHintResolver` SPI with `PassthroughReplyHintResolver` `@DefaultBean` — domains override for custom resolution
-- `NotificationDispatcher` applies resolver after `TemplateResolver.resolve()` in both dispatch paths
-- CONVERTED stays domain-level via existing `recordDirect()` endpoint
-- Flyway V2 adds `reply_hint` column to notification table
-- Design spec: `wsp-casehub-platform/specs/issue-682-wire-engagement-types/`
-- Landed as `823e721e` on main
-
-**#692 — sourceId linkage fix (S/Low, pre-existing bug from #170):**
-- Pre-existing: ALL engagement recording via InAppEngagementBridge was non-functional — delivery attempts stored with `sourceId=null`, bridge `findBySource()` always returned empty
-- `DeliveryResult` gains `sourceId` field with backward-compat 2-arg constructor
-- `InAppNotificationDeliverer.deliver()` returns stored notification ID in result
-- `NotificationDispatcher` captures sourceId from delivery results, passes to `DeliveryTracker`
-- Landed as `05c36a4f` on main
-
-**#693 — 24 new tests (S/Low):**
-- `NotificationServiceTest` (12 tests): trackClick ownership, reply validation for ACKNOWLEDGE/FREE_TEXT/OPTIONS
-- `EngagementIntegrationTest` (3 tests): full dispatch→bridge→engagement chain for OPENED, CLICKED, REPLIED
-- `NotificationStoreContractTest` (4 tests): findById ownership enforcement
-- `ReplyHintTest` (3 tests): Jackson serialization round-trip
-- `TemplateResolverTest` (2 tests): replyHint passthrough assertion
-- Landed with `05c36a4f` (squashed with #692)
-
-**Blog entry:** "The Engagement Bridge That Never Crossed" — `blog/2026-11-02-mdp02-engagement-tracking-silent-failure.md`
-
-**CLAUDE.md note:** The module table needs updating with new types (ReplyType, ReplyHint, ReplyHintResolver, ReplyRequest, NotificationClicked, NotificationReplied) and new NotificationApi methods (trackClick, reply). Deferred from this session.
+Designed and began implementing the declarative playbook testing framework (epic #683). Brainstormed the core model — a `.test.yaml` file IS a playbook with a `simulate:` block and `assertThat` matchers. Wrote the design spec, ran a 3-round standard review (25 issues, all resolved). Completed Batches 1-2 of the implementation plan: Walker sibling absorption + scalar-or-map polymorphism, assertThat plugin (12 matchers), emit-event + agent-invoke plugins, SimulateBlockParser + EventCapture (yaml-test-core module), run-playbook + verify-simulation plugins. 5/8 tasks done, all tests green.
 
 ## Immediate Next Step
 
-#662 — Plugin catalog infrastructure. Different domain — fresh session recommended.
-
-## Queue
-
-All 10 original queue items complete. #662 is the sole remaining item, appended during this session.
+Resume at Batch 3, Task 6: `YamlTestExecutor` and `YamlTestDiscovery` in yaml-test-core. Then Task 7 (JUnit Platform TestEngine + CLI in yaml-test module) and Task 8 (tutorial .test.yaml integration suite).
 
 ## References
 
-- Plan queue: `wsp-casehub-platform/.plan` — #662 is the only remaining item
-- Design spec: `wsp-casehub-platform/specs/issue-682-wire-engagement-types/`
-- Blog entry: `wsp-casehub-platform/blog/2026-11-02-mdp02-engagement-tracking-silent-failure.md`
+- Spec: `specs/epic-683-declarative-playbook-testing/2026-11-02-declarative-playbook-testing-design.md`
+- Plan: `plans/2026-11-02-declarative-playbook-testing.md`
+- Decisions: `specs/epic-683-declarative-playbook-testing/decisions.md`
+- Review: `/Users/mdproctor/reviews/casehub-platform/epic-683-playbook-testing-20261102-092447/`
