@@ -13,3 +13,13 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/platform#699 — Issue #699 ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: ParameterType EXPRESSION + @Expression + ExpressionContext.PARAMETER
+    - [ ] Task 2: VariableResolver scope infrastructure
+    - [ ] Task 3: StepResultStore liveResults
+  - [ ] Batch 2: Resolution
+    - [ ] Task 4: TypeAwareParamResolver
+    - [ ] Task 5: CatalogStepRunner wiring + AptPluginSource
+  - [ ] Batch 3: Processor
+    - [ ] Task 6: yaml-plugin-processor @Expression support
+    - [ ] Task 7: StructuralStepEvaluator scope migration + AssertThatPlugin cleanup
