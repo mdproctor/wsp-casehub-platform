@@ -27,7 +27,7 @@ The change introduces type-aware parameter resolution at the boundary between st
 After this change, a new TypeAwareParamResolver routes parameters by their declared type:
 
 - **STRING, INTEGER, NUMBER, BOOLEAN, ARRAY, OBJECT** → `VariableResolver` string-template expansion (existing path)
-- **EXPRESSION** → `ExpressionEngine.compile().eval()` with expression context built from VariableResolver's scopes
+- **EXPRESSION** → `ExpressionEngine.compile().eval()` with expression context built from VariableResolver's Map-backed scopes
 
 ```
                     ┌──────────────────────┐
@@ -83,7 +83,7 @@ public enum ParameterType {
     public boolean validate(Object value) {
         return switch (this) {
             // ... existing cases ...
-            case EXPRESSION -> value instanceof String || value != null;
+            case EXPRESSION -> true; // any value accepted — resolution handles null and non-String
         };
     }
 
@@ -109,10 +109,12 @@ public enum ParameterType {
 ```java
 package io.casehub.yaml.plugin.api;
 
-@Target(ElementType.FIELD)
+@Target({ElementType.RECORD_COMPONENT, ElementType.FIELD, ElementType.PARAMETER})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Expression {}
 ```
+
+Targets match `@Required` — `RECORD_COMPONENT` is required for annotation processing (`RecordComponentElement.getAnnotation(Expression.class)` returns null without it per JLS §9.6.4.1). `PARAMETER` is included for consistency with `@Required`.
 
 Used on `@Plugin` record fields to mark them as EXPRESSION-typed. The Java type stays `String` — the annotation drives schema generation and type-aware resolution.
 
@@ -120,11 +122,33 @@ Used on `@Plugin` record fields to mark them as EXPRESSION-typed. The Java type 
 
 **VariableResolver — map-backed scope overload + context export:**
 
-New `withObjectScope(String, Map)` overload stores the backing map alongside the ObjectVariableSource:
+New field and constructor parameter:
 
 ```java
 private final Map<String, Object> scopeContainers; // prefix → backing Map or object
+```
 
+The existing 4-parameter private constructor is replaced by a 5-parameter constructor. All internal factory methods (`withScope()`, `withDeferredPrefixHandler()`, `withChainedScope()`, `withObjectScope(String, ObjectVariableSource)`) forward `this.scopeContainers`:
+
+```java
+private VariableResolver(Map<String, VariableSource> prefixSources,
+                         Map<String, ObjectVariableSource> objectPrefixSources,
+                         Set<String> deferredPrefixes,
+                         DeferredPrefixHandler deferredPrefixHandler,
+                         Map<String, Object> scopeContainers) {
+    this.prefixSources         = prefixSources;
+    this.objectPrefixSources   = objectPrefixSources;
+    this.deferredPrefixes      = deferredPrefixes;
+    this.deferredPrefixHandler = deferredPrefixHandler;
+    this.scopeContainers       = scopeContainers;
+}
+```
+
+The public 2-parameter constructor initialises `scopeContainers` to `Map.of()`. Every method that returns a new VariableResolver (`withScope()`, `withDeferredPrefixHandler()`, `withChainedScope()`, `withObjectScope(String, ObjectVariableSource)`) passes `this.scopeContainers` to the new constructor. This ensures scopeContainers is never silently lost.
+
+New `withObjectScope(String, Map)` overload stores the backing map alongside the ObjectVariableSource:
+
+```java
 public VariableResolver withObjectScope(String prefix, Map<String, Object> map) {
     var newObjectSources = new LinkedHashMap<>(objectPrefixSources);
     newObjectSources.put(prefix, map::get);
@@ -135,7 +159,7 @@ public VariableResolver withObjectScope(String prefix, Map<String, Object> map) 
 }
 ```
 
-`buildExpressionContext()` returns the stored containers — concrete maps that expression engines (MVEL, JQ) can iterate for type introspection:
+`buildExpressionContext()` returns the stored containers — concrete maps that expression engines (MVEL) can iterate for type introspection:
 
 ```java
 public Map<String, Object> buildExpressionContext() {
@@ -149,21 +173,39 @@ public Map<String, Object> buildExpressionContext() {
 }
 ```
 
-Callers migrate from `withObjectScope("results", capturedOutput::get)` to `withObjectScope("results", capturedOutput)` to enable expression resolution for that scope. The existing `withObjectScope(String, ObjectVariableSource)` overload continues to work but those scopes are not available in expression context (MVEL needs iterable maps for type introspection at compile time).
+**Scope visibility and migration:** Only Map-backed scopes (registered via `withObjectScope(String, Map)`) appear in the expression context. Scopes registered via `withObjectScope(String, ObjectVariableSource)` are NOT visible to expression evaluation. This is intentional — `MvelExpressionEngine.compileMapEvaluator()` calls `MVEL.getTypeMap(evalContext)` on the first `eval()`, which iterates the context map's `entrySet()` to infer types for compilation. An `AbstractMap` with empty `entrySet()` produces an empty type map, causing MVEL to fail to resolve identifiers declared via that scope.
 
-**Why not lazy proxy maps:** MVEL calls `MVEL.getTypeMap(evalContext)` at compile time, which iterates the context map to determine types. An `AbstractMap` with empty `entrySet()` would cause MVEL compilation to fail for any expression referencing that scope. Concrete maps solve this.
+Callers migrate from `withObjectScope("results", capturedOutput::get)` to `withObjectScope("results", capturedOutput)` to enable expression resolution for that scope. Migration of scope registrations in StructuralStepEvaluator (`result` scope) and ScopeUtils (`match`, `signal`, `from`, `each`) is required before EXPRESSION params can reference those scopes. See "Scope migration" below for what is in scope for this work.
 
-### 3. platform-api
+**Scope migration (in scope for this issue):**
 
-**ExpressionContext.EXPRESSION:**
+The `result` scope in `StructuralStepEvaluator.withResultScope()` currently uses a functional `ObjectVariableSource` built from `StepResultStore`. This scope is the primary target for EXPRESSION params (e.g., `result.someStep.output`). To make it available in expression context:
 
 ```java
-public enum ExpressionContext {
-    CONDITION, TRANSFORM, FILTER, EXPRESSION
+private VariableResolver withResultScope(VariableResolver resolver) {
+    if (resultSource == null) return resolver;
+    Map<String, Object> resultMap = scope.resultStore().snapshot();
+    return resolver.withObjectScope("result", resultMap);
 }
 ```
 
-Used as the default engine context for plugin EXPRESSION params. ExpressionEngineRegistry consumers register a default engine for this context.
+`StepResultStore.snapshot()` returns a `Map<String, Object>` of all completed step results at the current point in time. This is a new method added to `StepResultStore`.
+
+Other scope migrations (`each`, `match`, `signal`, `from`, `error`, domain variables) are follow-up — see out-of-scope items. EXPRESSION params that reference those scopes will throw `ExpressionCompilationException` until their registrations are migrated.
+
+### 3. platform-api
+
+**ExpressionContext.PARAMETER:**
+
+```java
+public enum ExpressionContext {
+    CONDITION, TRANSFORM, FILTER, PARAMETER
+}
+```
+
+`PARAMETER` describes the purpose: resolving a plugin parameter value via an expression engine. Each `ExpressionContext` member names the *purpose* of evaluation — `CONDITION` (boolean test), `TRANSFORM` (data transformation), `FILTER` (data filtering), `PARAMETER` (plugin parameter resolution).
+
+**Default engine registration:** The existing `CONDITION`, `TRANSFORM`, and `FILTER` defaults are registered by consumer repos (engine, ops), not platform — `registerDefault()` is never called in platform production code. `PARAMETER` follows the same pattern: consumers call `registry.registerDefault(ExpressionContext.PARAMETER, "mvel")` at application startup. If no default is registered, `TypeAwareParamResolver` throws `IllegalStateException` with a clear message identifying the missing registration.
 
 ### 4. yaml-step-runtime
 
@@ -217,10 +259,12 @@ public class TypeAwareParamResolver {
         }
 
         ExpressionEngineRegistry engines = lookupEngines();
-        String engineType = engines.resolveDefault(ExpressionContext.EXPRESSION);
+        String engineType = engines.resolveDefault(ExpressionContext.PARAMETER);
         if (engineType == null) {
             throw new IllegalStateException(
-                "No default expression engine registered for ExpressionContext.EXPRESSION");
+                "No default expression engine registered for ExpressionContext.PARAMETER. "
+                + "Call registry.registerDefault(ExpressionContext.PARAMETER, \"mvel\") "
+                + "at application startup.");
         }
 
         Map<String, Object> context = resolver.buildExpressionContext();
@@ -277,7 +321,20 @@ The `hasExpressionParams()` check avoids creating TypeAwareParamResolver for def
 - Map `@Expression` fields to `ParameterType.EXPRESSION` in generated Definition and schema
 
 **SchemaEmitter changes:**
-- EXPRESSION fields emit `"type": "string", "format": "expression"` in JSON Schema
+
+EXPRESSION fields emit `"type": "string", "format": "expression"` in JSON Schema. The existing `SchemaEmitter.emit()` property loop gains an annotation check:
+
+```java
+RecordComponentElement field = fields.get(i);
+String yamlKey = BinderEmitter.toKebabCase(field.getSimpleName().toString());
+String jsonType = toJsonType(field.asType().toString());
+boolean isExpression = field.getAnnotation(Expression.class) != null;
+if (isExpression) {
+    w.print("    \"" + yamlKey + "\": { \"type\": \"string\", \"format\": \"expression\" }");
+} else {
+    w.print("    \"" + yamlKey + "\": { \"type\": \"" + jsonType + "\" }");
+}
+```
 
 ### 6. yaml-codegen
 
@@ -313,37 +370,48 @@ public static Definition definition() {
 // resolveSubject() deleted — _subject arrives already evaluated
 ```
 
+**AssertPlugin exclusion:** `AssertPlugin` also performs manual expression resolution via `ExpressionEngineRegistry`, but it is deliberately NOT migrated in this spec. AssertPlugin evaluates its `expression` field against `Map.of()` (empty context) — it tests MVEL expressions in isolation, not against playbook scope data. Migrating it to `@Expression` would expose the full expression context, changing semantics. AssertPlugin is a candidate for future migration if its design evolves to support contextual expressions.
+
 ## Scope Boundaries
+
+**Note:** This work establishes the platform infrastructure for type-safe expression resolution. Issue #699 cannot be closed by this work alone — #699 explicitly scopes consumer repo migration (engine, ops, helpdesk playbooks) and cross-repo propagation. Follow-up issues listed below must be completed before #699 can be closed.
 
 ### In scope (this issue — platform only)
 - `ParameterType.EXPRESSION` in yaml-plugin-api
 - `@Expression` annotation in yaml-plugin-api
 - `VariableResolver.withObjectScope(String, Map)` overload + `buildExpressionContext()` in yaml-core
-- `ExpressionContext.EXPRESSION` in platform-api
+- `VariableResolver` constructor refactor — all internal constructors forward `scopeContainers`
+- `ExpressionContext.PARAMETER` in platform-api
 - `TypeAwareParamResolver` in yaml-step-runtime
 - `CatalogStepRunner` wiring change in yaml-step-runtime
-- Plugin processor updates in yaml-plugin-processor
+- `StepResultStore.snapshot()` method + `result` scope migration to Map-backed in yaml-step-runtime
+- Plugin processor updates in yaml-plugin-processor (StepPluginProcessor + SchemaEmitter)
 - `AssertThatPlugin` cleanup in yaml-step-runtime
 - Tests for all of the above
 
 ### Out of scope (follow-up issues)
-- Consumer repo migration (engine, ops, helpdesk playbooks) — audit and migrate to terse expression form
-- `when:` decorator condition unification via TypeAwareParamResolver
-- yaml-codegen `"format": "expression"` handling
-- TypeScript Walker parity in drafthouse
-- Work-slot for cross-repo propagation
+- Consumer repo migration (engine, ops, helpdesk playbooks) — audit and migrate to terse expression form (casehubio/platform#TBD)
+- `when:` decorator condition unification via TypeAwareParamResolver (casehubio/platform#TBD)
+- yaml-codegen `"format": "expression"` handling (casehubio/platform#TBD)
+- TypeScript Walker parity in drafthouse (casehubio/platform#TBD)
+- Work-slot for cross-repo propagation (casehubio/platform#TBD)
+- Scope migration: `each`, `match`, `signal`, `from`, `error` scopes to Map-backed (casehubio/platform#TBD)
+- `AssertPlugin` contextual expression migration (casehubio/platform#TBD)
+- `registerDefault(ExpressionContext.PARAMETER, "mvel")` in consumer repo bootstrap (documented in consumer migration issue)
 
 ## Error Handling
 
 | Scenario | Behavior |
 |----------|----------|
 | EXPRESSION param, no ExpressionEngineRegistry | IllegalStateException: "EXPRESSION parameters require ExpressionEngineRegistry in ServiceRegistry" |
-| EXPRESSION param, no default engine for EXPRESSION context | IllegalStateException: "No default expression engine registered for ExpressionContext.EXPRESSION" |
+| EXPRESSION param, no default engine for PARAMETER context | IllegalStateException: "No default expression engine registered for ExpressionContext.PARAMETER. Call registry.registerDefault(ExpressionContext.PARAMETER, \"mvel\") at application startup." |
+| Expression references scope not in expression context | ExpressionCompilationException from MVEL — the scope must be migrated to Map-backed registration |
 | Expression compilation fails | ExpressionCompilationException propagates — plugin.execute() never called |
 | Expression evaluation fails | ExpressionEvaluationException propagates |
 | EXPRESSION param with null value | Returns null (no expression evaluation) |
 | EXPRESSION param with non-String value | Returns the value as-is (already evaluated, e.g., from YAML native types) |
 | `${...}` in EXPRESSION field | Stripped, inner string evaluated as expression |
+| `ParameterType.EXPRESSION.validate(null)` | Returns true — null is valid for EXPRESSION (resolution handles it) |
 
 ## Testing Strategy
 
@@ -366,6 +434,7 @@ public static Definition definition() {
    - Functional ObjectVariableSource scopes (via `withObjectScope(String, ObjectVariableSource)`) NOT in expression context
    - Deferred prefixes excluded
    - Context updates when resolver scopes change (withObjectScope(String, Map) adds container)
+   - scopeContainers preserved across `withScope()`, `withDeferredPrefixHandler()`, `withChainedScope()`, `withObjectScope(String, ObjectVariableSource)` calls
 
 4. **Plugin processor tests:**
    - @Expression annotation → ParameterType.EXPRESSION in generated Definition
