@@ -1,7 +1,7 @@
 # Work Plan — epic-683-declarative-playbook-testing
 
 ## State
-branch: epic-683-declarative-playbook-testing
+branch: 
 state: scaffolded
 project-sha: 
 date: 
@@ -12,7 +12,5 @@ design-section-hashes:
 flyway-next-v: 
 
 ## Queue
-- [ ] casehubio/platform#683 — Issue #683 ← active
-  - [x] Batch 1: Batch 4
-    - [x] Task 1: Integration:Task 8: Tutorial test suite
-- [ ] casehubio/platform#698 — reject-verbose-block-step-syntax
+- [x] casehubio/platform#683 — Issue #683
+- [ ] casehubio/platform#698 — reject-verbose-block-step-syntax ← active
