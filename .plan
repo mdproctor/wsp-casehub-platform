@@ -2,7 +2,7 @@
 
 ## State
 branch: 
-state: active
+state: closing:review
 project-sha: 
 date: 
 issue-repo: casehubio/platform
@@ -11,6 +11,7 @@ design-repo:
 design-section-hashes: 
 flyway-next-v: 
 
+evidence-era: true
 ## Queue
 - [x] casehubio/platform#683 — Issue #683
 - [ ] casehubio/platform#698 — reject-verbose-block-step-syntax ← active
