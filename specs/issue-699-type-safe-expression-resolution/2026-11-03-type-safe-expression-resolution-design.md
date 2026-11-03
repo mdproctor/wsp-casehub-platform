@@ -116,7 +116,20 @@ public @interface Expression {}
 
 Targets match `@Required` — `RECORD_COMPONENT` is required for annotation processing (`RecordComponentElement.getAnnotation(Expression.class)` returns null without it per JLS §9.6.4.1). `PARAMETER` is included for consistency with `@Required`.
 
-Used on `@Plugin` record fields to mark them as EXPRESSION-typed. The Java type stays `String` — the annotation drives schema generation and type-aware resolution.
+Used on `@Plugin` record fields to mark them as EXPRESSION-typed. The Java type must be `Object` — MVEL evaluation returns typed results (Map, List, Number, String, etc.), not always String. The annotation drives schema generation and type-aware resolution.
+
+**ParameterType.fromString() update:**
+
+```java
+public static ParameterType fromString(String name) {
+    return switch (name.toUpperCase(Locale.ROOT)) {
+        // ... existing cases ...
+        case "EXPRESSION" -> EXPRESSION;
+        default -> throw new IllegalArgumentException(
+                "Unknown parameter type '" + name + "'");
+    };
+}
+```
 
 ### 2. yaml-core (zero-dep, J2CL-safe)
 
@@ -177,19 +190,54 @@ public Map<String, Object> buildExpressionContext() {
 
 Callers migrate from `withObjectScope("results", capturedOutput::get)` to `withObjectScope("results", capturedOutput)` to enable expression resolution for that scope. Migration of scope registrations in StructuralStepEvaluator (`result` scope) and ScopeUtils (`match`, `signal`, `from`, `each`) is required before EXPRESSION params can reference those scopes. See "Scope migration" below for what is in scope for this work.
 
+**`withExpressionContext()` — expression-only scope registration:**
+
+```java
+public VariableResolver withExpressionContext(String prefix, Map<String, Object> map) {
+    var newContainers = new LinkedHashMap<>(scopeContainers);
+    newContainers.put(prefix, map);
+    return new VariableResolver(prefixSources, objectPrefixSources,
+            deferredPrefixes, deferredPrefixHandler, Map.copyOf(newContainers));
+}
+```
+
+This stores ONLY in `scopeContainers` without touching `objectPrefixSources`. Use when a scope needs both a functional ObjectVariableSource (for STRING resolution with error wrapping) and a concrete Map (for EXPRESSION resolution via MVEL).
+
 **Scope migration (in scope for this issue):**
 
-The `result` scope in `StructuralStepEvaluator.withResultScope()` currently uses a functional `ObjectVariableSource` built from `StepResultStore`. This scope is the primary target for EXPRESSION params (e.g., `result.someStep.output`). To make it available in expression context:
+The `result` scope in `StructuralStepEvaluator.withResultScope()` currently uses a functional `ObjectVariableSource` built from `StepResultStore`. This scope is the primary target for EXPRESSION params (e.g., `result.someStep.output`). The migration registers BOTH a functional source and a live concrete Map:
 
 ```java
 private VariableResolver withResultScope(VariableResolver resolver) {
     if (resultSource == null) return resolver;
-    Map<String, Object> resultMap = scope.resultStore().snapshot();
-    return resolver.withObjectScope("result", resultMap);
+    // Functional source for STRING params (live, with error wrapping)
+    resolver = resolver.withObjectScope("result", resultSource);
+    // Live ConcurrentHashMap for EXPRESSION params (concrete, MVEL-compatible)
+    resolver = resolver.withExpressionContext("result", scope.resultStore().liveResults());
+    return resolver;
 }
 ```
 
-`StepResultStore.snapshot()` returns a `Map<String, Object>` of all completed step results at the current point in time. This is a new method added to `StepResultStore`.
+**`StepResultStore.liveResults()`** returns the backing `ConcurrentHashMap<String, Map<String, Object>>` from `DefaultStepResultStore`. This map is:
+- **Concrete** — `ConcurrentHashMap` implements `Map` with a real `entrySet()`, satisfying MVEL's `getTypeMap()` requirement
+- **Live** — `recordSuccess()` calls `results.put(stepName, result)`, so new step completions are immediately visible to subsequent EXPRESSION evaluations within the same block
+
+```java
+// StepResultStore interface
+Map<String, Object> liveResults();
+
+// DefaultStepResultStore implementation
+@Override
+public Map<String, Object> liveResults() {
+    return results; // the ConcurrentHashMap<String, Map<String, Object>> field
+}
+```
+
+**Two paths, one prefix:** With this design, the `result` prefix has:
+- `objectPrefixSources["result"]` → `buildResultSource(store)` — used by VariableResolver for `${result.stepName.output}` STRING resolution, includes error compositing
+- `scopeContainers["result"]` → `store.liveResults()` — used by `buildExpressionContext()` for MVEL evaluation, raw output maps only
+
+Failed steps that have no output do NOT appear in `liveResults()` (only `recordSuccess()` writes to the results map). This is correct for EXPRESSION params — there is no output to evaluate. Error information remains available through `${result.stepName.error.message}` via the functional ObjectVariableSource path.
 
 Other scope migrations (`each`, `match`, `signal`, `from`, `error`, domain variables) are follow-up — see out-of-scope items. EXPRESSION params that reference those scopes will throw `ExpressionCompilationException` until their registrations are migrated.
 
@@ -314,6 +362,48 @@ private static boolean hasExpressionParams(Definition definition) {
 
 The `hasExpressionParams()` check avoids creating TypeAwareParamResolver for definitions that don't use EXPRESSION — zero overhead for existing plugins.
 
+**AptPluginSource changes:**
+
+`AptPluginSource.loadManifest()` reads `"type"` from schema JSON properties but ignores `"format"`. This means `@Expression` fields emitting `{"type": "string", "format": "expression"}` produce `ParameterType.STRING` at runtime — `hasExpressionParams()` returns false and TypeAwareParamResolver is never created.
+
+Fix: the schema property parsing loop checks `format` before falling through to `type`:
+
+```java
+for (Map.Entry<String, Object> prop : properties.entrySet()) {
+    Map<String, Object> propSchema = (Map<String, Object>) prop.getValue();
+    String typeStr = (String) propSchema.getOrDefault("type", "string");
+    String formatStr = (String) propSchema.get("format");
+    ParameterType paramType = "expression".equals(formatStr)
+            ? ParameterType.EXPRESSION
+            : ParameterType.fromString(typeStr);
+    builder.input(prop.getKey(), new Parameter(
+            paramType, false, null, null, null,
+            (String) propSchema.get("description")));
+}
+```
+
+**BinderEmitter changes:**
+
+`@Expression` record fields must be `Object`-typed (not `String`) because MVEL evaluation returns typed results. The generated `paramExtraction()` must skip casting for `@Expression` fields:
+
+```java
+static String paramExtraction(String type, String fieldName, boolean isExpression) {
+    if (isExpression) {
+        return "parameters.get(\"" + fieldName + "\")"; // no cast — returns Object
+    }
+    return switch (type) {
+        // ... existing cases (unchanged) ...
+    };
+}
+```
+
+The `emit()` method passes the `@Expression` annotation check:
+
+```java
+boolean isExpression = field.getAnnotation(Expression.class) != null;
+w.print(paramExtraction(type, yamlKey, isExpression));
+```
+
 ### 5. yaml-plugin-processor
 
 **StepPluginProcessor changes:**
@@ -384,7 +474,10 @@ public static Definition definition() {
 - `ExpressionContext.PARAMETER` in platform-api
 - `TypeAwareParamResolver` in yaml-step-runtime
 - `CatalogStepRunner` wiring change in yaml-step-runtime
-- `StepResultStore.snapshot()` method + `result` scope migration to Map-backed in yaml-step-runtime
+- `StepResultStore.liveResults()` method + `result` scope dual-registration (functional + live map) in yaml-step-runtime
+- `VariableResolver.withExpressionContext()` method in yaml-core
+- `AptPluginSource.loadManifest()` format-aware property parsing in yaml-step-runtime
+- `BinderEmitter` expression-aware param extraction (no cast for `@Expression Object` fields) in yaml-plugin-processor
 - Plugin processor updates in yaml-plugin-processor (StepPluginProcessor + SchemaEmitter)
 - `AssertThatPlugin` cleanup in yaml-step-runtime
 - Tests for all of the above
@@ -439,6 +532,13 @@ public static Definition definition() {
 4. **Plugin processor tests:**
    - @Expression annotation → ParameterType.EXPRESSION in generated Definition
    - JSON Schema includes `"format": "expression"`
+   - BinderEmitter: `@Expression Object` field → `parameters.get()` without cast
+   - BinderEmitter: non-Expression `String` field → `(String) parameters.get()` (unchanged)
+
+5a. **AptPluginSource tests:**
+   - Schema with `"format": "expression"` → `ParameterType.EXPRESSION` in loaded Definition
+   - Schema without `"format"` → `ParameterType.STRING` (existing behavior)
+   - `hasExpressionParams()` returns true for definitions loaded from `@Expression`-annotated plugins
 
 5. **AssertThatPlugin regression tests:**
    - Existing tests continue to pass with ${...} syntax
