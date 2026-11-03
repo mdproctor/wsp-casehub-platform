@@ -227,11 +227,14 @@ private VariableResolver withResultScope(VariableResolver resolver) {
 Map<String, Object> liveResults();
 
 // DefaultStepResultStore implementation
+@SuppressWarnings("unchecked")
 @Override
 public Map<String, Object> liveResults() {
-    return results; // the ConcurrentHashMap<String, Map<String, Object>> field
+    return (Map<String, Object>) (Map<?, ?>) results;
 }
 ```
+
+The double cast is required because `ConcurrentHashMap<String, Map<String, Object>>` is not directly assignable to `Map<String, Object>` due to Java generic invariance. The cast is safe — `Map<String, Object>` values ARE `Object` at runtime (generics erased), and the CHM is consumed by MVEL via reflection.
 
 **Two paths, one prefix:** With this design, the `result` prefix has:
 - `objectPrefixSources["result"]` → `buildResultSource(store)` — used by VariableResolver for `${result.stepName.output}` STRING resolution, includes error compositing
@@ -528,6 +531,9 @@ public static Definition definition() {
    - Deferred prefixes excluded
    - Context updates when resolver scopes change (withObjectScope(String, Map) adds container)
    - scopeContainers preserved across `withScope()`, `withDeferredPrefixHandler()`, `withChainedScope()`, `withObjectScope(String, ObjectVariableSource)` calls
+   - `withExpressionContext()` adds to scopeContainers without modifying objectPrefixSources
+   - Prefix registered via `withExpressionContext()` appears in `buildExpressionContext()` but NOT in VariableResolver string resolution
+   - Dual registration (same prefix via `withObjectScope` and `withExpressionContext`) keeps STRING and EXPRESSION paths independent
 
 4. **Plugin processor tests:**
    - @Expression annotation → ParameterType.EXPRESSION in generated Definition
