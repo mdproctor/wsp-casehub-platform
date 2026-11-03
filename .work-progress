@@ -104,3 +104,5 @@ arc42_scan_wrap=skipped
 handoff_write_attempt=1
 handoff_write=done
 handoff_write_produced=1
+_exec_ok:wip_commit=yes
+wip_commit=done
