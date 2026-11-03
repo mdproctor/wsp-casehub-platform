@@ -102,3 +102,5 @@ journal_entry=skipped
 arc42_scan_wrap_attempt=0
 arc42_scan_wrap=skipped
 handoff_write_attempt=1
+handoff_write=done
+handoff_write_produced=1
