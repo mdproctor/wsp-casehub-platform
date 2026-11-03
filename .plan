@@ -1,26 +1,17 @@
 # Work Plan — issue-699-type-safe-expression-resolution
 
 ## State
-branch: issue-699-type-safe-expression-resolution
+branch: 
 state: closing:review
 project-sha: 
 date: 
 issue-repo: casehubio/platform
-covers: 699
+covers: 699,700
 design-repo: 
 design-section-hashes: 
 flyway-next-v: 
-
 evidence-era: true
+
 ## Queue
-- [ ] casehubio/platform#699 — Issue #699 ← active
-  - [x] Batch 1: Foundation
-    - [x] Task 1: ParameterType EXPRESSION + @Expression + ExpressionContext.PARAMETER
-    - [x] Task 2: VariableResolver scope infrastructure
-    - [x] Task 3: StepResultStore liveResults
-  - [x] Batch 2: Resolution
-    - [x] Task 4: TypeAwareParamResolver
-    - [x] Task 5: CatalogStepRunner wiring + AptPluginSource
-  - [x] Batch 3: Processor
-    - [x] Task 6: yaml-plugin-processor @Expression support
-    - [x] Task 7: StructuralStepEvaluator scope migration + AssertThatPlugin cleanup
+- [x] casehubio/platform#699 — Issue #699
+- [ ] casehubio/platform#700 — feat: @ annotations for YAML playbooks ← active
