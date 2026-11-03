@@ -1,0 +1,15 @@
+# Work Plan — issue-703-playbook-variable-declarations
+
+## State
+branch: issue-703-playbook-variable-declarations
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 703
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#703 — Issue #703 ← active
