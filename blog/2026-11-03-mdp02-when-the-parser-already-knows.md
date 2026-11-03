@@ -89,7 +89,7 @@ And `AssertThatPlugin.resolveSubject()` — all thirty lines of it — gets dele
 
 The design review surfaced something I hadn't thought through: MVEL's `getTypeMap()` iterates the expression context map at compile time for type introspection. A lazy proxy map with an empty `entrySet()` would silently produce an empty type map, and MVEL would fail to resolve any identifier registered through that scope.
 
-This ruled out the elegant lazy-map approach. The working design uses concrete Map-backed scope registration — `withObjectScope("results", capturedOutput)` instead of `withObjectScope("results", capturedOutput::get)`. The functional overload still works for string resolution; the Map overload enables expression evaluation.
+This ruled out lazy proxy maps entirely. The working design uses concrete Map-backed scope registration — `withObjectScope("results", capturedOutput)` instead of `withObjectScope("results", capturedOutput::get)`. The functional overload still works for string resolution; the Map overload enables expression evaluation.
 
 The result scope needed special handling. `StructuralStepEvaluator` builds the `result` scope from a `StepResultStore` with error compositing — failed steps produce error maps, successful steps produce output maps. For expression evaluation, a live `ConcurrentHashMap` view of the results (via `liveResults()`) gives MVEL the concrete, iterable map it needs, while the functional `ObjectVariableSource` continues to handle the error-composited `${result.stepName.error.message}` path.
 
