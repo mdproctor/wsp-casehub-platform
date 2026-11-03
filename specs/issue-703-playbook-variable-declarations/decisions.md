@@ -68,3 +68,39 @@
 **Sources:** PlaybookCompiler.java:86-123 (compile method pattern)
 **Exploration:** quick
 **Status:** captured
+
+## D7: TypedName extension — nullable scalarType with typeName
+
+**Choice:** Extend `TypedName` to hold `String typeName` and nullable `ValueType scalarType`. When `typeName` matches a `ValueType`, `scalarType` is populated. For domain types like `AgentSessionConfig`, `scalarType` is null and `typeName` carries the opaque label.
+**Alternatives:**
+- New PlaybookTypedName separate from TypedName — leaves TypedName as CSV-only but duplicates parsing logic
+- Subclass/variant of TypedName — breaks the record pattern
+**Rationale:** TypedName is the natural place for `name:type` parsing. Extending it is backward-compatible — existing callers that use `.type()` (now `.scalarType()`) can continue to work. CsvParser already enforces scalars-only at its call site.
+**Trade-offs:** TypedName becomes a broader concept than its original CSV-header scope. Callers that assume non-null `scalarType` need updating (but there are very few — CsvParser and TypedVariables).
+**Sources:** TypedName.java, CsvParser.java
+**Exploration:** quick
+**Status:** captured
+
+## D8: Domain-typed values — store as-is, no validation
+
+**Choice:** Domain-typed variables store their values as-is with no shape validation. Map values stay as `Map<String,Object>`, scalar values also kept as-is. The type label is pure metadata.
+**Alternatives:**
+- Validate shape — domain types must have map values, scalars rejected. Provides early feedback but overly strict before deserialization exists.
+**Rationale:** Without a type registry, there's no basis for shape validation. Deferred to #699 where deserialization and type checking are the explicit focus.
+**Trade-offs:** Malformed domain-typed values won't be caught until runtime (or #699).
+**Sources:** Issue #699
+**Exploration:** quick
+**Status:** captured
+
+## D9: run-playbook param validation — validate at invocation
+
+**Choice:** `RunPlaybookPlugin` parses the sub-playbook's `params:`, validates caller-provided `vars:` against them using `ParameterValidator`, fails fast on missing required params or type mismatches.
+**Depends on:** D4 (reuse YamlModuleParameter), D6 (PlaybookCompiler-centric parsing)
+**Alternatives:**
+- No validation, best-effort — caller vars merged blindly, missing params resolve to null silently
+- Defer to follow-up — run-playbook integration out of scope for #703
+**Rationale:** Fail-fast validation gives playbook authors immediate feedback. The infrastructure (ParameterValidator) already exists. run-playbook is the primary consumer of params: — deferring it would leave params: untestable.
+**Trade-offs:** RunPlaybookPlugin becomes aware of the variable declaration parsing, adding a dependency on the new parsing code.
+**Sources:** RunPlaybookPlugin.java, ParameterValidator.java
+**Exploration:** quick
+**Status:** captured
