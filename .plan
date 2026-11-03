@@ -13,14 +13,14 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/platform#703 — Issue #703 ← active
-  - [ ] Batch 1: TypedName+TypedMap
-    - [ ] Task 1: Extend TypedName for domain types
-    - [ ] Task 2: Extend TypedMap and TypedVariables
-  - [ ] Batch 2: Parser
-    - [ ] Task 3: PlaybookVariableParser
-  - [ ] Batch 3: Compiler
-    - [ ] Task 4: PlaybookVariableContext + compiler wiring
-  - [ ] Batch 4: RunPlaybook
-    - [ ] Task 5: RunPlaybookPlugin vars passing
-  - [ ] Batch 5: TestInfra
-    - [ ] Task 6: YamlTestExecutor vars support
+  - [x] Batch 1: TypedName+TypedMap
+    - [x] Task 1: Extend TypedName for domain types
+    - [x] Task 2: Extend TypedMap and TypedVariables
+  - [x] Batch 2: Parser
+    - [x] Task 3: PlaybookVariableParser
+  - [x] Batch 3: Compiler
+    - [x] Task 4: PlaybookVariableContext + compiler wiring
+  - [x] Batch 4: RunPlaybook
+    - [x] Task 5: RunPlaybookPlugin vars passing
+  - [x] Batch 5: TestInfra
+    - [x] Task 6: YamlTestExecutor vars support
