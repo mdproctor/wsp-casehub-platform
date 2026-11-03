@@ -83,16 +83,17 @@
 
 ## D2: Expression context source
 
-**Choice:** Export from VariableResolver via `buildExpressionContext()` method
+**Choice:** Export from VariableResolver via `buildExpressionContext()` — backed by concrete maps stored via `withObjectScope(String, Map)` overload
 **Alternatives:**
+- Lazy proxy maps backed by ObjectVariableSource — fails because MVEL.getTypeMap() iterates the map at compile time; empty entrySet() breaks compilation
 - Caller-provided context — no VariableResolver changes but context can diverge from resolver scopes
 - Unified ResolutionContext — guarantees consistency but requires refactoring every VariableResolver call site
-**Rationale:** Single source of truth. The resolver knows its own scopes — asking it to export them as a Map<String, Object> for expression engine consumption is natural. Returns lazy proxy maps backed by ObjectVariableSources, no eager enumeration. Stays within yaml-core's zero-dep constraint (returns plain Map).
-**Trade-offs:** Small change to yaml-core's public API. ObjectVariableSource-backed proxy maps need on-demand resolution (lazy get, no size/iterator).
+**Rationale:** Single source of truth. Callers migrate from `withObjectScope("results", map::get)` to `withObjectScope("results", map)` — the resolver stores the backing map and returns it from buildExpressionContext(). MVEL gets concrete, iterable maps for type introspection. Stays within yaml-core's zero-dep constraint.
+**Trade-offs:** Small change to yaml-core's public API. Scopes registered via the functional `withObjectScope(String, ObjectVariableSource)` overload are NOT available in expression context (those callers need to migrate to the Map overload).
 **Depends on:** D1 (TypeAwareParamResolver needs an expression context)
-**Sources:** VariableResolver.java:15-17 (prefixSources, objectPrefixSources fields)
+**Sources:** VariableResolver.java:15-17, MvelExpressionEngine.java:25 (MVEL.getTypeMap iteration)
 **Exploration:** quick
-**Status:** captured
+**Status:** revised (lazy map approach disproven by MVEL type introspection requirement)
 
 ## D3: Plugin EXPRESSION field declaration
 
