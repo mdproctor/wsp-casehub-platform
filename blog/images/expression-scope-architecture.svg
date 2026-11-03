@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 360" font-family="system-ui, -apple-system, sans-serif" font-size="13">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#475569"/>
+    </marker>
+    <marker id="arr-blue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#2563eb"/>
+    </marker>
+    <marker id="arr-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#16a34a"/>
+    </marker>
+  </defs>
+
+  <text x="360" y="24" text-anchor="middle" font-size="15" font-weight="600" fill="#1e293b">Dual-Path Resolution: One Prefix, Two Consumers</text>
+
+  <!-- VariableResolver box -->
+  <rect x="220" y="45" width="280" height="65" rx="6" fill="#f1f5f9" stroke="#94a3b8"/>
+  <text x="360" y="65" text-anchor="middle" font-size="13" font-weight="600" fill="#334155">VariableResolver</text>
+  <text x="360" y="82" text-anchor="middle" font-size="11" fill="#64748b">withObjectScope("result", map)</text>
+  <text x="360" y="97" text-anchor="middle" font-size="11" fill="#64748b">withExpressionContext("result", liveResults())</text>
+
+  <!-- Split arrows -->
+  <line x1="280" y1="110" x2="150" y2="150" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+  <line x1="440" y1="110" x2="570" y2="150" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+  <!-- STRING path (left) -->
+  <rect x="30" y="155" width="240" height="145" rx="6" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="150" y="178" text-anchor="middle" font-size="13" font-weight="600" fill="#1d4ed8">STRING path</text>
+  <text x="150" y="198" text-anchor="middle" font-size="11" fill="#3b82f6">${result.stepName.output.field}</text>
+
+  <rect x="50" y="210" width="200" height="30" rx="3" fill="#fff" stroke="#bfdbfe"/>
+  <text x="150" y="230" text-anchor="middle" font-size="11" fill="#1e40af">ObjectVariableSource (map::get)</text>
+
+  <rect x="50" y="248" width="200" height="30" rx="3" fill="#fff" stroke="#bfdbfe"/>
+  <text x="150" y="268" text-anchor="middle" font-size="11" fill="#1e40af">Error-composited view</text>
+
+  <!-- EXPRESSION path (right) -->
+  <rect x="450" y="155" width="240" height="145" rx="6" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="570" y="178" text-anchor="middle" font-size="13" font-weight="600" fill="#15803d">EXPRESSION path</text>
+  <text x="570" y="198" text-anchor="middle" font-size="11" fill="#22c55e">result.stepName.output.field</text>
+
+  <rect x="470" y="210" width="200" height="30" rx="3" fill="#fff" stroke="#bbf7d0"/>
+  <text x="570" y="230" text-anchor="middle" font-size="11" fill="#166534">ConcurrentHashMap (live)</text>
+
+  <rect x="470" y="248" width="200" height="30" rx="3" fill="#fff" stroke="#bbf7d0"/>
+  <text x="570" y="268" text-anchor="middle" font-size="11" fill="#166534">MVEL iterates for type introspection</text>
+
+  <!-- Converge arrows -->
+  <line x1="150" y1="300" x2="280" y2="330" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+  <line x1="570" y1="300" x2="440" y2="330" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+  <!-- Result box -->
+  <rect x="260" y="320" width="200" height="30" rx="4" fill="#faf5ff" stroke="#c4b5fd"/>
+  <text x="360" y="340" text-anchor="middle" font-size="12" font-weight="500" fill="#6d28d9">Plugin receives resolved value</text>
+</svg>

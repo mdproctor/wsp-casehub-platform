@@ -43,6 +43,8 @@ private Object resolveSubject(Object rawSubject, ServiceRegistry services) {
 
 The plugin does what the resolution layer should have done. It strips syntax the author shouldn't have had to write. It looks up services the framework should have provided. It compiles and evaluates expressions that the type system already declared this parameter would receive. The information was there — the wiring just didn't use it.
 
+This is a pattern I've seen in every plugin system that grows organically. The host defines a type system for registration. That type system carries metadata about each parameter. But resolution ignores it — everything goes through the same string-expansion path. Plugins end up reimplementing type-aware handling ad-hoc, each one slightly differently, each one a maintenance surface.
+
 ## What the type system already knows
 
 CaseHub's plugin system has a `Definition` with typed `Parameter` inputs. A step like `assertThat` registers with the system and declares its parameters — name, type, whether required. The `ParameterType` enum covers the usual suspects: STRING, INTEGER, NUMBER, BOOLEAN, ARRAY, OBJECT.
@@ -53,7 +55,7 @@ So when `CatalogStepRunner` resolves parameters, it calls `resolver.resolveMap()
 
 ![Parameter resolution before and after type-aware routing](images/expression-resolution-flow.svg)
 
-## The design
+## Type-aware resolution
 
 `ParameterType` gains an `EXPRESSION` variant. A new `TypeAwareParamResolver` sits inside `CatalogStepRunner` and routes parameters by their declared type:
 
@@ -62,7 +64,7 @@ So when `CatalogStepRunner` resolves parameters, it calls `resolver.resolveMap()
 
 The separation is clean. EXPRESSION params never touch VariableResolver. STRING params never touch ExpressionEngine. No ambiguity about which path produced the result.
 
-The expression context comes from the same data the resolver already has — the `var`, `results`, `params` scopes. A new `buildExpressionContext()` method on `VariableResolver` exports its Map-backed scopes as concrete maps that MVEL can iterate for type introspection at compile time.
+The `hasExpressionParams()` guard checks the plugin's `Definition` before creating a `TypeAwareParamResolver` — plugins that don't declare any EXPRESSION parameters take the unchanged `resolveMap()` path. Zero overhead for existing plugins, zero migration required.
 
 A new `@Expression` annotation marks plugin record fields:
 
@@ -74,29 +76,35 @@ public record AssertThatPlugin(
 ) { ... }
 ```
 
-The plugin processor picks up `@Expression`, emits `"format": "expression"` in the JSON Schema, and generates uncast `Object` extraction in the binder (MVEL returns typed results, not always strings). At runtime, `AptPluginSource` reads the format and maps it to `ParameterType.EXPRESSION`. The `hasExpressionParams()` guard means zero overhead for plugins that don't use it.
+The plugin processor picks up `@Expression`, emits `"format": "expression"` in the JSON Schema, and generates uncast `Object` extraction in the binder — MVEL returns typed results, not always strings. At runtime, `AptPluginSource` reads the format and maps it to `ParameterType.EXPRESSION`.
 
-After all this, the playbook author writes:
+After this, the playbook author writes:
 
 ```yaml
 - assertThat: results.output.risk_assessment
   contains: 'equities'
 ```
 
-And `AssertThatPlugin.resolveSubject()` — all thirty lines of it — gets deleted. The plugin receives the evaluated value directly. The ceremony is gone from both sides of the boundary.
+And `AssertThatPlugin.resolveSubject()` — all thirty lines of it — is deleted. The plugin receives the evaluated value directly. The ceremony is gone from both sides of the boundary.
 
-## Where it gets interesting
+## The scope problem MVEL exposed
 
 The design review surfaced something I hadn't thought through: MVEL's `getTypeMap()` iterates the expression context map at compile time for type introspection. A lazy proxy map with an empty `entrySet()` would silently produce an empty type map, and MVEL would fail to resolve any identifier registered through that scope.
 
 This ruled out lazy proxy maps entirely. The working design uses concrete Map-backed scope registration — `withObjectScope("results", capturedOutput)` instead of `withObjectScope("results", capturedOutput::get)`. The functional overload still works for string resolution; the Map overload enables expression evaluation.
 
-The result scope needed special handling. `StructuralStepEvaluator` builds the `result` scope from a `StepResultStore` with error compositing — failed steps produce error maps, successful steps produce output maps. For expression evaluation, a live `ConcurrentHashMap` view of the results (via `liveResults()`) gives MVEL the concrete, iterable map it needs, while the functional `ObjectVariableSource` continues to handle the error-composited `${result.stepName.error.message}` path.
+The result scope needed dual registration. `StructuralStepEvaluator` registers the `result` prefix twice: a functional `ObjectVariableSource` for STRING resolution (which handles error compositing — `${result.stepName.error.message}`) and a live `ConcurrentHashMap` view via `liveResults()` for EXPRESSION evaluation (which gives MVEL the concrete, iterable map it needs).
 
-Two paths, one prefix. The `result` scope has a functional source for STRING resolution and a live map for EXPRESSION resolution. Sequential step references work because the map is live — step 3 can reference step 2's output because `recordSuccess()` writes to the same `ConcurrentHashMap` that `buildExpressionContext()` returns.
+![Dual-path resolution: one prefix, two consumers](images/expression-scope-architecture.svg)
 
-## What this opens up
+Sequential step references work because the map is live — step 3 can reference step 2's output because `recordSuccess()` writes to the same `ConcurrentHashMap` that `buildExpressionContext()` returns. No snapshot, no stale data, no synchronisation ceremony.
 
-The immediate payoff is cleaner playbooks and less plugin boilerplate. But the larger value is that the type system now participates in resolution. Once `ParameterType` knows about expressions, other things follow naturally: the `when:` decorator could use the same type-aware path instead of its separate `ConditionEvaluator`. Plugin parameters could declare TRANSFORM or FILTER contexts for per-field engine selection. And the playbook testing framework from [#703](https://github.com/casehubio/platform/issues/703) — where I added `vars:` and `params:` declarations — can now let test assertions use bare expressions instead of `${}` wrappers, closing the loop between type declarations and type-aware evaluation.
+## Why this matters beyond CaseHub
 
-The implementation plan is written — seven tasks across three batches. The foundation types are zero-risk (adding enum values and annotations), the resolution engine is the core work, and the plugin processor changes are mechanical. Backward compatibility is preserved: existing `${...}` syntax is accepted and stripped before evaluation, so nothing breaks.
+The underlying principle is general: **if your type system knows what a parameter is, your resolution layer should use that information.** Most plugin systems — YAML-based or otherwise — define typed parameter schemas at registration time and then ignore them during resolution. Everything gets string-expanded, and plugins reinvent type-aware handling in their own execute methods.
+
+The cost compounds in three directions. Plugin authors write boilerplate that the framework should handle. Users write ceremony that the schema makes redundant. And the framework loses the ability to optimise — it can't skip expression compilation for STRING params or skip string expansion for EXPRESSION params because it doesn't know which is which.
+
+The fix is straightforward once you see it. Route resolution through the type map that already exists. Let the schema author's declaration drive runtime behaviour. Move the type-awareness from the plugin to the framework, where it belongs.
+
+`ParameterType.EXPRESSION` is the specific change. The pattern — **type-driven resolution routing** — applies anywhere a host system dispatches to plugins with typed parameter schemas.
