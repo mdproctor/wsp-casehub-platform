@@ -1,0 +1,15 @@
+# Work Plan — issue-699-type-safe-expression-resolution
+
+## State
+branch: issue-699-type-safe-expression-resolution
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 699
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#699 — Issue #699 ← active
