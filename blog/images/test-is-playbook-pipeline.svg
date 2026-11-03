@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 340" font-family="'Inter', 'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#475569"/>
+    </marker>
+    <linearGradient id="yamlGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#dbeafe"/>
+      <stop offset="100%" stop-color="#bfdbfe"/>
+    </linearGradient>
+    <linearGradient id="execGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e0e7ff"/>
+      <stop offset="100%" stop-color="#c7d2fe"/>
+    </linearGradient>
+    <linearGradient id="resultGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#dcfce7"/>
+      <stop offset="100%" stop-color="#bbf7d0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Title -->
+  <text x="360" y="28" text-anchor="middle" font-size="15" font-weight="600" fill="#1e293b">Test Execution Pipeline</text>
+
+  <!-- .test.yaml file -->
+  <rect x="20" y="50" width="140" height="260" rx="8" fill="url(#yamlGrad)" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="90" y="74" text-anchor="middle" font-size="12" font-weight="600" fill="#1e40af">.test.yaml</text>
+  <line x1="35" y1="84" x2="145" y2="84" stroke="#93c5fd" stroke-width="1"/>
+
+  <text x="90" y="104" text-anchor="middle" font-size="10" fill="#1e40af">name:</text>
+  <rect x="35" y="114" width="110" height="40" rx="4" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="90" y="131" text-anchor="middle" font-size="9" font-weight="500" fill="#1d4ed8">simulate:</text>
+  <text x="90" y="146" text-anchor="middle" font-size="8" fill="#3b82f6">agent corpus</text>
+
+  <rect x="35" y="162" width="110" height="40" rx="4" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="90" y="179" text-anchor="middle" font-size="9" font-weight="500" fill="#1d4ed8">steps:</text>
+  <text x="90" y="194" text-anchor="middle" font-size="8" fill="#3b82f6">agent-invoke, assertThat</text>
+
+  <rect x="35" y="210" width="110" height="40" rx="4" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="90" y="227" text-anchor="middle" font-size="9" font-weight="500" fill="#1d4ed8">setup: / teardown:</text>
+  <text x="90" y="242" text-anchor="middle" font-size="8" fill="#3b82f6">lifecycle steps</text>
+
+  <rect x="35" y="258" width="110" height="40" rx="4" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="90" y="275" text-anchor="middle" font-size="9" font-weight="500" fill="#1d4ed8">capture:</text>
+  <text x="90" y="290" text-anchor="middle" font-size="8" fill="#3b82f6">output binding</text>
+
+  <!-- Arrow 1 -->
+  <line x1="165" y1="180" x2="200" y2="180" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Discovery + Parse -->
+  <rect x="205" y="110" width="120" height="60" rx="8" fill="url(#execGrad)" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="265" y="136" text-anchor="middle" font-size="10" font-weight="600" fill="#3730a3">Discovery</text>
+  <text x="265" y="152" text-anchor="middle" font-size="9" fill="#4f46e5">*.test.yaml scan</text>
+
+  <rect x="205" y="190" width="120" height="60" rx="8" fill="url(#execGrad)" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="265" y="216" text-anchor="middle" font-size="10" font-weight="600" fill="#3730a3">Parse</text>
+  <text x="265" y="232" text-anchor="middle" font-size="9" fill="#4f46e5">simulate → overlay</text>
+
+  <!-- Arrow 2 -->
+  <line x1="330" y1="180" x2="365" y2="180" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Execution core -->
+  <rect x="370" y="70" width="160" height="220" rx="8" fill="url(#execGrad)" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="450" y="94" text-anchor="middle" font-size="11" font-weight="600" fill="#3730a3">Executor</text>
+  <line x1="385" y1="104" x2="515" y2="104" stroke="#a5b4fc" stroke-width="1"/>
+
+  <rect x="385" y="114" width="130" height="34" rx="4" fill="#eef2ff" stroke="#a5b4fc"/>
+  <text x="450" y="130" text-anchor="middle" font-size="9" font-weight="500" fill="#4338ca">Walker.resolve()</text>
+  <text x="450" y="142" text-anchor="middle" font-size="8" fill="#6366f1">step resolution</text>
+
+  <rect x="385" y="156" width="130" height="34" rx="4" fill="#eef2ff" stroke="#a5b4fc"/>
+  <text x="450" y="172" text-anchor="middle" font-size="9" font-weight="500" fill="#4338ca">CatalogStepRunner</text>
+  <text x="450" y="184" text-anchor="middle" font-size="8" fill="#6366f1">plugin dispatch</text>
+
+  <rect x="385" y="198" width="130" height="34" rx="4" fill="#eef2ff" stroke="#a5b4fc"/>
+  <text x="450" y="214" text-anchor="middle" font-size="9" font-weight="500" fill="#4338ca">StructuralEvaluator</text>
+  <text x="450" y="226" text-anchor="middle" font-size="8" fill="#6366f1">if/parallel/race/try</text>
+
+  <rect x="385" y="240" width="130" height="34" rx="4" fill="#eef2ff" stroke="#a5b4fc"/>
+  <text x="450" y="256" text-anchor="middle" font-size="9" font-weight="500" fill="#4338ca">SimulationRuntime</text>
+  <text x="450" y="268" text-anchor="middle" font-size="8" fill="#6366f1">overlay stack</text>
+
+  <!-- Arrow 3 -->
+  <line x1="535" y1="180" x2="570" y2="180" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Results -->
+  <rect x="575" y="100" width="130" height="160" rx="8" fill="url(#resultGrad)" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="640" y="124" text-anchor="middle" font-size="11" font-weight="600" fill="#15803d">Results</text>
+  <line x1="590" y1="134" x2="690" y2="134" stroke="#86efac" stroke-width="1"/>
+
+  <rect x="590" y="144" width="100" height="28" rx="4" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="640" y="163" text-anchor="middle" font-size="9" font-weight="500" fill="#166534">PASS / FAIL</text>
+
+  <rect x="590" y="180" width="100" height="28" rx="4" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="640" y="199" text-anchor="middle" font-size="9" font-weight="500" fill="#166534">JUnit XML</text>
+
+  <rect x="590" y="216" width="100" height="28" rx="4" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="640" y="235" text-anchor="middle" font-size="9" font-weight="500" fill="#166534">IntelliJ / CLI</text>
+
+  <!-- Bottom label -->
+  <text x="360" y="330" text-anchor="middle" font-size="10" fill="#64748b">Same Walker + StructuralStepEvaluator used by the production runtime</text>
+</svg>
