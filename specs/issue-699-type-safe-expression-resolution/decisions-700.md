@@ -29,29 +29,35 @@
 
 ## D3: Decorator migration — dual path with deprecation timeline
 
-**Choice:** Both `timeout: 5s` (key) and `#@timeout(5s)` (annotation) work during the migration window. Annotation takes precedence on conflict. Deprecation warnings for the key form. Key form removed once D4 classification is validated through implementation — migration tool provided at that point.
+**Choice:** Both `timeout: 5s` (key) and `#@timeout(5s)` (annotation) work during the migration window. Annotation takes precedence on conflict. Deprecation warnings for the key form. Decorator-form key removed once D4 classification is validated through implementation — migration tool provided at that point.
+
+**PROMOTABLE_DECORATOR carve-out:** For `retry`, `timeout`, and `mutex` — PROMOTABLE_DECORATORS classified as annotation candidates — migration removes only the **decorator-form** key (e.g., `retry: 3`, `timeout: 5s`, `mutex: lock-name`). The **structural-scoping** key form (e.g., `retry condition: [steps]`, `timeout 30s: [steps]`, `mutex lock: [steps]`) is retained permanently — it has no annotation equivalent because annotations cannot scope a step list. The migration tool must distinguish these two forms by value type: scalar/simple values are decorator-form (migrated), List values or combined-key syntax are structural-scoping (preserved).
+
 **Alternatives:**
 - Immediate clean break — right design per platform philosophy, but premature before D4 audit is validated
 - Dual path without warnings — no migration pressure
 - Permanent dual path — maintenance burden that never gets removed
-**Rationale:** The dual path exists to hedge against D4 misclassification, not as permanent design. Once decorator classification is validated (D4 complete, Phase 2 @Inject proves the model), a clean break with a mechanical migration tool is the correct final state. The deprecation window is bounded: key form removed in the release following D4 validation.
-**Trade-offs:** Temporary dual-path maintenance. Migration tool must be ready before key-form removal.
-**Sources:** Issue #700 spec, R1-03 review
+- Migrate structural-scoping forms too — impossible; annotations cannot express step-list scoping
+**Rationale:** The dual path exists to hedge against D4 misclassification, not as permanent design. Once decorator classification is validated (D4 complete, Phase 2 @Inject proves the model), a clean break with a mechanical migration tool is the correct final state. The deprecation window is bounded: decorator-form key removed in the release following D4 validation. Structural-scoping forms are a permanent part of the language — they are not annotations and never will be.
+**Trade-offs:** Temporary dual-path maintenance. Migration tool must be ready before key-form removal. Migration tool must correctly distinguish decorator-form from structural-scoping usage.
+**Sources:** Issue #700 spec, R1-03 review, R2-02 review, Walker.java (PROMOTABLE_DECORATORS lines 19–20, structural handling lines 131–142, 388–395)
 **Exploration:** quick
-**Status:** revised (R1: added concrete deprecation timeline and removal trigger)
+**Status:** revised (R1: added deprecation timeline; R2: added PROMOTABLE_DECORATOR carve-out for structural-scoping forms)
 
 ## D4: Decorator audit classification
 
 **Choice:** Complete classification of all 28 `StepKeywords.DECORATOR_KEYS`:
 
-**Annotation candidates (12 — policy/metadata):** timeout, retry, priority, resource, background, mutex, delay, on-error, trigger, semaphore, at, cancel
+**Annotation candidates — decorator-form only (12 — policy/metadata):** timeout, retry, priority, resource, background, mutex, delay, on-error, trigger, semaphore, at, cancel
 
-**Stay as keys — structural (7):**
+Note: `retry`, `timeout`, and `mutex` are PROMOTABLE_DECORATORS with dual forms. Their **decorator-form** (scalar value: `retry: 3`, `timeout: 5s`, `mutex: lock-name`) is an annotation candidate. Their **structural-scoping form** (List value: `retry condition: [steps]`) is retained as a key — see D3 carve-out. The annotation replaces the decorator usage; the structural usage is permanent.
+
+**Stay as keys — primary structural (7):**
 - `if` — conditional branching, Walker produces IfElseStep
 - `barrier` — synchronization point, Walker produces BarrierStep with await list
 - `quorum` — quorum consensus, Walker produces QuorumStep with required/of params
-- `when` — structural guard in PROMOTABLE_DECORATORS, can scope step lists (`when condition: [steps]`)
-- `forEach` — iteration, PROMOTABLE_DECORATOR with step-list scoping
+- `when` — primary usage is structural guard (PROMOTABLE_DECORATOR), scopes step lists (`when condition: [steps]`). Also used as simple decorator guard, but structural is the dominant form.
+- `forEach` — primary usage is iteration (PROMOTABLE_DECORATOR), scopes step lists
 - `loop` — iteration control
 - `wait` — structural in select branches (SelectBranchType.WAIT), timing decorator elsewhere; structural usage takes precedence
 
@@ -69,13 +75,20 @@
 - `transition` — state machine flow control
 
 **Alternatives:**
-- `when` as annotation candidate — `when` changes WHETHER the step runs (fits the HOW/WHETHER criterion). However, `when` is a PROMOTABLE_DECORATOR in Walker with step-list scoping capability (`when cond: [steps]`). The structural form cannot be expressed as an annotation. Stays as key.
+- `when` as annotation candidate — `when` changes WHETHER the step runs (fits the HOW/WHETHER criterion). However, `when`'s **primary** usage is structural (iteration guard with step-list scoping). The structural form cannot be expressed as an annotation. Stays as key.
+- `retry`/`timeout`/`mutex` as "stays as key" — all three are PROMOTABLE_DECORATORS with structural-scoping capability. However, their **primary** usage is decorator-form (policy metadata). The structural-scoping form is retained as a key (D3 carve-out), but the decorator form migrates to annotation.
 - `on-error` vs `on-failure` distinction — Both are error-related. `on-error` is a step-level fallback handler (DecoratorChain.wrapOnError). `on-failure` has additional state-machine-level semantics in StateMachineParser (state transition target). The state-machine structural role keeps `on-failure` as a key.
 
-**Rationale:** Primary criterion: "changes WHAT the step does → key; changes HOW/WHETHER → annotation candidate." Secondary criterion: any key with structural handling in Walker (own ResolvedStep type or PROMOTABLE_DECORATOR scoping) stays as key regardless of primary criterion. Tertiary: keys with dual step/state-machine semantics stay as keys.
-**Sources:** StepKeywords.java (28 DECORATOR_KEYS), Walker.java (PROMOTABLE_DECORATORS, structural step types), DecoratorChain.java (decorator runtime handling), StateMachineParser.java (state-level metadata), OnCompleteExpander.java
+**Criteria hierarchy:**
+1. **Primary criterion:** changes WHAT the step does → key; changes HOW/WHETHER → annotation candidate.
+2. **Structural override:** keys with their own ResolvedStep type (IfElseStep, BarrierStep, QuorumStep) or whose **primary** usage is structural step-list scoping (forEach, when, loop) stay as keys regardless of primary criterion.
+3. **Dual-form handling:** PROMOTABLE_DECORATORS whose **primary** usage is decorator-form (retry, timeout, mutex) are annotation candidates for the decorator case; the structural-scoping key form is retained permanently (D3 carve-out).
+4. **Dual semantics:** keys with step + state-machine semantics (on-success, on-failure) stay as keys.
+
+**Rationale:** The criteria hierarchy distinguishes between primary and secondary usage patterns. All six PROMOTABLE_DECORATORS share identical structural handling in Walker (lines 131–142, 388–395), but their primary usage differs: `forEach`/`when`/`loop` are primarily iteration/logic constructs that happen to accept scalar values, while `retry`/`timeout`/`mutex` are primarily scalar policies that happen to accept step lists. The primary usage determines the classification; the secondary form is preserved through D3's carve-out.
+**Sources:** StepKeywords.java (28 DECORATOR_KEYS), Walker.java (PROMOTABLE_DECORATORS lines 19–20, structural handling lines 131–142, 388–395, combined-key prefixes lines 28–35), DecoratorChain.java (decorator runtime handling), StateMachineParser.java (state-level metadata), OnCompleteExpander.java
 **Exploration:** quick
-**Status:** revised (R1: completed audit for all 28 keys, added 12 previously unclassified keys, explicit criteria hierarchy)
+**Status:** revised (R1: completed audit for all 28 keys; R2: refined criteria hierarchy to distinguish primary vs secondary usage for PROMOTABLE_DECORATORS)
 
 ## D5: Annotation infrastructure module placement
 
