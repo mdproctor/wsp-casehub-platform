@@ -2,15 +2,22 @@
 
 ## Last Session (2026-11-04)
 
-Completed five issues from epic #702 (YAML Playbook Polish), all synced to main:
+Completed #706 — Typed error handling in catch blocks (M/Med), synced to main:
 
-- **#718** — Annotation threading through match/select (XS/Low): threaded `AnnotationMap` through `resolveMatchCases` and `resolveSelectBranches`
-- **#710** — yaml-codegen expression format (XS/Low): added `format` field to `TypeGraph.FieldDef`, maps `"expression"` to `Object`
-- **#711** — AssertPlugin migration evaluation (XS/Low): decided not to migrate — empty-context evaluation is intentional
-- **#712** — Scope dual-registration (S/Med): `pushScope` now adds Map-backed values to `scopeContainers` via `withExpressionContext`; also fixed `each` and `error` scopes
-- **#713** — ConditionEvaluator unification evaluation (S/Med): decided not to unify — Truthiness fast-path differs from general parameter resolution
+- `ErrorCategory`: added `yamlKey()`/`fromYamlKey()` for kebab-case YAML naming, 6 new values (RATE_LIMIT, SESSION_LIMIT, NOT_FOUND, AUTH_DENIED, SIMULATION, INFRASTRUCTURE)
+- `YamlError`: added `toDetailMap()` across all 20 records in the RuntimeStepError, CoordinationError, ParseError hierarchies
+- `Result.Failure`: added `detail` field (`Map<String, Object>`) for structured error data through the retry decorator
+- `FailureCategory`: constants updated from SCREAMING_SNAKE to kebab-case
+- New `RuntimeStepError` records: `RateLimitError`, `SessionLimitError`, `InfrastructureError`, `AuthDeniedError`, `CategorizedStepActionError`
+- `YamlErrorMapper`: new branches for agent/ACL exceptions, `fromFailure()` bridge
+- `evaluateTryCatchFinally`: catch scope now exposes `${error.type}`, `${error.message}`, `${error.step}`, `${error.detail}`
+- `buildResultSource`: updated to use `yamlKey()` for consistency
+- `AgentInvokeHandler`: categorized `Result.failed()` with detail maps
+- Agent exception enrichment: `AgentTimeoutException.timeout()`, `AgentSessionLimitException.limit()`
 
-Blog entry: `blog/2026-11-04-mdp01-the-places-your-type-system-forgets.md`
+Also moved platform#714 (TS Walker expression parity) to casehubio/casehub-pages#608, scoped as a full TS/Java parity audit.
+
+Design review ran 3 rounds (standard), found 20 issues — all resolved. Key findings: null safety in InfrastructureError.toDetailMap (fixed), dual-path architecture documented (handler-catch vs exception-propagation), Result.Failure.detail added to preserve structured data through retry decorator.
 
 ## Epic #702 — YAML Playbook Polish
 
@@ -21,24 +28,22 @@ Blog entry: `blog/2026-11-04-mdp01-the-places-your-type-system-forgets.md`
 | 699 | Type-safe expression resolution | XL | High | Done |
 | 700 | `@` annotations with `@Inject` | XL | High | Done |
 | 716 | Nested step-level annotations | S | Low | Done |
-| 718 | Match/select annotation threading | XS | Low | Done (this session) |
-| 710 | yaml-codegen expression format | XS | Low | Done (this session) |
-| 711 | AssertPlugin migration evaluation | XS | Low | Done (this session) |
-| 712 | Scope dual-registration | S | Med | Done (this session) |
-| 713 | ConditionEvaluator unification eval | S | Med | Done (this session) |
-| 706 | Typed error handling in catch blocks | M | Med | Open — next |
-| 705 | JSON Schema for playbook documents | M | Med | Open |
+| 718 | Match/select annotation threading | XS | Low | Done |
+| 710 | yaml-codegen expression format | XS | Low | Done |
+| 711 | AssertPlugin migration evaluation | XS | Low | Done |
+| 712 | Scope dual-registration | S | Med | Done |
+| 713 | ConditionEvaluator unification eval | S | Med | Done |
+| 706 | Typed error handling in catch blocks | M | Med | Done (this session) |
+| 705 | JSON Schema for playbook documents | M | Med | Open — next |
 | 708 | Playbook dry-run mode | M | Low | Open |
-| 714 | TypeScript Walker expression parity | M | Med | Open |
 | 701 | Playbook imports via module system | L | Med | Open |
 
 ## Immediate Next Step
 
-#706 — Typed error handling in catch blocks (M/Med).
+#705 — JSON Schema for playbook documents (M/Med).
 
 ## References
 
 - Epic: casehubio/platform#702
-- Blog (this session): `blog/2026-11-04-mdp01-the-places-your-type-system-forgets.md`
-- Blog (previous): `blog/2026-11-03-mdp01-playbooks-deserve-a-type-system.md`
-- Remaining queue: #706, #705, #708, #714, #701
+- TS parity audit: casehubio/casehub-pages#608 (moved from platform#714)
+- Remaining queue: #705, #708, #701
