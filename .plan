@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-711-assert-expression-migration
-state: active
+state: closing:review
 project-sha: 
 date: 
 issue-repo: casehubio/platform
