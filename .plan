@@ -14,17 +14,5 @@ evidence-era: true
 
 ## Queue
 - [x] casehubio/platform#699 — Issue #699
-- [ ] casehubio/platform#700 — feat: @ annotations for YAML playbooks ← active
-  - [x] Batch 1: Data Model + Parser
-    - [x] Task 1: Annotation records and AnnotationMap
-    - [x] Task 2: AnnotationParser argument grammar
-    - [x] Task 3: AnnotationExtractor pre-parser
-  - [x] Batch 2: Walker Integration
-    - [x] Task 4: Add annotations to ResolvedStep + Walker
-  - [x] Batch 3: Inject Resolution
-    - [x] Task 5: InjectionResolver SPI + InjectionBinding
-    - [x] Task 6: StructuralStepEvaluator @Inject wiring
-  - [x] Batch 4: Decorator Migration
-    - [x] Task 7: Decorator dual-path in DecoratorChain + Walker
-    - [x] Task 8: End-to-end annotation integration test
-- [ ] casehubio/platform#716 — nested step-level annotation support
+- [x] casehubio/platform#700 — feat: @ annotations for YAML playbooks
+- [ ] casehubio/platform#716 — nested step-level annotation support ← active
