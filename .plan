@@ -1,0 +1,15 @@
+# Work Plan — issue-708-playbook-dry-run-mode
+
+## State
+branch: issue-708-playbook-dry-run-mode
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 708
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#708 — Issue #708 ← active
