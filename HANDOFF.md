@@ -1,43 +1,44 @@
 # HANDOFF — casehub-platform
 
-## Last Session (2026-11-03)
+## Last Session (2026-11-04)
 
-Completed **#703** (playbook variable declarations, L/Med) as part of epic **#702** (YAML playbook polish). Wrote blog entry.
+Completed five issues from epic #702 (YAML Playbook Polish), all synced to main:
 
-**#703 — Playbook variable declarations (L/Med):**
-- Extended `TypedName` record to accept domain types as opaque labels alongside scalar `ValueType`s
-- Extended `TypedMap` with `domainTypes` field; `TypedVariables` gains type inference for untyped vars
-- New `PlaybookVariableParser` in yaml-core's playbook subpackage — parses `vars:` and `params:` with `name:type:` compound key syntax, short form + long form constraints reusing `YamlModuleParameter`
-- New `PlaybookVariableContext` in playbook-compiler — wraps parsed result, builds `VariableResolver`, validates caller params
-- `CompilationResult` gains `variableContext` field; `PlaybookCompiler` extracts vars/params from content map
-- `RunPlaybookPlugin` validates caller vars against sub-playbook params at invocation time
-- `YamlTestExecutor` supports `vars:` and `params:` in test files
-- Spring parity exception added for yaml-test module
-- Landed as `3fb7f083` on main
-- Design spec: `wsp-casehub-platform/specs/issue-703-playbook-variable-declarations/`
-- Blog entry: `wsp-casehub-platform/blog/2026-11-03-mdp01-playbooks-deserve-a-type-system.md`
+- **#718** — Annotation threading through match/select (XS/Low): threaded `AnnotationMap` through `resolveMatchCases` and `resolveSelectBranches`
+- **#710** — yaml-codegen expression format (XS/Low): added `format` field to `TypeGraph.FieldDef`, maps `"expression"` to `Object`
+- **#711** — AssertPlugin migration evaluation (XS/Low): decided not to migrate — empty-context evaluation is intentional
+- **#712** — Scope dual-registration (S/Med): `pushScope` now adds Map-backed values to `scopeContainers` via `withExpressionContext`; also fixed `each` and `error` scopes
+- **#713** — ConditionEvaluator unification evaluation (S/Med): decided not to unify — Truthiness fast-path differs from general parameter resolution
+
+Blog entry: `blog/2026-11-04-mdp01-the-places-your-type-system-forgets.md`
 
 ## Epic #702 — YAML Playbook Polish
 
 | # | Title | Scale | Complexity | Status |
 |---|-------|-------|------------|--------|
 | 698 | Enforce combined-key syntax | S | Low | Done |
-| 703 | Playbook variable declarations | L | Med | Done (this session) |
-| 699 | Type-safe expression resolution | XL | High | Open — next |
-| 700 | `@` annotations with `@Inject` | XL | High | Open — unblocked by #703 |
-| 701 | Playbook imports via module system | L | Med | Open — blocked by #699, #700 |
-| 705 | JSON Schema for playbook documents | M | Med | Open — independent |
-| 708 | Playbook dry-run mode | M | Low | Open — independent |
-
-Dependency graph: #699 and #700 are now unblocked by #703. #701 depends on both. #705 and #708 are independent.
+| 703 | Playbook variable declarations | L | Med | Done |
+| 699 | Type-safe expression resolution | XL | High | Done |
+| 700 | `@` annotations with `@Inject` | XL | High | Done |
+| 716 | Nested step-level annotations | S | Low | Done |
+| 718 | Match/select annotation threading | XS | Low | Done (this session) |
+| 710 | yaml-codegen expression format | XS | Low | Done (this session) |
+| 711 | AssertPlugin migration evaluation | XS | Low | Done (this session) |
+| 712 | Scope dual-registration | S | Med | Done (this session) |
+| 713 | ConditionEvaluator unification eval | S | Med | Done (this session) |
+| 706 | Typed error handling in catch blocks | M | Med | Open — next |
+| 705 | JSON Schema for playbook documents | M | Med | Open |
+| 708 | Playbook dry-run mode | M | Low | Open |
+| 714 | TypeScript Walker expression parity | M | Med | Open |
+| 701 | Playbook imports via module system | L | Med | Open |
 
 ## Immediate Next Step
 
-#699 — Type-safe expression resolution (XL/High). This is the critical path item in the polish epic. Builds directly on the variable declaration infrastructure from #703.
+#706 — Typed error handling in catch blocks (M/Med).
 
 ## References
 
 - Epic: casehubio/platform#702
-- Design spec: `wsp-casehub-platform/specs/issue-703-playbook-variable-declarations/2026-11-03-playbook-variable-declarations-design.md`
-- Implementation plan: `wsp-casehub-platform/plans/2026-11-03-playbook-variable-declarations.md`
-- Blog: `wsp-casehub-platform/blog/2026-11-03-mdp01-playbooks-deserve-a-type-system.md`
+- Blog (this session): `blog/2026-11-04-mdp01-the-places-your-type-system-forgets.md`
+- Blog (previous): `blog/2026-11-03-mdp01-playbooks-deserve-a-type-system.md`
+- Remaining queue: #706, #705, #708, #714, #701
