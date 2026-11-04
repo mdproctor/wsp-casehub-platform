@@ -17,17 +17,15 @@ So when the time came to add metadata — descriptions for tooling, roles for go
 
 I chose annotations. And then I chose to make them YAML comments.
 
-## Why comments
+## The `@` that didn't survive
 
-The obvious approach is bare `@` — familiar from Java, clean to read:
+The [previous entry in this series](2026-11-03-mdp02-when-the-parser-already-knows.md) used bare `@` in its examples — `@type(expression)` as the proposed annotation syntax. That was the plan. The issue spec committed to it, argued for it, dismissed `#@` as unnecessary compatibility overhead for a format that needs a CaseHub-aware editor anyway.
 
-```yaml
-@timeout(5s)
-- rest-request:
-    url: /api/customers
-```
+I changed my mind during implementation.
 
-The problem: that's not valid YAML. A pre-parser would need to strip those lines before SnakeYAML can touch the file, transforming text in the critical parsing path. Every tool that reads playbooks would need the pre-parser. Every error message would need line-number adjustment. The pre-parser isn't just extraction — it's text transformation, and text transformation has a way of becoming the thing everything depends on.
+The bare `@` design looked clean in the spec. In practice, it meant the pre-parser had to strip annotation lines before SnakeYAML could parse the file — transforming text in the critical parsing path. We went through three variations trying to make the stripping clean: positional index mapping, synthetic YAML keys, SnakeYAML Mark tracking. Each one coupled extraction to parsing in a way that made one depend on the other. The complexity wasn't in any single approach — it was in the fact that every approach needed *both* operations to cooperate.
+
+The fix was embarrassingly simple. Stop stripping. Make them comments.
 
 `#@` avoids this entirely:
 
