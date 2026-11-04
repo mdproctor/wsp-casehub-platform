@@ -1,0 +1,15 @@
+# Work Plan — issue-711-assert-expression-migration
+
+## State
+branch: issue-711-assert-expression-migration
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 711
+design-repo: 
+design-section-hashes: 
+flyway-next-v: 
+
+## Queue
+- [ ] casehubio/platform#711 — Issue #711 ← active
