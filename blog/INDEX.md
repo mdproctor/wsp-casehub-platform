@@ -35,3 +35,4 @@
 | [2026-11-01-mdp01-generated-code-security-gap.md](2026-11-01-mdp01-generated-code-security-gap.md) | 2026-11-01 | Why code generators must propagate all security annotations — not just the ones you remembered to handle |
 | [2026-11-03-mdp01-playbooks-deserve-a-type-system.md](2026-11-03-mdp01-playbooks-deserve-a-type-system.md) | 2026-11-03 | Why playbooks need typed variable declarations — vars:, params:, constraints, and the contract between caller and callee |
 | [2026-11-03-mdp02-when-the-parser-already-knows.md](2026-11-03-mdp02-when-the-parser-already-knows.md) | 2026-11-03 | Type-safe expression resolution design — eliminating redundant ${} wrappers by making the plugin type system participate in parameter resolution |
+| [2026-11-04-mdp01-metadata-that-doesnt-break-your-parser.md](2026-11-04-mdp01-metadata-that-doesnt-break-your-parser.md) | 2026-11-04 | #@ annotations for YAML playbooks — comment-based metadata that composes with existing parsers |

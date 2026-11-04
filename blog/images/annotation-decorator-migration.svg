@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 300" font-family="'Segoe UI', system-ui, sans-serif" font-size="13">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#475569"/>
+    </marker>
+  </defs>
+
+  <rect width="680" height="300" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="340" y="28" text-anchor="middle" font-size="15" font-weight="600" fill="#1e293b">Decorator Migration — dual path, annotation wins</text>
+
+  <!-- Before column -->
+  <rect x="30" y="50" width="200" height="120" rx="6" fill="#fef2f2" stroke="#fca5a5"/>
+  <text x="130" y="72" text-anchor="middle" font-weight="600" fill="#991b1b">Before</text>
+  <text x="40" y="96" font-family="'SF Mono', monospace" font-size="12" fill="#374151">- rest-request:</text>
+  <text x="40" y="114" font-family="'SF Mono', monospace" font-size="12" fill="#374151">    url: /api</text>
+  <text x="40" y="132" font-family="'SF Mono', monospace" font-size="12" fill="#b91c1c" font-weight="600">  timeout: 5s</text>
+  <text x="40" y="150" font-family="'SF Mono', monospace" font-size="12" fill="#b91c1c" font-weight="600">  retry: 3</text>
+
+  <!-- After column -->
+  <rect x="280" y="50" width="220" height="120" rx="6" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="390" y="72" text-anchor="middle" font-weight="600" fill="#166534">After</text>
+  <text x="290" y="96" font-family="'SF Mono', monospace" font-size="12" fill="#166534" font-weight="600">#@timeout(5s)</text>
+  <text x="290" y="114" font-family="'SF Mono', monospace" font-size="12" fill="#166534" font-weight="600">#@retry(3)</text>
+  <text x="290" y="132" font-family="'SF Mono', monospace" font-size="12" fill="#374151">- rest-request:</text>
+  <text x="290" y="150" font-family="'SF Mono', monospace" font-size="12" fill="#374151">    url: /api</text>
+
+  <!-- Arrow between -->
+  <line x1="235" y1="110" x2="275" y2="110" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Structural stays box -->
+  <rect x="540" y="50" width="120" height="120" rx="6" fill="#fefce8" stroke="#fde68a"/>
+  <text x="600" y="72" text-anchor="middle" font-weight="600" fill="#854d0e">Stays as key</text>
+  <text x="550" y="96" font-family="'SF Mono', monospace" font-size="11" fill="#374151">retry cond:</text>
+  <text x="550" y="114" font-family="'SF Mono', monospace" font-size="11" fill="#374151">  - step-a:</text>
+  <text x="550" y="132" font-family="'SF Mono', monospace" font-size="11" fill="#374151">  - step-b:</text>
+  <text x="550" y="155" font-size="10" fill="#92400e" font-style="italic">structural scoping</text>
+
+  <!-- Classification table -->
+  <rect x="30" y="190" width="630" height="100" rx="6" fill="#fff" stroke="#e2e8f0"/>
+  <text x="50" y="212" font-weight="600" fill="#334155">12 migrate to annotations</text>
+  <text x="50" y="232" font-size="11" fill="#64748b">timeout · retry · delay · priority · resource · background</text>
+  <text x="50" y="250" font-size="11" fill="#64748b">on-error · trigger · semaphore · at · cancel · mutex</text>
+
+  <line x1="350" y1="196" x2="350" y2="284" stroke="#e2e8f0"/>
+
+  <text x="370" y="212" font-weight="600" fill="#334155">16 stay as keys</text>
+  <text x="370" y="232" font-size="11" fill="#64748b">when · capture · transform · signal · publish · forEach</text>
+  <text x="370" y="250" font-size="11" fill="#64748b">loop · on-success · on-failure · on-complete · transition</text>
+  <text x="370" y="268" font-size="11" fill="#64748b">if · barrier · quorum · wait · from</text>
+</svg>
