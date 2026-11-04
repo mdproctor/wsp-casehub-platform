@@ -26,6 +26,8 @@ Designed and implemented **#700** (`#@` annotations for YAML playbooks, XL/High)
 | 705 | JSON Schema for playbook documents | M | Med | Open |
 | 708 | Playbook dry-run mode | M | Low | Open |
 
+**Blog:** "Metadata That Doesn't Break Your Parser" — covers the `#@` design pivot from bare `@`, the pre-parser architecture, `@Inject` wiring, and decorator migration. Acknowledges contradiction with the previous entry's bare `@` proposal.
+
 ## Immediate Next Step
 
 **Implement #716** (nested step-level annotations, S/Low) — extend `AnnotationExtractor` to track indent-level changes and produce nested step indices. Same branch `issue-699-type-safe-expression-resolution`.
@@ -35,3 +37,4 @@ Designed and implemented **#700** (`#@` annotations for YAML playbooks, XL/High)
 - Design spec (#700): `wsp-casehub-platform/specs/issue-699-type-safe-expression-resolution/2026-11-04-annotations-design.md`
 - Decisions: `wsp-casehub-platform/specs/issue-699-type-safe-expression-resolution/decisions-700.md`
 - Implementation plan: `wsp-casehub-platform/plans/2026-11-04-annotations-for-yaml-playbooks.md`
+- Blog: `wsp-casehub-platform/blog/2026-11-04-mdp01-metadata-that-doesnt-break-your-parser.md`
