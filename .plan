@@ -1,0 +1,21 @@
+# Work Plan — issue-718-match-select-annotations
+
+## Queue
+- [ ] casehubio/platform#718 — annotation support inside match/select branches ← active
+- [ ] casehubio/platform#710 — yaml-codegen expression format handling
+- [ ] casehubio/platform#711 — AssertPlugin contextual expression migration
+- [ ] casehubio/platform#712 — scope migration to Map-backed registration
+- [ ] casehubio/platform#713 — when: decorator condition unification
+- [ ] casehubio/platform#706 — typed error handling in catch blocks
+- [ ] casehubio/platform#705 — JSON Schema for playbook documents
+- [ ] casehubio/platform#708 — playbook dry-run mode
+- [ ] casehubio/platform#714 — TypeScript Walker expression parity
+- [ ] casehubio/platform#701 — wire playbook imports to module system
+
+## State
+branch: issue-718-match-select-annotations
+state: active
+issue-repo: casehubio/platform
+covers: casehubio/platform#718
+Current: casehubio/platform#718 — annotation support inside match/select branches
+date: 2026-11-04
