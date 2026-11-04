@@ -2,16 +2,16 @@
 
 ## Last Session (2026-11-04)
 
-Designed and implemented **#700** (`#@` annotations for YAML playbooks, XL/High) — brainstorming through full implementation in one session. All 3 phases delivered: pre-parser + tooling annotations, @Inject resolution, decorator migration with dual-path. 8 tasks, 1644 tests green across yaml-core and yaml-step-runtime.
-
-**Key design decision:** `#@` prefix (valid YAML comments) instead of bare `@` — eliminates pre-parser text transformation. Bare `@` rendering deferred to UI (#717). Decision review (3 rounds) added PROMOTABLE_DECORATOR carve-out: structural-scoping forms (`retry condition: [steps]`) stay as keys permanently.
+Implemented **#716** (nested step-level annotations, S/Low) — TDD, 7 new tests, 1655 total green across yaml-core and yaml-step-runtime.
 
 **What was built:**
-- `io.casehub.yaml.core.annotation` package — `AnnotationExtractor`, `AnnotationParser`, `Annotation`, `AnnotationArg`, `AnnotationMap`, `InjectionResolver`, `InjectionBinding`
-- `ResolvedStep.annotations()` default method + annotations field on all 12 record variants
-- `Walker.resolve(steps, registry, annotations)` overload with `withAnnotations` + `mergeAnnotationDecorators` + `parseDecoratorValue`
-- `StructuralStepEvaluator.withInjections(bindings, resolver)` — pre-flight injection resolution
-- 12 MIGRATED_DECORATORS: timeout, retry, delay, priority, resource, background, on-error, trigger, semaphore, at, cancel, mutex
+- `AnnotationExtractor` rewritten with `TreeMap<Integer, Integer>` indent-level tracking — produces hierarchical dotted keys (`"0.0"`, `"0.1"`, `"1.0.0"`) for annotations inside structural blocks (block, try/catch/finally, if/then/else, parallel, race)
+- `AnnotationMap.forStep(String)` and `hasStepAnnotation(String, String)` overloads for hierarchical key lookup
+- `Walker` threads `AnnotationMap`, `annPrefix`, and `annOffset` through all recursive `resolve`/`resolveOne` calls — offset tracking ensures sequential counting across try/catch/finally and if/then/else sub-lists matches the pre-parser's indent-based counting
+
+**Key design decision:** sequential counting across companion sub-lists. The pre-parser sees all `- ` items at a given indent level sequentially (it doesn't know about `catch:` vs `try:` boundaries — they're just non-`- ` lines). The Walker matches by tracking a running offset across sub-lists within a structural step.
+
+**Known limitation:** match/select branches currently get empty annotations (their helper methods pass `AnnotationMap.empty()`). These are uncommon targets for annotations and can be threaded through in a future pass.
 
 ## Epic #702 — YAML Playbook Polish
 
@@ -20,17 +20,15 @@ Designed and implemented **#700** (`#@` annotations for YAML playbooks, XL/High)
 | 698 | Enforce combined-key syntax | S | Low | Done |
 | 703 | Playbook variable declarations | L | Med | Done |
 | 699 | Type-safe expression resolution | XL | High | Done |
-| 700 | `#@` annotations | XL | High | **Done** |
-| 716 | Nested step-level annotations | S | Low | **Next** |
+| 700 | `#@` annotations | XL | High | Done |
+| 716 | Nested step-level annotations | S | Low | **Done** |
 | 701 | Playbook imports via module system | L | Med | Open |
 | 705 | JSON Schema for playbook documents | M | Med | Open |
 | 708 | Playbook dry-run mode | M | Low | Open |
 
-**Blog:** "Metadata That Doesn't Break Your Parser" — covers the `#@` design pivot from bare `@`, the pre-parser architecture, `@Inject` wiring, and decorator migration. Acknowledges contradiction with the previous entry's bare `@` proposal.
-
 ## Immediate Next Step
 
-**Implement #716** (nested step-level annotations, S/Low) — extend `AnnotationExtractor` to track indent-level changes and produce nested step indices. Same branch `issue-699-type-safe-expression-resolution`.
+Queue drained. Branch `issue-699-type-safe-expression-resolution` covers issues #699, #700, #716 — all complete. Ready for `work end` to close the branch.
 
 ## References
 
