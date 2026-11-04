@@ -2,7 +2,7 @@
 
 ## State
 branch: issue-718-match-select-annotations
-state: scaffolded
+state: active
 project-sha: 
 date: 
 issue-repo: casehubio/platform
@@ -12,4 +12,13 @@ design-section-hashes:
 flyway-next-v: none
 
 ## Queue
-- [ ] casehubio/platform#718 — Issue #718 ← active
+- [x] casehubio/platform#718 — Issue #718
+- [ ] casehubio/platform#710 — yaml-codegen-expression-format
+- [ ] casehubio/platform#711 — issue-711
+- [ ] casehubio/platform#712 — issue-712
+- [ ] casehubio/platform#713 — issue-713
+- [ ] casehubio/platform#706 — issue-706
+- [ ] casehubio/platform#705 — issue-705
+- [ ] casehubio/platform#708 — issue-708
+- [ ] casehubio/platform#714 — issue-714
+- [ ] casehubio/platform#701 — issue-701
