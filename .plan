@@ -2,7 +2,7 @@
 
 ## State
 branch: 
-state: active
+state: drained
 project-sha: 
 date: 
 issue-repo: casehubio/platform
