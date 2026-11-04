@@ -28,19 +28,25 @@ Add 8 plugin step types (`assert`, `assertThat`, `rest-call`, `agent-invoke`, `e
 
 The gap isn't the vocabulary itself — it's that the information exists only in Java `Set.of()` calls and switch-case dispatch. Nothing exposes it in a format IDEs understand.
 
-## Why JSON Schema, not a language server
+## JSON Schema alongside an LSP
 
-A language server (LSP) gives the richest IDE experience — semantic completions, inline documentation, go-to-definition for step references. It's also a runtime dependency: a server process, a protocol implementation, version coupling between the server and the IDE plugin.
+We are building a language server for playbooks — it's already started in the pages repo. An LSP gives the richest experience: semantic completions that know what variables are in scope, inline documentation pulled from plugin metadata, go-to-definition for step references and module imports. That's the long game.
 
-JSON Schema gives about 80% of the value for about 5% of the cost. Both IntelliJ and VS Code's YAML extension support Draft 2020-12 natively. The schema is a static JSON file — no server process, no protocol, no version coupling. A single comment at the top of a playbook file activates it:
+JSON Schema is the short game, and it stays useful even after the LSP ships. Three reasons.
+
+First, it works everywhere today with zero setup. Both IntelliJ and VS Code's YAML extension support Draft 2020-12 natively. One comment at the top of a playbook file activates it:
 
 ```yaml
 # yaml-language-server: $schema=https://casehub.io/yaml-core/playbook-document.schema.json
 ```
 
-The tradeoff is precision. JSON Schema can't validate that `timeout 10s` is a valid duration — the `10s` is embedded in a dynamic YAML key, and `patternProperties` only matches the key pattern, not its embedded value. It can't see `#@` annotations at all (they're YAML comments). And it validates one YAML document at a time, so the multi-document playbook layout (front matter + content) needs a separate schema for each document.
+No server process, no extension install, no version coupling. Any editor that speaks JSON Schema gets autocompletion immediately.
 
-For a DSL where the primary pain point is "I can't remember whether it's `forEach` or `for-each`" and "does `timeout` go inside the step or next to it" — that tradeoff is fine.
+Second, it's the fallback. An LSP is a running process that can crash, lag, or lose connection. When it's down, the schema is still there — static, always available, zero dependencies. The two layers complement each other: the LSP handles semantic intelligence (variable scoping, cross-file references, annotation validation), the schema handles structural intelligence (valid keys, parameter shapes, type constraints).
+
+Third, it's consumable outside editors. A CI linter can validate playbook files against the schema before they reach the runtime. A documentation generator can extract the vocabulary and produce a reference page. The LSP serves the editor; the schema serves the ecosystem.
+
+The schema has real limits. It can't validate that `timeout 10s` is a valid duration — the `10s` is embedded in a dynamic YAML key, and `patternProperties` only matches the key pattern, not its embedded value. It can't see `#@` annotations (YAML comments are invisible to it). It validates one YAML document at a time, so the multi-document playbook layout needs a separate schema for each document. These are exactly the gaps the LSP will fill.
 
 ## The flat step model
 
@@ -109,6 +115,6 @@ On top of the drift tests, 61 playbook fixtures and 7 test files validate agains
 
 ## What this opens up
 
-The schema is a static file on the classpath. Any tool that reads JSON Schema can consume it — not just IDEs. A CI linter could validate playbook files before they reach the runtime. A documentation generator could extract the vocabulary and produce a reference page. A playground could offer autocompletion in the browser.
+The immediate value is simple: a playbook author types `par` and sees `parallel` in the completion list, with a tooltip showing it takes an array of steps or an object with `advance-after` and `cancel-remaining`. They don't need to check the docs. They don't need to grep the Java source.
 
-The immediate value is simpler: a playbook author types `par` and sees `parallel` in the completion list, with a tooltip showing it takes an array of steps or an object with `advance-after` and `cancel-remaining`. They don't need to check the docs. They don't need to grep the Java source. The IDE knows the language.
+When the LSP lands, these layers stack. The schema provides the structural foundation — valid keys, parameter shapes, type constraints — and the LSP adds the semantic layer on top: variable scoping, cross-file module resolution, annotation validation, runtime error diagnostics. Neither replaces the other. A playbook author in VS Code gets schema completions immediately, then richer LSP completions once the server connects. If the server disconnects, the schema completions stay.
