@@ -10,6 +10,7 @@ Completed #705 — JSON Schema for playbook and .test.yaml documents (M/Med), sy
 - 72 drift-detection and fixture-validation tests in `PlaybookSchemaValidationTest`: 4 drift tests (structural keys, decorator keys, plugin schemas, combined-key prefixes) + 61 playbook fixtures + 7 test files
 - `networknt/json-schema-validator` 1.5.6 added as test dependency to yaml-step-runtime
 - Design decision: static hand-written schema + drift tests over auto-composition — vocabulary changes slowly (8 plugins), tests catch drift, evolution to auto-composition is additive if plugin count grows
+- Blog: "Teaching Your IDE a New Language" — JSON Schema as complementary layer to the in-progress LSP in pages
 
 ## Epic #702 — YAML Playbook Polish
 
