@@ -126,14 +126,14 @@ sealed interface AnnotationArg {
 
 record AnnotationMap(
     List<Annotation> documentAnnotations,
-    Map<Integer, List<Annotation>> stepAnnotations
+    Map<String, List<Annotation>> stepAnnotations
 ) {
     List<Annotation> forStep(int index);
     boolean hasStepAnnotation(int index, String name);
 }
 ```
 
-The `AnnotationMap` uses step indices for V1 (top-level steps only). The data model supports hierarchical path-based addressing for #716 (nested annotations) — the `Map<Integer, ...>` key becomes a path string like `"steps[2].block[0]"` when nesting is added, without changing the lookup API (D7).
+The `AnnotationMap` uses string-keyed step paths. V1 uses simple index strings (`"0"`, `"1"`, `"2"`). The `forStep(int)` convenience method converts to string internally. When #716 adds nesting support, the same map accepts hierarchical paths like `"steps[2].block[0]"` — no type change, no API change (D7).
 
 ### AnnotationExtractor
 
@@ -163,6 +163,8 @@ claude: agent
 ```
 
 The binding line (`claude: agent`) stays in the parsed content map as an inert key. Downstream code only reads known keys (`steps`, `params`, `vars`, `name`). Unknown keys are harmless.
+
+**Association rule:** The pre-parser knows a line is a binding (not regular content) because it immediately follows an `@Inject` annotation. The `@Inject` annotation consumes its target line as the binding declaration — variable name is the key (`claude`), type hint is the value (`agent`). Non-`@Inject` annotations do not consume their target lines.
 
 **Design invariant:** Inert binding lines are safe only at the document level. Walker's `resolveOne` throws `IllegalArgumentException` on unknown keys within the step map. If future annotations introduce step-level binding lines, they must be stripped or registered as known keys.
 
@@ -283,7 +285,7 @@ The Walker receives `AnnotationMap` alongside the step list. During `resolveOne`
 |-----------|------|---------|
 | `@Inject` | `(Type, qualifier: value?)` | Dependency injection binding |
 
-### Testing
+### Testing (Phase 1 — pure metadata)
 
 | Annotation | Args | Purpose |
 |-----------|------|---------|
@@ -296,6 +298,7 @@ The Walker receives `AnnotationMap` alongside the step list. During `resolveOne`
 
 - **#716** — Nested step-level annotation support (extend pre-parser to handle annotations inside block/try/if structures)
 - **#717** — Render `#@` as bare `@` in playbook UI (presentation concern)
+- Migration tool for decorator key-form → annotation conversion (out of scope for #700 — needed before key-form removal per D3)
 
 ## References
 
