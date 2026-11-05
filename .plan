@@ -1,7 +1,7 @@
 # Work Plan — issue-708-playbook-dry-run-mode
 
 ## State
-branch: issue-708-playbook-dry-run-mode
+branch: 
 state: scaffolded
 project-sha: 
 date: 
@@ -12,23 +12,11 @@ design-section-hashes:
 flyway-next-v: 
 
 ## Queue
-- [ ] casehubio/platform#708 — Issue #708 ← active
-  - [x] Batch 1: Foundation
-    - [x] Task 1: StepTraceNode + StepOutcome + listener
-  - [x] Batch 2: Runner
-    - [x] Task 2: PlaybookRunConfig + result types
-    - [x] Task 3: PlaybookRunnerCore run and validate
-  - [x] Batch 3: CLI
-    - [x] Task 4: YamlTestCli --dry-run extensions
-    - [x] Task 5: RunPlaybookPlugin delegation
-  - [x] Batch 4: API
-    - [x] Task 6: PlaybookApi @McpDomain interface
-  - [x] Batch 5: Verification
-    - [x] Task 7: Cross-module build verification
-- [ ] casehubio/platform#719 — wire StepExecutionListener into StructuralStepEvaluator
-- [ ] casehubio/platform#720 — detect SIMULATED outcome in dry-run trace
-- [ ] casehubio/platform#721 — CDI PlaybookApi implementation
-- [ ] casehubio/platform#722 — delegate RunPlaybookPlugin to PlaybookRunnerCore
+- [x] casehubio/platform#708 — Issue #708
+- [x] casehubio/platform#719 — wire StepExecutionListener into StructuralStepEvaluator
+- [x] casehubio/platform#720 — detect SIMULATED outcome in dry-run trace
+- [x] casehubio/platform#721 — CDI PlaybookApi implementation
+- [x] casehubio/platform#722 — delegate RunPlaybookPlugin to PlaybookRunnerCore
 
 ## Deferred
 - [ ] RunPlaybookPlugin delegation (S / Med) [casehubio/platform] — Circular dependency: yaml-step-runtime cannot import from yaml-test-core. Delegation requires either moving RunPlaybookPlugin to yaml-test-core or extracting a shared runner module.

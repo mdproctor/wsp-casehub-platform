@@ -867,8 +867,8 @@ git commit -m "feat(#708): extend YamlTestCli with --dry-run, --corpus, --profil
 ### Task 5: RunPlaybookPlugin delegates to PlaybookRunnerCore
 
 **Files:**
-- Modify: `yaml-step-runtime/src/main/java/io/casehub/yaml/step/plugin/RunPlaybookPlugin.java`
-- Test: `yaml-step-runtime/src/test/java/io/casehub/yaml/step/plugin/RunPlaybookPluginTest.java` (if exists, else create)
+- Modify: `../../yaml-test-core/src/main/java/io/casehub/yaml/test/RunPlaybookPlugin.java`
+- Test: `../../yaml-test-core/src/test/java/io/casehub/yaml/test/RunPlaybookPluginTest.java` (if exists, else create)
 
 **Interfaces:**
 - Consumes: `PlaybookRunnerCore.run()` (Task 3), `PlaybookRunConfig` (Task 2), `StepTraceNode.flatten()` (Task 1)
