@@ -1,0 +1,15 @@
+# Work Plan — issue-724-streaming-playbook-sse
+
+## State
+branch: issue-724-streaming-playbook-sse
+state: scaffolded
+project-sha: 
+date: 
+issue-repo: casehubio/platform
+covers: 724
+design-repo: 
+design-section-hashes: 
+flyway-next-v: none
+
+## Queue
+- [ ] casehubio/platform#724 — Issue #724 ← active
