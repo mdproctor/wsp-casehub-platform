@@ -13,3 +13,15 @@ flyway-next-v:
 
 ## Queue
 - [ ] casehubio/platform#708 — Issue #708 ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: StepTraceNode + StepOutcome + listener
+  - [ ] Batch 2: Runner
+    - [ ] Task 2: PlaybookRunConfig + result types
+    - [ ] Task 3: PlaybookRunnerCore run and validate
+  - [ ] Batch 3: CLI
+    - [ ] Task 4: YamlTestCli --dry-run extensions
+    - [ ] Task 5: RunPlaybookPlugin delegation
+  - [ ] Batch 4: API
+    - [ ] Task 6: PlaybookApi @McpDomain interface
+  - [ ] Batch 5: Verification
+    - [ ] Task 7: Cross-module build verification
