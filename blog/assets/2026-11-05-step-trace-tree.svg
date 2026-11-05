@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 340" style="max-width: 680px; width: 100%;">
+  <style>
+    .node { fill: #f8f9fa; stroke: #495057; stroke-width: 1.5; rx: 6; }
+    .node-sim { fill: #e8f5e9; stroke: #2e7d32; stroke-width: 1.5; rx: 6; }
+    .node-skip { fill: #fff3e0; stroke: #e65100; stroke-width: 1.5; rx: 6; stroke-dasharray: 4,3; }
+    .label { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 12px; fill: #212529; }
+    .label-sm { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 10px; fill: #868e96; }
+    .label-outcome { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 10px; font-weight: 600; }
+    .outcome-exec { fill: #2e7d32; }
+    .outcome-sim { fill: #1565c0; }
+    .outcome-skip { fill: #e65100; }
+    .arrow { stroke: #adb5bd; stroke-width: 1.2; fill: none; marker-end: url(#arrowhead); }
+    .brace { stroke: #adb5bd; stroke-width: 1; fill: none; }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#adb5bd"/>
+    </marker>
+  </defs>
+
+  <!-- Root playbook node -->
+  <rect class="node" x="20" y="10" width="640" height="32"/>
+  <text class="label" x="30" y="30" font-weight="600">playbook: risk-assessment.yaml</text>
+  <text class="label-outcome outcome-exec" x="580" y="30">EXECUTED</text>
+
+  <!-- Step 1: agent-invoke (simulated) -->
+  <rect class="node-sim" x="50" y="60" width="590" height="32"/>
+  <text class="label" x="60" y="80">1. agent-invoke "Assess risk profile"</text>
+  <text class="label-outcome outcome-sim" x="520" y="80">SIMULATED (sequential)</text>
+
+  <!-- Step 2: if-else -->
+  <rect class="node" x="50" y="110" width="590" height="32"/>
+  <text class="label" x="60" y="130">2. if-else: ${result.risk} == 'HIGH'</text>
+  <text class="label-outcome outcome-exec" x="570" y="130">EXECUTED</text>
+
+  <!-- Then branch -->
+  <rect class="node-sim" x="80" y="155" width="540" height="28"/>
+  <text class="label" x="90" y="173">then: rest-call /api/escalate</text>
+  <text class="label-outcome outcome-sim" x="500" y="173">SIMULATED (key-lookup)</text>
+
+  <!-- Else branch (skipped) -->
+  <rect class="node-skip" x="80" y="195" width="540" height="28"/>
+  <text class="label" x="90" y="213">else: rest-call /api/log-routine</text>
+  <text class="label-outcome outcome-skip" x="560" y="213">SKIPPED</text>
+
+  <!-- Step 3: parallel -->
+  <rect class="node" x="50" y="240" width="590" height="32"/>
+  <text class="label" x="60" y="260">3. parallel</text>
+  <text class="label-outcome outcome-exec" x="570" y="260">EXECUTED</text>
+
+  <!-- Parallel branches -->
+  <rect class="node-sim" x="80" y="285" width="260" height="28"/>
+  <text class="label" x="90" y="303">emit-event capacity.pressure</text>
+  <text class="label-outcome outcome-exec" x="260" y="303">EXECUTED</text>
+
+  <rect class="node-sim" x="360" y="285" width="260" height="28"/>
+  <text class="label" x="370" y="303">agent-invoke "Generate report"</text>
+  <text class="label-outcome outcome-sim" x="530" y="303">SIMULATED</text>
+</svg>
