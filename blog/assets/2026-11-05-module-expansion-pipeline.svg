@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 480" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#64748b"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#3b82f6"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title { font-size: 15px; font-weight: 600; fill: #1e293b; }
+    .label { font-size: 12px; fill: #475569; }
+    .code { font-size: 11px; font-family: 'SF Mono', 'Fira Code', monospace; fill: #1e293b; }
+    .code-dim { font-size: 11px; font-family: 'SF Mono', 'Fira Code', monospace; fill: #94a3b8; }
+    .code-blue { font-size: 11px; font-family: 'SF Mono', 'Fira Code', monospace; fill: #3b82f6; }
+    .code-green { font-size: 11px; font-family: 'SF Mono', 'Fira Code', monospace; fill: #059669; }
+    .phase { font-size: 11px; font-weight: 600; fill: #64748b; letter-spacing: 1px; }
+    .note { font-size: 10px; fill: #94a3b8; font-style: italic; }
+  </style>
+
+  <!-- Left column: Playbook + Module -->
+  <text x="20" y="28" class="title">Playbook</text>
+  <rect x="20" y="38" width="200" height="170" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="32" y="58" class="code-dim">imports:</text>
+  <text x="32" y="73" class="code">  - module: lifecycle</text>
+  <text x="32" y="88" class="code">    as: lc</text>
+  <text x="32" y="110" class="code-dim">steps:</text>
+  <text x="32" y="125" class="code-blue">  - use: lc.open</text>
+  <text x="32" y="140" class="code">  - agent-invoke:</text>
+  <text x="32" y="155" class="code">      prompt: "work"</text>
+  <text x="32" y="170" class="code-blue">  - use: lc.close</text>
+  <text x="32" y="198" class="note">3 steps, 2 are references</text>
+
+  <text x="20" y="238" class="title">Module: lifecycle</text>
+  <rect x="20" y="248" width="200" height="140" rx="6" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+  <text x="32" y="268" class="code-dim">module:</text>
+  <text x="32" y="283" class="code">  name: lifecycle</text>
+  <text x="32" y="305" class="code-dim">steps:</text>
+  <text x="32" y="320" class="code-green">  open:</text>
+  <text x="32" y="335" class="code">    - agent-invoke: "init"</text>
+  <text x="32" y="355" class="code-green">  close:</text>
+  <text x="32" y="370" class="code">    - agent-invoke: "done"</text>
+
+  <!-- Center: Pipeline arrows -->
+  <text x="290" y="28" class="phase">EXPANSION PIPELINE</text>
+
+  <!-- Step 1 -->
+  <line x1="220" y1="100" x2="270" y2="100" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="275" y="75" width="170" height="50" rx="20" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="310" y="96" class="label">ModuleExpander</text>
+  <text x="304" y="112" class="code-dim">alias-prefix keys</text>
+
+  <!-- Step 2 -->
+  <line x1="360" y1="125" x2="360" y2="165" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="275" y="170" width="170" height="50" rx="20" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="295" y="191" class="label">PlaybookModuleBridge</text>
+  <text x="303" y="207" class="code-dim">inline use: steps</text>
+
+  <!-- Step 3 -->
+  <line x1="445" y1="195" x2="495" y2="195" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Right column: Expanded result -->
+  <text x="500" y="28" class="title">After expansion</text>
+  <rect x="500" y="38" width="200" height="200" rx="6" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+  <text x="512" y="58" class="code-dim">steps:</text>
+  <text x="512" y="78" class="code-green">  - agent-invoke:</text>
+  <text x="512" y="93" class="code-green">      prompt: "init"</text>
+  <text x="512" y="118" class="code">  - agent-invoke:</text>
+  <text x="512" y="133" class="code">      prompt: "work"</text>
+  <text x="512" y="158" class="code-green">  - agent-invoke:</text>
+  <text x="512" y="173" class="code-green">      prompt: "done"</text>
+  <text x="512" y="228" class="note">3 steps, all concrete</text>
+
+  <!-- Walker arrow -->
+  <line x1="600" y1="238" x2="600" y2="280" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <rect x="500" y="285" width="200" height="40" rx="6" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+  <text x="540" y="310" class="code-blue">Walker.resolve()</text>
+
+  <!-- Bottom note -->
+  <text x="500" y="350" class="note">Walker sees ordinary steps.</text>
+  <text x="500" y="365" class="note">No runtime changes needed.</text>
+
+  <!-- Key insight box -->
+  <rect x="20" y="415" width="680" height="50" rx="6" fill="#fefce8" stroke="#fde68a" stroke-width="1"/>
+  <text x="36" y="436" class="label" font-weight="600">Key:</text>
+  <text x="70" y="436" class="label">ModuleBridge&lt;T&gt; handles domain integration — playbooks implement one interface,</text>
+  <text x="70" y="452" class="label">the entire yaml-core module system (alias prefixing, parameter validation, outputs) becomes available.</text>
+</svg>
