@@ -1,0 +1,12 @@
+# Work Plan — Work Plan —
+
+## State
+branch: issue-725-cli-discover-simulation-yaml
+state: active
+Current: none
+date: 
+issue-repo: casehubio/platform
+status: active
+
+## Queue
+- [ ] casehubio/platform#725 — fix: CLI --dry-run should discover simulation.yaml from directory hierarchy
