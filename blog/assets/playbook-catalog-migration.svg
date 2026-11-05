@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 380" font-family="'SF Mono', 'Menlo', 'Monaco', monospace" font-size="13">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#666"/>
+    </marker>
+  </defs>
+
+  <rect width="720" height="380" rx="8" fill="#1e1e2e"/>
+  <text x="360" y="32" text-anchor="middle" fill="#cdd6f4" font-size="15" font-weight="600">Before and after: playbook catalog packaging</text>
+
+  <!-- BEFORE panel -->
+  <rect x="20" y="52" width="330" height="300" rx="6" fill="#181825" stroke="#f38ba8" stroke-width="1"/>
+  <text x="185" y="76" text-anchor="middle" fill="#f38ba8" font-size="12" font-weight="600">BEFORE</text>
+
+  <g fill="#585b70" font-size="12">
+    <text x="40" y="100">casehub-platform/</text>
+    <text x="60" y="120">playbooks/</text>
+    <text x="80" y="140" fill="#f9e2af">manifest.json</text>
+    <text x="80" y="160" fill="#f9e2af">composition/*.yaml</text>
+    <text x="80" y="180" fill="#f9e2af">flow-control/*.yaml</text>
+    <text x="80" y="200" fill="#585b70">... 62 files</text>
+    <text x="60" y="230">playbook-catalog/</text>
+    <text x="80" y="250">pom.xml</text>
+    <text x="80" y="270" fill="#585b70" font-size="11" font-style="italic">↑ references ../playbooks</text>
+  </g>
+
+  <text x="185" y="320" text-anchor="middle" fill="#f38ba8" font-size="11">Path.of(".")</text>
+  <text x="185" y="338" text-anchor="middle" fill="#585b70" font-size="11">unpredictable in server env</text>
+
+  <!-- AFTER panel -->
+  <rect x="370" y="52" width="330" height="300" rx="6" fill="#181825" stroke="#a6e3a1" stroke-width="1"/>
+  <text x="535" y="76" text-anchor="middle" fill="#a6e3a1" font-size="12" font-weight="600">AFTER</text>
+
+  <g fill="#cdd6f4" font-size="12">
+    <text x="390" y="100">casehub-platform/</text>
+    <text x="410" y="120">playbook-catalog/</text>
+    <text x="430" y="140">src/main/playbooks/</text>
+    <text x="450" y="160" fill="#a6e3a1">manifest.json</text>
+    <text x="450" y="180" fill="#a6e3a1">composition/*.yaml</text>
+    <text x="450" y="200" fill="#a6e3a1">flow-control/*.yaml</text>
+    <text x="450" y="220" fill="#cdd6f4">... 62 files</text>
+  </g>
+
+  <line x1="540" y1="250" x2="540" y2="278" stroke="#89b4fa" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="535" y="266" text-anchor="end" fill="#89b4fa" font-size="11">mvn package</text>
+
+  <rect x="475" y="282" width="130" height="26" rx="4" fill="#313244"/>
+  <text x="540" y="300" text-anchor="middle" fill="#a6e3a1" font-size="11">classpath:playbooks/</text>
+
+  <text x="535" y="338" text-anchor="middle" fill="#a6e3a1" font-size="11">self-contained JAR</text>
+  <text x="535" y="352" text-anchor="middle" fill="#585b70" font-size="11">add as dependency → done</text>
+</svg>
