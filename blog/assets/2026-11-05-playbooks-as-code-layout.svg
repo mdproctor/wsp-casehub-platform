@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 280" style="max-width: 640px; width: 100%;">
+  <style>
+    .box { rx: 6; stroke-width: 1.5; }
+    .box-code { fill: #e8f5e9; stroke: #2e7d32; }
+    .box-res { fill: #fff3e0; stroke: #e65100; }
+    .box-new { fill: #e3f2fd; stroke: #1565c0; }
+    .txt { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 12px; fill: #212529; }
+    .txt-bold { font-weight: 600; }
+    .txt-sm { font-size: 10px; fill: #868e96; }
+    .txt-label { font-size: 11px; fill: #495057; font-style: italic; }
+    .line { stroke: #adb5bd; stroke-width: 1; }
+  </style>
+
+  <!-- Header -->
+  <text class="txt txt-bold" x="20" y="25">Before: playbooks as data</text>
+  <text class="txt txt-bold" x="340" y="25">After: playbooks as code</text>
+  <line class="line" x1="320" y1="10" x2="320" y2="270"/>
+
+  <!-- Before column -->
+  <rect class="box box-code" x="20" y="40" width="280" height="28"/>
+  <text class="txt" x="30" y="58">src/main/java/</text>
+  <text class="txt-sm" x="200" y="58">compiled, packaged</text>
+
+  <rect class="box box-code" x="20" y="78" width="280" height="28"/>
+  <text class="txt" x="30" y="96">src/test/java/</text>
+  <text class="txt-sm" x="200" y="96">compiled, test scope</text>
+
+  <rect class="box box-res" x="20" y="126" width="280" height="28"/>
+  <text class="txt" x="30" y="144">src/test/resources/*.test.yaml</text>
+  <text class="txt-sm" x="220" y="164">mixed with config</text>
+
+  <rect class="box box-res" x="20" y="174" width="280" height="28"/>
+  <text class="txt" x="30" y="192">playbooks/  (repo root)</text>
+  <text class="txt-sm" x="210" y="212">no classpath, no packaging</text>
+
+  <!-- After column -->
+  <rect class="box box-code" x="340" y="40" width="280" height="28"/>
+  <text class="txt" x="350" y="58">src/main/java/</text>
+  <text class="txt-sm" x="520" y="58">compiled, packaged</text>
+
+  <rect class="box box-new" x="340" y="78" width="280" height="28"/>
+  <text class="txt" x="350" y="96">src/main/playbooks/</text>
+  <text class="txt-sm" x="510" y="96">packaged in JAR</text>
+
+  <rect class="box box-code" x="340" y="126" width="280" height="28"/>
+  <text class="txt" x="350" y="144">src/test/java/</text>
+  <text class="txt-sm" x="520" y="144">compiled, test scope</text>
+
+  <rect class="box box-new" x="340" y="164" width="280" height="28"/>
+  <text class="txt" x="350" y="182">src/test/playbooks/</text>
+  <text class="txt-sm" x="515" y="182">test classpath only</text>
+
+  <!-- Labels -->
+  <text class="txt-label" x="340" y="220">Same convention. Same classpath.</text>
+  <text class="txt-label" x="340" y="236">Same treatment by build + tooling.</text>
+</svg>
