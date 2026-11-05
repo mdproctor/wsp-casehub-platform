@@ -34,3 +34,4 @@
 | [2026-10-30-mdp01-when-playbooks-talk-back.md](2026-10-30-mdp01-when-playbooks-talk-back.md) | 2026-10-30 | Advisory step type — how protocol playbooks communicate evaluation results through the compiler |
 | [2026-11-01-mdp01-generated-code-security-gap.md](2026-11-01-mdp01-generated-code-security-gap.md) | 2026-11-01 | Why code generators must propagate all security annotations — not just the ones you remembered to handle |
 | [2026-11-03-mdp01-playbooks-deserve-a-type-system.md](2026-11-03-mdp01-playbooks-deserve-a-type-system.md) | 2026-11-03 | Why playbooks need typed variable declarations — vars:, params:, constraints, and the contract between caller and callee |
+| [2026-11-05-mdp04-convention-that-stops-at-the-container.md](2026-11-05-mdp04-convention-that-stops-at-the-container.md) | 2026-11-05 | Convention-based simulation discovery — why the CLI silently ignored simulation.yaml and the design lesson in the twenty-line fix |

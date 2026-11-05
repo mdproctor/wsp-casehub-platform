@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" font-family="'SF Mono', 'Menlo', 'Monaco', monospace" font-size="13">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#666"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="720" height="420" rx="8" fill="#1e1e2e"/>
+
+  <!-- Title -->
+  <text x="360" y="32" text-anchor="middle" fill="#cdd6f4" font-size="15" font-weight="600">Directory hierarchy discovery: simulation.yaml</text>
+
+  <!-- Left panel: directory tree -->
+  <rect x="20" y="52" width="340" height="340" rx="6" fill="#181825" stroke="#313244" stroke-width="1"/>
+  <text x="190" y="76" text-anchor="middle" fill="#a6adc8" font-size="11" font-weight="600">FILESYSTEM</text>
+
+  <!-- Tree lines -->
+  <g fill="none" stroke="#585b70" stroke-width="1">
+    <line x1="50" y1="108" x2="50" y2="308"/>
+    <line x1="50" y1="108" x2="68" y2="108"/>
+    <line x1="50" y1="148" x2="68" y2="148"/>
+    <line x1="50" y1="188" x2="68" y2="188"/>
+    <line x1="80" y1="228" x2="80" y2="308"/>
+    <line x1="80" y1="228" x2="98" y2="228"/>
+    <line x1="80" y1="268" x2="98" y2="268"/>
+    <line x1="80" y1="308" x2="98" y2="308"/>
+  </g>
+
+  <!-- Directory entries -->
+  <text x="72" y="113" fill="#89b4fa" font-size="13">project/</text>
+  <text x="72" y="153" fill="#a6e3a1" font-size="13">simulation.yaml</text>
+  <text x="72" y="193" fill="#89b4fa" font-size="13">scenarios/</text>
+  <text x="102" y="233" fill="#89b4fa" font-size="13">onboarding/</text>
+  <text x="102" y="273" fill="#f9e2af" font-size="13">playbook.yaml</text>
+  <text x="102" y="313" fill="#585b70" font-size="13">(no simulation.yaml)</text>
+
+  <!-- Discovery arrows -->
+  <g>
+    <!-- Arrow from playbook up to scenarios -->
+    <line x1="270" y1="273" x2="270" y2="233" stroke="#f38ba8" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="6,3"/>
+    <text x="278" y="258" fill="#f38ba8" font-size="10">1. not here</text>
+
+    <!-- Arrow from scenarios up to project -->
+    <line x1="270" y1="220" x2="270" y2="153" stroke="#f38ba8" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="6,3"/>
+    <text x="278" y="190" fill="#f38ba8" font-size="10">2. not here</text>
+
+    <!-- Arrow to simulation.yaml — found -->
+    <line x1="270" y1="140" x2="270" y2="113" stroke="#a6e3a1" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="278" y="128" fill="#a6e3a1" font-size="10" font-weight="600">3. found!</text>
+  </g>
+
+  <!-- Right panel: before/after -->
+  <rect x="380" y="52" width="320" height="150" rx="6" fill="#181825" stroke="#313244" stroke-width="1"/>
+  <text x="540" y="76" text-anchor="middle" fill="#f38ba8" font-size="11" font-weight="600">BEFORE</text>
+  <text x="400" y="100" fill="#585b70" font-size="12">$ casehub-test --dry-run playbook.yaml</text>
+  <text x="400" y="124" fill="#585b70" font-size="12">→ empty overlay pushed</text>
+  <text x="400" y="148" fill="#585b70" font-size="12">→ no strategies configured</text>
+  <text x="400" y="172" fill="#585b70" font-size="12">→ all SPI calls pass through</text>
+  <text x="400" y="190" fill="#585b70" font-size="11" font-style="italic">simulation.yaml silently ignored</text>
+
+  <rect x="380" y="216" width="320" height="176" rx="6" fill="#181825" stroke="#313244" stroke-width="1"/>
+  <text x="540" y="240" text-anchor="middle" fill="#a6e3a1" font-size="11" font-weight="600">AFTER</text>
+  <text x="400" y="264" fill="#cdd6f4" font-size="12">$ casehub-test --dry-run playbook.yaml</text>
+  <text x="400" y="288" fill="#cdd6f4" font-size="12">→ walks up from playbook dir</text>
+  <text x="400" y="312" fill="#cdd6f4" font-size="12">→ finds simulation.yaml</text>
+  <text x="400" y="336" fill="#cdd6f4" font-size="12">→ parses strategies + corpus</text>
+  <text x="400" y="360" fill="#a6e3a1" font-size="12">→ SPI calls intercepted</text>
+  <text x="400" y="382" fill="#a6e3a1" font-size="11" font-style="italic">zero flags, zero config</text>
+</svg>
