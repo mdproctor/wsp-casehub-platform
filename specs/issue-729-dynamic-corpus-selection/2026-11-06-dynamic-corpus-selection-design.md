@@ -50,9 +50,9 @@ SimulationRuntime.createStrategy(qn, strategyName, corpus)
 #### CorpusSelector (simulation-api)
 
 ```java
-@FunctionalInterface
 public interface CorpusSelector {
     String activePhase();
+    default void onResolved() {}
 }
 ```
 
@@ -181,7 +181,11 @@ public final class LookupCountSelector implements CorpusSelector {
 }
 ```
 
-Each call to `activePhase()` increments the counter. The `count` field on each phase is how many lookups that phase handles before advancing to the next.
+The `count` field on each phase is how many successful resolutions that phase handles before advancing to the next.
+
+**Lookup counting lifecycle:** `activePhase()` is pure read — no side effects. `LookupCountSelector` also implements `advance()` which increments the counter. The `SimulationRuntime` calls `advanceCorpusSelector(qn)` after each successful `strategy.resolve()` — this is a one-line addition to the runtime's resolution path. This separation avoids double-counting from the `canResolve()` + `resolve()` pair that both call through to `PhasedCorpus.lookupByKey()`.
+
+See the **Lifecycle Hook** section below for details.
 
 #### RandomSelector
 
@@ -349,6 +353,32 @@ corpus-selection:
 ```
 
 Weights must sum to 1.0.
+
+### Lifecycle Hook — onResolved()
+
+The `CorpusSelector.onResolved()` method is called after each successful `strategy.resolve()`. This is the increment point for `LookupCountSelector` — it cannot increment inside `activePhase()` because `activePhase()` is called from both `canResolve()` and `resolve()` (strategies call `corpus.lookupByKey()` in both paths).
+
+The call site is `SimulationRuntime`, which wraps the strategy resolution:
+
+```java
+public <I, O> O resolveWithSelector(String qualifiedName, SimulationStrategy<I, O> strategy, I input) {
+    O result = strategy.resolve(input);
+    // Notify corpus selector (if any) that a resolution completed
+    CorpusSelector selector = corpusSelectors.get(qualifiedName);
+    if (selector != null) {
+        selector.onResolved();
+    }
+    return result;
+}
+```
+
+The generated `@Decorator` and `SimulatingAction` already call through `runtime.strategyFor()` → `strategy.resolve()`. Adding the `onResolved()` call to the runtime's resolution path is a single integration point — callers don't change.
+
+**Which selectors use onResolved():**
+- `LookupCountSelector` — increments counter
+- `StateMachineSelector` — no-op (transitions are driven by external `advance()` calls)
+- `DurationSelector` — no-op (driven by wall-clock time)
+- `RandomSelector` — no-op (stateless)
 
 ### Validation Rules
 
