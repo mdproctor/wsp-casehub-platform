@@ -58,3 +58,15 @@
 **Exploration:** quick
 **Depends on:** D1, D4 (corpus-level decorator + mutual exclusion)
 **Status:** captured
+
+## D6: CorpusSelectorConfig shape
+
+**Choice:** Typed sealed interface — one record per selector type (StateMachine, Duration, LookupCount, Weighted)
+**Alternatives:**
+- Generic map-based config — single record with type string + properties map, runtime validation only
+**Rationale:** Four known selector types with distinct configuration shapes. Sealed interface gives compile-time exhaustiveness checking in SimulationRuntime.createStrategy(). Parse-time validation in YamlSimulationConfig catches config errors early.
+**Trade-offs:** Adding a new selector type requires adding a new record to the sealed interface (in simulation-api). This is acceptable — new selector types are infrequent and should be deliberate.
+**Sources:** simulation-api module pattern (sealed types: Result in yaml-plugin-api)
+**Exploration:** quick
+**Depends on:** D5 (SimulationConfig carries CorpusSelectorConfig)
+**Status:** captured
