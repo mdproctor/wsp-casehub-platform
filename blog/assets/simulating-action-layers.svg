@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 340" font-family="'Inter','Segoe UI',system-ui,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#f1f5f9"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="680" height="340" rx="12" fill="url(#bg)" stroke="#e2e8f0" stroke-width="1"/>
+
+  <!-- Title -->
+  <text x="340" y="32" text-anchor="middle" font-size="14" font-weight="600" fill="#334155">Action execution with transparent simulation</text>
+
+  <!-- Playbook step -->
+  <rect x="40" y="56" width="160" height="44" rx="8" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.5"/>
+  <text x="120" y="82" text-anchor="middle" font-size="12" font-weight="500" fill="#1e40af">Playbook Step</text>
+
+  <!-- Arrow 1 -->
+  <line x1="200" y1="78" x2="248" y2="78" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+  <!-- SimulatingAction -->
+  <rect x="250" y="52" width="180" height="52" rx="8" fill="#fef3c7" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="340" y="74" text-anchor="middle" font-size="12" font-weight="600" fill="#92400e">SimulatingAction</text>
+  <text x="340" y="92" text-anchor="middle" font-size="10" fill="#a16207">transparent wrapper</text>
+
+  <!-- Decision diamond -->
+  <polygon points="340,130 390,162 340,194 290,162" fill="#fff" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="340" y="158" text-anchor="middle" font-size="10" font-weight="500" fill="#475569">overlay</text>
+  <text x="340" y="170" text-anchor="middle" font-size="10" font-weight="500" fill="#475569">active?</text>
+
+  <!-- Arrow down from SimulatingAction to diamond -->
+  <line x1="340" y1="104" x2="340" y2="130" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+  <!-- YES path — left to corpus -->
+  <text x="268" y="155" text-anchor="end" font-size="10" font-weight="600" fill="#16a34a">yes + match</text>
+  <line x1="290" y1="162" x2="180" y2="162" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrowGreen)"/>
+
+  <!-- Corpus box -->
+  <rect x="40" y="140" width="140" height="44" rx="8" fill="#dcfce7" stroke="#86efac" stroke-width="1.5"/>
+  <text x="110" y="160" text-anchor="middle" font-size="11" font-weight="500" fill="#166534">Corpus Response</text>
+  <text x="110" y="174" text-anchor="middle" font-size="9" fill="#15803d">from simulation.yaml</text>
+
+  <!-- Arrow from corpus to result -->
+  <line x1="110" y1="184" x2="110" y2="232" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrowGreen)"/>
+
+  <!-- NO path — right to real handler -->
+  <text x="412" y="155" font-size="10" font-weight="600" fill="#dc2626">no / no match</text>
+  <line x1="390" y1="162" x2="500" y2="162" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arrowRed)"/>
+
+  <!-- Real handler box -->
+  <rect x="500" y="140" width="140" height="44" rx="8" fill="#fce4ec" stroke="#f48fb1" stroke-width="1.5"/>
+  <text x="570" y="160" text-anchor="middle" font-size="11" font-weight="500" fill="#880e4f">Real Handler</text>
+  <text x="570" y="174" text-anchor="middle" font-size="9" fill="#ad1457">HTTP / GraphQL / MCP</text>
+
+  <!-- Arrow from real handler to result -->
+  <line x1="570" y1="184" x2="570" y2="232" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arrowRed)"/>
+
+  <!-- Result boxes -->
+  <rect x="40" y="232" width="140" height="40" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1"/>
+  <text x="110" y="256" text-anchor="middle" font-size="11" font-weight="500" fill="#166534">Result (simulated)</text>
+
+  <rect x="500" y="232" width="140" height="40" rx="8" fill="#fff1f2" stroke="#f48fb1" stroke-width="1"/>
+  <text x="570" y="256" text-anchor="middle" font-size="11" font-weight="500" fill="#880e4f">Result (real)</text>
+
+  <!-- Bottom note -->
+  <text x="340" y="306" text-anchor="middle" font-size="11" fill="#64748b">Same playbook. Same compilation. Different runtime.</text>
+  <text x="340" y="322" text-anchor="middle" font-size="11" fill="#64748b">Push an overlay to simulate. Pop it to go live.</text>
+
+  <!-- Arrowhead markers -->
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#16a34a"/>
+    </marker>
+    <marker id="arrowRed" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#dc2626"/>
+    </marker>
+  </defs>
+</svg>
