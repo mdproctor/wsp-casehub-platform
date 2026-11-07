@@ -10,3 +10,4 @@ status: active
 
 ## Queue
 - [ ] casehubio/platform#725 — fix: CLI --dry-run should discover simulation.yaml from directory hierarchy
+- [ ] casehubio/platform#729 — feat: dynamic corpus selection
