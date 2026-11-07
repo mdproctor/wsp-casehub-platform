@@ -259,15 +259,21 @@ Existing implementations (`MapSimulationConfig`, overlay configs) return `Option
 
 ### SimulationRuntime Changes
 
-In `createStrategy()`, after resolving the strategy name, build the `PhasedCorpus` and wrap the strategy to fire `onResolved()`:
+**Selector persistence:** Corpus selectors are stored in a `ConcurrentHashMap<String, CorpusSelector>` on the runtime that is **not** cleared by `pushOverlay()` / `popOverlay()`. This is distinct from the strategy cache (`strategyCache`), which IS cleared on overlay changes. When `createStrategy()` is called after a cache invalidation, `buildSelector()` reuses the existing selector via `computeIfAbsent` — preserving transition state, lookup counts, and duration start times across overlay push/pop cycles.
+
+**Config scoping:** `createStrategy()` takes the effective `SimulationConfig` as a parameter. `strategyFor()` passes `overlay.config()` for overlay strategies and `this.config` for base strategies. This ensures overlays use their own corpus-selection (or none, via the `Optional.empty()` default on `SimulationConfig`), without inheriting the base config's corpus-selection. If the base config has `corpus-selection: state-machine` for a QN and an overlay provides its own corpus for that QN, the overlay's corpus is used directly — the base config's phased corpus does not override it.
 
 ```java
+// Selector map — NOT cleared by push/pop (selectors outlive the strategy cache)
+private final ConcurrentHashMap<String, CorpusSelector> corpusSelectors = new ConcurrentHashMap<>();
+
 private SimulationStrategy<?, ?> createStrategy(String qualifiedName,
                                                  String strategyName,
-                                                 SimulationCorpus corpus) {
+                                                 SimulationCorpus corpus,
+                                                 SimulationConfig effectiveConfig) {
     SimulationCorpus effectiveCorpus = corpus;
     CorpusSelector selector = null;
-    Optional<CorpusSelectorConfig> selection = config.corpusSelection(qualifiedName);
+    Optional<CorpusSelectorConfig> selection = effectiveConfig.corpusSelection(qualifiedName);
     if (selection.isPresent()) {
         selector = buildSelector(qualifiedName, selection.get());
         effectiveCorpus = new PhasedCorpus<>(selector, selection.get().phases());
@@ -285,7 +291,7 @@ private SimulationStrategy<?, ?> createStrategy(String qualifiedName,
 }
 
 private CorpusSelector buildSelector(String qualifiedName, CorpusSelectorConfig config) {
-    CorpusSelector selector = switch (config) {
+    return corpusSelectors.computeIfAbsent(qualifiedName, qn -> switch (config) {
         case CorpusSelectorConfig.StateMachine sm ->
             new StateMachineSelector(sm.initial(), sm.transitions());
         case CorpusSelectorConfig.Duration d ->
@@ -294,11 +300,7 @@ private CorpusSelector buildSelector(String qualifiedName, CorpusSelectorConfig 
             new LookupCountSelector(lc.orderedPhases());
         case CorpusSelectorConfig.Weighted w ->
             new RandomSelector(w.weightedPhases());
-    };
-    if (selector instanceof StateMachineSelector sms) {
-        stateMachineSelectors.put(qualifiedName, sms);
-    }
-    return selector;
+    });
 }
 
 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -322,11 +324,22 @@ private static SimulationStrategy<?, ?> wrapWithSelector(SimulationStrategy stra
 
 The `wrapWithSelector` method wraps the strategy so that `onResolved()` fires after every `resolve()` call. Because callers receive the wrapped strategy from `strategyFor()`, the lifecycle hook is transparent — generated `@Decorator` classes and `SimulatingAction` call `strategy.resolve()` directly and the notification fires automatically.
 
-The `StateMachineSelector` instance is registered in a `ConcurrentHashMap<String, StateMachineSelector>` on the runtime, so the wiring layer can retrieve it to connect trigger sources:
+The existing `strategyFor()` method is updated to pass the appropriate config:
+
+```java
+// Overlay path:
+createStrategy(qn, overlayStrategy.get(), overlay.corpus(), overlay.config())
+// Base path:
+createStrategy(qn, strategyName, corpus, config)
+```
+
+The `stateMachineSelector()` API casts from the general `corpusSelectors` map:
 
 ```java
 public Optional<StateMachineSelector> stateMachineSelector(String qualifiedName) {
-    return Optional.ofNullable(stateMachineSelectors.get(qualifiedName));
+    CorpusSelector selector = corpusSelectors.get(qualifiedName);
+    return selector instanceof StateMachineSelector sms
+        ? Optional.of(sms) : Optional.empty();
 }
 ```
 
@@ -339,6 +352,114 @@ The `corpus-selection` block is a new optional property on `method-config`, mutu
   "anyOf": [
     { "required": ["corpus-selection", "corpus"] },
     { "required": ["corpus-selection", "corpus-files"] }
+  ]
+}
+```
+
+The `corpus-selection` property is added to `method-config`:
+
+```json
+"corpus-selection": { "$ref": "#/$defs/corpus-selection-config" }
+```
+
+The `$defs/corpus-selection-config` definition uses `if/then` on the `type` discriminator:
+
+```json
+"corpus-selection-config": {
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["state-machine", "duration", "lookup-count", "random"]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "state-machine" } }, "required": ["type"] },
+      "then": {
+        "required": ["initial", "transitions", "phases"],
+        "properties": {
+          "initial": { "type": "string", "description": "Starting state" },
+          "transitions": {
+            "type": "object",
+            "description": "fromState → trigger → toState",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            }
+          },
+          "phases": {
+            "type": "object",
+            "description": "State name → corpus entries",
+            "additionalProperties": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/corpus-entry" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "duration" } }, "required": ["type"] },
+      "then": {
+        "required": ["phases"],
+        "properties": {
+          "phases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "corpus"],
+              "properties": {
+                "name": { "type": "string" },
+                "duration": { "type": ["string", "number"], "description": "Phase duration (5s, 2m, 500ms). Omit on last phase (terminal)." },
+                "corpus": { "type": "array", "items": { "$ref": "#/$defs/corpus-entry" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "lookup-count" } }, "required": ["type"] },
+      "then": {
+        "required": ["phases"],
+        "properties": {
+          "phases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "corpus"],
+              "properties": {
+                "name": { "type": "string" },
+                "count": { "type": "integer", "minimum": 1, "description": "Resolutions before advancing. Omit on last phase (terminal)." },
+                "corpus": { "type": "array", "items": { "$ref": "#/$defs/corpus-entry" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "random" } }, "required": ["type"] },
+      "then": {
+        "required": ["phases"],
+        "properties": {
+          "phases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "weight", "corpus"],
+              "properties": {
+                "name": { "type": "string" },
+                "weight": { "type": "number", "minimum": 0, "maximum": 1, "description": "Selection probability. All weights must sum to 1.0." },
+                "corpus": { "type": "array", "items": { "$ref": "#/$defs/corpus-entry" } }
+              }
+            }
+          }
+        }
+      }
+    }
   ]
 }
 ```
