@@ -11,3 +11,8 @@ status: active
 ## Queue
 - [ ] casehubio/platform#725 — fix: CLI --dry-run should discover simulation.yaml from directory hierarchy
 - [ ] casehubio/platform#729 — feat: dynamic corpus selection
+- [ ] casehubio/platform#744 — step lifecycle wiring for StateMachineSelector
+- [ ] casehubio/platform#746 — MCP tool for runtime phase inspection
+- [ ] casehubio/platform#747 — per-phase corpus-files support
+- [ ] casehubio/platform#745 — CDI event observer wiring for event-triggered corpus selection
+- [ ] casehubio/platform#748 — profile-level corpus-selection
