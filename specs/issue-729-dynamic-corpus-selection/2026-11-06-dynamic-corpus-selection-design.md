@@ -560,6 +560,8 @@ The `CorpusSelector.onResolved()` method is called after each successful `strate
 
 The mechanism is **strategy wrapping**: `SimulationRuntime.createStrategy()` wraps the strategy in a delegating wrapper that calls `selector.onResolved()` after `resolve()` (see `wrapWithSelector()` in §SimulationRuntime Changes). The wrapped strategy IS the strategy returned by `strategyFor()`. Callers — generated `@Decorator` classes, `SimulatingAction`, and any future strategy consumers — call `strategy.resolve()` directly on the wrapped strategy, and the `onResolved()` notification fires automatically. No caller changes required.
 
+**Exception behavior:** If `resolve()` throws, `onResolved()` is not called — failed resolutions are not counted. This is correct: a `SimulationKeyNotFoundException` or other resolution failure should not advance `LookupCountSelector`'s counter.
+
 **Which selectors use onResolved():**
 - `LookupCountSelector` — increments counter
 - `StateMachineSelector` — no-op (transitions are driven by external `advance()` calls)
@@ -577,6 +579,7 @@ The mechanism is **strategy wrapping**: `SimulationRuntime.createStrategy()` wra
 7. Random: weights must sum to 1.0 (within floating-point tolerance)
 8. All types: phase names must be unique within a `corpus-selection` block
 9. Runtime: `PhasedCorpus` throws `SimulationConfigException` if `activePhase()` returns a name not in the phases map
+10. State machine (warning): phases not reachable from `initial` via the transition graph are logged as warnings at parse time — likely a missing transition in the configuration
 
 ### Testing Strategy
 
@@ -594,6 +597,11 @@ The mechanism is **strategy wrapping**: `SimulationRuntime.createStrategy()` wra
 - End-to-end: YAML → config → runtime → strategy → phased resolution
 - State machine trigger wiring via `SimulationRuntime.stateMachineSelector()`
 - Duration with `SpeedMultiplier` bridge
+- Selector persistence across overlay cycles:
+  - `StateMachineSelector`: advance state, push/pop overlay, verify state preserved
+  - `LookupCountSelector`: resolve N times, push/pop overlay, verify count not reset
+  - `DurationSelector`: resolve, push/pop overlay, verify start time not restarted
+  - `stateMachineSelector(qn)` returns the same instance before and after overlay push/pop
 
 ## Scope Boundaries
 
