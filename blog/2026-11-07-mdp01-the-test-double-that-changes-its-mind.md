@@ -111,8 +111,93 @@ The fix: `activePhase()` is pure read, no side effects. A separate `onResolved()
 
 This is the kind of thing that only surfaces when you think about the actual call path. The generated `@Decorator` calls `canResolve()` then `resolve()` — both go through the corpus. Without the separation, lookup-count-based selection would advance twice per actual use.
 
-## What it opens up
+## Step names as triggers
 
-The selector infrastructure is in place. The immediate follow-on is wiring step lifecycle events to `StateMachineSelector.advance()` — right now the state machine is the mechanism, but the triggers aren't connected to playbook step completion yet. That wiring is thin, and once it lands, a playbook simulation can model an entire multi-step business process where each API returns contextually appropriate responses based on where you are in the workflow.
+The state machine needs something to drive it. The answer turned out to be the simplest possible thing: step names. When a named playbook step completes successfully, `advanceStateMachines(stepName)` fires on every registered `StateMachineSelector`. The selector checks its transition map — if the step name matches a trigger for the current state, the state advances. If not, nothing happens. No configuration needed beyond the transition map that already exists in the YAML.
 
-The random selector is already self-contained — no wiring needed. Point it at your payment endpoint, set your failure weights, and your retry logic gets tested on every run.
+![Step completion drives state machine drives corpus](images/step-lifecycle-wiring.svg)
+
+This makes the whole thing declarative end-to-end. The playbook declares step names. The simulation config declares transitions keyed on those names. At runtime, step completion is the glue — no Java code, no event listeners to register, no coupling between the playbook and the simulation config beyond shared step names.
+
+## Zero Java, three files
+
+The payoff is that a simulation scenario is pure YAML — a playbook, a simulation config, and a test. They're paired by name:
+
+**`order-lifecycle.playbook.yaml`** — three named steps that talk to an agent:
+
+```yaml
+steps:
+  - agent-session-open:
+      session: order-agent
+      system: You are an order processing assistant.
+
+  - name: check-order
+    agent-query:
+      session: order-agent
+      user: "Check order status for ORD-5501"
+
+  - name: process-payment
+    agent-query:
+      session: order-agent
+      user: "Process payment for ORD-5501"
+
+  - name: ship-order
+    agent-query:
+      session: order-agent
+      user: "Ship order ORD-5501"
+
+  - agent-session-close: order-agent
+```
+
+**`order-lifecycle.simulation.yaml`** — a state machine that advances as each step completes, with different corpus data per phase:
+
+```yaml
+methods:
+  agent-provider.invoke:
+    strategy: sequential
+    corpus-selection:
+      type: state-machine
+      initial: pending
+      transitions:
+        pending:
+          check-order: checked
+        checked:
+          process-payment: paid
+        paid:
+          ship-order: shipped
+      phases:
+        pending:
+          - output: "Order ORD-5501 is PENDING"
+        checked:
+          - output: "Order ORD-5501 is CHECKED"
+        paid:
+          - output: "Payment confirmed for ORD-5501"
+        shipped:
+          - output: "Order ORD-5501 has SHIPPED"
+```
+
+**`order-lifecycle.test.yaml`** — runs the playbook and asserts the state machine reached `shipped` and the agent response came from the right phase:
+
+```yaml
+name: State machine corpus selection
+simulate:
+  agent:
+    - prompt: "fallback"
+      response: "static fallback"
+
+tests:
+  - name: "step completion advances state machine and changes agent responses"
+    steps:
+      - run-playbook: ../../../main/playbooks/simulation/order-lifecycle.playbook.yaml
+        capture: result
+      - assertThat: result.succeeded
+        equals: true
+      - assertThat: result.stateMachines.agent-provider_invoke
+        equals: shipped
+      - assertThat: result.output.response
+        contains: "Payment confirmed"
+```
+
+The last assertion is the interesting one. The third step (`ship-order`) runs while the state machine is at `paid` — so the agent returns "Payment confirmed for ORD-5501" from the `paid` phase, not from `pending` or `shipped`. The state advances to `shipped` *after* the step completes. The test proves the whole chain: step names drive transitions, transitions drive corpus selection, corpus selection drives what the agent says back.
+
+The random selector needs none of this wiring — no step names, no lifecycle hooks. Point it at your payment endpoint, set your failure weights, and your retry logic gets tested on every run.
