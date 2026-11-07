@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 160" font-family="system-ui, -apple-system, sans-serif" font-size="13">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#475569"/>
+    </marker>
+  </defs>
+
+  <rect width="600" height="160" fill="#f8fafc" rx="8"/>
+
+  <!-- States -->
+  <rect x="20" y="50" width="110" height="50" rx="24" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text x="75" y="80" text-anchor="middle" font-weight="600" fill="#92400e">PENDING</text>
+
+  <rect x="200" y="50" width="110" height="50" rx="24" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5"/>
+  <text x="255" y="80" text-anchor="middle" font-weight="600" fill="#0c4a6e">PAID</text>
+
+  <rect x="380" y="50" width="110" height="50" rx="24" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="435" y="80" text-anchor="middle" font-weight="600" fill="#166534">SHIPPED</text>
+
+  <rect x="500" y="50" width="80" height="50" rx="24" fill="#f3e8ff" stroke="#9333ea" stroke-width="1.5"/>
+  <text x="540" y="80" text-anchor="middle" font-weight="600" fill="#6b21a8">DONE</text>
+
+  <!-- Transitions -->
+  <line x1="130" y1="75" x2="195" y2="75" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="162" y="65" text-anchor="middle" font-size="10" fill="#64748b">pay</text>
+
+  <line x1="310" y1="75" x2="375" y2="75" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="342" y="65" text-anchor="middle" font-size="10" fill="#64748b">ship</text>
+
+  <line x1="490" y1="75" x2="496" y2="75" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="493" y="65" text-anchor="middle" font-size="10" fill="#64748b">deliver</text>
+
+  <!-- Corpus labels -->
+  <text x="75" y="125" text-anchor="middle" font-size="10" fill="#b45309">corpus: awaiting</text>
+  <text x="255" y="125" text-anchor="middle" font-size="10" fill="#0369a1">corpus: paid</text>
+  <text x="435" y="125" text-anchor="middle" font-size="10" fill="#15803d">corpus: shipped</text>
+  <text x="540" y="125" text-anchor="middle" font-size="10" fill="#7e22ce">corpus: delivered</text>
+
+  <!-- Initial marker -->
+  <circle cx="10" cy="75" r="5" fill="#475569"/>
+  <line x1="15" y1="75" x2="18" y2="75" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+</svg>
