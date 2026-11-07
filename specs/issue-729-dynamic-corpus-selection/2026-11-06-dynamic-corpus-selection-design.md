@@ -67,18 +67,32 @@ public final class PhasedCorpus<I, O> implements SimulationCorpus<I, O> {
     private final Map<String, List<InvocationRecord<I, O>>> phases;
     // phase name → corpus entries for that phase
 
-    // All SimulationCorpus methods delegate to the active phase's entries:
+    // All SimulationCorpus read methods delegate to the active phase's entries:
     // lookupByKey(qn, key) → filter active phase entries by key
     // lookupByIndex(qn, index) → index into active phase entries
     // list(qn) → return active phase entries
+    // listByTenant(qn, tenancyId) → filter active phase entries by tenancyId
     // size(qn) → return active phase entry count
     //
     // record(), seed(), clear() → throw UnsupportedOperationException
     // (PhasedCorpus is read-only — corpus data is seeded per-phase at creation)
+
+    private List<InvocationRecord<I, O>> activeEntries(String qualifiedName) {
+        String phase = selector.activePhase();
+        List<InvocationRecord<I, O>> entries = phases.get(phase);
+        if (entries == null) {
+            throw new SimulationConfigException(
+                "Phase '" + phase + "' not found in PhasedCorpus for " + qualifiedName
+                + " — available phases: " + phases.keySet());
+        }
+        return entries;
+    }
 }
 ```
 
 `PhasedCorpus` implements `SimulationCorpus` but is read-only. All mutation methods (`record`, `seed`, `clear`) throw `UnsupportedOperationException`. Corpus data is loaded per-phase during config parsing and passed in at construction time.
+
+**Runtime phase validation:** If `selector.activePhase()` returns a phase name not in the phases map, `PhasedCorpus` throws `SimulationConfigException` with a diagnostic message listing the available phases. This fail-fast surfaces bad `CorpusSelector` implementations immediately rather than silently returning empty results.
 
 #### CorpusSelectorConfig (simulation-api)
 
@@ -123,18 +137,24 @@ The `phases()` method provides the shared contract for extracting per-phase corp
 ```java
 public final class StateMachineSelector implements CorpusSelector {
     private final Map<String, Map<String, String>> transitions;
-    private volatile String currentState;
+    private final AtomicReference<String> currentState;
 
     public StateMachineSelector(String initial,
-                                Map<String, Map<String, String>> transitions) { ... }
+                                Map<String, Map<String, String>> transitions) {
+        this.currentState = new AtomicReference<>(initial);
+        this.transitions = Map.copyOf(transitions);
+    }
 
     @Override
-    public String activePhase() { return currentState; }
+    public String activePhase() { return currentState.get(); }
 
     public void advance(String trigger) {
-        // Look up currentState in transitions map
-        // If trigger matches, transition to new state
-        // Thread-safe via volatile + CAS or similar
+        currentState.getAndUpdate(state -> {
+            Map<String, String> stateTransitions = transitions.get(state);
+            if (stateTransitions == null) return state;
+            String next = stateTransitions.get(trigger);
+            return next != null ? next : state;
+        });
     }
 }
 ```
@@ -150,11 +170,26 @@ Transitions are triggered externally via `advance(String trigger)`. The wiring l
 public final class DurationSelector implements CorpusSelector {
     private final List<CorpusSelectorConfig.DurationPhase> phases;
     private final SpeedMultiplier speedMultiplier;
+    private final LongSupplier nanoSource;
     private final long startNanos;
+
+    public DurationSelector(List<CorpusSelectorConfig.DurationPhase> phases,
+                            SpeedMultiplier speedMultiplier) {
+        this(phases, speedMultiplier, System::nanoTime);
+    }
+
+    DurationSelector(List<CorpusSelectorConfig.DurationPhase> phases,
+                     SpeedMultiplier speedMultiplier,
+                     LongSupplier nanoSource) {
+        this.phases = phases;
+        this.speedMultiplier = speedMultiplier;
+        this.nanoSource = nanoSource;
+        this.startNanos = nanoSource.getAsLong();
+    }
 
     @Override
     public String activePhase() {
-        long elapsed = (System.nanoTime() - startNanos);
+        long elapsed = (nanoSource.getAsLong() - startNanos);
         double speed = speedMultiplier.currentSpeed();
         long simulatedElapsed = (long) (elapsed * speed);
         // Walk phases, find the one whose cumulative duration covers simulatedElapsed
@@ -163,7 +198,7 @@ public final class DurationSelector implements CorpusSelector {
 }
 ```
 
-Respects `SpeedMultiplier` — at 10x speed, a 10s phase expires after 1s of wall-clock time. The last phase has no duration limit (it's the terminal state).
+Respects `SpeedMultiplier` — at 10x speed, a 10s phase expires after 1s of wall-clock time. The last phase has no duration limit (it's the terminal state). The package-private constructor accepts a `LongSupplier` for the time source, allowing tests to inject a controllable clock for deterministic duration-based selection tests.
 
 #### LookupCountSelector
 
@@ -174,18 +209,21 @@ public final class LookupCountSelector implements CorpusSelector {
 
     @Override
     public String activePhase() {
-        int count = lookupCount.getAndIncrement();
+        int count = lookupCount.get();
         // Walk phases, find the one whose cumulative count covers this lookup
         // Last phase is active indefinitely after count thresholds
+    }
+
+    @Override
+    public void onResolved() {
+        lookupCount.incrementAndGet();
     }
 }
 ```
 
 The `count` field on each phase is how many successful resolutions that phase handles before advancing to the next.
 
-**Lookup counting lifecycle:** `activePhase()` is pure read — no side effects. `LookupCountSelector` also implements `advance()` which increments the counter. The `SimulationRuntime` calls `advanceCorpusSelector(qn)` after each successful `strategy.resolve()` — this is a one-line addition to the runtime's resolution path. This separation avoids double-counting from the `canResolve()` + `resolve()` pair that both call through to `PhasedCorpus.lookupByKey()`.
-
-See the **Lifecycle Hook** section below for details.
+**Lookup counting lifecycle:** `activePhase()` is pure read — no side effects. `LookupCountSelector` overrides `onResolved()` to increment the counter. The runtime's strategy wrapping (see §SimulationRuntime Changes) calls `onResolved()` after each successful `strategy.resolve()` — transparent to callers. This separation avoids double-counting from the `canResolve()` + `resolve()` pair that both call through to `PhasedCorpus.lookupByKey()`.
 
 #### RandomSelector
 
@@ -221,40 +259,70 @@ Existing implementations (`MapSimulationConfig`, overlay configs) return `Option
 
 ### SimulationRuntime Changes
 
-In `createStrategy()`, after resolving the strategy name:
+In `createStrategy()`, after resolving the strategy name, build the `PhasedCorpus` and wrap the strategy to fire `onResolved()`:
 
 ```java
 private SimulationStrategy<?, ?> createStrategy(String qualifiedName,
                                                  String strategyName,
                                                  SimulationCorpus corpus) {
     SimulationCorpus effectiveCorpus = corpus;
+    CorpusSelector selector = null;
     Optional<CorpusSelectorConfig> selection = config.corpusSelection(qualifiedName);
     if (selection.isPresent()) {
-        effectiveCorpus = buildPhasedCorpus(qualifiedName, selection.get());
+        selector = buildSelector(qualifiedName, selection.get());
+        effectiveCorpus = new PhasedCorpus<>(selector, selection.get().phases());
     }
-    return switch (resolveAlias(strategyName)) {
+
+    SimulationStrategy<?, ?> strategy = switch (resolveAlias(strategyName)) {
         case "key-lookup" -> new KeyLookupStrategy<>(effectiveCorpus, qualifiedName, ...);
         // ... same as before, using effectiveCorpus instead of corpus
     };
+
+    if (selector != null) {
+        strategy = wrapWithSelector(strategy, selector);
+    }
+    return strategy;
 }
 
-private PhasedCorpus<Object, Object> buildPhasedCorpus(String qualifiedName,
-                                                        CorpusSelectorConfig config) {
+private CorpusSelector buildSelector(String qualifiedName, CorpusSelectorConfig config) {
     CorpusSelector selector = switch (config) {
         case CorpusSelectorConfig.StateMachine sm ->
             new StateMachineSelector(sm.initial(), sm.transitions());
         case CorpusSelectorConfig.Duration d ->
-            new DurationSelector(d.orderedPhases(), speedMultiplier());
+            new DurationSelector(d.orderedPhases(), this::globalSpeed);
         case CorpusSelectorConfig.LookupCount lc ->
             new LookupCountSelector(lc.orderedPhases());
         case CorpusSelectorConfig.Weighted w ->
             new RandomSelector(w.weightedPhases());
     };
-    return new PhasedCorpus<>(selector, config.phases());
+    if (selector instanceof StateMachineSelector sms) {
+        stateMachineSelectors.put(qualifiedName, sms);
+    }
+    return selector;
+}
+
+@SuppressWarnings({"rawtypes", "unchecked"})
+private static SimulationStrategy<?, ?> wrapWithSelector(SimulationStrategy strategy,
+                                                          CorpusSelector selector) {
+    return new SimulationStrategy<>() {
+        @Override public Object resolve(Object input) {
+            Object result = strategy.resolve(input);
+            selector.onResolved();
+            return result;
+        }
+        @Override public boolean canResolve(Object input) {
+            return strategy.canResolve(input);
+        }
+        @Override public DataRealism dataRealism() {
+            return strategy.dataRealism();
+        }
+    };
 }
 ```
 
-The `StateMachineSelector` instance is registered in a new `ConcurrentHashMap<String, StateMachineSelector>` on the runtime, so the wiring layer can retrieve it to connect trigger sources:
+The `wrapWithSelector` method wraps the strategy so that `onResolved()` fires after every `resolve()` call. Because callers receive the wrapped strategy from `strategyFor()`, the lifecycle hook is transparent — generated `@Decorator` classes and `SimulatingAction` call `strategy.resolve()` directly and the notification fires automatically.
+
+The `StateMachineSelector` instance is registered in a `ConcurrentHashMap<String, StateMachineSelector>` on the runtime, so the wiring layer can retrieve it to connect trigger sources:
 
 ```java
 public Optional<StateMachineSelector> stateMachineSelector(String qualifiedName) {
@@ -264,7 +332,18 @@ public Optional<StateMachineSelector> stateMachineSelector(String qualifiedName)
 
 ### YAML Schema
 
-The `corpus-selection` block is a new optional property on `method-config`, mutually exclusive with `corpus` and `corpus-files`:
+The `corpus-selection` block is a new optional property on `method-config`, mutually exclusive with `corpus` and `corpus-files`. The JSON schema enforces this via a `not` constraint on `method-config`:
+
+```json
+"not": {
+  "anyOf": [
+    { "required": ["corpus-selection", "corpus"] },
+    { "required": ["corpus-selection", "corpus-files"] }
+  ]
+}
+```
+
+YAML examples:
 
 ```yaml
 methods:
@@ -358,21 +437,7 @@ Weights must sum to 1.0.
 
 The `CorpusSelector.onResolved()` method is called after each successful `strategy.resolve()`. This is the increment point for `LookupCountSelector` — it cannot increment inside `activePhase()` because `activePhase()` is called from both `canResolve()` and `resolve()` (strategies call `corpus.lookupByKey()` in both paths).
 
-The call site is `SimulationRuntime`, which wraps the strategy resolution:
-
-```java
-public <I, O> O resolveWithSelector(String qualifiedName, SimulationStrategy<I, O> strategy, I input) {
-    O result = strategy.resolve(input);
-    // Notify corpus selector (if any) that a resolution completed
-    CorpusSelector selector = corpusSelectors.get(qualifiedName);
-    if (selector != null) {
-        selector.onResolved();
-    }
-    return result;
-}
-```
-
-The generated `@Decorator` and `SimulatingAction` already call through `runtime.strategyFor()` → `strategy.resolve()`. Adding the `onResolved()` call to the runtime's resolution path is a single integration point — callers don't change.
+The mechanism is **strategy wrapping**: `SimulationRuntime.createStrategy()` wraps the strategy in a delegating wrapper that calls `selector.onResolved()` after `resolve()` (see `wrapWithSelector()` in §SimulationRuntime Changes). The wrapped strategy IS the strategy returned by `strategyFor()`. Callers — generated `@Decorator` classes, `SimulatingAction`, and any future strategy consumers — call `strategy.resolve()` directly on the wrapped strategy, and the `onResolved()` notification fires automatically. No caller changes required.
 
 **Which selectors use onResolved():**
 - `LookupCountSelector` — increments counter
@@ -390,6 +455,7 @@ The generated `@Decorator` and `SimulatingAction` already call through `runtime.
 6. Lookup-count: last phase must not have a `count` (terminal)
 7. Random: weights must sum to 1.0 (within floating-point tolerance)
 8. All types: phase names must be unique within a `corpus-selection` block
+9. Runtime: `PhasedCorpus` throws `SimulationConfigException` if `activePhase()` returns a name not in the phases map
 
 ### Testing Strategy
 
@@ -421,11 +487,13 @@ The generated `@Decorator` and `SimulatingAction` already call through `runtime.
 - Unit and config tests
 
 **Out of scope (follow-up):**
-- Playbook step lifecycle wiring (connecting step completion events to `StateMachineSelector.advance()`)
-- CDI event observer wiring for event-triggered transitions
-- MCP tool for runtime phase inspection / manual trigger
-- Per-phase `corpus-files` (external file references within phases)
-- Profile-level corpus-selection (phases that span multiple methods)
+- Playbook step lifecycle wiring (connecting step completion events to `StateMachineSelector.advance()`) — #730
+- CDI event observer wiring for event-triggered transitions — #731
+- MCP tool for runtime phase inspection / manual trigger — #732
+- Per-phase `corpus-files` (external file references within phases) — #733
+- Profile-level corpus-selection (phases that span multiple methods) — #734
+
+Note: issue #729 should remain open after this scope — the "event-triggered selector" acceptance criterion (#730, #731) is explicitly deferred to follow-up work. This scope delivers the selector infrastructure; wiring comes next.
 
 ## References
 
