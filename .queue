@@ -1,7 +1,7 @@
 # Work Plan — Work Plan —
 
 ## State
-branch: issue-763-register-default-expression-engines
+branch: issue-766-767-768-expression-defaults-hardening
 state: active
 Current: none
 date: 
@@ -17,3 +17,6 @@ status: active
 - [ ] casehubio/platform#745 — CDI event observer wiring for event-triggered corpus selection
 - [ ] casehubio/platform#748 — profile-level corpus-selection
 - [ ] casehubio/platform#763 — fix: expression module should auto-register default CONDITION/TRANSFORM/FILTER engines
+- [ ] casehubio/platform#766 — fail-fast startup validation for ExpressionEngineRegistry defaults
+- [ ] casehubio/platform#767 — replace silent degradation fallback in CorpusSelectionEventObserver
+- [ ] casehubio/platform#768 — document ExpressionContext.PARAMETER default policy
