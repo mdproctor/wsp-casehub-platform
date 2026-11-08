@@ -1,0 +1,8 @@
+{"ts": "2026-11-08T04:14:15.362219+00:00", "mode": "wrap", "action": "epic_hygiene", "step": "", "steps_executed": ["loose_ends:SKIPPED_ERROR"], "error": ""}
+{"ts": "2026-11-08T04:14:25.567412+00:00", "mode": "wrap", "action": "wrap_sweep_config", "step": "", "steps_executed": [], "error": ""}
+{"ts": "2026-11-08T04:16:04.405377+00:00", "mode": "wrap", "action": "journal_entry", "step": "", "steps_executed": [], "error": ""}
+{"ts": "2026-11-08T04:16:09.168372+00:00", "mode": "wrap", "action": "garden_feedback", "step": "", "steps_executed": [], "error": ""}
+{"ts": "2026-11-08T04:16:13.307366+00:00", "mode": "wrap", "action": "notes", "step": "", "steps_executed": [], "error": ""}
+{"ts": "2026-11-08T04:16:17.330075+00:00", "mode": "wrap", "action": "handoff_write", "step": "", "steps_executed": [], "error": ""}
+{"ts": "2026-11-08T04:17:02.664719+00:00", "mode": "wrap", "action": "error", "step": "wip_commit", "steps_executed": ["wip_commit:ERROR:1"], "error": "exit_2"}
+{"ts": "2026-11-08T04:17:13.418995+00:00", "mode": "wrap", "action": "error", "step": "wip_commit", "steps_executed": ["wip_commit:ERROR:2"], "error": "exit_2"}
