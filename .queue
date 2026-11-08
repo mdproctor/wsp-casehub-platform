@@ -1,7 +1,7 @@
 # Work Plan — Work Plan —
 
 ## State
-branch: issue-745-cdi-event-corpus-selection
+branch: issue-763-register-default-expression-engines
 state: active
 Current: none
 date: 
@@ -16,3 +16,4 @@ status: active
 - [ ] casehubio/platform#747 — per-phase corpus-files support
 - [ ] casehubio/platform#745 — CDI event observer wiring for event-triggered corpus selection
 - [ ] casehubio/platform#748 — profile-level corpus-selection
+- [ ] casehubio/platform#763 — fix: expression module should auto-register default CONDITION/TRANSFORM/FILTER engines
