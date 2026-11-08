@@ -20,3 +20,6 @@ status: active
 - [ ] casehubio/platform#766 — fail-fast startup validation for ExpressionEngineRegistry defaults
 - [ ] casehubio/platform#767 — replace silent degradation fallback in CorpusSelectionEventObserver
 - [ ] casehubio/platform#768 — document ExpressionContext.PARAMETER default policy
+- [ ] casehubio/platform#764 — test: integration test for profile-level shared selector
+- [ ] casehubio/platform#765 — feat: CorpusSelectionEventObserver rebuild trigger index on profile activation
+- [ ] casehubio/platform#727 — refactor: rename Manifest to AgentManifest for disambiguation
