@@ -127,24 +127,17 @@ The payoff is that a simulation scenario is pure YAML — a playbook, a simulati
 
 ```yaml
 steps:
-  - agent-session-open:
-      session: order-agent
+  - agent-session-open order-agent:
       system: You are an order processing assistant.
 
   - name: check-order
-    agent-query:
-      session: order-agent
-      user: "Check order status for ORD-5501"
+    agent-query order-agent: "Check order status for ORD-5501"
 
   - name: process-payment
-    agent-query:
-      session: order-agent
-      user: "Process payment for ORD-5501"
+    agent-query order-agent: "Process payment for ORD-5501"
 
   - name: ship-order
-    agent-query:
-      session: order-agent
-      user: "Ship order ORD-5501"
+    agent-query order-agent: "Ship order ORD-5501"
 
   - agent-session-close: order-agent
 ```
