@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 340" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="none" stroke="#475569" stroke-width="1.2"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="720" height="340" rx="8" fill="#f8fafc"/>
+
+  <!-- Title -->
+  <text x="360" y="28" text-anchor="middle" font-size="14" font-weight="600" fill="#1e293b">Before and After: Annotation Surface for Tier 2</text>
+
+  <!-- BEFORE side -->
+  <text x="180" y="56" text-anchor="middle" font-size="12" font-weight="600" fill="#dc2626">Before — Annotation Required</text>
+  <rect x="20" y="68" width="320" height="120" rx="6" fill="#fff" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="32" y="88" font-size="10" font-family="'JetBrains Mono', monospace" fill="#6366f1">@PlatformQuery</text>
+  <text x="32" y="104" font-size="10" font-family="'JetBrains Mono', monospace" fill="#dc2626">@GeneratePlugin(</text>
+  <text x="52" y="118" font-size="10" font-family="'JetBrains Mono', monospace" fill="#dc2626">capability = AccountInfo.class,</text>
+  <text x="52" y="132" font-size="10" font-family="'JetBrains Mono', monospace" fill="#dc2626">accessor = "accountInfo",</text>
+  <text x="52" y="146" font-size="10" font-family="'JetBrains Mono', monospace" fill="#dc2626">spiMethod = "balance")</text>
+  <text x="32" y="162" font-size="10" font-family="'JetBrains Mono', monospace" fill="#475569">public AccountBalance balance(...)</text>
+  <text x="32" y="178" font-size="10" font-family="'JetBrains Mono', monospace" fill="#94a3b8">// method body is opaque to APT</text>
+
+  <!-- AFTER side -->
+  <text x="540" y="56" text-anchor="middle" font-size="12" font-weight="600" fill="#16a34a">After — Inferred from Code</text>
+  <rect x="380" y="68" width="320" height="120" rx="6" fill="#fff" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="392" y="88" font-size="10" font-family="'JetBrains Mono', monospace" fill="#6366f1">@PlatformQuery</text>
+  <text x="392" y="104" font-size="10" font-family="'JetBrains Mono', monospace" fill="#475569">public AccountBalance balance(...) {</text>
+  <text x="412" y="120" font-size="10" font-family="'JetBrains Mono', monospace" fill="#16a34a">BankPlatform p = svc.platform(x);</text>
+  <text x="412" y="136" font-size="10" font-family="'JetBrains Mono', monospace" fill="#16a34a">requireCapability(p, AcctInfo, ...);</text>
+  <text x="412" y="152" font-size="10" font-family="'JetBrains Mono', monospace" fill="#16a34a">return p.acctInfo(u).balance(id);</text>
+  <text x="392" y="168" font-size="10" font-family="'JetBrains Mono', monospace" fill="#475569">}</text>
+
+  <!-- Arrow between -->
+  <line x1="345" y1="128" x2="375" y2="128" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- AST Scanner box -->
+  <rect x="160" y="210" width="400" height="110" rx="6" fill="#eff6ff" stroke="#93c5fd" stroke-width="1"/>
+  <text x="360" y="234" text-anchor="middle" font-size="12" font-weight="600" fill="#1e40af">TreePathScanner — single pass</text>
+
+  <text x="180" y="256" font-size="10" fill="#475569">Rule 1: service.platform(x) → SPI type + routing param</text>
+  <text x="180" y="272" font-size="10" fill="#475569">Rule 3: requireCapability(p, Class, name) → capability</text>
+  <text x="180" y="288" font-size="10" fill="#475569">Rule 4: return p.accessor(args).method(args) → call chain</text>
+  <text x="180" y="304" font-size="10" fill="#475569">Rule 5: x != null ? x : literal → static defaults</text>
+
+  <!-- Arrows from After to Scanner -->
+  <line x1="540" y1="190" x2="540" y2="208" stroke="#93c5fd" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <text x="558" y="204" font-size="9" fill="#6b7280">reads body</text>
+</svg>
