@@ -92,6 +92,10 @@ AST shape:
 
 Used by: Voice (helper-method routing), potentially future connectors with non-standard service lookup.
 
+**Limitation — non-trivial return transformation:** Voice `speak()` does not return the SPI result directly — it Base64-encodes audio, extracts fields from `ResolvedVoice`, and constructs a `VoiceSynthesisResult` DTO. Methods with non-trivial return value transformation cannot be auto-generated because the transformation logic is opaque to the generator. These methods fall back to `@GeneratePlugin` annotation or remain hand-written plugins.
+
+The AST walker detects this: when the return expression is not a method invocation chain on the SPI variable (e.g., it's a constructor call or a local variable), inference marks the method as "non-direct return" and falls back.
+
 ### Pattern C — Direct registry (no SPI routing)
 
 ```java
@@ -102,10 +106,18 @@ public List<VoiceDescriptor> listVoices(...) {
 }
 ```
 
-No SPI type, no capability routing. These methods don't use the connector pattern at all — they call injected services directly. AST inference produces no `InferredCallChain`. These methods either:
-- Generate as Tier 1-style direct delegation (if the injected service type is a suitable `@Execute` parameter)
-- Fall back to `@GeneratePlugin` annotation
-- Skip with WARNING
+No SPI type, no capability routing, no `service.platform()` call. AST inference produces no `InferredCallChain` (no SPI variable detected). These methods fall back to the existing Jandex-based SPI resolution from #795. If that also fails, they skip with WARNING. Pattern C methods are typically utility/discovery methods that don't map to the connector SPI pattern.
+
+### Locally-constructed target method arguments
+
+When the SPI method's target call includes locally-constructed arguments (e.g., `new SynthesisOptions(...)` or `new PageRequest(cursor, size)`), the AST walker records the argument as a local variable reference, not a method parameter name. The generator handles this by mapping to the SPI method's parameter type via Jandex:
+
+1. The AST walker extracts the target method name and argument names (including local variables)
+2. The generator looks up the target method's parameter types on the capability interface via Jandex
+3. For arguments that are local variables (not method params), the generator uses the SPI method's declared parameter type as the plugin field type
+4. The plugin field is the complex type (e.g., `@Optional SynthesisOptions options`) — consistent with D4
+
+This handles the `synthesise(text, options)` case: `text` maps to a plugin field from the API method params; `options` maps to a `SynthesisOptions` plugin field from the SPI method's parameter type. The YAML user provides the `SynthesisOptions` structure directly.
 
 ## AST Walker Architecture
 
