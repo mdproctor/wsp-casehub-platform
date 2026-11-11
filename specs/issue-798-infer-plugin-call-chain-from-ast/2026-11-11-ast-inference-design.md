@@ -668,6 +668,34 @@ spiMethodName = effectiveSpiMethod;
 
 This ensures AST-inferred capability values reach the accessor introspection and delegate call construction, not just the merge variables.
 
+#### Static default integration
+
+After constructing `fields` via `mapParamsToFields()` (and adding accessor fields), apply AST-inferred static defaults to fields that have no annotation-provided default:
+
+```java
+// Apply AST-inferred static defaults
+if (inferred != null && inferred.staticDefaults() != null) {
+    for (int i = 0; i < fields.size(); i++) {
+        PluginField f = fields.get(i);
+        if ((f.defaultValue == null || f.defaultValue.isEmpty())
+                && inferred.staticDefaults().containsKey(f.name)) {
+            // Field with inferred default becomes @Optional with defaultValue
+            fields.set(i, new PluginField(f.name, f.typeStr, false,
+                    inferred.staticDefaults().get(f.name)));
+        }
+    }
+}
+```
+
+This connects Rule 5's `staticDefaults` map to the existing `PluginField.defaultValue` infrastructure. The compact constructor generation (lines 1976-1990 in current code) already handles fields with `defaultValue` — it generates `if (fieldName == null) fieldName = "defaultValue";` for each. No changes to the compact constructor generation are needed.
+
+Precedence: `@DefaultValue` annotations (from `ResolvedParam.defaultValue()`, applied during `mapParamsToFields()`) take precedence over AST-inferred defaults. The check `f.defaultValue == null || f.defaultValue.isEmpty()` ensures AST-inferred defaults only apply when no annotation-provided default exists.
+
+Effect on the generated plugin for `ConnectorBankApi.listTransactions()`:
+- `pageSize` parameter has `int size = pageSize != null ? pageSize : 50` → inferred default `"50"`
+- Generated field changes from `@Required Integer pageSize` to `@Optional Integer pageSize` with compact constructor: `if (pageSize == null) pageSize = 50;`
+- YAML users can omit `pageSize` (defaults to 50) or specify it explicitly
+
 ### Processing summary diagnostic (D3)
 
 Summary counters are **processor-level instance fields**, accumulated across all domains during the domain loop in `process()`. The summary is emitted **once**, after the domain loop completes — not per-domain:
