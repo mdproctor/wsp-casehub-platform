@@ -163,6 +163,8 @@ private ExecutableElement findMethodElement(ResolvedOperation op) {
 
 3. **Methods not in current compilation round** — AST inference only works for `RoundEnvironment`-sourced methods (classes compiled in the current APT round). Jandex-only classes from dependency JARs have no source tree available.
 
+4. **Indirect return via local variable** — inference requires the SPI method chain to appear directly in the return expression (`return p.accessor().method(args)`) or as an expression statement (Rule 6 for void methods). If the SPI call is assigned to a local variable and the variable is returned (`var result = p.accessor().method(args); return result;`), the return expression is an `IdentifierTree`, not a method chain, and the target method is not extracted. Such methods fall back to annotation-based resolution.
+
 ### Precedence model (D8)
 
 1. `@GeneratePlugin` present with **explicit** call-chain values → annotation overrides inference
@@ -260,6 +262,27 @@ private String resolveTypeName(String simpleName) {
 
 This resolves both `spiTypeFqcn` (from Rule 1) and `capabilityFqcn` (from Rule 3) to proper FQCNs, ensuring correct comparison with Jandex-resolved values in the integration code.
 
+#### Scope guards — skipping nested scopes
+
+Lambda expressions and anonymous class bodies introduce nested scopes with their own return statements, variable declarations, and method invocations. These are irrelevant to the enclosing method's call chain and must not interfere with inference. The scanner skips these subtrees entirely:
+
+```java
+@Override
+public Void visitLambdaExpression(LambdaExpressionTree node, Void p) {
+    return null; // do not recurse into lambda body
+}
+
+@Override
+public Void visitNewClass(NewClassTree node, Void p) {
+    if (node.getClassBody() != null) {
+        return null; // do not recurse into anonymous class body
+    }
+    return super.visitNewClass(node, p);
+}
+```
+
+This prevents false-positive `MULTIPLE_RETURNS` from lambda returns (e.g., `stream().filter(a -> { return a.isActive(); })`), and also prevents lambda-scoped variable declarations from polluting the `variableTypes` map (e.g., a lambda-local `var p = ...` would shadow the outer SPI variable).
+
 #### Recognition rules
 
 **Rule 1 — Variable declaration with `service.platform(x)` call:**
@@ -270,8 +293,13 @@ public Void visitVariable(VariableTree node, Void p) {
     // Record variable name → resolved FQCN
     String typeName = node.getType().toString();
     if ("var".equals(typeName)) {
-        // var-typed variable — cannot resolve type from AST (see Known Limitations)
-        failureReason = InferenceFailure.VAR_TYPED_SPI;
+        // var-typed — cannot resolve type from AST
+        // Only fail inference if this is the SPI variable (service.platform() pattern)
+        if (node.getInitializer() instanceof MethodInvocationTree inv
+                && methodName(inv).equals("platform")) {
+            failureReason = InferenceFailure.VAR_TYPED_SPI;
+        }
+        // Don't add to variableTypes — type is unknown
         return super.visitVariable(node, p);
     }
     String resolvedType = resolveTypeName(typeName);
@@ -441,18 +469,78 @@ public Void visitVariable(VariableTree node, Void p) {
 }
 ```
 
+**`extractParamName(condition, trueExpr)`** — validates the `x != null ? x : literal` pattern and returns the parameter name, or null if the pattern doesn't match:
+
+```java
+private String extractParamName(ExpressionTree condition, ExpressionTree trueExpr) {
+    // Condition must be: paramName != null
+    if (!(condition instanceof BinaryTree binary)) return null;
+    if (binary.getKind() != Tree.Kind.NOT_EQUAL_TO) return null;
+    ExpressionTree left = binary.getLeftOperand();
+    ExpressionTree right = binary.getRightOperand();
+    // One operand must be null literal
+    boolean leftIsNull = right instanceof LiteralTree lit && lit.getValue() == null;
+    boolean rightIsNull = left instanceof LiteralTree lit2 && lit2.getValue() == null;
+    if (!leftIsNull && !rightIsNull) return null;
+    // Non-null operand is the parameter name
+    ExpressionTree paramExpr = leftIsNull ? left : right;
+    if (!(paramExpr instanceof IdentifierTree paramId)) return null;
+    // True expression must be the same identifier
+    if (!(trueExpr instanceof IdentifierTree trueId)) return null;
+    if (!paramId.getName().contentEquals(trueId.getName())) return null;
+    return paramId.getName().toString();
+}
+```
+
+**Rule 6 — Void method expression statement with SPI method chain:**
+
+For `@PlatformMutation` methods with void return type (e.g., delete operations), the SPI call is an expression statement rather than a return statement. Rule 6 extends `visitExpressionStatement` to extract the call chain from SPI method invocations:
+
+```java
+// In visitExpressionStatement, after Rule 3 (requireCapability check):
+if (node.getExpression() instanceof MethodInvocationTree inv) {
+    List<MethodCallInfo> chain = flattenMethodChain(inv);
+    if (chain.size() >= 2) {
+        MethodCallInfo first = chain.get(0);
+        if (first.receiverName != null
+                && variableTypes.containsKey(first.receiverName)
+                && variableTypes.get(first.receiverName).equals(spiTypeFqcn)) {
+            // Only set if not already set by a return statement (Rule 4 takes precedence)
+            if (targetMethod == null) {
+                capabilityAccessor = first.methodName;
+                accessorArgs = first.argNames();
+                MethodCallInfo last = chain.get(chain.size() - 1);
+                targetMethod = last.methodName;
+                targetArgs = last.argNames();
+            }
+        }
+    } else if (chain.size() == 1) {
+        MethodCallInfo call = chain.get(0);
+        if (call.receiverName != null
+                && variableTypes.containsKey(call.receiverName)
+                && targetMethod == null) {
+            targetMethod = call.methodName;
+            targetArgs = call.argNames();
+        }
+    }
+}
+```
+
+Rule 4 (return statement) takes precedence: if both a return statement and an expression statement contain SPI method chains, the return-based inference wins. For void methods with no return statement, Rule 6 is the only source of the target method.
+
 ### InferenceFailure
 
 An enum capturing why inference failed, used by the processing summary for diagnostic reporting:
 
 ```java
 public enum InferenceFailure {
-    NO_METHOD_BODY,         // method not in current compilation unit
-    VAR_TYPED_SPI,          // SPI variable uses var — no type in AST
-    MULTIPLE_RETURNS,       // multiple return statements — ambiguous control flow
-    CAPABILITY_MISMATCH,    // requireCapability method name ≠ target method name
-    NO_SPI_VARIABLE,        // no service.platform() call found (Pattern C)
-    UNRECOGNIZED_PATTERN    // AST shape doesn't match any known pattern
+    NO_METHOD_BODY,              // method not in current compilation unit
+    VAR_TYPED_SPI,               // SPI variable uses var — no type in AST
+    MULTIPLE_RETURNS,            // multiple return statements — ambiguous control flow
+    CAPABILITY_MISMATCH,         // requireCapability method name ≠ target method name
+    INCOMPLETE_CAPABILITY_CHAIN, // capability detected but accessor not found in return chain
+    NO_SPI_VARIABLE,             // no service.platform() call found (Pattern C)
+    UNRECOGNIZED_PATTERN         // AST shape doesn't match any known pattern
 }
 ```
 
@@ -494,6 +582,10 @@ InferredCallChain result() {
     // Detect Pattern C — no SPI variable found
     if (spiTypeFqcn == null && failureReason == null) {
         failureReason = InferenceFailure.NO_SPI_VARIABLE;
+    }
+    // Detect incomplete capability chain — capability found but accessor missing
+    if (capabilityFqcn != null && capabilityAccessor == null && failureReason == null) {
+        failureReason = InferenceFailure.INCOMPLETE_CAPABILITY_CHAIN;
     }
     // Detect incomplete pattern — have SPI type but no target method
     if (spiTypeFqcn != null && targetMethod == null && failureReason == null) {
@@ -572,7 +664,6 @@ if (effectiveCapability != null && !effectiveCapability.isEmpty()) {
     // ... accessor introspection via Jandex (unchanged) ...
 }
 spiMethodName = effectiveSpiMethod;
-effectiveRoutingParam = effectiveRoutingParam; // replaces routingParamName
 ```
 
 This ensures AST-inferred capability values reach the accessor introspection and delegate call construction, not just the merge variables.
@@ -607,9 +698,11 @@ if (generatePlugins && totalPluginCount > 0) {
 
 This gives a single, project-wide view: `"AST inference: 47/60 methods inferred, 13 fell back (5 no_spi_variable, 3 var_typed_spi, 2 multiple_returns, 3 unrecognized_pattern): [method list]"`.
 
-Each generated plugin includes a source comment:
+Each generated plugin includes a source comment indicating the resolution path. `usedInference` is derived from the completeness check: after the merge code nulls out incomplete inference (line 528), `inferred != null` means inference succeeded and was used:
 
 ```java
+boolean usedInference = (inferred != null);
+// ... later, in the source generation:
 out.println("// GENERATED by GraphQLResolverProcessor — do not edit");
 out.println("// resolved via: " + (usedInference ? "AST inference" : "@GeneratePlugin annotation"));
 ```
@@ -725,7 +818,8 @@ Test sources with intentionally unsupported patterns:
 - **Lambda body:** SPI call inside a lambda. Assert not inferred.
 - **Try-catch wrapping:** SPI call inside try block. Assert still inferred (try-catch doesn't change the call chain).
 - **Multiple return statements:** Assert inference returns null with `failureReason = MULTIPLE_RETURNS`.
-- **No return statement (void method):** Assert target method extracted from the last method invocation expression statement.
+- **No return statement (void method):** Assert target method extracted from the SPI method invocation expression statement via Rule 6.
+- **Lambda with explicit return:** `stream().filter(a -> { return a.isActive(); })` in method body does NOT trigger `MULTIPLE_RETURNS`.
 
 ### 3. Integration with compile-testing
 
