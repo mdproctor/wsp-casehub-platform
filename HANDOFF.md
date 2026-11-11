@@ -2,14 +2,28 @@
 
 ## Last Session
 
-Completed #746 — MCP tool for runtime simulation phase inspection (S/Low). Landed as 54875f7b. Added `type()`/`reset()` to `CorpusSelector` SPI, selector inspection methods to `SimulationRuntime`, and `CorpusSelectorService @McpDomain("corpus-selectors")` in event-simulation with list/status/advance/reset operations. Also added `initializeSelectors()` called at startup so selectors are discoverable without prior `strategyFor()` calls.
+**Date:** 2026-11-11
+**Landed:** #798 (5 commits), #802 (2 commits) — all on main
 
-## Immediate Next Step
+### #798 — AST-based plugin call chain inference
+Built `CallChainScanner` (TreePathScanner) with 6 recognition rules to infer SPI call chains from connector method bodies. Eliminates `@GeneratePlugin(capability, spi, accessor, spiMethod)` for most connector methods. Integrated into `GraphQLResolverProcessor.generatePluginSource()` with annotation-override precedence. Blog: "The Annotation the Code Already Knew."
 
-Pick next from queue — #747 (per-phase corpus-files, XS/Low) or #725 (CLI --dry-run discovery, S/Low) are smallest. #745 (CDI event observer wiring, M/Med) and #748 (profile-level corpus-selection, M/Med) are larger.
+### #802 — var-typed SPI resolution fix
+Two root causes: (1) `VariableTree.getType()` behavior differs across JDKs — fixed with unified var/explicit type resolution. (2) `CAPABILITY_MISMATCH` cross-validation compared API operation names against SPI method names — removed (they're intentionally different). This was the actual cause of 97/121 method failures.
 
-## References
+### Key findings
+- `resolveVarPlatformType` path is untestable locally (this JDK resolves `var` to the inferred type). Connectors build is the integration test.
+- `requireCapabilityMethodName` is populated but unused after removing CAPABILITY_MISMATCH. Could verify capability class against Jandex accessor return type (enhancement).
 
-- `.queue` — 6 remaining issues
-- `specs/issue-746-mcp-simulation-phase-inspection/` — design spec and decisions
-- `plans/2026-11-08-mcp-simulation-phase-inspection.md` — implementation plan
+## Queue
+
+| # | Title | Scale | Priority |
+|---|-------|-------|----------|
+| 803 | 34 methods still fail SPI resolution — identical pattern to working ones | M | High |
+| 804 | Static default assigns String to Integer — type mismatch | XS | High |
+| 805 | cursor param should be @Optional, not @Required | XS | Med |
+| 806 | Wire pluginSubject and absorbSiblings from @GeneratePlugin | S | Med |
+| 807 | Voice and messaging need different resolution patterns | S | Low |
+| 808 | Hand-written plugin skip detection across modules | S | Med |
+
+**Recommended start:** #803 + #804 + #805 bundled — all in CallChainScanner, two are XS fixes.
