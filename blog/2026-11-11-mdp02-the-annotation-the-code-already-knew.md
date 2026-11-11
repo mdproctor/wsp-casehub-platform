@@ -46,7 +46,9 @@ requireCapability(p, AccountInformation.class, "balance");
 return p.accountInformation(userId()).balance(accountId);
 ```
 
-Three lines, six pieces of information: SPI type, routing parameter, capability class, capability accessor, target method, target arguments. The scanner extracts all of them by visiting `VariableTree`, `ExpressionStatementTree`, and `ReturnTree` nodes in a single pass.
+The middle line — `requireCapability` — is a runtime guard. A banking SPI like `BankPlatform` has multiple capability sub-interfaces: `AccountInformation` for balances and transactions, `PaymentInitiation` for transfers. Not every provider implements every capability. Stripe might support account queries but not payment initiation; a regional bank might support both. `requireCapability` checks at call time whether the resolved platform actually supports the capability this method needs, and throws a typed `UnsupportedCapabilityException` with the list of what the platform does support — so the caller gets a clear error, not a `NullPointerException` from a missing sub-interface.
+
+Every connector method has one. The pattern is uniform: resolve the platform, guard the capability, chain through the accessor to the target method. Three lines, six pieces of information: SPI type, routing parameter, capability class, capability accessor, target method, target arguments. The scanner extracts all of them by visiting `VariableTree`, `ExpressionStatementTree`, and `ReturnTree` nodes in a single pass.
 
 **Helper-method routing** — the voice connector pattern. A helper resolves the platform through a non-standard path, but the SPI call chain is structurally identical once the variable is assigned.
 
