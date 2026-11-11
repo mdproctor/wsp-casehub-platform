@@ -14,7 +14,7 @@ backend didn't know how to use Vertex AI transport. That's the gap this closes.
 
 The interesting part isn't the code. It's how much infrastructure was already in
 place. `VertexClient` already existed in `llm-config-vertex/` — it could validate
-GCP ADC credentials and list Vertex models. `ManifestProcessor` already seeded
+GCP ADC credentials and list Vertex models. `AgentManifestProcessor` already seeded
 credentials from `agent-config.yaml`. `BackendInstanceCoordinator` already iterated
 credential refs and matched them to factories. The `CLIOptions` record already had
 an `env` field that gets passed to the CLI subprocess. The routing layer already

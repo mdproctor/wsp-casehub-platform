@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 320" font-family="Inter, system-ui, -apple-system, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#64748b"/>
+    </marker>
+    <filter id="sh" x="-4%" y="-4%" width="108%" height="112%">
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <!-- Tier 1 -->
+  <text x="20" y="28" font-size="13" font-weight="700" fill="#0f172a">Tier 1 — Platform Interfaces</text>
+  <text x="20" y="46" font-size="10" fill="#64748b">Zero annotation changes required</text>
+
+  <rect x="20" y="60" width="150" height="60" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.2" filter="url(#sh)"/>
+  <text x="95" y="85" text-anchor="middle" font-size="11" font-weight="500" fill="#1e40af">LabelApi</text>
+  <text x="95" y="100" text-anchor="middle" font-size="9" fill="#60a5fa">@McpDomain("labels")</text>
+
+  <line x1="170" y1="90" x2="216" y2="90" stroke="#64748b" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <rect x="220" y="60" width="200" height="60" rx="6" fill="#fce7f3" stroke="#ec4899" stroke-width="1.2" filter="url(#sh)"/>
+  <text x="320" y="82" text-anchor="middle" font-size="11" font-weight="500" fill="#9d174d">LabelsChildrenPlugin</text>
+  <text x="320" y="100" text-anchor="middle" font-size="9" fill="#f472b6">@Execute api.children(path)</text>
+
+  <line x1="420" y1="90" x2="466" y2="90" stroke="#64748b" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <rect x="470" y="64" width="230" height="52" rx="6" fill="#f0fdf4" stroke="#22c55e" stroke-width="1" filter="url(#sh)"/>
+  <text x="585" y="84" text-anchor="middle" font-size="12" font-weight="600" fill="#166534" font-family="monospace">- labels-children: /ops</text>
+  <text x="585" y="104" text-anchor="middle" font-size="9" fill="#4ade80">YAML playbook step</text>
+
+  <!-- Divider -->
+  <line x1="20" y1="150" x2="700" y2="150" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4"/>
+
+  <!-- Tier 2 -->
+  <text x="20" y="178" font-size="13" font-weight="700" fill="#0f172a">Tier 2 — Connector Classes</text>
+  <text x="20" y="196" font-size="10" fill="#64748b">@GeneratePlugin(capability = ...) for SPI routing</text>
+
+  <rect x="20" y="210" width="150" height="80" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.2" filter="url(#sh)"/>
+  <text x="95" y="232" text-anchor="middle" font-size="11" font-weight="500" fill="#1e40af">ConnectorBankApi</text>
+  <text x="95" y="250" text-anchor="middle" font-size="9" fill="#60a5fa">@McpDomain</text>
+  <text x="95" y="265" text-anchor="middle" font-size="9" fill="#60a5fa">@Inject BankPlatformService</text>
+  <text x="95" y="280" text-anchor="middle" font-size="8" fill="#ec4899">@GeneratePlugin(...)</text>
+
+  <line x1="170" y1="250" x2="216" y2="250" stroke="#64748b" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <rect x="220" y="210" width="200" height="80" rx="6" fill="#fce7f3" stroke="#ec4899" stroke-width="1.2" filter="url(#sh)"/>
+  <text x="320" y="237" text-anchor="middle" font-size="11" font-weight="500" fill="#9d174d">BankBalancePlugin</text>
+  <text x="320" y="255" text-anchor="middle" font-size="9" fill="#f472b6">@Execute(BankPlatform spi)</text>
+  <text x="320" y="273" text-anchor="middle" font-size="8" fill="#f472b6">spi.accountInfo(userId)</text>
+  <text x="320" y="285" text-anchor="middle" font-size="8" fill="#f472b6">.balance(accountId)</text>
+
+  <line x1="420" y1="250" x2="466" y2="250" stroke="#64748b" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <rect x="470" y="224" width="230" height="52" rx="6" fill="#f0fdf4" stroke="#22c55e" stroke-width="1" filter="url(#sh)"/>
+  <text x="585" y="244" text-anchor="middle" font-size="12" font-weight="600" fill="#166534" font-family="monospace">- bank-balance: "12345"</text>
+  <text x="585" y="264" text-anchor="middle" font-size="9" fill="#4ade80">YAML playbook step</text>
+</svg>
