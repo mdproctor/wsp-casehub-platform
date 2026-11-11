@@ -274,25 +274,25 @@ public record BankInitiatePaymentPlugin(
 }
 ```
 
-### Platform interface — notification query
+### Platform interface — label query
 
 ```java
-@Plugin(value = "notifications-find", description = "Find notifications for a user")
-public record NotificationsFindPlugin(
-        @Required String userId,
-        @Required String tenancyId,
-        @Optional String status,
-        @Optional String category,
-        @Optional String cursor,
-        @Optional Integer limit) {
+// Source: LabelApi interface
+@McpDomain("labels")
+public interface LabelApi {
+    @PlatformQuery("List child labels under a path")
+    List<LabelDescriptor> children(String path);
+}
+
+// Generated plugin
+@Plugin(value = "labels-children", description = "List child labels under a path")
+public record LabelsChildrenPlugin(@Required String path) {
 
     @Execute
-    public Result execute(NotificationStore store) {
-        var query = new NotificationQuery(userId, tenancyId,
-                status != null ? NotificationStatus.valueOf(status) : null,
-                category, cursor, limit != null ? limit : 50);
-        var result = store.find(query);
-        return Result.of(Records.toMap(result));
+    public Result execute(LabelApi api) {
+        var result = api.children(path);
+        return Result.of(Map.of("items", result.stream()
+                .map(Records::toMap).toList()));
     }
 }
 ```
