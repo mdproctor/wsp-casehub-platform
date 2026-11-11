@@ -106,6 +106,8 @@ public @interface GeneratePlugin {
     Class<?> capability() default void.class;
     Class<?> spi() default void.class;      // explicit SPI type override
     String accessor() default "";            // explicit accessor method name
+    String spiMethod() default "";           // SPI method name when it differs from the API method name
+    String[] optionalParams() default {};    // parameter names to generate as @Optional instead of @Required
     boolean exclude() default false;         // opt out of generation
 }
 ```
@@ -202,7 +204,8 @@ When `@GeneratePlugin(capability = X.class)` is set (not `void.class`):
 2. If `@GeneratePlugin(accessor = "...")` is present, use that instead
 3. Verify via Jandex: the SPI type must have a method with that name returning the capability type — emit compile error otherwise
 4. Introspect accessor parameters: if the accessor takes parameters (e.g., `accountInformation(String userId)`), add corresponding `@Optional` fields to the plugin record
-5. Find the method on the capability interface matching the API method name
+5. Find the method on the capability interface: if `@GeneratePlugin(spiMethod = "...")` is specified, use that name; otherwise use the API method name. Emit compile error if no matching method is found on the capability interface.
+6. **Parameter type compatibility:** The source method parameters (excluding routing, context, and streaming-input parameters) must match the SPI method parameters in type. When parameter types diverge (e.g., source has individual `String` params but the SPI method takes a record), the generator emits a compile error — the plugin must be hand-written. The generator does NOT auto-construct record types from individual parameters.
 
 When no `@GeneratePlugin` is present or `capability` is `void.class`, call the method directly on the interface/SPI type.
 
@@ -221,7 +224,19 @@ When no `@GeneratePlugin` is present or `capability` is `void.class`, call the m
 | Routing parameter (connector `platform` param) | Excluded |
 | Capability accessor parameters | Added as `@Optional` fields |
 
-**Unannotated parameters:** Tier 1 platform interface methods (e.g., `AclApi.check(String actorId, ResourceId resourceId, AclAction action)`) have no `@PathParam`/`@QueryParam` annotations. All unannotated parameters become plugin record fields. Boxed primitive types indicate nullable/optional semantics (e.g., `Integer limit`); all other types default to `@Required` since platform interface methods treat their parameters as mandatory inputs. `@GeneratePlugin` can override individual parameter handling via `exclude` when needed.
+**Unannotated parameters:** Tier 1 platform interface methods (e.g., `AclApi.check(String actorId, ResourceId resourceId, AclAction action)`) have no `@PathParam`/`@QueryParam` annotations. All unannotated parameters become plugin record fields. Boxed primitive types indicate nullable/optional semantics (e.g., `Integer limit`); all other types default to `@Required` since the safe default is to require inputs.
+
+**Overriding optionality for specific parameters:** Two mechanisms are supported:
+
+1. **`@GeneratePlugin(optionalParams = {"cursor", "category"})`** — lists parameter names that should generate as `@Optional` instead of `@Required`. The APT validates that listed names exist as parameters on the method — compile error if a listed name doesn't match. Example:
+   ```java
+   @PlatformQuery("List available models — all params optional.")
+   @GeneratePlugin(optionalParams = {"vendor", "family", "tier", "locality", "maxCostTier"})
+   List<ModelDescriptor> listModels(String vendor, String family,
+                                    String tier, String locality, String maxCostTier);
+   ```
+
+2. **Java nullability annotations** — if a parameter is annotated with `@Nullable` (from `jakarta.annotation`, `org.jspecify.annotations`, or `org.jetbrains.annotations`), the generator treats it as `@Optional`. This is the canonical Java mechanism for expressing parameter optionality and is not plugin-specific.
 
 **Routing parameter identification:** A parameter is a routing parameter if its name matches the argument of the `platform(String)` method on the `@Inject` service type. Only applies to connector classes.
 
@@ -233,6 +248,8 @@ Scan for existing `@Plugin` classes with matching `value()` names using the same
 2. **RoundEnvironment:** scan the current compilation unit for `@Plugin` records, collect their `value()` names. This catches hand-written plugins in the same module.
 
 If a hand-written plugin exists with the same name as a generated plugin, skip generation for that method. Log a NOTE diagnostic.
+
+**Implementation note:** `graphql-generator` does not depend on `yaml-plugin-api`, so the scan uses `DotName.createSimple("io.casehub.yaml.plugin.api.Plugin")` — the same string-based annotation reference pattern used throughout the processor for all other annotations.
 
 ## Result Handling
 
@@ -273,7 +290,7 @@ public final class Records {
 | `List<T>` where T is a record | `Result.of(Map.of("items", result.stream().map(Records::toMap).toList()))` |
 | `Set<T>` where T is a record | `Result.of(Map.of("items", result.stream().map(Records::toMap).toList()))` |
 | `Page<T>` | `Result.of(Map.of("items", ..., "cursor", ..., "hasMore", ...))` |
-| `Map<K,V>`, raw `Object` | Unsupported — emit compile error |
+| `Map<K,V>`, raw `Object` | Unsupported — skip with WARNING diagnostic (see §What Is NOT Generated) |
 | `Multi<T>`, `Flow.Publisher<T>` | Unsupported — excluded from generation (see §What Is NOT Generated) |
 
 ## Error Handling
@@ -289,43 +306,56 @@ Generated plugins do NOT catch SPI exceptions. Exceptions propagate to the step 
 - Methods where SPI type inference fails (connector classes only) — compile error
 - Methods where capability accessor verification fails — compile error
 - Methods returning reactive types (`Multi<T>`, `Flow.Publisher<T>`, `Publisher<T>`) — these are MCP streaming endpoints with fundamentally different semantics; they do not map to the plugin streaming contract
-- Methods returning `Map<K,V>` or raw `Object` — unsupported return types, emit compile error
+- Methods returning `Map<K,V>` or raw `Object` — unsupported return types, skip with WARNING diagnostic (e.g., `NotificationApi.unreadCount()` returns `Map<String, Long>` — skipped, not an error)
 
 Processing plugins with no MCP equivalent (AudioPlugin, AudioDenoisePlugin, SpeakerPlugin) remain hand-written — they have no `@PlatformQuery`/`@PlatformMutation` annotation.
 
 ## Generated Code Examples
 
-### Streaming mutation — voice speak
+### Streaming mutation — agent query
 
 The streaming plugin contract differs from non-streaming: the `@Execute` method's first parameter is the streaming input, it returns a typed output (not `Result`), and remaining parameters are services. Configuration parameters are record fields.
 
-For `@PlatformMutation(streaming = true)` methods, `@GeneratePlugin(subject = "text")` identifies which method parameter becomes the streaming input. All other non-excluded parameters become plugin record fields. If `subject` is not specified for a streaming mutation, emit a compile error.
+For `@PlatformMutation(streaming = true)` methods, `@GeneratePlugin(subject = "prompt")` identifies which method parameter becomes the streaming input. All other non-excluded parameters become plugin record fields. If `subject` is not specified for a streaming mutation, emit a compile error.
+
+This example uses a Tier 1 interface (direct delegation, no capability routing):
 
 ```java
-// Source: ConnectorVoiceApi method
-@PlatformMutation(value = "Synthesise text to speech audio", streaming = true)
-@GeneratePlugin(subject = "text", capability = TextToSpeech.class)
-public SynthesisResult speak(
-        @PathParam String text,
-        @QueryParam String voice,
-        @QueryParam String language,
-        @QueryParam String audioFormat) { ... }
+// Source: AgentHttpApi interface
+@McpDomain("agent-http")
+public interface AgentHttpApi {
+    @PlatformMutation(value = "Query within a session", streaming = true)
+    @GeneratePlugin(subject = "prompt")
+    Multi<AgentEvent> querySession(String sessionId, String prompt);
+}
+
+// Generated plugin (Multi<T> return is excluded from generation — see §What Is NOT Generated)
+// This method would NOT generate a plugin due to the reactive return type.
+```
+
+For streaming mutations with non-reactive return types (e.g., a record output), the generated plugin forwards parameters directly:
+
+```java
+// Source: hypothetical streaming interface method
+@PlatformMutation(value = "Transcribe audio to text", streaming = true)
+@GeneratePlugin(subject = "audio")
+TranscriptionResult transcribe(String audio, String language);
 
 // Generated plugin
-@Plugin(value = "voice-speak", streaming = true,
-        description = "Synthesise text to speech audio")
-public record VoiceSpeakPlugin(
-        @Optional String voice,
-        @Optional String language,
-        @Optional String audioFormat) {
+@Plugin(value = "example-transcribe", streaming = true,
+        description = "Transcribe audio to text")
+public record ExampleTranscribePlugin(@Optional String language) {
 
     @Execute
-    public SynthesisResult process(String text, VoicePlatform spi) {
-        return spi.textToSpeech().synthesise(text,
-                new SynthesisOptions(voice, language, audioFormat));
+    public TranscriptionResult process(String audio, TranscriptionService spi) {
+        return spi.transcribe(audio, language);
     }
 }
 ```
+
+The generator forwards source method parameters directly to the SPI method call. When the source method and SPI method have the same parameter types, no type synthesis is needed. When they diverge (different parameter types or counts), the generator emits a compile error — the plugin must be hand-written.
+
+For Tier 2 streaming connector methods with capability routing, use `@GeneratePlugin(spiMethod = "...")` when the API method name differs from the capability interface method name. If `spiMethod` is unspecified, the generator uses the API method name to find the capability method.
 
 ### Mutation with complex type — bank payment
 
@@ -397,7 +427,8 @@ Compile-testing with `javax.tools.JavaCompiler` — feed mock `@McpDomain` types
 - `@GeneratePlugin(exclude = true)` suppression
 - Compile error on failed SPI inference
 - Compile error on failed accessor verification
-- Compile error on unsupported return types (`Map`, `Multi`)
+- Compile error on parameter type mismatch between source and SPI methods
+- Warning + skip on unsupported return types (`Map`)
 - `StepPluginProcessor` multi-round processing (generated `@Plugin` records processed in Round 2)
 
 ### 2. APT chain test — connectors repo (tracked separately)
@@ -411,6 +442,21 @@ Verify the two-round processing chain: `GraphQLResolverProcessor` generates `@Pl
 ### 4. Records.toMap() tests — platform repo (yaml-step-runtime)
 
 Unit tests for the new flatten utility: simple records, nested records, records with lists, records with `Optional` fields, records with `Map` components, null component values, null input (throws), non-record input (throws).
+
+## Deployment Strategy
+
+### Where plugins are generated
+
+`platform-api/` is a zero-dependency API module — it cannot run APT processors. Tier 1 plugins are generated by downstream modules that have `platform-api/` on their classpath and enable `generatePlugins=true`.
+
+| Module | Generates | How |
+|--------|-----------|-----|
+| `connectors/graphql/` | Tier 2 connector plugins + Tier 1 platform interface plugins | `platform-api/` is on its classpath via transitive deps; `GraphQLResolverProcessor` scans the combined Jandex index containing both connector and platform-api `@McpDomain` types |
+| Future `platform-plugins/` module | Tier 1 platform interface plugins only | Dedicated module for deployments without connectors; depends on `platform-api/` and `graphql-generator` as APT |
+
+**Default strategy:** The connectors module generates BOTH tiers from its combined classpath. Since the YAML step runtime in production always has the connectors module loaded, this covers all generated plugins. `domainFilter` can restrict which domains generate plugins in any given module if needed.
+
+**Standalone deployments:** If platform-api plugins are needed without the connectors module (e.g., a platform-only deployment), a `platform-plugins/` module should be created. This is not needed initially but is the natural extension point.
 
 ## Scale
 
