@@ -24,3 +24,9 @@ status: active
 - [ ] casehubio/platform#765 — feat: CorpusSelectionEventObserver rebuild trigger index on profile activation
 - [ ] casehubio/platform#727 — refactor: rename Manifest to AgentManifest for disambiguation
 - [ ] casehubio/platform#769 — YamlTestExecutor forward base ServiceRegistry to per-test runner
+- [ ] casehubio/platform#803 — 34 methods still fail SPI resolution
+- [ ] casehubio/platform#804 — static default String-to-Integer type mismatch
+- [ ] casehubio/platform#805 — cursor param should be Optional
+- [ ] casehubio/platform#806 — wire pluginSubject and absorbSiblings
+- [ ] casehubio/platform#807 — voice and messaging resolution patterns
+- [ ] casehubio/platform#808 — hand-written plugin skip detection
