@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 380" font-family="'SF Mono', 'Menlo', 'Consolas', monospace" font-size="11">
+  <style>
+    .header { font-size: 13px; fill: #0f172a; font-weight: 700; }
+    .col-header { font-size: 11px; fill: #475569; font-weight: 600; }
+    .cell { font-size: 11px; fill: #1e293b; }
+    .cell-fix { font-size: 11px; fill: #059669; font-weight: 600; }
+    .divider { stroke: #cbd5e1; stroke-width: 1; }
+    .row-bg-alt { fill: #f8fafc; }
+    .row-bg-header { fill: #e2e8f0; }
+  </style>
+
+  <text x="350" y="24" text-anchor="middle" class="header">What the test suite assumed vs. what real code does</text>
+
+  <!-- Header row -->
+  <rect x="20" y="38" width="660" height="28" class="row-bg-header" rx="4"/>
+  <text x="40" y="57" class="col-header">Test assumption</text>
+  <text x="300" y="57" class="col-header">Real code</text>
+  <text x="540" y="57" class="col-header">Fix</text>
+
+  <line x1="20" y1="66" x2="680" y2="66" class="divider"/>
+
+  <!-- Row 1 -->
+  <rect x="20" y="68" width="660" height="52" class="row-bg-alt" rx="0"/>
+  <text x="40" y="86" class="cell">Explicit imports for</text>
+  <text x="40" y="100" class="cell">every SPI type</text>
+  <text x="300" y="86" class="cell">import pkg.spi.*</text>
+  <text x="300" y="100" class="cell">(star imports common in connectors)</text>
+  <text x="540" y="93" class="cell-fix">Star import resolution</text>
+
+  <line x1="20" y1="120" x2="680" y2="120" class="divider"/>
+
+  <!-- Row 2 -->
+  <text x="40" y="140" class="cell">@Inject fields on the</text>
+  <text x="40" y="154" class="cell">declaring class</text>
+  <text x="300" y="140" class="cell">@Inject field on a superclass</text>
+  <text x="300" y="154" class="cell">(AbstractConnector base class)</text>
+  <text x="540" y="147" class="cell-fix">Superclass field walk</text>
+
+  <line x1="20" y1="172" x2="680" y2="172" class="divider"/>
+
+  <!-- Row 3 -->
+  <rect x="20" y="174" width="660" height="52" class="row-bg-alt" rx="0"/>
+  <text x="40" y="192" class="cell">@DefaultValue is always</text>
+  <text x="40" y="206" class="cell">a String field</text>
+  <text x="300" y="192" class="cell">@DefaultValue("20") on</text>
+  <text x="300" y="206" class="cell">Integer pageSize</text>
+  <text x="540" y="199" class="cell-fix">Type-aware literals</text>
+
+  <line x1="20" y1="226" x2="680" y2="226" class="divider"/>
+
+  <!-- Row 4 -->
+  <text x="40" y="246" class="cell">String query params are</text>
+  <text x="40" y="260" class="cell">always required</text>
+  <text x="300" y="246" class="cell">cursor is null on first call</text>
+  <text x="300" y="260" class="cell">(pagination token pattern)</text>
+  <text x="540" y="253" class="cell-fix">Pagination heuristic</text>
+
+  <line x1="20" y1="278" x2="680" y2="278" class="divider"/>
+
+  <!-- Row 5 -->
+  <rect x="20" y="280" width="660" height="52" class="row-bg-alt" rx="0"/>
+  <text x="40" y="298" class="cell">Hand-written plugins only</text>
+  <text x="40" y="312" class="cell">in dependency JARs</text>
+  <text x="300" y="298" class="cell">@Plugin records in same</text>
+  <text x="300" y="312" class="cell">compilation unit</text>
+  <text x="540" y="305" class="cell-fix">RoundEnv scan</text>
+
+  <line x1="20" y1="332" x2="680" y2="332" class="divider"/>
+
+  <!-- Footer -->
+  <text x="350" y="360" text-anchor="middle" class="col-header">Each row: a valid assumption about well-structured test code</text>
+  <text x="350" y="376" text-anchor="middle" class="col-header">that breaks silently against production codebases</text>
+</svg>

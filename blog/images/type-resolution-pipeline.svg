@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 520" font-family="'SF Mono', 'Menlo', 'Consolas', monospace" font-size="12">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="none" stroke="#334155" stroke-width="1.5"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="none" stroke="#dc2626" stroke-width="1.5"/>
+    </marker>
+  </defs>
+
+  <style>
+    .box { fill: #f8fafc; stroke: #334155; stroke-width: 1.5; rx: 6; }
+    .box-fix { fill: #ecfdf5; stroke: #059669; stroke-width: 2; rx: 6; }
+    .box-fail { fill: #fef2f2; stroke: #dc2626; stroke-width: 1.5; rx: 6; }
+    .label { font-size: 12px; fill: #1e293b; font-weight: 600; }
+    .sublabel { font-size: 10px; fill: #64748b; }
+    .fix-label { font-size: 10px; fill: #059669; font-weight: 600; }
+    .fail-label { font-size: 11px; fill: #dc2626; font-weight: 600; }
+    .title { font-size: 14px; fill: #0f172a; font-weight: 700; }
+    .connector { stroke: #334155; stroke-width: 1.5; fill: none; }
+    .connector-fail { stroke: #dc2626; stroke-width: 1.5; fill: none; stroke-dasharray: 4,3; }
+  </style>
+
+  <text x="360" y="28" text-anchor="middle" class="title">resolveTypeName — where real code falls through</text>
+
+  <!-- Step 1: FQN check -->
+  <rect x="220" y="48" width="280" height="40" class="box"/>
+  <text x="360" y="72" text-anchor="middle" class="label">Contains "." → return as-is</text>
+
+  <!-- Arrow down -->
+  <line x1="360" y1="88" x2="360" y2="118" class="connector" marker-end="url(#arrow)"/>
+  <text x="370" y="107" class="sublabel">miss</text>
+
+  <!-- Step 2: Explicit import -->
+  <rect x="220" y="118" width="280" height="40" class="box"/>
+  <text x="360" y="142" text-anchor="middle" class="label">Explicit import map lookup</text>
+
+  <!-- Arrow down -->
+  <line x1="360" y1="158" x2="360" y2="188" class="connector" marker-end="url(#arrow)"/>
+  <text x="370" y="177" class="sublabel">miss</text>
+
+  <!-- Step 3: Star import (NEW) -->
+  <rect x="195" y="188" width="330" height="52" class="box-fix"/>
+  <text x="360" y="210" text-anchor="middle" class="label">Star import package + Jandex verify</text>
+  <text x="360" y="228" text-anchor="middle" class="fix-label">NEW — resolves import pkg.spi.*</text>
+
+  <!-- Arrow down -->
+  <line x1="360" y1="240" x2="360" y2="270" class="connector" marker-end="url(#arrow)"/>
+  <text x="370" y="259" class="sublabel">miss</text>
+
+  <!-- Step 4: Jandex scan -->
+  <rect x="220" y="270" width="280" height="52" class="box"/>
+  <text x="360" y="292" text-anchor="middle" class="label">Jandex full-index scan</text>
+  <text x="360" y="308" text-anchor="middle" class="sublabel">unique simple name → resolved</text>
+
+  <!-- Arrow down -->
+  <line x1="360" y1="322" x2="360" y2="352" class="connector" marker-end="url(#arrow)"/>
+  <text x="370" y="341" class="sublabel">0 or 2+ matches</text>
+
+  <!-- Step 5: Single star import fallback (NEW) -->
+  <rect x="195" y="352" width="330" height="52" class="box-fix"/>
+  <text x="360" y="374" text-anchor="middle" class="label">Single star-import package fallback</text>
+  <text x="360" y="392" text-anchor="middle" class="fix-label">NEW — when Jandex unavailable</text>
+
+  <!-- Arrow down -->
+  <line x1="360" y1="404" x2="360" y2="434" class="connector" marker-end="url(#arrow)"/>
+  <text x="370" y="423" class="sublabel">miss</text>
+
+  <!-- Step 6: Current package -->
+  <rect x="220" y="434" width="280" height="40" class="box-fail"/>
+  <text x="360" y="458" text-anchor="middle" class="fail-label">currentPackage + simpleName</text>
+
+  <!-- Annotation: wrong package -->
+  <line x1="500" y1="454" x2="580" y2="454" class="connector-fail"/>
+  <text x="590" y="450" class="sublabel" fill="#dc2626">Often wrong — SPI types</text>
+  <text x="590" y="464" class="sublabel" fill="#dc2626">live in .spi subpackages</text>
+
+  <!-- Right side: hit annotations -->
+  <line x1="500" y1="138" x2="580" y2="138" class="connector"/>
+  <text x="590" y="142" class="sublabel">✓ BankPlatform</text>
+
+  <line x1="525" y1="214" x2="580" y2="214" class="connector"/>
+  <text x="590" y="210" class="sublabel" fill="#059669">✓ CalendarPlatform</text>
+  <text x="590" y="224" class="sublabel" fill="#059669">  (was falling through)</text>
+</svg>
