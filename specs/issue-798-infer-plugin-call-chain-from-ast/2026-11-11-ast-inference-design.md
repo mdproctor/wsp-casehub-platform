@@ -31,9 +31,9 @@ Plus: static default value inference — literal values (`50`, `"wav"`, `false`)
 
 ### Deferred (until primary ships)
 
-- Dynamic default value inference — runtime-computed expressions (`Instant.now()`) are NOT inferred
-- Complex parameter construction pattern detection — `new PageRequest(cursor, size)` is visible to the walker but not acted on in primary scope
-- Conditional logic detection — dropped from scope entirely
+- Dynamic default value inference (#799) — runtime-computed expressions (`Instant.now()`) are NOT inferred
+- Complex parameter construction pattern detection (#800) — `new PageRequest(cursor, size)` is visible to the walker but not acted on in primary scope
+- Conditional logic detection (#801) — dropped from scope entirely
 
 ### Out of scope
 
@@ -135,6 +135,34 @@ if (!ops.isInterface && treesAvailable) {
 }
 ```
 
+**`findMethodElement(op)`** bridges from `ResolvedOperation` to `ExecutableElement` using the same `TypeElement` lookup pattern as the existing `resolvePluginMeta`:
+
+```java
+private ExecutableElement findMethodElement(ResolvedOperation op) {
+    TypeElement te = processingEnv.getElementUtils().getTypeElement(op.declaringClassFqcn());
+    if (te == null) return null; // Jandex-sourced domain — no source in current round
+    int paramCount = op.params().size();
+    for (Element enclosed : te.getEnclosedElements()) {
+        if (enclosed.getSimpleName().toString().equals(op.methodName())
+                && enclosed instanceof ExecutableElement exec
+                && exec.getParameters().size() == paramCount) {
+            return exec;
+        }
+    }
+    return null;
+}
+```
+
+**Constraint:** For Jandex-sourced domains (connector classes loaded from dependency JARs rather than compiled in the current round), `getTypeElement()` returns a type with no source, so `Trees.getTree()` on the returned `ExecutableElement` yields null. The entry point naturally short-circuits: `MethodBodyInferrer.infer()` returns null when `trees.getTree(method)` is null, and the method falls back to annotation-based resolution. AST inference only works for `RoundEnvironment`-sourced methods.
+
+### Known limitations
+
+1. **`var`-typed SPI variables** — when the SPI variable uses `var` instead of an explicit type (`var p = bankService.platform(platform)`), the declared type is not available in the AST (`node.getType().toString()` returns `"var"`). The scanner cannot infer the SPI type and falls back to annotation-based resolution. This is acceptable given the current connector convention of explicit type declarations.
+
+2. **Non-direct return transformation** — methods that transform the SPI result before returning (e.g., Voice `speak()` which Base64-encodes audio and constructs a DTO) cannot have their call chain fully inferred. The scanner detects this: when the return expression is not a method invocation chain on the SPI variable, inference marks the method as not directly returnable and falls back.
+
+3. **Methods not in current compilation round** — AST inference only works for `RoundEnvironment`-sourced methods (classes compiled in the current APT round). Jandex-only classes from dependency JARs have no source tree available.
+
 ### Precedence model (D8)
 
 1. `@GeneratePlugin` present with **explicit** call-chain values → annotation overrides inference
@@ -164,15 +192,18 @@ public final class MethodBodyInferrer {
                                            IndexView jandexIndex) {
         MethodTree methodTree = trees.getTree(method);
         if (methodTree == null || methodTree.getBody() == null) {
-            return null;
+            return new InferredCallChain(null, null, null, null, null,
+                    null, null, null, null, InferenceFailure.NO_METHOD_BODY);
         }
         TreePath methodPath = trees.getPath(method);
-        CallChainScanner scanner = new CallChainScanner(jandexIndex);
+        CallChainScanner scanner = new CallChainScanner(jandexIndex, methodPath);
         scanner.scan(methodPath, null);
         return scanner.result();
     }
 }
 ```
+
+The scanner constructor takes the `TreePath` to extract the `CompilationUnitTree` for import resolution (see Type Resolution above).
 
 ### CallChainScanner
 
@@ -182,8 +213,9 @@ A `TreePathScanner<Void, Void>` subclass that walks the method body in a single 
 class CallChainScanner extends TreePathScanner<Void, Void> {
 
     private final IndexView jandexIndex;
+    private final Map<String, String> importMap; // simple name → FQCN from imports
 
-    // Variable tracking (D2): variable name → declared type name
+    // Variable tracking (D2): variable name → declared type FQCN
     private final Map<Name, String> variableTypes = new HashMap<>();
 
     // Inferred data — populated during traversal
@@ -196,8 +228,37 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
     private List<String> targetArgs;
     private Map<String, String> staticDefaults;  // paramName → literal value
     private String requireCapabilityMethodName;   // from requireCapability() third arg
+
+    // Multi-return detection
+    private int returnCount;
+
+    // Failure tracking
+    private InferenceFailure failureReason;
 }
 ```
+
+#### Type resolution — simple names to FQCNs
+
+The scanner resolves simple type names (from `node.getType().toString()`) to fully-qualified class names using two strategies:
+
+1. **Import resolution** — on construction, the scanner extracts the `CompilationUnitTree` from the `TreePath` and builds an `importMap` from `import` declarations. For `import io.casehub.connectors.bank.spi.BankPlatform;`, the map contains `{"BankPlatform" → "io.casehub.connectors.bank.spi.BankPlatform"}`. Wildcard imports (e.g., `import io.casehub.connectors.bank.spi.*;`) are noted but not expanded.
+
+2. **Jandex fallback** — when a simple name is not found in the import map (wildcard import or same-package type), the scanner searches the Jandex index for classes matching the simple name. If exactly one match is found, that FQN is used. If zero or multiple matches are found, inference fails for that type (the `jandexIndex` constructor parameter serves this purpose).
+
+```java
+private String resolveTypeName(String simpleName) {
+    if (simpleName.contains(".")) return simpleName; // already qualified
+    String fromImports = importMap.get(simpleName);
+    if (fromImports != null) return fromImports;
+    // Jandex fallback for wildcard/same-package imports
+    List<ClassInfo> candidates = jandexIndex.getKnownClasses().stream()
+            .filter(ci -> ci.simpleName().equals(simpleName))
+            .toList();
+    return candidates.size() == 1 ? candidates.get(0).name().toString() : simpleName;
+}
+```
+
+This resolves both `spiTypeFqcn` (from Rule 1) and `capabilityFqcn` (from Rule 3) to proper FQCNs, ensuring correct comparison with Jandex-resolved values in the integration code.
 
 #### Recognition rules
 
@@ -206,14 +267,20 @@ class CallChainScanner extends TreePathScanner<Void, Void> {
 ```java
 @Override
 public Void visitVariable(VariableTree node, Void p) {
-    // Record variable name → declared type
+    // Record variable name → resolved FQCN
     String typeName = node.getType().toString();
-    variableTypes.put(node.getName(), typeName);
+    if ("var".equals(typeName)) {
+        // var-typed variable — cannot resolve type from AST (see Known Limitations)
+        failureReason = InferenceFailure.VAR_TYPED_SPI;
+        return super.visitVariable(node, p);
+    }
+    String resolvedType = resolveTypeName(typeName);
+    variableTypes.put(node.getName(), resolvedType);
 
     // Check if initializer is service.platform(arg)
     if (node.getInitializer() instanceof MethodInvocationTree inv) {
         if (methodName(inv).equals("platform") && inv.getArguments().size() == 1) {
-            spiTypeFqcn = typeName;  // declared type IS the SPI type
+            spiTypeFqcn = resolvedType;  // resolved FQCN of the SPI type
             routingParamName = inv.getArguments().get(0).toString();
         }
     }
@@ -229,7 +296,7 @@ public Void visitVariable(VariableTree node, Void p) {
 // on a previously-tracked variable
 if (node.getInitializer() instanceof MethodInvocationTree inv) {
     if (methodName(inv).equals("platform") && inv.getArguments().isEmpty()) {
-        spiTypeFqcn = typeName;
+        spiTypeFqcn = resolvedType;
     }
 }
 ```
@@ -247,7 +314,7 @@ public Void visitExpressionStatement(ExpressionStatementTree node, Void p) {
                 ExpressionTree capArg = args.get(1);
                 if (capArg instanceof MemberSelectTree ms
                         && ms.getIdentifier().contentEquals("class")) {
-                    capabilityFqcn = ms.getExpression().toString();
+                    capabilityFqcn = resolveTypeName(ms.getExpression().toString());
                 }
                 // Third arg (if present) is the method name string
                 if (args.size() >= 3 && args.get(2) instanceof LiteralTree lit) {
@@ -265,9 +332,18 @@ public Void visitExpressionStatement(ExpressionStatementTree node, Void p) {
 ```java
 @Override
 public Void visitReturn(ReturnTree node, Void p) {
+    returnCount++;
+    if (returnCount > 1) {
+        // Multiple returns → ambiguous control flow, fail inference
+        spiTypeFqcn = null;
+        capabilityAccessor = null;
+        targetMethod = null;
+        targetArgs = null;
+        failureReason = InferenceFailure.MULTIPLE_RETURNS;
+        return super.visitReturn(node, p);
+    }
+
     ExpressionTree expr = node.getExpression();
-    // Walk the method chain: p.accountInformation(userId()).balance(accountId)
-    // This is a nested MethodInvocationTree structure
     List<MethodCallInfo> chain = flattenMethodChain(expr);
     // chain = [{receiver: p, method: accountInformation, args: [userId()]},
     //          {method: balance, args: [accountId]}]
@@ -295,6 +371,54 @@ public Void visitReturn(ReturnTree node, Void p) {
 }
 ```
 
+**`MethodCallInfo`** — a record representing one link in a flattened method chain:
+
+```java
+record MethodCallInfo(Name receiverName, String methodName, List<String> args) {
+    List<String> argNames() {
+        return args;
+    }
+}
+```
+
+**`flattenMethodChain(expr)`** — recursively unwraps nested `MethodInvocationTree` into a flat list, outermost receiver first:
+
+```java
+private List<MethodCallInfo> flattenMethodChain(ExpressionTree expr) {
+    List<MethodCallInfo> chain = new ArrayList<>();
+    flattenMethodChainRecursive(expr, chain);
+    return chain;
+}
+
+private void flattenMethodChainRecursive(ExpressionTree expr, List<MethodCallInfo> chain) {
+    if (!(expr instanceof MethodInvocationTree inv)) return;
+
+    ExpressionTree methodSelect = inv.getMethodSelect();
+    List<String> args = inv.getArguments().stream()
+            .map(ExpressionTree::toString)
+            .toList();
+
+    if (methodSelect instanceof MemberSelectTree ms) {
+        // Recurse into the receiver: a.b().c() → unwrap a.b() first
+        flattenMethodChainRecursive(ms.getExpression(), chain);
+        Name receiverName = (chain.isEmpty() && ms.getExpression() instanceof IdentifierTree id)
+                ? id.getName() : null;
+        chain.add(new MethodCallInfo(receiverName, ms.getIdentifier().toString(), args));
+    }
+}
+```
+
+For `p.accountInformation(userId()).balance(accountId)`, the AST is:
+```
+MethodInvocationTree("balance", args=[accountId],
+    receiver=MethodInvocationTree("accountInformation", args=[userId()],
+        receiver=IdentifierTree("p")))
+```
+
+`flattenMethodChain` produces: `[{receiver: p, method: accountInformation, args: [userId()]}, {receiver: null, method: balance, args: [accountId]}]`.
+
+Note: argument expressions like `userId()` are method invocations, not identifiers. `ExpressionTree.toString()` renders them as source-level text (e.g., `"userId()"`). These are matched by name against the connector method's `@QueryParam`/`@PathParam` parameters — the generator already handles this mapping in the existing Tier 2 code.
+
 **Rule 5 — Static default value detection:**
 
 ```java
@@ -317,6 +441,21 @@ public Void visitVariable(VariableTree node, Void p) {
 }
 ```
 
+### InferenceFailure
+
+An enum capturing why inference failed, used by the processing summary for diagnostic reporting:
+
+```java
+public enum InferenceFailure {
+    NO_METHOD_BODY,         // method not in current compilation unit
+    VAR_TYPED_SPI,          // SPI variable uses var — no type in AST
+    MULTIPLE_RETURNS,       // multiple return statements — ambiguous control flow
+    CAPABILITY_MISMATCH,    // requireCapability method name ≠ target method name
+    NO_SPI_VARIABLE,        // no service.platform() call found (Pattern C)
+    UNRECOGNIZED_PATTERN    // AST shape doesn't match any known pattern
+}
+```
+
 ### InferredCallChain
 
 The result record produced by the scanner:
@@ -331,17 +470,45 @@ public record InferredCallChain(
     String targetMethod,
     List<String> targetArgs,
     Map<String, String> staticDefaults,
-    String requireCapabilityMethodName
+    String requireCapabilityMethodName,
+    InferenceFailure failureReason
 ) {
     public boolean isComplete() {
-        return spiTypeFqcn != null && targetMethod != null;
+        if (spiTypeFqcn == null || targetMethod == null) return false;
+        // If capability was detected (via requireCapability), accessor must also be present
+        if (capabilityFqcn != null && capabilityAccessor == null) return false;
+        return failureReason == null;
     }
+}
+```
+
+The scanner's `result()` method performs cross-validation before returning:
+
+```java
+InferredCallChain result() {
+    // Cross-validate requireCapability method name against inferred target method
+    if (requireCapabilityMethodName != null && targetMethod != null
+            && !requireCapabilityMethodName.equals(targetMethod)) {
+        failureReason = InferenceFailure.CAPABILITY_MISMATCH;
+    }
+    // Detect Pattern C — no SPI variable found
+    if (spiTypeFqcn == null && failureReason == null) {
+        failureReason = InferenceFailure.NO_SPI_VARIABLE;
+    }
+    // Detect incomplete pattern — have SPI type but no target method
+    if (spiTypeFqcn != null && targetMethod == null && failureReason == null) {
+        failureReason = InferenceFailure.UNRECOGNIZED_PATTERN;
+    }
+    return new InferredCallChain(spiTypeFqcn, routingParamName,
+            capabilityFqcn, capabilityAccessor, accessorArgs,
+            targetMethod, targetArgs, staticDefaults,
+            requireCapabilityMethodName, failureReason);
 }
 ```
 
 ### Integration with generatePluginSource()
 
-The inferred data merges with the existing generation logic:
+The inferred data merges with the existing generation logic. The key change: the existing capability routing condition `if (!meta.capabilityFqcn.isEmpty())` changes to use effective values, so AST-inferred capabilities flow into accessor introspection and delegate call construction.
 
 ```java
 // After resolving PluginMeta from annotation
@@ -349,7 +516,17 @@ PluginMeta meta = resolvePluginMeta(op);
 InferredCallChain inferred = null;
 
 if (!ops.isInterface && treesAvailable) {
-    inferred = MethodBodyInferrer.infer(trees, methodElement, jandexIndex);
+    ExecutableElement methodElement = findMethodElement(op);
+    if (methodElement != null) {
+        inferred = MethodBodyInferrer.infer(trees, methodElement, jandexIndex);
+    }
+
+    // Accumulate failure reason for processing summary
+    if (inferred != null && !inferred.isComplete()) {
+        failureReasons.merge(inferred.failureReason(), 1, Integer::sum);
+        fallbackMethods.add(op.methodName());
+        inferred = null; // treat incomplete inference as failure
+    }
 }
 
 // Merge: annotation explicit values take precedence over inference
@@ -369,16 +546,66 @@ String effectiveRoutingParam = inferred != null ? inferred.routingParamName()
         : routingParamName;
 ```
 
-### Processing summary diagnostic (D3)
-
-At the end of `generatePluginSource()`, emit a single summary:
+The existing capability routing block (line 1870 in current code) changes from:
 
 ```java
-processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
-    "AST inference: " + inferredCount + "/" + totalCount
-    + " methods inferred, " + fallbackCount
-    + " fell back to @GeneratePlugin: " + fallbackMethods);
+// BEFORE: only fires when annotation has explicit capability
+if (!meta.capabilityFqcn.isEmpty()) {
+    capabilityAccessor = !meta.accessor.isEmpty() ? meta.accessor : decapitalize(capSimple);
+    // ... accessor introspection via Jandex ...
+}
+if (!meta.spiMethod.isEmpty()) {
+    spiMethodName = meta.spiMethod;
+}
 ```
+
+to:
+
+```java
+// AFTER: fires when capability is known from annotation OR inference
+if (effectiveCapability != null && !effectiveCapability.isEmpty()) {
+    String capSimple = effectiveCapability.contains(".")
+            ? effectiveCapability.substring(effectiveCapability.lastIndexOf('.') + 1)
+            : effectiveCapability;
+    capabilityAccessor = effectiveAccessor != null && !effectiveAccessor.isEmpty()
+            ? effectiveAccessor : decapitalize(capSimple);
+    // ... accessor introspection via Jandex (unchanged) ...
+}
+spiMethodName = effectiveSpiMethod;
+effectiveRoutingParam = effectiveRoutingParam; // replaces routingParamName
+```
+
+This ensures AST-inferred capability values reach the accessor introspection and delegate call construction, not just the merge variables.
+
+### Processing summary diagnostic (D3)
+
+Summary counters are **processor-level instance fields**, accumulated across all domains during the domain loop in `process()`. The summary is emitted **once**, after the domain loop completes — not per-domain:
+
+```java
+// Processor-level fields
+private int inferredCount;
+private int totalPluginCount;
+private final Map<InferenceFailure, Integer> failureReasons = new EnumMap<>(InferenceFailure.class);
+private final List<String> fallbackMethods = new ArrayList<>();
+
+// In process(), after the domain loop:
+if (generatePlugins && totalPluginCount > 0) {
+    int fallbackCount = fallbackMethods.size();
+    StringBuilder summary = new StringBuilder();
+    summary.append("AST inference: ").append(inferredCount).append("/")
+           .append(totalPluginCount).append(" methods inferred");
+    if (fallbackCount > 0) {
+        summary.append(", ").append(fallbackCount).append(" fell back (");
+        failureReasons.forEach((reason, count) ->
+                summary.append(count).append(" ").append(reason.name().toLowerCase()).append(", "));
+        summary.setLength(summary.length() - 2); // trim trailing ", "
+        summary.append("): ").append(fallbackMethods);
+    }
+    processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE, summary.toString());
+}
+```
+
+This gives a single, project-wide view: `"AST inference: 47/60 methods inferred, 13 fell back (5 no_spi_variable, 3 var_typed_spi, 2 multiple_returns, 3 unrecognized_pattern): [method list]"`.
 
 Each generated plugin includes a source comment:
 
@@ -404,13 +631,16 @@ The `Trees` API and `TreePathScanner` are in the `jdk.compiler` module. This is 
 
 This is only needed if `graphql-generator` itself is compiled as a module. Since it's a classpath-based Maven build, no additional configuration is expected.
 
-### Graceful unavailability
+### Initialization and lifecycle
 
-If `Trees.instance(processingEnv)` throws or returns null (non-javac compiler), set `treesAvailable = false` and all methods fall back to annotation-based resolution:
+`trees` and `treesAvailable` are **instance fields** on `GraphQLResolverProcessor`. Initialization happens **once**, at the beginning of `process()`, before the domain loop — after `loadCombinedIndex()` and before `scanHandWrittenPluginNames()`:
 
 ```java
-Trees trees;
-boolean treesAvailable;
+// Instance fields
+private Trees trees;
+private boolean treesAvailable;
+
+// In process(), after loadCombinedIndex():
 try {
     trees = Trees.instance(processingEnv);
     treesAvailable = true;
@@ -421,6 +651,8 @@ try {
         "AST inference unavailable (non-javac compiler?) — using annotation-based resolution");
 }
 ```
+
+Since `processed = true` (line 95) ensures the processor fires exactly once, this initialization runs exactly once per compilation round. The `trees` instance is then passed to `MethodBodyInferrer.infer()` inside `generatePluginSource()` during the domain loop.
 
 ### Constraint
 
@@ -492,7 +724,7 @@ Test sources with intentionally unsupported patterns:
 - **Complex control flow:** if/else branching around SPI calls. Assert inference returns null (falls back).
 - **Lambda body:** SPI call inside a lambda. Assert not inferred.
 - **Try-catch wrapping:** SPI call inside try block. Assert still inferred (try-catch doesn't change the call chain).
-- **Multiple return statements:** Assert inference uses first return or returns null.
+- **Multiple return statements:** Assert inference returns null with `failureReason = MULTIPLE_RETURNS`.
 - **No return statement (void method):** Assert target method extracted from the last method invocation expression statement.
 
 ### 3. Integration with compile-testing
@@ -506,6 +738,8 @@ Extend the existing `PluginGenerationTest` with connector-style source files tha
 | `graphql-generator/src/main/java/.../infer/MethodBodyInferrer.java` | **NEW** — public entry point |
 | `graphql-generator/src/main/java/.../infer/CallChainScanner.java` | **NEW** — TreePathScanner subclass |
 | `graphql-generator/src/main/java/.../infer/InferredCallChain.java` | **NEW** — result record |
+| `graphql-generator/src/main/java/.../infer/InferenceFailure.java` | **NEW** — failure reason enum |
+| `graphql-generator/src/main/java/.../infer/MethodCallInfo.java` | **NEW** — method chain element record |
 | `graphql-generator/src/main/java/.../GraphQLResolverProcessor.java` | **MODIFY** — integrate inference into generatePluginSource(), add processing summary |
 | `graphql-generator/pom.xml` | **MODIFY** — add `--add-modules jdk.compiler` if needed |
 | `graphql-generator/src/test/java/.../infer/CallChainScannerTest.java` | **NEW** — AST walker unit tests |
