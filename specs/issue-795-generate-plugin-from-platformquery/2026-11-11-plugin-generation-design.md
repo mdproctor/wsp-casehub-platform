@@ -147,6 +147,8 @@ public Set<String> getSupportedOptions() {
 }
 ```
 
+The `pluginPackage` option sets the Java package for generated plugin records. When unset, the default uses `deriveOutputPackage(spiPackage, "plugin")` — the same derivation as `graphqlPackage`/`restPackage`: replaces `.api.` in the source package with `.plugin.` (e.g., `io.casehub.platform.api.acl` → `io.casehub.platform.plugin.acl`). When set, all generated plugins use the specified package.
+
 ```java
 for (var entry : allDomains.entrySet()) {
     if (generateGraphQL) generateResolverSource(...);
@@ -190,12 +192,12 @@ public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment 
 **Interface path:** The `@McpDomain` interface itself is the `@Execute` parameter type. No inference needed.
 
 **Connector class path:**
-1. Find `@Inject` fields on the `@McpDomain` class
-2. For each field type, check via Jandex if it has a `platform(String)` method
-3. The return type of that method is the SPI type (e.g., `BankPlatformService.platform()` → `BankPlatform`)
-4. If `@GeneratePlugin(spi = X.class)` is present, use that instead
+1. If `@GeneratePlugin(spi = X.class)` is present, use that directly (explicit override — skips inference)
+2. If `@GeneratePlugin(capability = X.class)` is present, find which `@Inject` field's SPI type contains that capability interface via Jandex. If exactly one SPI type matches, use it. If multiple contain the capability, emit compile error requiring `@GeneratePlugin(spi = ...)`
+3. Otherwise, find `@Inject` fields on the `@McpDomain` class. For each field type, check via Jandex if it has a `platform(String)` method. The return type of that method is the SPI type (e.g., `BankPlatformService.platform()` → `BankPlatform`)
+4. If exactly one `@Inject` field qualifies, use its SPI type. If **multiple** `@Inject` fields qualify (multi-service connectors), emit compile error requiring `@GeneratePlugin(spi = ...)` to disambiguate
 
-If inference fails, emit a compile error — no silent fallback.
+If inference fails (no qualifying field found), emit a compile error — no silent fallback.
 
 ### Capability call chain resolution
 
@@ -344,7 +346,7 @@ TranscriptionResult transcribe(String audio, String language);
 // Generated plugin
 @Plugin(value = "example-transcribe", streaming = true,
         description = "Transcribe audio to text")
-public record ExampleTranscribePlugin(@Optional String language) {
+public record ExampleTranscribePlugin(@Required String language) {
 
     @Execute
     public TranscriptionResult process(String audio, TranscriptionService spi) {
