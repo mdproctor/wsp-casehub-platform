@@ -24,3 +24,5 @@ active_issue: 834
 - [ ] casehubio/platform#765 — feat: CorpusSelectionEventObserver rebuild trigger index on profile activation
 - [ ] casehubio/platform#848 — Streaming plugins bypass validation and coercion
 - [ ] casehubio/platform#849 — Streaming + ContextParam intersection not handled in generator
+- [ ] casehubio/platform#850 — WS-5b Category-level behavioral tests
+- [ ] casehubio/platform#851 — Restore module-system demonstration
