@@ -1,17 +1,33 @@
 # HANDOFF — casehub-platform
 
-**Last closed:** #807 (Plugin generator: voice and messaging resolution patterns)
-**Landed:** `45dd3954` on main, published to origin
-**Queue:** 8 items remaining
+**Last closed:** #833 (WS-4: Canonical form — one file shape, reconcile guide)
+**Landed:** `3900bebb` on main, published to origin
+**Queue:** 13 items remaining
 
 ## This session
 
-Made `@GeneratePlugin(spi)` functional in the graphql-generator APT. The attribute existed since the annotation was designed but was never consumed — extracted into `PluginMeta` and ignored. Now bypasses AST inference when specified, counts as annotation-guided resolution instead of fallback.
+Canonical form for the playbook corpus — one file shape, one key case, reconciled guide.
 
-**Filed:** connectors#264 (consumer-side annotation placement), platform#844 (routing parameter auto-identification when spi is specified).
+**Code:**
+- Renamed `forEach` YAML keyword to `for-each` across Walker, StepKeywords, FusionPass, DecoratorChain, ForEachExpander, ImportExpander, PlaybookCompiler, all JSON schemas, and all tests
+- Added `@JsonProperty("for-each")` mixin in yaml-jackson for YamlImport deserialization (critical — without it, imports with `for-each:` silently get null forEach field)
+- Migrated 71 playbook files from three-document bare-list form to two-document canonical form with explicit `steps:` key
+- Renamed 8 agent-interaction-pattern files to `.playbook.yaml`
+- Fixed JSON schema to accept runtime value types: log (string shorthand), loop (string/boolean/object), when/if (boolean), barrier/quorum (typed decorator alternatives)
+
+**Docs:**
+- Reconciled yaml-language-guide.md: guard keyword `when` (not `if`), type checking claims fixed (P24), 13 undocumented decorators added, bare variable references fixed, canonical file shape documented
+- Updated CLAUDE.md module descriptions for for-each rename
+- Blog: "One Shape, or the LLM Guesses" with external SVG diagram
+
+**Filed:** #845 (pages repo: migrate forEach to for-each), #846 (pre-existing test failures: StepTraceCollectorTest + PlaybookDryRunTest), #847 (JSON schema: complete step type validation coverage)
+
+## Breaking change
+
+The `forEach` → `for-each` YAML keyword rename breaks the pages repo. Confirmed with the team — they'll follow git history to get parity (#845).
 
 ## Next in queue
 
-Epic #827 Batch 2 (parallel): #833 (WS-4: Canonical form) or #835 (WS-6a: Generator fixes + plugin validation) — either can go first.
+Epic #827 Batch 2 continues: #835 (WS-6a: Generator fixes + plugin validation) — different domain (APT generators), fresh session recommended.
 
 Or standalone: #838, #839, #840, #841, #842, #843, #765.
