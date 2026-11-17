@@ -1,11 +1,11 @@
 # Work Plan —
 
 ## State
-branch: issue-807-voice-messaging-resolution
+branch: issue-835-generator-fixes-plugin-validation
 issue-repo: casehubio/platform
 status: active
 date: 
-active_issue: 833
+active_issue: 835
 
 ## Queue
 - [ ] casehubio/platform#807 — voice and messaging resolution patterns
