@@ -1,19 +1,17 @@
 # HANDOFF — casehub-platform
 
-**Last closed:** #829 (WS-2: Specify and fix decorator semantics)
-**Landed:** `5a764cd` on main, published to origin
-**Queue:** 13 items (purged 20 already-closed issues)
+**Last closed:** #807 (Plugin generator: voice and messaging resolution patterns)
+**Landed:** `45dd3954` on main, published to origin
+**Queue:** 8 items remaining
 
-## Queue health
+## This session
 
-The queue had 32 items, 20 of which were already closed on GitHub (landed in prior sessions without queue advancement). Purged all closed issues. Remaining:
+Made `@GeneratePlugin(spi)` functional in the graphql-generator APT. The attribute existed since the annotation was designed but was never consumed — extracted into `PluginMeta` and ignored. Now bypasses AST inference when specified, counts as annotation-guided resolution instead of fallback.
 
-- **Epic #827** — Batch 1 complete (#828, #829). Batch 2 is current: #833 (WS-4), #835 (WS-6a). Then Batch 3: #830, #834. Capstone: #836.
-- **Standalone:** #807, #838, #839, #840
-- **Follow-ups from #829:** #841, #842, #843
+**Filed:** connectors#264 (consumer-side annotation placement), platform#844 (routing parameter auto-identification when spi is specified).
 
 ## Next in queue
 
-#807 — voice and messaging resolution patterns (first non-epic item)
+Epic #827 Batch 2 (parallel): #833 (WS-4: Canonical form) or #835 (WS-6a: Generator fixes + plugin validation) — either can go first.
 
-Or within the epic: #833 (WS-4: Canonical form) or #835 (WS-6a: Generator fixes) — Batch 2 items are parallel, either can go first.
+Or standalone: #838, #839, #840, #841, #842, #843, #765.
