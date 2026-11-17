@@ -20,7 +20,7 @@ Canonical form for the playbook corpus — one file shape, one key case, reconci
 - Updated CLAUDE.md module descriptions for for-each rename
 - Blog: "One Shape, or the LLM Guesses" with external SVG diagram
 
-**Filed:** #845 (pages repo: migrate forEach to for-each), #846 (pre-existing test failures: StepTraceCollectorTest + PlaybookDryRunTest), #847 (JSON schema: complete step type validation coverage)
+**Filed:** casehub-pages#673 (migrate forEach to for-each), #846 (pre-existing test failures: StepTraceCollectorTest + PlaybookDryRunTest), #847 (JSON schema: complete step type validation coverage)
 
 ## Breaking change
 
