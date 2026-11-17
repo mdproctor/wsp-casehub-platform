@@ -16,9 +16,9 @@ Applications request LLM capability by intelligence tier (`FAST`, `STANDARD`, `F
 
 - `ModelChain` with `Named`/`Queried` entries and full fallback retry logic (reactive + synchronous)
 - `AliasDeclaration` → single `ModelQuery` (no chain support)
-- `ManifestResult` holds `Map<String, ModelQuery> aliases`
+- `AgentManifestResult` holds `Map<String, ModelQuery> aliases`
 - `SimulatedAgentBackend` (key: `"simulated"`) — corpus-driven agent backend using `SimulationRuntime`
-- `ManifestLoader` with profile support (`agent-config-{profile}.yaml`)
+- `AgentManifestLoader` with profile support (`agent-config-{profile}.yaml`)
 - `RoutingAgentProvider` four-step resolution: alias → tier ref → registry ID → backend key
 - Tiebreaking: prefer `defaults.backend` → `preferVendor` → first match
 - Ollama already CDI-discovered via `OllamaBeans` — models with `backendKey: ollama` route to it
@@ -140,7 +140,7 @@ aliases:
     tier: EMBEDDING
 ```
 
-#### `ManifestProcessor` changes
+#### `AgentManifestProcessor` changes
 
 - `toModelQuery(AliasDeclaration)` becomes `toModelChain(AliasDeclaration)`
 - If `chain` is present: each `ChainEntry` becomes `ModelChainEntry.Named` (when `model` is set) or `ModelChainEntry.Queried` (otherwise)

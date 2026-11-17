@@ -8,7 +8,7 @@ Claude backend instance configured for Vertex transport. When a model entry spec
 
 The existing infrastructure handles most of the lifecycle:
 - `VertexClient` (VendorClient) can validate GCP ADC credentials and list Vertex models
-- `ManifestProcessor` seeds `LlmCredentialStore` from `agent-config.yaml` providers
+- `AgentManifestProcessor` seeds `LlmCredentialStore` from `agent-config.yaml` providers
 - `BackendInstanceCoordinator` iterates credential stores and matches to factories
 - `CLIOptions` has an `env` field passed to the Claude CLI subprocess
 
@@ -173,7 +173,7 @@ providers:
       region: env:GOOGLE_CLOUD_REGION
 ```
 
-`ManifestProcessor.processProviders()` resolves `env:` refs via `ManifestCredentialResolver`,
+`ManifestProcessor.processProviders()` resolves `env:` refs via `AgentManifestCredentialResolver`,
 stores as `cloud-vertex` in `LlmCredentialStore`. `VertexClient` declares
 `requiredFields: ["project-id", "region"]` which `buildVendorRequirements()` picks up.
 No changes needed.

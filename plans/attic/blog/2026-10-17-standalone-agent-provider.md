@@ -398,7 +398,7 @@ public record ManifestResult(
 
 - [ ] **Step 4: Fix all ManifestResult construction sites**
 
-Use `ide_find_references` on `ManifestResult` constructor. Each existing call passes 3 args — add `Map.of()` (or the actual providers map) as the 4th argument.
+Use `ide_find_references` on `AgentManifestResult` constructor. Each existing call passes 3 args — add `Map.of()` (or the actual providers map) as the 4th argument.
 
 Key location: `ManifestProcessor.processAliasesAndDefaults()` (~line 110-121) — this is where providers are extracted and should be retained.
 

@@ -446,7 +446,7 @@ private ManifestResult processAliasesAndDefaults(Manifest manifest) {
 }
 ```
 
-- [ ] **Step 10: Update `ManifestResult` type**
+- [ ] **Step 10: Update `AgentManifestResult` type**
 
 ```java
 import io.casehub.platform.api.model.ModelChain;
@@ -468,7 +468,7 @@ public record ManifestResult(Map<String, ModelChain> aliases, String defaultBack
 The type change from `Map<String, ModelQuery>` to `Map<String, ModelChain>` breaks:
 - `RoutingAgentProvider` constructors and factory methods — update `aliases` field type (done in Task 3)
 - `RouterBeans` — passes `result.aliases()` which is now `Map<String, ModelChain>` (done in Task 3)
-- Test files constructing `ManifestResult` directly
+- Test files constructing `AgentManifestResult` directly
 
 For now, update test files in `agent-config-core` only. Router changes are Task 3.
 

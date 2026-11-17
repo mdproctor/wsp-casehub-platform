@@ -158,7 +158,7 @@ git commit -m "feat(#335): extend ModelQuery with minContextWindow, minMaxOutput
 - Test: `agent-config-core/src/test/java/io/casehub/platform/agent/config/ManifestCredentialResolverTest.java`
 
 **Interfaces:**
-- Produces: `Manifest` record, `CredentialRef` sealed interface (EnvRef, FileRef, ExternalRef), `ManifestCredentialResolver.resolve(CredentialRef) → String`, `ManifestResult(Map<String, ModelQuery> aliases, String defaultBackendKey)`, `LocalModelReconciler` functional interface
+- Produces: `AgentManifest` record, `CredentialRef` sealed interface (EnvRef, FileRef, ExternalRef), `ManifestCredentialResolver.resolve(CredentialRef) → String`, `ManifestResult(Map<String, ModelQuery> aliases, String defaultBackendKey)`, `LocalModelReconciler` functional interface
 - Consumes: `CredentialResolver` from platform-api (injected, for `ref:` prefix delegation)
 
 - [ ] **Step 1: Write failing test for CredentialRef parsing**
@@ -314,7 +314,7 @@ After this batch: ManifestLoader discovers and parses YAML files from the direct
 - Test fixture: `agent-config-core/src/test/resources/manifests/override.yaml`
 
 **Interfaces:**
-- Consumes: `Manifest` record (from Task 2)
+- Consumes: `AgentManifest` record (from Task 2)
 - Produces: `ManifestLoader.load(List<Path> searchPaths, String profile) → Manifest` (merged result)
 
 - [ ] **Step 1: Write failing test for single-file parsing**
@@ -343,7 +343,7 @@ defaults:
 
 - [ ] **Step 3: Implement ManifestLoader — single-resource parsing**
 
-Jackson ObjectMapper with YAMLFactory. Deserialize into `Manifest` record. Handle missing sections (all fields nullable with defaults in compact constructor).
+Jackson ObjectMapper with YAMLFactory. Deserialize into `AgentManifest` record. Handle missing sections (all fields nullable with defaults in compact constructor).
 
 - [ ] **Step 4: Run test — passes**
 
@@ -425,8 +425,8 @@ git commit -m "feat(#335): ManifestLoader — YAML parsing, directory hierarchy 
 - Test: `agent-config-core/src/test/java/io/casehub/platform/agent/config/ManifestProcessorTest.java`
 
 **Interfaces:**
-- Consumes: `Manifest` (from Task 2/3), `ManifestCredentialResolver` (from Task 2), `LlmCredentialStore` (platform-api), `MutableModelRegistry` (platform-api), `LocalModelReconciler` (from Task 2)
-- Produces: `ManifestResult` (aliases + defaultBackendKey)
+- Consumes: `AgentManifest` (from Task 2/3), `AgentManifestCredentialResolver` (from Task 2), `LlmCredentialStore` (platform-api), `MutableModelRegistry` (platform-api), `LocalModelReconciler` (from Task 2)
+- Produces: `AgentManifestResult` (aliases + defaultBackendKey)
 
 - [ ] **Step 1: Write failing test for credential storage**
 
@@ -450,14 +450,14 @@ void storesResolvedCredentials() {
 
 - [ ] **Step 3: Implement ManifestProcessor.process()**
 
-Constructor takes: `LlmCredentialStore`, `MutableModelRegistry`, `ManifestCredentialResolver`, `Map<String, List<String>> vendorRequiredFields`, `LocalModelReconciler`. The `process(Manifest)` method runs steps 1-4 from the spec:
+Constructor takes: `LlmCredentialStore`, `MutableModelRegistry`, `AgentManifestCredentialResolver`, `Map<String, List<String>> vendorRequiredFields`, `LocalModelReconciler`. The `process(Manifest)` method runs steps 1-4 from the spec:
 
 1. **Providers → Credentials:** Resolve refs, validate required fields, store as `"cloud-{vendor}"`
 2. **Models → Registry:** Register via `replaceSource("manifest", 8, models)`. Default `apiModelId` to `id` if null.
 3. **Local models → Reconciliation:** Call `reconciler.ensurePresent(id)` for each
 4. **Aliases + Defaults → ManifestResult:** Convert `AliasDeclaration` → `ModelQuery`, determine default backend
 
-Returns `ManifestResult`.
+Returns `AgentManifestResult`.
 
 - [ ] **Step 4: Run test — passes**
 
@@ -530,7 +530,7 @@ git commit -m "feat(#335): ManifestProcessor — credential storage, model regis
 - Test: `agent-router-core/src/test/java/io/casehub/platform/agent/router/RoutingAgentProviderTest.java`
 
 **Interfaces:**
-- Consumes: `ManifestResult` (from Task 4), `ModelQuery` (from Task 1)
+- Consumes: `AgentManifestResult` (from Task 4), `ModelQuery` (from Task 1)
 - Produces: Extended `RoutingAgentProvider(registry, defaultBackendKey, modelRegistry, aliases)`, `AgentSessionConfig.withModel(String)`
 
 - [ ] **Step 1: Write failing test for alias resolution**
@@ -656,8 +656,8 @@ After this batch: Drop an `agent-config.yaml` in a Quarkus app, and AgentProvide
 - Test fixture: `agent-config/src/test/resources/agent-config.yaml`
 
 **Interfaces:**
-- Consumes: `ManifestLoader` (Task 3), `ManifestProcessor` (Task 4), `VendorClient` beans from llm-config, `OllamaModelSource` from llm-config, `LlmConfigService` from llm-config
-- Produces: `ManifestResult` as CDI bean
+- Consumes: `AgentManifestLoader` (Task 3), `AgentManifestProcessor` (Task 4), `VendorClient` beans from llm-config, `OllamaModelSource` from llm-config, `LlmConfigService` from llm-config
+- Produces: `AgentManifestResult` as CDI bean
 
 - [ ] **Step 1: Write failing integration test**
 

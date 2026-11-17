@@ -152,11 +152,11 @@ Creates in-memory stubs for all 9 constructor parameters:
 Exposes `modelRegistry()` accessor for consumers who need the populated
 registry for advanced composition.
 
-Manifest loading preserves full `ManifestLoader` behavior: directory
+Manifest loading preserves full `AgentManifestLoader` behavior: directory
 hierarchy discovery, YAML merging, recursive remote source loading
 with cycle detection.
 
-#### 6. `ManifestResult` expansion (`agent-config-core`)
+#### 6. `AgentManifestResult` expansion (`agent-config-core`)
 
 Add provider declarations to the record:
 
@@ -173,7 +173,7 @@ public record ManifestResult(
 }
 ```
 
-`ManifestProcessor` retains provider entries (currently consumed and
+`AgentManifestProcessor` retains provider entries (currently consumed and
 discarded) in the result. Backward-compatible — existing callers use
 the new constructor; the field is additive.
 

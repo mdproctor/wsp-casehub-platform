@@ -11,7 +11,7 @@
 
 **Goal:** Add an optional `pools:` section to the platform manifest schema, with platform-neutral types that claudony maps to its pool provisioning system.
 
-**Architecture:** New `PoolDeclaration` record in `agent-config-core` captures pool config with typed core fields and opaque extension maps. `Manifest` gains a `pools` map field. `ManifestLoader.merge()` uses name-keyed replace. `ManifestResult` passes pool declarations through to consumers.
+**Architecture:** New `PoolDeclaration` record in `agent-config-core` captures pool config with typed core fields and opaque extension maps. `AgentManifest` gains a `pools` map field. `ManifestLoader.merge()` uses name-keyed replace. `AgentManifestResult` passes pool declarations through to consumers.
 
 **Tech Stack:** Java records, Jackson YAML, JUnit 5 + AssertJ
 
@@ -222,7 +222,7 @@ void loadFileNoPoolsSectionReturnsEmptyMap(@TempDir Path tempDir) throws IOExcep
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `mvn --batch-mode test -f agent-config-core/pom.xml -Dtest=ManifestLoaderTest#loadFileParsesPools -pl agent-config-core`
-Expected: Compilation failure — `Manifest` has no `pools` field
+Expected: Compilation failure — `AgentManifest` has no `pools` field
 
 - [ ] **Step 3: Add pools field to Manifest**
 
@@ -316,7 +316,7 @@ private Manifest manifestWith(List<ModelDescriptor> models, List<ProviderDeclara
 }
 ```
 
-Fix all other `new Manifest(...)` calls in test files (`ManifestLoaderTest`, `ManifestProcessorTest`) to include the 7th `Map.of()` argument.
+Fix all other `new Manifest(...)` calls in test files (`AgentManifestLoaderTest`, `AgentManifestProcessorTest`) to include the 7th `Map.of()` argument.
 
 - [ ] **Step 4: Run ManifestLoaderTest to verify pool parsing tests pass**
 
@@ -513,7 +513,7 @@ git commit -m "feat(#511): add pool-declaration JSON Schema and update CLAUDE.md
 - [ ] **Step 1: Run full Maven install**
 
 Run: `mvn --batch-mode install`
-Expected: BUILD SUCCESS — all modules compile, all tests pass. The `Manifest` constructor change propagates through all consumers. If any module fails due to the new 7th parameter, fix the call site.
+Expected: BUILD SUCCESS — all modules compile, all tests pass. The `AgentManifest` constructor change propagates through all consumers. If any module fails due to the new 7th parameter, fix the call site.
 
 - [ ] **Step 2: Commit any fixups**
 

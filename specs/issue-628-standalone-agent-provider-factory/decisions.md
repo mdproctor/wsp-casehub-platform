@@ -81,7 +81,7 @@
 
 ## D8: ManifestResult expansion — carry provider declarations
 
-**Choice:** Expand `ManifestResult` record to include `Map<String, ProviderDeclaration> providers` — vendor key to properties mapping
+**Choice:** Expand `AgentManifestResult` record to include `Map<String, ProviderDeclaration> providers` — vendor key to properties mapping
 **Alternatives:**
 - Return a separate result type from a new loader method — fragments the API, two result types for the same manifest
 - Have discover() re-parse the manifest independently — wasteful, duplicates ManifestLoader work

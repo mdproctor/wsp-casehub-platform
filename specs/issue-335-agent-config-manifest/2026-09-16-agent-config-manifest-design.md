@@ -148,7 +148,7 @@ Manifest credential fields are references, never raw values.
 | `file:/path` | File contents | Kubernetes mounted secrets |
 | `ref:credential-ref` | `CredentialResolver` SPI → Quarkus `CredentialsProvider` → Vault/AWS/GCP | Production |
 
-The existing `credentials-quarkus/` module bridges `CredentialResolver.resolve()` to Quarkus `CredentialsProvider`. `ManifestCredentialResolver` delegates `ref:` prefixes to `CredentialResolver` (platform-api SPI), which routes through the Quarkus bridge when `credentials-quarkus/` is on the classpath. Adding a Vault extension makes `ref:vault/anthropic-key` work automatically.
+The existing `credentials-quarkus/` module bridges `CredentialResolver.resolve()` to Quarkus `CredentialsProvider`. `AgentManifestCredentialResolver` delegates `ref:` prefixes to `CredentialResolver` (platform-api SPI), which routes through the Quarkus bridge when `credentials-quarkus/` is on the classpath. Adding a Vault extension makes `ref:vault/anthropic-key` work automatically.
 
 Outside Quarkus (Spring, standalone), only `env:` and `file:` are available unless a `CredentialResolver` implementation is provided — correct for those contexts.
 
@@ -352,9 +352,9 @@ This follows the same dependency-injection pattern used for vendor field require
 
 1. Parse each alias: `ModelConstraints` → `ModelQuery` (all fields including `preferVendor`)
 2. Determine effective default backend: manifest `defaults.backend` if declared, else fall back to `RoutingAgentConfig.defaultBackend()` (which defaults to `"claude"` via `@WithDefault`)
-3. Produce `ManifestResult` record: `Map<String, ModelQuery> aliases`, `String defaultBackendKey`
+3. Produce `AgentManifestResult` record: `Map<String, ModelQuery> aliases`, `String defaultBackendKey`
 
-`ManifestResult` is a CDI bean produced by `AgentConfigBeans`. `RouterBeans` consumes it as an optional dependency — if present, its aliases and default backend key override config-property values. `RoutingAgentProvider` gains a new constructor accepting aliases:
+`AgentManifestResult` is a CDI bean produced by `AgentConfigBeans`. `RouterBeans` consumes it as an optional dependency — if present, its aliases and default backend key override config-property values. `RoutingAgentProvider` gains a new constructor accepting aliases:
 
 ```java
 public RoutingAgentProvider(BackendInstanceRegistry registry,
@@ -441,19 +441,19 @@ Framework-neutral. Pure Java + Jackson. Depends on `platform-api` (zero-dependen
 
 | Type | Purpose |
 |------|---------|
-| `Manifest` | Parsed manifest record (models, providers, sources, aliases, localModels, defaults) |
+| `AgentManifest` | Parsed manifest record (models, providers, sources, aliases, localModels, defaults) |
 | `ProviderDeclaration` | Record: vendor, credential references, host |
 | `AliasDeclaration` | Record: name, ModelConstraints |
 | `LocalModelDeclaration` | Record: id, ensure |
 | `SourceDeclaration` | Record: uri, priority |
 | `CredentialRef` | Sealed interface: EnvRef, FileRef, ExternalRef — parsed from prefix |
-| `ManifestLoader` | Discovers resources from hierarchy, parses YAML, merges. Cycle detection via URI set, max depth 3, 10s timeout per remote fetch, max 20 total sources. |
-| `ManifestProcessor` | Drives existing SPIs from merged manifest. Accepts vendor required fields as `Map<String, List<String>>` and a `LocalModelReconciler` as constructor parameters (injected by Quarkus layer). |
-| `ManifestResult` | Record: `Map<String, ModelQuery> aliases`, `String defaultBackendKey` |
+| `AgentManifestLoader` | Discovers resources from hierarchy, parses YAML, merges. Cycle detection via URI set, max depth 3, 10s timeout per remote fetch, max 20 total sources. |
+| `AgentManifestProcessor` | Drives existing SPIs from merged manifest. Accepts vendor required fields as `Map<String, List<String>>` and a `LocalModelReconciler` as constructor parameters (injected by Quarkus layer). |
+| `AgentManifestResult` | Record: `Map<String, ModelQuery> aliases`, `String defaultBackendKey` |
 | `LocalModelReconciler` | Functional interface: `void ensurePresent(String modelId)`. Implementation provided by Quarkus wiring layer (delegates to `OllamaModelSource` + `LlmConfigService`). |
-| `ManifestCredentialResolver` | Resolves CredentialRef to plain values. Handles `env:` and `file:` directly; delegates `ref:` to `CredentialResolver` SPI (from platform-api, injected via constructor). |
+| `AgentManifestCredentialResolver` | Resolves CredentialRef to plain values. Handles `env:` and `file:` directly; delegates `ref:` to `CredentialResolver` SPI (from platform-api, injected via constructor). |
 
-The resolver is named `ManifestCredentialResolver` (not `CredentialRefResolver`) to avoid confusion with the existing `CredentialResolver` SPI in `platform-api`. `CredentialResolver` resolves credentials by logical name; `ManifestCredentialResolver` resolves credential references with `env:`/`file:`/`ref:` prefixes. Different operation, distinct name.
+The resolver is named `AgentManifestCredentialResolver` (not `CredentialRefResolver`) to avoid confusion with the existing `CredentialResolver` SPI in `platform-api`. `CredentialResolver` resolves credentials by logical name; `AgentManifestCredentialResolver` resolves credential references with `env:`/`file:`/`ref:` prefixes. Different operation, distinct name.
 
 `VendorInfo` stays in `llm-config/` — `agent-config-core` does not depend on `llm-config`. Instead, ManifestProcessor accepts vendor field requirements as a parameter (`Map<String, List<String>>`), and the Quarkus wiring layer extracts this from `VendorClient` beans.
 
@@ -463,9 +463,9 @@ Quarkus wiring. Thin.
 
 | Type | Purpose |
 |------|---------|
-| `AgentConfigBeans` | `@Observes @Priority(50) StartupEvent` — runs ManifestLoader + ManifestProcessor, produces `ManifestResult` as CDI bean. Collects `VendorClient` beans to extract vendor required fields. Provides `LocalModelReconciler` implementation (delegates to `OllamaModelSource` + `LlmConfigService`). |
+| `AgentConfigBeans` | `@Observes @Priority(50) StartupEvent` — runs ManifestLoader + ManifestProcessor, produces `AgentManifestResult` as CDI bean. Collects `VendorClient` beans to extract vendor required fields. Provides `LocalModelReconciler` implementation (delegates to `OllamaModelSource` + `LlmConfigService`). |
 
-No separate `QuarkusCredentialRefResolver` — `ManifestCredentialResolver` in agent-config-core handles all three prefixes via `CredentialResolver` SPI injection.
+No separate `QuarkusCredentialRefResolver` — `AgentManifestCredentialResolver` in agent-config-core handles all three prefixes via `CredentialResolver` SPI injection.
 
 ### `agent-config-spring` (generated)
 
@@ -651,11 +651,11 @@ The manifest unifies existing independent mechanisms:
 ## What's New vs What's Extended vs What's Unchanged
 
 **New (the glue layer):**
-- `Manifest` record type
-- `ManifestLoader` — discovers, parses, merges resources (with cycle detection, depth limits)
-- `ManifestProcessor` — drives existing SPIs from merged manifest
-- `ManifestResult` — CDI-produced record carrying aliases and default backend
-- `ManifestCredentialResolver` — prefix-based credential reference resolution
+- `AgentManifest` record type
+- `AgentManifestLoader` — discovers, parses, merges resources (with cycle detection, depth limits)
+- `AgentManifestProcessor` — drives existing SPIs from merged manifest
+- `AgentManifestResult` — CDI-produced record carrying aliases and default backend
+- `AgentManifestCredentialResolver` — prefix-based credential reference resolution
 - `LocalModelReconciler` — functional interface for local model reconciliation (impl in Quarkus layer)
 - `model-selection.schema.json` — JSON Schema for type-safe YAML
 - Alias registry in RoutingAgentProvider

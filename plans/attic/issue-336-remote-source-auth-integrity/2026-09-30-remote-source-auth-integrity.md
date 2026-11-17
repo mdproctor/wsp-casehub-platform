@@ -11,7 +11,7 @@
 
 **Goal:** Harden ManifestLoader's remote source fetching with typed authentication headers, SHA-256 content integrity verification with optional DID-based signatures, Content-Type validation, response size limits, HTTPS enforcement, and redirect handling.
 
-**Architecture:** Extend `SourceDeclaration` with two optional sub-records (`SourceAuth`, `SourceIntegrity`). Refactor `ManifestLoader` from zero-arg to constructor-injected (credential resolver, DID resolver, security config). Replace bare `fetchRemote(String)` with a multi-step security pipeline operating on `SourceDeclaration`. All changes in `agent-config-core` (framework-neutral, pure Java + Jackson) with minimal wiring changes in `agent-config` (Quarkus).
+**Architecture:** Extend `SourceDeclaration` with two optional sub-records (`SourceAuth`, `SourceIntegrity`). Refactor `AgentManifestLoader` from zero-arg to constructor-injected (credential resolver, DID resolver, security config). Replace bare `fetchRemote(String)` with a multi-step security pipeline operating on `SourceDeclaration`. All changes in `agent-config-core` (framework-neutral, pure Java + Jackson) with minimal wiring changes in `agent-config` (Quarkus).
 
 **Tech Stack:** Java 21+, Jackson YAML, `java.net.http.HttpClient`, `java.security.MessageDigest`, `io.casehub.platform.api.signing.SignatureVerifier`, `io.casehub.platform.api.identity.DIDResolver`
 
@@ -177,7 +177,7 @@ public record SourceDeclaration(String uri, int priority, SourceAuth auth, Sourc
 
 - [ ] **Step 6: Fix existing test and production code**
 
-The existing `ManifestLoaderTest` constructs `SourceDeclaration` with `(uri, priority)` — update to `(uri, priority, null, null)`. Check `Manifest` record's `sources()` default (already `List.of()` via `@JsonProperty` defaults). Check `ManifestLoader.merge()` — uses `sources.put(source.uri(), source)`, which works unchanged.
+The existing `AgentManifestLoaderTest` constructs `SourceDeclaration` with `(uri, priority)` — update to `(uri, priority, null, null)`. Check `AgentManifest` record's `sources()` default (already `List.of()` via `@JsonProperty` defaults). Check `ManifestLoader.merge()` — uses `sources.put(source.uri(), source)`, which works unchanged.
 
 Search all callers:
 ```
@@ -333,7 +333,7 @@ class SourceValidatorTest {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `mvn --batch-mode test -pl agent-config-core -Dtest=SourceValidatorTest`
-Expected: compilation error — `SourceValidator` and `ManifestSecurityConfig` don't exist.
+Expected: compilation error — `SourceValidator` and `AgentManifestSecurityConfig` don't exist.
 
 - [ ] **Step 3: Create ManifestSecurityConfig**
 
@@ -454,7 +454,7 @@ git commit -m "feat(#336): add ManifestSecurityConfig and SourceValidator with c
 - Modify: `agent-config-core/src/test/java/io/casehub/platform/agent/config/ManifestLoaderTest.java`
 
 **Interfaces:**
-- Consumes: `ManifestSecurityConfig` from Task 2, `ManifestCredentialResolver` from existing code, `DIDResolver` from `platform-api`, `SourceDeclaration` (extended) from Task 1, `SourceValidator` from Task 2
+- Consumes: `AgentManifestSecurityConfig` from Task 2, `AgentManifestCredentialResolver` from existing code, `DIDResolver` from `platform-api`, `SourceDeclaration` (extended) from Task 1, `SourceValidator` from Task 2
 - Produces: `ManifestLoader(ManifestCredentialResolver, DIDResolver, ManifestSecurityConfig)` constructor, `fetchRemote(SourceDeclaration) → Manifest` (package-private, replaces `fetchRemote(String)`)
 
 This task implements pipeline steps 1-8 and 11 (HTTPS enforcement, validation, request building with auth headers, redirect handling, Content-Type validation, size-limited read, and parse). Digest and signature verification (steps 9-10) are added in Task 4.
@@ -507,11 +507,11 @@ void allowsPublicHttpWhenInsecureEnabled() {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `mvn --batch-mode test -pl agent-config-core -Dtest=ManifestLoaderTest`
-Expected: compilation error — `ManifestLoader` has no 3-arg constructor, no `fetchRemote(SourceDeclaration)` method.
+Expected: compilation error — `AgentManifestLoader` has no 3-arg constructor, no `fetchRemote(SourceDeclaration)` method.
 
 - [ ] **Step 3: Refactor ManifestLoader constructor**
 
-Change `ManifestLoader` from zero-arg to 3-arg constructor. Keep a zero-arg constructor that creates defaults (for backward compatibility of `loadFile`/`loadResource` non-HTTP paths):
+Change `AgentManifestLoader` from zero-arg to 3-arg constructor. Keep a zero-arg constructor that creates defaults (for backward compatibility of `loadFile`/`loadResource` non-HTTP paths):
 
 ```java
 private static final int MAX_BODY_SIZE = 1_048_576; // 1 MB
@@ -696,7 +696,7 @@ public Manifest loadResource(URI uri) {
 
 - [ ] **Step 8: Fix existing tests**
 
-Update existing `ManifestLoaderTest` tests that use `new ManifestLoader()` — the zero-arg constructor is preserved for backward compatibility. Add `import static org.mockito.Mockito.mock;` and Mockito as a test dependency if not already present.
+Update existing `AgentManifestLoaderTest` tests that use `new ManifestLoader()` — the zero-arg constructor is preserved for backward compatibility. Add `import static org.mockito.Mockito.mock;` and Mockito as a test dependency if not already present.
 
 Run: `mvn --batch-mode test -pl agent-config-core`
 Expected: all pass
@@ -766,7 +766,7 @@ Expected: compilation error — `ManifestLoader.verifyDigest` doesn't exist.
 
 - [ ] **Step 3: Implement `verifyDigest` static method**
 
-Add to `ManifestLoader`:
+Add to `AgentManifestLoader`:
 
 ```java
 static boolean verifyDigest(byte[] bodyBytes, String declaredDigest, String uri) {
@@ -884,7 +884,7 @@ void verifySignatureSkipsWhenNotDeclared() {
 
 - [ ] **Step 6: Implement `verifySignature` static method**
 
-Add to `ManifestLoader`:
+Add to `AgentManifestLoader`:
 
 ```java
 static boolean verifySignature(byte[] bodyBytes, String signatureB64, String signerDid,
@@ -972,7 +972,7 @@ git commit -m "feat(#336): digest and signature verification in ManifestLoader f
 - Modify: `docs/guides/consumer-guide.md` or `docs/guides/contributor-guide.md` (if source auth docs needed)
 
 **Interfaces:**
-- Consumes: `ManifestLoader(ManifestCredentialResolver, DIDResolver, ManifestSecurityConfig)` from Task 3, `ManifestSecurityConfig` from Task 2
+- Consumes: `ManifestLoader(ManifestCredentialResolver, DIDResolver, ManifestSecurityConfig)` from Task 3, `AgentManifestSecurityConfig` from Task 2
 - Produces: Updated `AgentConfigLoader` constructor (adds `DIDResolver` nullable param + `boolean allowInsecure`), updated `AgentConfigBeans` CDI wiring
 
 - [ ] **Step 1: Write failing test — AgentConfigLoader passes dependencies through**
