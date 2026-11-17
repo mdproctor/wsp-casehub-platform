@@ -12,6 +12,29 @@
 **Exploration:** quick
 **Status:** captured
 
+## D5: Expression delegate typing
+
+**Choice:** Two separate delegates — condition delegate and transform delegate
+**Alternatives:**
+- Single generic ExpressionEngineRegistry reference — requires yaml-core to depend on platform-api (violates zero-dep constraint)
+- Single Function<String, Object> with casting — type-unsafe, conflates two concerns
+**Rationale:** ConditionEvaluator stays in yaml-core with `Function<String, Boolean>` for conditions only. DecoratorChain gets a separate `Function<Map<String,Object>, Map<String,Object>>` for transforms. Both wired from ExpressionEngineRegistry by the runner. Two delegates, two concerns, no type gymnastics. Preserves yaml-core's zero-dep invariant.
+**Trade-offs:** Two wiring points instead of one. Acceptable because the concerns are genuinely different (boolean evaluation vs map transformation).
+**Sources:** ConditionEvaluator.java (yaml-core, zero-dep), ExpressionEngineRegistry (platform-api), P33, P35
+**Exploration:** quick
+**Status:** captured
+
+## D6: Capture namespace model
+
+**Choice:** Flat map, globally scoped within the playbook run
+**Alternatives:**
+- Hierarchical dot-path namespacing (try.parallel-0.myCapture) — couples references to nesting structure, makes capture names unpredictable
+**Rationale:** A capture at any depth writes to the same flat Map<String, Map<String, Object>>. Same name at different depths = last-write-wins (matches existing top-level behavior). No auto-namespacing. Playbook authors choose capture names; if two branches both write `capture: result`, that's a user error. Flat is what authors expect from `${captures.result}`.
+**Trade-offs:** Name collisions in parallel branches are silent. Could add a warning log but not an error — the naming is the author's responsibility.
+**Sources:** PlaybookRunnerCore.java:130-153, P36
+**Exploration:** quick
+**Status:** captured
+
 ## D2: Condition fix — injection and Norway problem
 
 **Choice:** ExpressionEngine + strict Truthiness
