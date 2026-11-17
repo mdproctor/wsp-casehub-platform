@@ -1,9 +1,9 @@
 # Work Plan —
 
 ## State
-branch: main
+branch: issue-828-canonical-runner-inert-features
 state: active
-Current: none
+Current: casehubio/platform#828
 date: 
 issue-repo: casehubio/platform
 status: active
