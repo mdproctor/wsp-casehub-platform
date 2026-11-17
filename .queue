@@ -1,12 +1,13 @@
 # Work Plan —
 
 ## State
-branch: issue-828-canonical-runner-inert-features
+branch: issue-829-decorator-semantics
 state: active
-Current: casehubio/platform#828
+Current: casehubio/platform#829
 date: 
 issue-repo: casehubio/platform
 status: active
+active_issue: casehubio/platform#829
 
 ## Queue
 - [ ] casehubio/platform#725 — fix: CLI --dry-run should discover simulation.yaml from directory hierarchy

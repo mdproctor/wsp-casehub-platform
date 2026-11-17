@@ -489,7 +489,7 @@ Each finding gets its own test class. Tests are written before implementation (T
 
 ## References
 
-- `yaml-test-core/src/main/java/io/casehub/yaml/test/PlaybookRunnerCore.java` — current runner location
+- `../../../yaml-step-runtime/src/main/java/io/casehub/yaml/step/runner/PlaybookRunnerCore.java` — current runner location
 - `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/DecoratorChain.java` — decorator chain with on-error, transform, condition evaluation
 - `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/StructuralStepEvaluator.java` — structural step evaluation, capture point
 - `yaml-step-runtime/src/main/java/io/casehub/yaml/step/eval/CatalogStepRunner.java` — step runner, invoke throw

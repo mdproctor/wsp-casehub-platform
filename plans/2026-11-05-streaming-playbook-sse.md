@@ -32,8 +32,8 @@
 Add per-step callback support to StepTraceCollector and a blocking streaming method to PlaybookRunnerCore that invokes the callback as each step completes.
 
 **Files:**
-- Modify: `yaml-test-core/src/main/java/io/casehub/yaml/test/StepTraceCollector.java`
-- Modify: `yaml-test-core/src/main/java/io/casehub/yaml/test/PlaybookRunnerCore.java`
+- Modify: `../../yaml-step-runtime/src/main/java/io/casehub/yaml/step/runner/StepTraceCollector.java`
+- Modify: `../../yaml-step-runtime/src/main/java/io/casehub/yaml/step/runner/PlaybookRunnerCore.java`
 - Test: `yaml-test-core/src/test/java/io/casehub/yaml/test/StepTraceCollectorTest.java`
 - Test: `yaml-test-core/src/test/java/io/casehub/yaml/test/PlaybookRunnerCoreTest.java`
 
@@ -271,7 +271,7 @@ git commit -m "feat(#724): add streaming callback to StepTraceCollector and runS
 Declare `runStream()` on the SPI interface and implement it in the CDI bean. The graphql-generator APT auto-generates the SSE REST endpoint.
 
 **Files:**
-- Modify: `yaml-test-core/src/main/java/io/casehub/yaml/test/PlaybookApi.java`
+- Modify: `../../yaml-step-runtime/src/main/java/io/casehub/yaml/step/runner/PlaybookApi.java`
 - Modify: `playbook-runner/src/main/java/io/casehub/yaml/test/quarkus/PlaybookBeans.java`
 - Test: `playbook-runner/src/test/java/io/casehub/yaml/test/quarkus/PlaybookBeansStreamingTest.java`
 
@@ -293,7 +293,6 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Flow;
@@ -308,10 +307,10 @@ class PlaybookBeansStreamingTest {
         // Use a direct PlaybookRunnerCore (no CDI needed)
         var pluginRegistry = new io.casehub.yaml.step.catalog.CompositePluginRegistry();
         pluginRegistry.register(io.casehub.yaml.plugin.api.Definition.of("agent-invoke")
-                .execute((params, svc) ->
-                        io.casehub.yaml.plugin.api.Result.of(
-                                Map.of("text", String.valueOf(params.get("prompt")))))
-                .build());
+                                                                     .execute((params, svc) ->
+                                                                                      io.casehub.yaml.plugin.api.Result.of(
+                                                                                              Map.of("text", String.valueOf(params.get("prompt")))))
+                                                                     .build());
         var serviceRegistry = new io.casehub.yaml.plugin.api.MapServiceRegistry();
 
         var beans = new PlaybookBeans(pluginRegistry, serviceRegistry, null);
@@ -324,18 +323,26 @@ class PlaybookBeansStreamingTest {
         Flow.Publisher<StepTraceNode> publisher = beans.runStream(request);
 
         var received = new ArrayList<StepTraceNode>();
-        var latch = new CountDownLatch(1);
+        var latch    = new CountDownLatch(1);
         publisher.subscribe(new Flow.Subscriber<>() {
             private Flow.Subscription subscription;
-            @Override public void onSubscribe(Flow.Subscription s) {
+
+            @Override
+            public void onSubscribe(Flow.Subscription s) {
                 this.subscription = s;
                 s.request(Long.MAX_VALUE);
             }
-            @Override public void onNext(StepTraceNode item) {
+
+            @Override
+            public void onNext(StepTraceNode item) {
                 received.add(item);
             }
-            @Override public void onError(Throwable t) { latch.countDown(); }
-            @Override public void onComplete() { latch.countDown(); }
+
+            @Override
+            public void onError(Throwable t) {latch.countDown();}
+
+            @Override
+            public void onComplete()         {latch.countDown();}
         });
 
         assertThat(latch.await(5, TimeUnit.SECONDS)).isTrue();
@@ -353,7 +360,7 @@ Expected: compilation error — `runStream` does not exist on PlaybookBeans/Play
 
 - [ ] **Step 3: Add runStream to PlaybookApi SPI**
 
-Modify `yaml-test-core/src/main/java/io/casehub/yaml/test/PlaybookApi.java`:
+Modify `../../yaml-step-runtime/src/main/java/io/casehub/yaml/step/runner/PlaybookApi.java`:
 
 ```java
 @McpDomain("playbooks")
