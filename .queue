@@ -22,3 +22,5 @@ active_issue: 835
 - [ ] casehubio/platform#842 — background decorator error observability
 - [ ] casehubio/platform#843 — configurable iteration cap for until loops
 - [ ] casehubio/platform#765 — feat: CorpusSelectionEventObserver rebuild trigger index on profile activation
+- [ ] casehubio/platform#848 — Streaming plugins bypass validation and coercion
+- [ ] casehubio/platform#849 — Streaming + ContextParam intersection not handled in generator
