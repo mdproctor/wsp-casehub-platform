@@ -47,3 +47,4 @@
 | [2026-11-17-mdp03-the-attribute-nobody-read.md](2026-11-17-mdp03-the-attribute-nobody-read.md) | 2026-11-17 | When an annotation attribute is extracted but never consumed, the escape hatch exists only on paper |
 | [2026-11-17-mdp04-the-generators-last-mile.md](2026-11-17-mdp04-the-generators-last-mile.md) | 2026-11-17 | Three generator blind spots: skipped context params, non-injective naming, and path-dependent validation |
 | [2026-11-17-mdp05-the-catalogue-is-the-security-surface.md](2026-11-17-mdp05-the-catalogue-is-the-security-surface.md) | 2026-11-17 | When an LLM can write your playbooks, the step catalogue becomes a security boundary — and the existing schema filter was already the right mechanism |
+| [2026-11-17-mdp07-the-test-that-teaches-nothing.md](2026-11-17-mdp07-the-test-that-teaches-nothing.md) | 2026-11-17 | Tutorial metadata headers for playbook examples + assertion-quality lint that rejects tests asserting only succeeded/stepCount |
