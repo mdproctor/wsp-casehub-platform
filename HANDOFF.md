@@ -1,33 +1,29 @@
 # HANDOFF — casehub-platform
 
-**Last closed:** #833 (WS-4: Canonical form — one file shape, reconcile guide)
-**Landed:** `3900bebb` on main, published to origin
-**Queue:** 13 items remaining
+**Last closed:** #835 (WS-6a: Generator fixes + plugin validation)
+**Landed:** `d9416ed0` on main, published to origin
+**Queue:** 16 items remaining (2 new from this session)
 
 ## This session
 
-Canonical form for the playbook corpus — one file shape, one key case, reconciled guide.
+Fixed three generator/plugin validation bugs blocking typed playbooks. Epic #827 Batch 2.
 
-**Code:**
-- Renamed `forEach` YAML keyword to `for-each` across Walker, StepKeywords, FusionPass, DecoratorChain, ForEachExpander, ImportExpander, PlaybookCompiler, all JSON schemas, and all tests
-- Added `@JsonProperty("for-each")` mixin in yaml-jackson for YamlImport deserialization (critical — without it, imports with `for-each:` silently get null forEach field)
-- Migrated 71 playbook files from three-document bare-list form to two-document canonical form with explicit `steps:` key
-- Renamed 8 agent-interaction-pattern files to `.playbook.yaml`
-- Fixed JSON schema to accept runtime value types: log (string shorthand), loop (string/boolean/object), when/if (boolean), barrier/quorum (typed decorator alternatives)
+**Code (2 commits):**
+- `PluginScanner.extractParam`: String→Number/float coercion, case-insensitive enum valueOf fallback, coercion failure logging
+- `PluginScanner.scanAndRegister`: wraps `@Plugin` actions in `ValidatingAction` with `coerceParams` pre-pass — String values from YAML interpolation are coerced before type validation runs
+- `GraphQLResolverProcessor.generatePluginSource`: `@ContextParam` params now injected via `CurrentPrincipal` as an execute method parameter (resolved by `ServiceRegistry.lookup`). HTTP-only context params (`httpHeaders`, `queryParams`, `requestUrl`) pass `null` in plugin context
+- `derivePluginName`: collision-aware overload — short names by default, full domain path (`connectors-voice-speak`) only when two domains collide. Two-pass compile-time detection across APT round
+- `CompositePluginRegistry.register`: upgraded from INFO to WARNING on name collision
+- `PluginScanner.mapType`: enums mapped to `ParameterType.STRING` (was OBJECT — caused validation rejection)
 
-**Docs:**
-- Reconciled yaml-language-guide.md: guard keyword `when` (not `if`), type checking claims fixed (P24), 13 undocumented decorators added, bare variable references fixed, canonical file shape documented
-- Updated CLAUDE.md module descriptions for for-each rename
-- Blog: "One Shape, or the LLM Guesses" with external SVG diagram
+**Blog:** "The Generator's Last Mile" — generator blind spots: skipped context, non-injective naming, path-dependent validation
 
-**Filed:** casehub-pages#673 (migrate forEach to for-each), #846 (pre-existing test failures: StepTraceCollectorTest + PlaybookDryRunTest), #847 (JSON schema: complete step type validation coverage)
+**Filed:** #848 (streaming plugins bypass validation and coercion, S/Med), #849 (streaming + ContextParam intersection, XS/Low)
 
-## Breaking change
-
-The `forEach` → `for-each` YAML keyword rename breaks the pages repo. Confirmed with the team — they'll follow git history to get parity (#845).
+**Pre-existing failures confirmed:** StepTraceCollectorTest + PlaybookDryRunTest (#846) and RunPlaybookTests state machine tests — all fail on main identically. #838 tracks the root cause.
 
 ## Next in queue
 
-Epic #827 Batch 2 continues: #835 (WS-6a: Generator fixes + plugin validation) — different domain (APT generators), fresh session recommended.
+Epic #827 continues: #830 (WS-3: Trust model for playbook authoring, M/High) or #834 (WS-5: Rules headers and lint, S/Med). Both are topic changes from generator work — fresh session.
 
-Or standalone: #838, #839, #840, #841, #842, #843, #765.
+Standalone candidates: #838, #839, #840, #841, #842, #843, #765, #848, #849.
