@@ -30,10 +30,15 @@ status: active
 - [ ] casehubio/platform#806 — wire pluginSubject and absorbSiblings
 - [ ] casehubio/platform#807 — voice and messaging resolution patterns
 - [ ] casehubio/platform#808 — hand-written plugin skip detection
-- [ ] casehubio/platform#828 — WS-1 Canonical runner + finish inert features
-- [ ] casehubio/platform#829 — WS-2 Specify and fix decorator semantics
-- [ ] casehubio/platform#830 — WS-3 Trust model for playbook authoring
-- [ ] casehubio/platform#833 — WS-4 Canonical form — one file shape reconcile guide
-- [ ] casehubio/platform#834 — WS-5 Rules headers and lint for playbook tests
-- [ ] casehubio/platform#835 — WS-6a Generator fixes + plugin validation
-- [ ] casehubio/platform#836 — WS-6b Validator MCP tool + shaped plugin schemas + authoring metric
+- [ ] casehubio/platform#827 — Playbook language direction — platform (epic)
+  ### Batch 1 — Foundation ← current
+  - [ ] casehubio/platform#828 — WS-1: Canonical runner + finish inert features
+  ### Batch 2 — Parallel (after WS-1)
+  - [ ] casehubio/platform#829 — WS-2: Specify and fix decorator semantics
+  - [ ] casehubio/platform#833 — WS-4: Canonical form — one file shape, reconcile guide
+  - [ ] casehubio/platform#835 — WS-6a: Generator fixes + plugin validation
+  ### Batch 3 — Parallel (after Batch 2)
+  - [ ] casehubio/platform#830 — WS-3: Trust model for playbook authoring
+  - [ ] casehubio/platform#834 — WS-5: Rules headers and lint for playbook tests
+  ### Batch 4 — Capstone
+  - [ ] casehubio/platform#836 — WS-6b: Validator MCP tool + shaped plugin schemas + metric
