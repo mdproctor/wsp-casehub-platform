@@ -3,10 +3,10 @@
 ## State
 branch: main
 state: active
-date:
+date: 
 issue-repo: casehubio/platform
 status: active
-active_issue:
+active_issue: 
 
 ## Queue
 - [ ] casehubio/platform#807 — voice and messaging resolution patterns
@@ -25,3 +25,4 @@ active_issue:
 - [ ] casehubio/platform#841 — parallel structural step needs concurrency bound and fail-fast
 - [ ] casehubio/platform#842 — background decorator error observability
 - [ ] casehubio/platform#843 — configurable iteration cap for until loops
+- [ ] casehubio/platform#765 — feat: CorpusSelectionEventObserver rebuild trigger index on profile activation
