@@ -57,17 +57,18 @@
 **Exploration:** quick
 **Status:** captured
 
-## D6: Level filtering — capability-based
+## D6: Level filtering — capability-based with named levels
 
-**Choice:** Map playbook levels (1-5) to capability sets. Level 1 = steps only. Level 2 = steps + decorators + control-flow. Level 3 = + concurrency + modules. Level 4 = + orchestration + correlation. Level 5 = everything. Catalogue query filters by level using the same `SchemaFilteredRegistry` pattern.
+**Choice:** Map playbook levels to capability sets via named, registered `PlaybookLevel` records. Names: `foundational`, `basic-patterns`, `intermediate`, `advanced`, `expert`. Registered in a `LevelRegistry`, discoverable via catalogue. Catalogue query takes a level name, not an integer. Existing playbook metadata (`meta.level: 1`) accepts either form (integer backward-compatible, name preferred).
 **Alternatives:**
+- Raw integer levels — magic numbers with no discoverability. Rejected: same anti-pattern as hardcoded strings.
 - Tag-based levels — add 'level' field to Definition/Parameter, filter by level <= requested. Rejected: requires annotating every plugin.
 - No filtering, just grouping — return full catalogue grouped by level. Rejected: doesn't achieve the 'small vocabulary' goal.
-**Rationale:** Reuses existing capability taxonomy. Levels are a view over capabilities, not a new dimension. The mapping is maintained in one place.
+**Rationale:** Named levels follow the same pattern as named schemas — registered, discoverable, self-describing. Reuses existing capability taxonomy. Levels are a view over capabilities, not a new dimension.
 **Trade-offs:** Level-to-capability mapping is implicit — a new capability must be assigned to a level. Worth it vs annotating every plugin individually.
-**Sources:** `PlaybookCapabilities.java`, `MapPlaybookSchemaRegistry.java`
+**Sources:** `PlaybookCapabilities.java`, `MapPlaybookSchemaRegistry.java`, `PlaybookSchemaRegistry.java` (pattern for named registration)
 **Exploration:** quick
-**Status:** captured
+**Status:** revised (D9 — named levels replace raw integers)
 
 ## D7: Trust gating — include in this issue
 
@@ -89,5 +90,17 @@
 **Rationale:** Integrates with existing test framework. The metric is fundamentally a test: "can a model produce a valid playbook for this level?" JUnit reports give CI-visible results.
 **Trade-offs:** Requires AgentProvider to be available in test scope. Tests with LLM dependencies are non-deterministic and potentially slow — should be tagged for separate CI runs.
 **Sources:** `YamlTestEngine.java`, `ValidatePlaybookPlugin.java`, `AgentProvider` SPI
+**Exploration:** quick
+**Status:** captured
+
+## D9: Named levels — registered and discoverable
+
+**Choice:** Levels are `PlaybookLevel` records (name, ordinal, capabilities) registered in a `PlaybookLevelRegistry`. The catalogue query and metric plugin reference levels by name (`foundational`, `basic-patterns`, `intermediate`, `advanced`, `expert`), not raw integer. The registry is the single source of truth for level-to-capability mapping.
+**Depends on:** D6 (capability-based level filtering)
+**Alternatives:**
+- Raw integer levels — magic numbers, no discoverability, no self-describing metadata.
+**Rationale:** Same pattern as `PlaybookSchemaRegistry` — named, registered, discoverable. Avoids hardcoded integers that have no meaning without convention. The LevelRegistry can be queried by the catalogue API to list available levels.
+**Trade-offs:** Slightly more infrastructure than a static Map<Integer, Set<String>>. Worth it for consistency with the schema registry pattern.
+**Sources:** `PlaybookSchemaRegistry.java`, `PlaybookSchemaDescriptor.java`
 **Exploration:** quick
 **Status:** captured
