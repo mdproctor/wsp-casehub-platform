@@ -1,38 +1,37 @@
 # HANDOFF — casehub-platform
 
-**Last closed:** #834 (WS-5: Rules headers and lint for playbook tests)
-**Landed:** `5e17be28` on main, published to origin
-**Queue:** 18 items remaining (2 new: #850, #851)
+**Last closed:** #850 (WS-5b: Category-level behavioral tests), #854 (StepTraceCollector fix)
+**Landed:** `acaff89b` on main, published to origin
+**Queue:** 18 items remaining (2 new: #852, #853)
 
 ## This session
 
-Tutorial headers and assertion-quality lint for playbook tests. Narrowed scope significantly from the direction doc — dropped R-ID rules (natural language rules with only structural enforcement don't carry their weight).
+Implemented the three deferred batches from #834's plan — runner enrichment with orchestration primitive state, category-level validation tests for all 8 uncovered playbook categories, and an assertion-quality lint that rejects tests with only trivial assertions. Also fixed 2 pre-existing test failures (#854).
 
-**What landed (3 commits):**
+**What landed (4 commits):**
 
-1. **Gate cleanup** — fixed the 3 playbooks that the catalog-parsing-gate expected to fail (modules, rest, 08-structured-output). Root cause: the Walker rejected unknown sibling keys (`headers`, `body`, `response-format`). Fix: `absorbSiblings(true)` on all stub definitions in `ValidatePlaybookPlugin.buildCatalogRegistry()`. Gate now expects 0 failures. `modules.playbook.yaml` restructured from module-definition form to step-based form (filed #851 for teaching regression).
+1. **Primitive state enrichment** — `DefaultExecutionScope.snapshotPrimitives()` captures counter values, flag states, and gauge values before scope close. Plumbed through `PlaybookRunResult.primitiveStates()` → `RunPlaybookPlugin` result map as top-level `counters`, `flags`, `gauges` keys. Infrastructure for when coordination primitive plugins become runtime implementations.
 
-2. **Header validation** — `ValidatePlaybookPlugin.executeDirectory()` now checks every `.playbook.yaml` for `level`, `layer`, and `teaches` in its `meta:` block. Reports `headerErrors` alongside compilation errors. Test coverage in `ValidatePlaybookPluginTest`. Gate assertion: `result.headerErrors hasSize: 0`.
+2. **Category validation tests** — 8 new `.test.yaml` files using directory-mode `validate-playbook`. Categories: flow-control (12), step-workflows (13), composition (9), concurrency-patterns (8), coordination (4), coordination-primitives (6), invoke-bindings (6), data-delivery (3). Each validates compilation and tutorial headers.
 
-3. **Tutorial headers** — all 70 playbooks have `level` (1-5 difficulty), `layer` (= directory name), `teaches` (one-line concept), and `builds-on` (prerequisite playbooks). Header validation in the gate enforces these on new playbooks.
+3. **Assertion-quality lint** — `AssertionQualityLintTest` scans all `.test.yaml` files, fails when test cases only assert on `result.succeeded`/`result.stepCount`/`result.valid`. Per-file `lint: skip` opt-out. Upgraded agent-interaction-patterns compilation + execution tests with non-trivial assertions (stepNames, poolDeclarations, stepEvents).
+
+4. **StepTraceCollector fix** — wired state machine advancement (`runtime::advanceStateMachines`) and simulation detection (`simulationChecker`) into the collector via `SimulationActivator` SPI. Fixed 2 pre-existing test failures (StepTraceCollectorTest, PlaybookDryRunTest, simulation order-lifecycle).
+
+**Key discovery:** Most playbook action plugins (counter-add, flag-set, click, log, rest-request — 60+ actions) exist only as validation stubs in `ValidatePlaybookPlugin.CATALOG_STUB_ACTIONS`. They allow `Walker.resolve()` to compile but have no runtime implementations. Category tests use directory-mode `validate-playbook` (structural) rather than `run-playbook` (behavioural) for this reason. Filed #852 for runtime implementations.
 
 **Issues filed:**
-- #850 — WS-5b: Category-level behavioral tests (runner enrichment + 10 test files + assertion-quality lint). Deferred batches 3-4 from this issue's plan.
-- #851 — Restore module-system demonstration (modules.playbook.yaml lost teaching value in restructure)
+- #852 — Runtime plugins for coordination primitive actions (M/Med)
+- #853 — response-format sibling key not handled at execution time (S/Low)
+- #854 — StepTraceCollector fix (XS/Low — already fixed and closed)
 
-**Blog:** "The Test That Teaches Nothing" — why `succeeded: true` isn't a test, and what tutorial metadata enables
-
-**Pre-existing test failures:** 2 simulation tests fail on main (#838 StepTraceCollector, PlaybookDryRun). Not introduced by this branch.
-
-**Design artifacts:**
-- Spec: `specs/issue-834-rules-headers-lint-playbook-tests/2026-11-17-rules-headers-lint-design.md`
-- Plan: `plans/2026-11-17-rules-headers-lint.md`
-- Decisions: `specs/issue-834-rules-headers-lint-playbook-tests/decisions.md` (9 decisions, including dropping R-ID rules)
+**Blog:** "The Test That Teaches Nothing" revised — now covers category validation, lint, primitive enrichment, and the stub-to-implementation gap
 
 ## Next in queue
 
 Epic #827 continues. Next candidates:
-- #850 (WS-5b: Category-level behavioral tests, M/Med) — direct continuation of this session's work, same files and modules
 - #836 (WS-6b: Validator MCP tool + shaped schemas + metric, L/High) — design-heavy, unblocked by #830's trust model
+- #851 (Restore module-system demonstration, S/Low) — modules.playbook.yaml lost teaching value in #834 restructure
+- #852 (Runtime plugins for coordination primitives, M/Med) — unlocks behavioural tests for coordination-primitives, concurrency-patterns
 
-Standalone candidates: #838, #839, #840, #841, #842, #843, #765, #848, #849, #851.
+Standalone candidates: #838 (closed), #839, #840, #841, #842, #843, #765, #848, #849.
