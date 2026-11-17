@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 280">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#555"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="380" y="22" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="bold" fill="#333">Plugin Action Pipeline — Before and After</text>
+
+  <!-- BEFORE row -->
+  <text x="20" y="72" font-family="sans-serif" font-size="11" font-weight="bold" fill="#c5221f">BEFORE</text>
+
+  <rect x="80" y="50" width="120" height="40" rx="4" fill="#fff3e0" stroke="#e65100" stroke-width="1.5"/>
+  <text x="140" y="72" text-anchor="middle" font-family="monospace" font-size="11" fill="#333">YAML params</text>
+  <text x="140" y="84" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#888">"count": "3"</text>
+
+  <line x1="200" y1="70" x2="260" y2="70" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="265" y="50" width="130" height="40" rx="4" fill="#fce8e6" stroke="#ea4335" stroke-width="1.5"/>
+  <text x="330" y="68" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#c5221f">extractParam</text>
+  <text x="330" y="82" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#c5221f">ClassCastException</text>
+
+  <line x1="395" y1="70" x2="440" y2="70" stroke="#aaa" stroke-width="1" stroke-dasharray="4"/>
+
+  <rect x="445" y="50" width="130" height="40" rx="4" fill="#f5f5f5" stroke="#bbb" stroke-width="1" stroke-dasharray="3"/>
+  <text x="510" y="68" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#999">ValidatingAction</text>
+  <text x="510" y="82" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#999">not applied</text>
+
+  <line x1="575" y1="70" x2="620" y2="70" stroke="#aaa" stroke-width="1" stroke-dasharray="4"/>
+
+  <rect x="625" y="50" width="110" height="40" rx="4" fill="#fce8e6" stroke="#ea4335" stroke-width="1.5"/>
+  <text x="680" y="68" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#c5221f">execute</text>
+  <text x="680" y="82" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#c5221f">0/false defaults</text>
+
+  <!-- AFTER row -->
+  <text x="20" y="182" font-family="sans-serif" font-size="11" font-weight="bold" fill="#137333">AFTER</text>
+
+  <rect x="80" y="160" width="120" height="40" rx="4" fill="#fff3e0" stroke="#e65100" stroke-width="1.5"/>
+  <text x="140" y="182" text-anchor="middle" font-family="monospace" font-size="11" fill="#333">YAML params</text>
+  <text x="140" y="194" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#888">"count": "3"</text>
+
+  <line x1="200" y1="180" x2="244" y2="180" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="249" y="155" width="110" height="50" rx="4" fill="#e8f0fe" stroke="#4285f4" stroke-width="1.5"/>
+  <text x="304" y="176" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#1a73e8">coerceParams</text>
+  <text x="304" y="192" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#1a73e8">"3" → 3</text>
+
+  <line x1="359" y1="180" x2="393" y2="180" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="398" y="155" width="130" height="50" rx="4" fill="#e6f4ea" stroke="#34a853" stroke-width="1.5"/>
+  <text x="463" y="176" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#137333">ValidatingAction</text>
+  <text x="463" y="192" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#137333">required + type</text>
+
+  <line x1="528" y1="180" x2="574" y2="180" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="579" y="155" width="100" height="50" rx="4" fill="#e8f0fe" stroke="#4285f4" stroke-width="1.5"/>
+  <text x="629" y="176" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#1a73e8">extractParam</text>
+  <text x="629" y="192" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#1a73e8">typed values</text>
+
+  <line x1="679" y1="180" x2="710" y2="180" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="715" y="165" width="30" height="30" rx="4" fill="#e6f4ea" stroke="#34a853" stroke-width="1.5"/>
+  <text x="730" y="184" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#137333">✓</text>
+
+  <!-- Annotations -->
+  <text x="140" y="250" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#888">String values from YAML interpolation</text>
+  <text x="304" y="250" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#1a73e8">parseScalar()</text>
+  <text x="463" y="250" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#137333">Validator.validateStep()</text>
+  <text x="629" y="250" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#1a73e8">typed construction</text>
+
+  <line x1="140" y1="237" x2="140" y2="205" stroke="#aaa" stroke-width="0.5" stroke-dasharray="2"/>
+  <line x1="304" y1="237" x2="304" y2="210" stroke="#aaa" stroke-width="0.5" stroke-dasharray="2"/>
+  <line x1="463" y1="237" x2="463" y2="210" stroke="#aaa" stroke-width="0.5" stroke-dasharray="2"/>
+  <line x1="629" y1="237" x2="629" y2="210" stroke="#aaa" stroke-width="0.5" stroke-dasharray="2"/>
+</svg>
