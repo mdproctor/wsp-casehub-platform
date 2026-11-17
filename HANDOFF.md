@@ -2,28 +2,18 @@
 
 **Last closed:** #829 (WS-2: Specify and fix decorator semantics)
 **Landed:** `5a764cd` on main, published to origin
-**Status:** Queue active, 25 items remaining
+**Queue:** 13 items (purged 20 already-closed issues)
 
-## What #829 delivered
+## Queue health
 
-Specified contracts and fixed bugs for 7 decorators in `DecoratorChain`:
+The queue had 32 items, 20 of which were already closed on GitHub (landed in prior sessions without queue advancement). Purged all closed issues. Remaining:
 
-- **Result.Skipped** — new sealed interface variant; `isSuccess()=true` (flow control continues), `isSkipped()=true` for distinction. Singleton constant.
-- **timeout** — no longer blocks forever on uninterruptible steps; `shutdownNow()` on timeout, `shutdown()` on success
-- **cancel** — `AtomicBoolean cancelFired` preserves external interrupts; only clears when cancel signal was responsible
-- **retry** — `failCat == null ||` stops uncategorised failures from bypassing the `on` filter
-- **loop** — until loops that exhaust iterations now return failure
-- **forEach parallel** — fail-fast cancel + `concurrency` semaphore parameter
-- **background** — conformance tests documenting fire-and-forget contract
-
-Blog: "Seven Decorators, Seven Contracts"
-
-## Follow-up issues filed
-
-- #841 — parallel structural step needs concurrency bound and fail-fast (S/Low)
-- #842 — background decorator error observability (S/Med)
-- #843 — configurable iteration cap for until loops (XS/Low)
+- **Epic #827** — Batch 1 complete (#828, #829). Batch 2 is current: #833 (WS-4), #835 (WS-6a). Then Batch 3: #830, #834. Capstone: #836.
+- **Standalone:** #807, #838, #839, #840
+- **Follow-ups from #829:** #841, #842, #843
 
 ## Next in queue
 
-#725 — fix: CLI --dry-run should discover simulation.yaml from directory hierarchy
+#807 — voice and messaging resolution patterns (first non-epic item)
+
+Or within the epic: #833 (WS-4: Canonical form) or #835 (WS-6a: Generator fixes) — Batch 2 items are parallel, either can go first.
