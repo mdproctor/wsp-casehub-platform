@@ -58,13 +58,11 @@ This is the entire integration surface. `SchemaFilteredRegistry.availableActions
 
 ### Variable sources
 
-`VariableSource.env()` and `systemProperty()` are not registered in production. The trust model formalises this: registration of these sources is gated by the `ENV_ACCESS` capability in the active schema. When running under the `assisted` context, the resolver chain must not include these sources.
+`VariableSource.env()` and `systemProperty()` are not registered in production. This issue formalises that as policy: the `ENV_ACCESS` capability must be present in the active schema for these sources to be registered. The runtime gating (checking the active schema before wiring sources into the resolver chain) is delivered in WS-6b.
 
 ### Expression engines
 
-MVEL is gated by `EXPRESSION_MVEL`. JQ (pure JSON transform, no side effects) and JEXL (sandboxed) remain available in both contexts.
-
-The expression engine registry checks the active schema's capabilities before compiling an MVEL expression. Under `assisted`, MVEL compilation returns an error with a message indicating the expression type is not available in this authoring context.
+MVEL is gated by `EXPRESSION_MVEL`. JQ (pure JSON transform, no side effects) and JEXL (sandboxed) remain available in both contexts. This issue defines the capability constant; the runtime check (expression engine registry refusing MVEL compilation under `assisted`) is delivered in WS-6b.
 
 ### Configuration
 
