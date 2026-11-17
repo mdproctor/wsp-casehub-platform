@@ -1,10 +1,20 @@
+# Work Plan —
+
+## State
+branch: issue-807-voice-messaging-resolution
+issue-repo: casehubio/platform
+status: active
+date: 
+active_issue: 833
+
+## Queue
 - [ ] casehubio/platform#807 — voice and messaging resolution patterns
 - [ ] casehubio/platform#827 — Playbook language direction — platform
-  - [ ] casehubio/platform#833 — WS-4: Canonical form — one file shape, reconcile guide
-  - [ ] casehubio/platform#835 — WS-6a: Generator fixes + plugin validation
-  - [ ] casehubio/platform#830 — WS-3: Trust model for playbook authoring
-  - [ ] casehubio/platform#834 — WS-5: Rules headers and lint for playbook tests
-  - [ ] casehubio/platform#836 — WS-6b: Validator MCP tool + shaped plugin schemas + metric
+- [ ] casehubio/platform#833 — WS-4: Canonical form — one file shape, reconcile guide
+- [ ] casehubio/platform#835 — WS-6a: Generator fixes + plugin validation
+- [ ] casehubio/platform#830 — WS-3: Trust model for playbook authoring
+- [ ] casehubio/platform#834 — WS-5: Rules headers and lint for playbook tests
+- [ ] casehubio/platform#836 — WS-6b: Validator MCP tool + shaped plugin schemas + metric
 - [ ] casehubio/platform#838 — StepTraceCollector restore advanceStateMachines
 - [ ] casehubio/platform#839 — SimulationRuntimeActivator static ObjectMapper
 - [ ] casehubio/platform#840 — consolidate duplicate capture logic
@@ -12,10 +22,3 @@
 - [ ] casehubio/platform#842 — background decorator error observability
 - [ ] casehubio/platform#843 — configurable iteration cap for until loops
 - [ ] casehubio/platform#765 — feat: CorpusSelectionEventObserver rebuild trigger index on profile activation
-
-## State
-branch: issue-807-voice-messaging-resolution
-issue-repo: casehubio/platform
-status: active
-date: 
-active_issue: 
