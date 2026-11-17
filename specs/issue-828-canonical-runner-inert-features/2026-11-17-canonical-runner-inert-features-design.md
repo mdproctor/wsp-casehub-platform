@@ -45,12 +45,16 @@ playbook-runner/           (CDI wiring, unchanged module)
 
 ### Dependency changes
 
-`yaml-step-runtime` gains:
-- `simulation-api` (compile, for `SimulationRuntime` constructor parameter — optional at runtime)
-- `simulation-core` (compile, for `SimulationOverlay`, `MapSimulationConfig`)
-- `simulation-inmem` (compile, for `InMemorySimulationCorpus`)
-- `simulation-config-core` (compile, for `YamlSimulationConfig`)
-- `yaml-jackson` (compile, for `YamlModuleFileMixin` used by module loading)
+`yaml-step-runtime` gains no new compile dependencies for simulation. Instead, simulation activation is abstracted behind a functional interface:
+
+```java
+@FunctionalInterface
+public interface SimulationActivator {
+    SimulationOverlay activate(PlaybookRunConfig config, Path playbookPath);
+}
+```
+
+`PlaybookRunnerCore` accepts an optional `SimulationActivator` instead of `SimulationRuntime`. The CDI layer (`PlaybookBeans`) wires the implementation when simulation modules are on the classpath. This keeps `yaml-step-runtime` free of simulation dependencies — every consumer of `yaml-step-runtime` avoids pulling in `simulation-api`, `simulation-core`, `simulation-inmem`, and `simulation-config-core` transitively.
 
 `yaml-test-core` drops the runner types and their transitive deps. Retains dependency on `yaml-step-runtime` to access the relocated types.
 
@@ -76,15 +80,29 @@ The `StructuralStepEvaluator` already accepts an `ExecutionScope` in its two-arg
 
 ### Expression engine
 
-The runner accepts a `Function<String, Boolean>` condition delegate via its constructor. When present, `ConditionEvaluator` uses it for any condition that isn't a literal boolean.
+The runner accepts a `ConditionDelegate` (see P33 below) via its constructor. When present, `ConditionEvaluator` uses it for any condition that isn't a literal boolean.
 
-The CDI layer (`PlaybookBeans`) wires this from `ExpressionEngineRegistry`:
+The CDI layer (`PlaybookBeans`) wires this from `ExpressionEngineRegistry`. The registry's `compile()` signature is a 4-arg method: `compile(String type, String expression, Class<C> contextType, Class<R> resultType)`. The CDI layer first resolves the default engine type for the CONDITION context via `resolveDefault(ExpressionContext.CONDITION)`, then compiles with bindings:
 
 ```java
-Function<String, Boolean> conditionDelegate = expression -> {
-    var compiled = expressionRegistry.compile(expression, ExpressionContext.CONDITION);
-    Object result = compiled.eval(/* variables from resolver */);
-    return Truthiness.isTruthy(String.valueOf(result));
+ConditionDelegate conditionDelegate = (expression, bindings) -> {
+    String engineType = expressionRegistry.resolveDefault(ExpressionContext.CONDITION);
+    CompiledExpression<Map, Boolean> compiled =
+        expressionRegistry.compile(engineType, expression, Map.class, Boolean.class);
+    return Boolean.TRUE.equals(compiled.eval(bindings));
+};
+```
+
+Similarly, the transform delegate uses `ExpressionContext.TRANSFORM`:
+
+```java
+TransformDelegate transformDelegate = (expression, input) -> {
+    String engineType = expressionRegistry.resolveDefault(ExpressionContext.TRANSFORM);
+    CompiledExpression<Map, Object> compiled =
+        expressionRegistry.compile(engineType, expression, Map.class, Object.class);
+    Object result = compiled.eval(input);
+    if (result instanceof Map<?, ?> m) return (Map<String, Object>) m;
+    return Map.of("value", result);
 };
 ```
 
@@ -115,8 +133,9 @@ public boolean evaluate(String condition, VariableResolver resolver, String cont
         return Boolean.parseBoolean(condition);
     }
 
-    // 2. Check if it's a pure variable reference (${x.y}) that resolved to a boolean
-    if (isVariableReference(condition)) {
+    // 2. Check if it's a sole variable reference (${prefix.name} with no surrounding text)
+    //    Uses VariableResolver's existing sole-reference detection
+    if (VariableResolver.isSoleReference(condition)) {
         Object value = resolver.resolve(condition);
         if (value instanceof Boolean b) return b;
         if (value instanceof String s) {
@@ -145,7 +164,25 @@ public interface ConditionDelegate {
 
 **Truthiness is restricted** to strict `true`/`false` only. The old values (`yes`, `no`, `on`, `off`, `y`, `n`, `1`, `0`) are removed. This is a breaking change — intentional for a pre-release platform.
 
-**All callers updated.** `DecoratorChain.resolveCondition()`, `StructuralStepEvaluator.evaluateIfElse()`, `evaluateMatch()` guard evaluation — all switch from the two-step resolve-then-evaluate to the single `evaluate(condition, resolver, context)` call.
+**Old `evaluate(String)` method removed.** The unsafe single-arg method that takes pre-resolved text is deleted, forcing all callers through the safe path. Leaving it accessible would let callers bypass the injection fix.
+
+**`isVariableReference` definition.** Uses `VariableResolver.isSoleReference(condition)` — an existing private method on `VariableResolver` that checks for `${prefix.name}` with no surrounding text. This method is promoted to package-private static (or a utility method) to be callable from `ConditionEvaluator`. Edge cases: `${var.flag}` → sole reference, `${var.a} && ${var.b}` → not sole (goes to expression engine), `true` → handled by literal check above.
+
+**All callers updated.** `DecoratorChain.resolveCondition()` changes from:
+```java
+private boolean resolveCondition(String condition, VariableResolver resolver, String context) {
+    String resolved = resolver.resolveString(condition, context);
+    return conditionEvaluator.evaluate(resolved);
+}
+```
+to:
+```java
+private boolean resolveCondition(String condition, VariableResolver resolver, String context) {
+    return conditionEvaluator.evaluate(condition, resolver, context);
+}
+```
+
+This affects `wrapWhen`, `wrapLoop` (until), `wrapFrom` (filter and until), and `publishToChannel` (if) in `DecoratorChain`, plus `evaluateIfElse()` and `evaluateMatch()` guard evaluation in `StructuralStepEvaluator`.
 
 ## P34: on-error handler implementation
 
@@ -155,7 +192,26 @@ public interface ConditionDelegate {
 
 ### Fix
 
-`DecoratorChain` gains a `StepLookup` function:
+### DecoratorConfig
+
+`DecoratorChain` constructor parameters are consolidated into a configuration record:
+
+```java
+public record DecoratorConfig(
+    ConditionEvaluator conditionEvaluator,
+    SpeedMultiplier speedMultiplier,
+    ExecutionScope scope,
+    StepLookup stepLookup,
+    StepEvaluator handlerEvaluator,
+    TransformDelegate transformDelegate
+) {}
+```
+
+This keeps the constructor clean and makes it extensible for WS-2 (P38, P39) without further signature changes.
+
+### StepLookup — name→step index
+
+`StepLookup` builds a recursive name→step index from the resolved step list:
 
 ```java
 @FunctionalInterface
@@ -164,7 +220,27 @@ public interface StepLookup {
 }
 ```
 
-The runner passes this when constructing the decorator chain. `wrapOnError` uses it:
+The runner builds the index after `Walker.resolve()`:
+
+```java
+Map<String, ResolvedStep> stepIndex = StepIndexBuilder.build(resolved);
+StepLookup stepLookup = stepIndex::get;
+```
+
+`StepIndexBuilder.build()` recursively walks the resolved step tree — block steps, parallel branches, try/catch/finally — and indexes every step by its `name()`. Steps without names are not indexed. Duplicate names: last-write-wins (consistent with the flat capture model).
+
+### Handler execution via evaluator
+
+The handler step is executed through `StepEvaluator` (a functional interface wrapping `StructuralStepEvaluator.evaluateInternal`), not through `StepRunner`. This allows handlers to be any step type — blocks, if/else, try/catch — not just single plugin steps.
+
+```java
+@FunctionalInterface
+public interface StepEvaluator {
+    Result evaluate(ResolvedStep step, StepContext ctx, StepRunner runner);
+}
+```
+
+`wrapOnError` uses it:
 
 ```java
 private DecoratedExecution wrapOnError(DecoratedExecution inner, Map<String, Object> decorators) {
@@ -180,11 +256,11 @@ private DecoratedExecution wrapOnError(DecoratedExecution inner, Map<String, Obj
             result = Result.failed(e.getMessage());
         }
         if (!result.isSuccess()) {
-            if (stepLookup == null) {
+            if (config.stepLookup() == null) {
                 return Result.failed("on-error handler '" + fallbackStepName
                     + "' cannot run — no step lookup available");
             }
-            ResolvedStep handler = stepLookup.resolve(fallbackStepName);
+            ResolvedStep handler = config.stepLookup().resolve(fallbackStepName);
             if (handler == null) {
                 return Result.failed("on-error handler '" + fallbackStepName + "' not found");
             }
@@ -197,15 +273,19 @@ private DecoratedExecution wrapOnError(DecoratedExecution inner, Map<String, Obj
                     case "message" -> errorMsg;
                     default -> null;
                 });
-            // Execute the handler step
-            return handlerRunner.run(handler, errorResolver);
+            // Execute handler through evaluator (supports structural steps)
+            Result handlerResult = config.handlerEvaluator().evaluate(
+                handler, ctx.withResolver(errorResolver), runner);
+            // Handler fails → original failure propagates
+            if (!handlerResult.isSuccess()) return result;
+            return handlerResult;
         }
         return result;
     };
 }
 ```
 
-The `handlerRunner` is the same `StepRunner` used by `StructuralStepEvaluator`, passed into `DecoratorChain` via constructor.
+Note: `runner` is captured from the decorator chain's execution context. `StructuralStepEvaluator` passes a `StepEvaluator` lambda wrapping its own `evaluateInternal` method.
 
 ### Contract
 
@@ -258,8 +338,13 @@ private DecoratedExecution wrapTransform(DecoratedExecution inner, Map<String, O
     return ctx -> {
         Result result = inner.execute(ctx);
         if (!result.isSuccess()) return result;
-        Map<String, Object> transformed = transformDelegate.transform(expression, result.output());
-        return Result.of(transformed);
+        try {
+            Map<String, Object> transformed = config.transformDelegate().transform(
+                expression, result.output());
+            return Result.of(transformed);
+        } catch (Exception e) {
+            return Result.failed("Transform failed: " + e.getMessage());
+        }
     };
 }
 ```
@@ -298,25 +383,46 @@ public final class CaptureCollector {
 }
 ```
 
-`StructuralStepEvaluator` accepts a `CaptureCollector` and checks for `capture` decorators on every step at every depth:
+`StructuralStepEvaluator` accepts a `CaptureCollector` and checks for `capture` decorators on every step at every depth. The check is step-type-agnostic — `decorators()` is defined on the `ResolvedStep` sealed interface, so every variant (PluginStep, BlockStep, ParallelStep, etc.) carries decorators:
 
 ```java
 private Result evaluateInternal(ResolvedStep step, StepContext ctx, StepRunner runner) {
     // ... existing code ...
     Result result = /* dispatch */;
 
-    // Capture at any depth
-    if (result.isSuccess() && step instanceof ResolvedStep.PluginStep ps) {
-        var capture = ps.decorators().get("capture");
-        if (capture != null && result.output() != null && captureCollector != null) {
-            captureCollector.capture(String.valueOf(capture), result.output());
-            // Also add to resolver for downstream reference
+    // Capture at any depth, any step type
+    if (result.isSuccess() && result.output() != null && captureCollector != null) {
+        var capture = step.decorators().get("capture");
+        if (capture != null) {
+            String captureName = String.valueOf(capture);
+            captureCollector.capture(captureName, result.output());
+            // Wire into resolver for downstream steps
+            Map<String, Object> output = result.output();
+            ctx = ctx.withResolver(ctx.resolver().withObjectScope(captureName, output::get));
         }
     }
 
     return result;
 }
 ```
+
+**Resolver threading:** `evaluateBlock` threads the updated context through its step loop so captured values are available to subsequent steps within the same block:
+
+```java
+private Result evaluateBlock(ResolvedStep.BlockStep block, StepContext ctx, StepRunner runner) {
+    Result last = Result.of(Map.of());
+    StepContext currentCtx = ctx;
+    for (ResolvedStep sub : block.steps()) {
+        last = evaluateInternal(sub, currentCtx, runner);
+        if (!last.isSuccess()) return last;
+        // evaluateInternal may have updated ctx via capture — thread it forward
+        currentCtx = /* updated context from evaluateInternal */;
+    }
+    return last;
+}
+```
+
+To thread the context, `evaluateInternal` returns a `StepResult` record containing both the `Result` and the (possibly updated) `StepContext`, or `captureCollector` is used as the side-channel and the evaluator rebuilds context from it at each step boundary.
 
 The runner creates a `CaptureCollector` per run, passes it to the evaluator, and reads from it after evaluation:
 
@@ -358,7 +464,7 @@ Each finding gets its own test class. Tests are written before implementation (T
 | Finding | Test class | Key assertions |
 |---------|-----------|----------------|
 | P32 | `PlaybookRunnerCoreTest` | Runner creates scope, decorators that require scope work (cancel, background, select, barrier, quorum), expression conditions evaluate |
-| P33 | `ConditionEvaluatorTest` | Strict boolean only, expression delegation with bindings, injection attempt fails safely, Norway values rejected |
+| P33 | `ConditionEvaluatorTest` + `DecoratorConditionTest` | Strict boolean only, expression delegation with bindings, injection attempt fails safely, Norway values rejected. Additionally: decorator-chain condition callers (`wrapWhen`, `wrapLoop` until, `wrapFrom` filter/until, `publishToChannel` if) pass resolver correctly to the new safe evaluation path |
 | P34 | `OnErrorHandlerTest` | Named handler runs on failure, handler success recovers error, handler failure propagates original, missing handler propagates original |
 | P35 | `TransformDecoratorTest` | Expression applied to output, map result replaces output, scalar wrapped, transform failure fails step |
 | P36 | `NestedCaptureTest` | Capture inside if/then, block, parallel, try all collected, flat map semantics, last-write-wins on collision |
@@ -371,6 +477,8 @@ Each finding gets its own test class. Tests are written before implementation (T
 1. **Truthiness restricted:** `yes`, `no`, `on`, `off`, `y`, `n`, `1`, `0` no longer work as condition values. Only `true` and `false`. Playbooks using these must be updated.
 2. **Package relocation:** `PlaybookRunnerCore` and helpers move from `io.casehub.yaml.test` to `io.casehub.yaml.step.runner`. Any direct imports must be updated. The CDI layer (`PlaybookBeans`) absorbs this change.
 3. **on-error semantics:** Previously returned a success with marker keys. Now actually runs the named handler. Playbooks depending on the marker key behavior need to be updated.
+4. **Expression engine required for non-literal conditions:** Conditions that aren't literal `true`/`false` now require an expression engine on the classpath (the `expression/` module). Without it, any expression condition throws `ConditionEvaluationException`.
+5. **ConditionEvaluator API change:** The old `evaluate(String)` method is removed. All callers must use the new `evaluate(String, VariableResolver, String)` method.
 
 ### Non-breaking changes
 
