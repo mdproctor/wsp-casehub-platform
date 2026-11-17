@@ -159,19 +159,30 @@ Not every playbook in a category needs an individual test. The category test cov
 
 ### Result enrichment
 
-To enable behavioral assertions, enrich the `run-playbook` result map to include orchestration state when available:
+The `run-playbook` plugin (`RunPlaybookPlugin.java`) already returns a rich result map:
 
-| Key | Source | Example assertion |
-|-----|--------|-------------------|
-| `result.output.*` | Playbook output variables | `result.output.response` |
-| `result.stateMachines.*` | State machine final states | `result.stateMachines.order` |
-| `result.counters.*` | Counter primitive final values | `result.counters.attempts` |
-| `result.flags.*` | Flag primitive final states | `result.flags.ready` |
-| `result.retryCount` | Retry decorator execution count | `result.retryCount` |
-| `result.error` | Error message on failure | `result.error` |
-| `result.stepNames` | Executed step names (from validate-playbook) | `result.stepNames` |
+| Key | Already exists | Source |
+|-----|---------------|--------|
+| `result.succeeded` | yes | `PlaybookRunResult.success()` |
+| `result.output.*` | yes | Playbook output variables |
+| `result.captures.*` | yes | Per-step captured values |
+| `result.stepCount` | yes | Flattened trace count |
+| `result.stepEvents` | yes | Step-by-step execution trace (action, success) |
+| `result.stateMachines.*` | yes | State machine final states (simulation mode) |
+| `result.error` | yes | Error message on failure |
+| `result.duration` | yes | Execution time in ms |
 
-Where runner enrichment isn't sufficient, individual playbooks can add explicit output steps to surface domain-specific outcomes.
+**New keys to add** (require changes to `RunPlaybookPlugin` or `PlaybookRunnerCore`):
+
+| Key | Source | Rationale |
+|-----|--------|-----------|
+| `result.counters.*` | Counter primitive final values | Enables assertions on counter-based playbooks |
+| `result.flags.*` | Flag primitive final states | Enables assertions on flag-based playbooks |
+| `result.gauges.*` | Gauge primitive final values | Enables assertions on gauge-based playbooks |
+
+Whether these are feasible depends on whether the runner's `VariableResolver` retains orchestration primitive state after execution. If not, explicit output steps in the playbooks themselves are the fallback — the playbook writes its observable outcome to output, and the test asserts on `result.output.*`.
+
+The existing `result.output.*` and `result.captures.*` already support most behavioral assertions. New enrichment keys are a convenience, not a gate.
 
 ## 4. Gate Cleanup
 
