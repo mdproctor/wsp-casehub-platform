@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" style="max-width: 760px; font-family: 'JetBrains Mono', 'Fira Code', monospace;">
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#666"/>
+    </marker>
+  </defs>
+  <!-- Before box -->
+  <rect x="10" y="10" width="340" height="300" rx="6" fill="#f8f8f8" stroke="#ccc"/>
+  <text x="180" y="35" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Before (3 shapes)</text>
+  <!-- Shape A -->
+  <rect x="25" y="50" width="310" height="75" rx="4" fill="#fff" stroke="#ddd"/>
+  <text x="35" y="68" font-size="10" fill="#888">Shape A — 61 files</text>
+  <text x="35" y="85" font-size="11" fill="#444">playbook: "1.0" / schema: client</text>
+  <text x="35" y="100" font-size="11" fill="#444">--- meta: ... ---</text>
+  <text x="35" y="115" font-size="11" fill="#c44">- click: "A"  (bare list, no steps:)</text>
+  <!-- Shape B -->
+  <rect x="25" y="135" width="310" height="60" rx="4" fill="#fff" stroke="#ddd"/>
+  <text x="35" y="153" font-size="10" fill="#888">Shape B — 9 files</text>
+  <text x="35" y="170" font-size="11" fill="#444"># comment, no header</text>
+  <text x="35" y="185" font-size="11" fill="#c44">steps:  (no version, no meta)</text>
+  <!-- Mixed keys -->
+  <rect x="25" y="205" width="310" height="45" rx="4" fill="#fff" stroke="#ddd"/>
+  <text x="35" y="223" font-size="10" fill="#888">Key case — mixed</text>
+  <text x="35" y="240" font-size="11" fill="#c44">on-error  on-success  forEach  when</text>
+  <!-- Guard confusion -->
+  <rect x="25" y="260" width="310" height="40" rx="4" fill="#fff" stroke="#ddd"/>
+  <text x="35" y="278" font-size="10" fill="#888">Guard keyword — guide says if, code uses when</text>
+  <text x="35" y="293" font-size="11" fill="#c44">if: true  ← guard or structural branch?</text>
+
+  <!-- Arrow -->
+  <line x1="360" y1="160" x2="400" y2="160" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- After box -->
+  <rect x="410" y="10" width="340" height="300" rx="6" fill="#f0f7f0" stroke="#8c8"/>
+  <text x="580" y="35" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">After (1 shape)</text>
+  <!-- Canonical form -->
+  <rect x="425" y="50" width="310" height="120" rx="4" fill="#fff" stroke="#bdb"/>
+  <text x="435" y="68" font-size="10" fill="#888">Canonical — all files</text>
+  <text x="435" y="85" font-size="11" fill="#2a2">playbook: "1.0"</text>
+  <text x="435" y="100" font-size="11" fill="#2a2">schema: client</text>
+  <text x="435" y="115" font-size="11" fill="#444">---</text>
+  <text x="435" y="130" font-size="11" fill="#2a2">meta: { title, description, tags }</text>
+  <text x="435" y="145" font-size="11" fill="#2a2">steps:</text>
+  <text x="435" y="160" font-size="11" fill="#2a2">  - click: "A"</text>
+  <!-- Kebab keys -->
+  <rect x="425" y="180" width="310" height="45" rx="4" fill="#fff" stroke="#bdb"/>
+  <text x="435" y="198" font-size="10" fill="#888">Key case — kebab-case throughout</text>
+  <text x="435" y="215" font-size="11" fill="#2a2">on-error  on-success  for-each  when</text>
+  <!-- Guard clear -->
+  <rect x="425" y="235" width="310" height="65" rx="4" fill="#fff" stroke="#bdb"/>
+  <text x="435" y="253" font-size="10" fill="#888">Guard vs branch — distinct keywords</text>
+  <text x="435" y="270" font-size="11" fill="#2a2">when: true  ← guard (skip step)</text>
+  <text x="435" y="287" font-size="11" fill="#2a2">if: / then: / else:  ← structural branch</text>
+</svg>
