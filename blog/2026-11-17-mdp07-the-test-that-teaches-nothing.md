@@ -95,8 +95,50 @@ The Walker treated unknown sibling keys as action candidates, failed to resolve 
 
 One line changed in `ValidatePlaybookPlugin`. Three playbooks passed. The gate went from expecting three failures to expecting zero.
 
-## What comes next
+## Covering the catalogue
 
-The headers and gate are landed. Category-level tests — one per directory, with behavioural assertions — are the next batch. The runner needs to expose orchestration primitive state (counter values, flag states) in its result map so tests can assert on them without playbooks needing explicit output steps. And the assertion-quality lint itself — the Java test that scans `.test.yaml` files and fails the build when tests assert only `succeeded` — is the final piece.
+The gap between "all playbooks validate" and "all playbooks are tested" turned out to be wider than I expected. The YAML test engine registers about fifteen runtime plugins — agent session operations, the assert/emit/run-playbook tools, and three APT-generated plugins. Everything else — counter-add, flag-set, log, click, rest-request, gauge-set, the entire coordination primitive vocabulary — exists only as validation stubs. They let the Walker resolve step names during compilation. They don't execute.
 
-The underlying principle is simple: an example is not documentation until its test explains it. If the reader has to guess what the example does, the example failed.
+That rules out `run-playbook` with behavioural assertions for most categories. The retry playbook uses `click` steps. The flag playbook uses `flag-set`. The state machine playbook uses `sm-create` and `sm-transition`. None of these are real runtime plugins — they're names in a stub list.
+
+What *does* work is directory-mode validation. Each category gets a test that validates all its playbooks at once — compilation succeeds, tutorial headers are present, no errors. It's not a behavioural test in the sense I originally wanted. But it catches real problems: a new playbook with a typo in a step name, a missing tutorial header, a structural error the Walker rejects.
+
+![Playbook test coverage after category tests](images/playbook-test-coverage.svg)
+
+The agent-interaction-patterns directory is the exception. Its playbooks use agent session plugins that actually execute with corpus stubs, so those tests assert on `stepEvents` counts — verifying that the right number of session lifecycle steps ran.
+
+## The lint
+
+The assertion-quality lint is a Java test that scans every `.test.yaml` file and fails if any test case's only assertions target `result.succeeded`, `result.stepCount`, or `result.valid`. Three fields. That's the trivial set.
+
+```java
+private static final Set<String> TRIVIAL_TARGETS = Set.of(
+        "result.succeeded", "result.stepCount", "result.valid"
+);
+```
+
+If your test asserts on `result.stepNames`, `result.hasFork`, `result.poolDeclarations`, `result.errors`, `result.validatedCount`, or any other field — the lint passes. The constraint is narrow by design. It doesn't prescribe what a good assertion looks like. It only rejects the ones that are demonstrably empty of information.
+
+A per-file `lint: skip` opt-out exists for structural gates like the catalogue-parsing-gate, where asserting "zero errors" on the full directory is the point.
+
+## Primitive state enrichment
+
+The runner now snapshots orchestration primitives — counters, flags, gauges — before closing the execution scope. `DefaultExecutionScope.snapshotPrimitives()` iterates the primitive map, reads each value through its type-safe accessor, and returns a `Map<String, Map<String, Object>>` keyed by primitive category.
+
+```java
+if (val instanceof OrcCounter c) {
+    counters.put(entry.getKey(), c.get());
+} else if (val instanceof OrcFlag f) {
+    flags.put(entry.getKey(), f.get());
+} else if (val instanceof OrcGauge<?> g) {
+    gauges.put(entry.getKey(), g.get());
+}
+```
+
+The snapshot flows through `PlaybookRunResult.primitiveStates()` into the `run-playbook` result map as top-level `counters`, `flags`, and `gauges` keys. When the coordination primitive plugins eventually become real runtime implementations instead of validation stubs, the tests can assert on actual primitive values — `result.counters.requests equals 3` — without any changes to the test framework.
+
+The infrastructure is wired. The plug point is the stub-to-implementation gap in the action registry.
+
+## The underlying principle
+
+An example is not documentation until its test explains it. If the reader has to guess what the example does, the example failed. That's the bar — and the lint enforces it at the structural level, even though the semantic level is still the author's job.

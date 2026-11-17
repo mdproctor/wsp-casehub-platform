@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f8f9fa"/>
+      <stop offset="100%" stop-color="#e9ecef"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="720" height="420" rx="8" fill="url(#bg)"/>
+
+  <text x="360" y="32" text-anchor="middle" font-size="15" font-weight="600" fill="#212529">Playbook Test Coverage After Category Tests</text>
+
+  <!-- Category bars -->
+  <g transform="translate(200, 55)">
+    <!-- flow-control -->
+    <text x="-8" y="14" text-anchor="end" font-size="11" fill="#495057">flow-control</text>
+    <rect x="0" y="2" width="300" height="18" rx="3" fill="#dee2e6"/>
+    <rect x="0" y="2" width="300" height="18" rx="3" fill="#339af0"/>
+    <text x="308" y="15" font-size="10" fill="#495057">12</text>
+
+    <!-- step-workflows -->
+    <text x="-8" y="46" text-anchor="end" font-size="11" fill="#495057">step-workflows</text>
+    <rect x="0" y="34" width="300" height="18" rx="3" fill="#dee2e6"/>
+    <rect x="0" y="34" width="325" height="18" rx="3" fill="#339af0"/>
+    <text x="333" y="47" font-size="10" fill="#495057">13</text>
+
+    <!-- composition -->
+    <text x="-8" y="78" text-anchor="end" font-size="11" fill="#495057">composition</text>
+    <rect x="0" y="66" width="300" height="18" rx="3" fill="#dee2e6"/>
+    <rect x="0" y="66" width="225" height="18" rx="3" fill="#339af0"/>
+    <text x="233" y="79" font-size="10" fill="#495057">9</text>
+
+    <!-- concurrency-patterns -->
+    <text x="-8" y="110" text-anchor="end" font-size="11" fill="#495057">concurrency-patterns</text>
+    <rect x="0" y="98" width="300" height="18" rx="3" fill="#dee2e6"/>
+    <rect x="0" y="98" width="200" height="18" rx="3" fill="#339af0"/>
+    <text x="208" y="111" font-size="10" fill="#495057">8</text>
+
+    <!-- coordination -->
+    <text x="-8" y="142" text-anchor="end" font-size="11" fill="#495057">coordination</text>
+    <rect x="0" y="130" width="300" height="18" rx="3" fill="#dee2e6"/>
+    <rect x="0" y="130" width="100" height="18" rx="3" fill="#339af0"/>
+    <text x="108" y="143" font-size="10" fill="#495057">4</text>
+
+    <!-- coordination-primitives -->
+    <text x="-8" y="174" text-anchor="end" font-size="11" fill="#495057">coord-primitives</text>
+    <rect x="0" y="162" width="300" height="18" rx="3" fill="#dee2e6"/>
+    <rect x="0" y="162" width="150" height="18" rx="3" fill="#339af0"/>
+    <text x="158" y="175" font-size="10" fill="#495057">6</text>
+
+    <!-- invoke-bindings -->
+    <text x="-8" y="206" text-anchor="end" font-size="11" fill="#495057">invoke-bindings</text>
+    <rect x="0" y="194" width="300" height="18" rx="3" fill="#dee2e6"/>
+    <rect x="0" y="194" width="150" height="18" rx="3" fill="#339af0"/>
+    <text x="158" y="207" font-size="10" fill="#495057">6</text>
+
+    <!-- data-delivery -->
+    <text x="-8" y="238" text-anchor="end" font-size="11" fill="#495057">data-delivery</text>
+    <rect x="0" y="226" width="300" height="18" rx="3" fill="#dee2e6"/>
+    <rect x="0" y="226" width="75" height="18" rx="3" fill="#339af0"/>
+    <text x="83" y="239" font-size="10" fill="#495057">3</text>
+
+    <!-- agent-interaction -->
+    <text x="-8" y="270" text-anchor="end" font-size="11" fill="#495057">agent-interaction</text>
+    <rect x="0" y="258" width="300" height="18" rx="3" fill="#dee2e6"/>
+    <rect x="0" y="258" width="200" height="18" rx="3" fill="#51cf66"/>
+    <text x="208" y="271" font-size="10" fill="#495057">8</text>
+
+    <!-- simulation -->
+    <text x="-8" y="302" text-anchor="end" font-size="11" fill="#495057">simulation</text>
+    <rect x="0" y="290" width="300" height="18" rx="3" fill="#dee2e6"/>
+    <rect x="0" y="290" width="25" height="18" rx="3" fill="#51cf66"/>
+    <text x="33" y="303" font-size="10" fill="#495057">1</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(260, 380)">
+    <rect x="0" y="0" width="14" height="14" rx="2" fill="#339af0"/>
+    <text x="20" y="12" font-size="11" fill="#495057">New category validation (directory-mode)</text>
+    <rect x="0" y="22" width="14" height="14" rx="2" fill="#51cf66"/>
+    <text x="20" y="34" font-size="11" fill="#495057">Existing execution tests (run-playbook)</text>
+  </g>
+</svg>
