@@ -1,11 +1,11 @@
 # Work Plan —
 
 ## State
-branch: issue-834-rules-headers-lint-playbook-tests
+branch: issue-850-category-behavioral-tests
 issue-repo: casehubio/platform
 status: active
 date: 2026-11-17
-active_issue: 834
+active_issue: 850
 
 ## Queue
 - [ ] casehubio/platform#807 — voice and messaging resolution patterns
