@@ -1,49 +1,50 @@
 ## D1: Content taxonomy and directory structure
 
-**Choice:** Top-level `tutorials/` and `examples/` as peers. `tutorials/` holds progressive and deep-dive teaching material. `examples/` holds use-case demonstrations organized by medium: `examples/playbooks/` (playbook use cases + capability matrix) and `examples/java/` (Java SDK use cases + capability matrix). The capability matrix cross-references tutorials. Current `playbooks/` module content moves to `examples/playbooks/`. `docs/examples/` content relocates into `examples/`. Use cases can mirror across playbooks and java.
+**Choice:** Top-level `tutorials/` and `examples/` as peers in each repo. `tutorials/` holds progressive and deep-dive teaching material (leveled playbooks, yaml-composition). `examples/` holds use-case demonstrations: `examples/playbooks/` (playbook use cases + capability matrix) and `examples/java/` (Java SDK use cases + capability matrix). Capability matrix cross-references tutorials. Current `playbooks/` module content moves to `examples/playbooks/`. `docs/examples/` content relocates into `examples/`. Pages repo already has `tutorials/` with this convention.
 
 **Alternatives:**
-- Everything under `examples/` (tutorials nested inside) — cross-referencing direction feels odd when examples point inward to their own children
+- Everything under `examples/` — works for aggregation but tutorials are conceptually peers, not children
 - Keep `playbooks/` as-is — mixes learning content taxonomy with module naming
 
-**Rationale:** Tutorials are the "textbook chapters" (teach concepts). Examples are the "lab exercises" (demonstrate concepts applied). Examples cross-reference into tutorials. As siblings, the references flow naturally.
+**Rationale:** Tutorials teach concepts. Examples demonstrate concepts applied. As siblings, cross-references flow naturally. The `casehub/examples` aggregator syncs both (sync config updated).
 
-**Trade-offs:** Two top-level directories for learning content instead of one. Worth it for clean cross-referencing.
+**Trade-offs:** Two top-level directories for learning content. Worth it for clean cross-referencing.
 
-**Sources:** Existing `playbooks/` structure, `docs/examples/`, pages repo `tutorials/`, direction doc (parent#540)
-
-**Exploration:** quick
-
-**Status:** captured
-
-## D2: Capability scoping for platform levels
-
-**Choice:** Platform levels use only capabilities from the platform repo — step types, decorators, flow control, coordination primitives, orchestration, agent sessions. No domain modules (ledger, engine, work items, cases). Each repo writes its own levels for its own capabilities.
-
-**Alternatives:**
-- Cross-repo levels that build a full application — creates coupling between repos and breaks independent level progression
-
-**Rationale:** Each repo owns its conformance suite. Platform levels prove the platform executor works. Engine levels (separate repo) prove engine capabilities on top.
-
-**Trade-offs:** Early levels may feel abstract without domain context, but that's the point — platform is the foundation.
-
-**Sources:** Issue #837 body (depends on prior platform work steps), user clarification
+**Sources:** Existing `playbooks/` structure, pages repo `tutorials/`, `casehub/examples` aggregator, direction doc (parent#540)
 
 **Exploration:** quick
 
 **Status:** captured
 
-## D3: Scenario threading approach
+## D2: Capability scoping — each repo owns its content
 
-**Choice:** Use-case examples (data-pipeline, api-integration, case-processing) with a capability matrix. Each use case naturally exercises multiple capabilities. Together they cover the full surface. The matrix cross-references which capabilities and tutorial levels each example demonstrates. Use all three proposed scenarios rather than forcing one through all levels.
+**Choice:** Each repo owns tutorials and examples for its own capabilities. Platform levels use only platform capabilities (step types, decorators, flow control, coordination, agent sessions). Content ownership follows capability ownership. Pages renders content interactively after consuming it via the catalog — separation of concerns.
 
 **Alternatives:**
-- Single scenario throughout — some capabilities feel forced into the narrative
-- Numbered levels with one concept each — ends up mirroring reference categories without adding value
+- Cross-repo levels — coupling between repos
+- All tutorials in pages — loses headless conformance testing at the platform level
 
-**Rationale:** Same model as Java examples: folder of use cases + capability matrix. The matrix makes it clear what levels/capabilities are demonstrated by each use case. Realistic examples that happen to demonstrate capabilities.
+**Rationale:** Each repo's tutorials are its conformance suite (LD-1). Platform tests headlessly. Pages adds interactive rendering. Build order supports this: pages is built after platform.
 
-**Trade-offs:** No single linear progression — reader navigates via matrix. This is the intended design.
+**Trade-offs:** Early platform levels feel abstract without UI. That's the point — platform proves the runtime; pages proves the experience.
+
+**Sources:** Issue #837, user direction, build order (platform before pages)
+
+**Exploration:** quick
+
+**Status:** captured
+
+## D3: Use-case examples with capability matrix
+
+**Choice:** Use-case examples (data-pipeline, api-integration, case-processing) under `examples/playbooks/` with a capability matrix. Each use case exercises multiple capabilities. Matrix cross-references which capabilities and tutorial levels each example demonstrates. Same model as Java examples: folder of use cases + matrix. Use cases can mirror across playbooks and java.
+
+**Alternatives:**
+- Isolated single-pattern reference examples — already exist as the current `playbooks/` categories; use cases add realistic context
+- Numbered levels as examples — mirrors reference categories without adding value
+
+**Rationale:** Realistic examples that happen to demonstrate capabilities. The matrix is the navigation — "I want to learn about coordination" → "look at data-pipeline and api-integration."
+
+**Trade-offs:** No single linear progression in examples — reader navigates via matrix. Tutorials provide the linear progression.
 
 **Sources:** User direction, Java examples convention
 
@@ -53,17 +54,35 @@
 
 ## D4: Tutorial naming convention
 
-**Choice:** Leveled tutorials use numbered prefix + category name: `01-basic-steps/`, `02-captures/`, `03-flow-control/`, etc. Number provides ordering, name provides discoverability. Each tutorial directory is a grouping (e.g., `tutorials/platform-playbooks/01-basic-steps/`).
+**Choice:** Leveled tutorials use numbered prefix + category name: `01-basic-steps/`, `02-captures/`, `03-flow-control/`, etc. Number provides ordering, name provides discoverability. Grouped under a tutorial track (e.g., `tutorials/platform-playbooks/01-basic-steps/`).
 
 **Alternatives:**
-- Unnumbered directories with ordering in a manifest file — discoverable but ordering isn't visible in filesystem
-- Pure numeric directories — ordering visible but meaningless names
+- Unnumbered with manifest — ordering not visible in filesystem
+- Pure numeric — meaningless names
 
-**Rationale:** Filesystem ordering matches learning order. A reader can `ls` the directory and see the progression. The name tells them what they'll learn without opening files.
+**Rationale:** Filesystem ordering matches learning order. Consistent with pages repo convention.
 
-**Trade-offs:** Renaming or reordering levels requires renumbering directories. Acceptable for content that stabilises quickly.
+**Trade-offs:** Renumbering on reorder. Acceptable for content that stabilises quickly.
 
-**Sources:** Common convention in framework tutorials (Rust book, Django tutorial)
+**Sources:** Pages repo `tutorials/` convention, common framework pattern
+
+**Exploration:** quick
+
+**Status:** captured
+
+## D5: Platform also hosts yaml-composition tutorial
+
+**Choice:** Platform repo includes a `tutorials/yaml-composition/` tutorial track alongside `tutorials/platform-playbooks/`. yaml-core is a platform module — the canonical composition language tutorial belongs with its runtime. Pages has its own yaml-composition tutorial teaching composition in the page-building context.
+
+**Alternatives:**
+- yaml-composition only in pages — but yaml-core is a platform module
+- Single shared tutorial referenced from both — complex cross-repo dependency
+
+**Rationale:** The composition language is platform infrastructure. Platform teaches it in the playbook context. Pages teaches it in the page-building context. Same language, different application.
+
+**Trade-offs:** Two tutorials covering overlapping yaml-core content. Acceptable because the application context differs meaningfully.
+
+**Sources:** yaml-core module ownership, pages `tutorials/yaml-composition/`
 
 **Exploration:** quick
 
