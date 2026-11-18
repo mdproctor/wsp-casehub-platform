@@ -105,3 +105,15 @@
 **Sources:** `PlaybookSchemaRegistry.java`, `PlaybookSchemaDescriptor.java`
 **Exploration:** quick
 **Status:** captured
+
+## D10: Reject `steps:` key — bare list is the only form
+
+**Choice:** The validator rejects `steps:` as an error, not a deprecated alternative. A bare YAML list is the only valid step container. The error message tells the author to remove the wrapper: "Remove the 'steps:' wrapper — use a bare list instead." Catalogue examples and authoring metric use the bare-list form exclusively.
+**Alternatives:**
+- Accept both forms — adds "two ways to do it" complexity, validator must handle both, LLMs learn inconsistent patterns.
+- Deprecation warning — softer, but doesn't force migration and leaves ambiguity.
+**Rationale:** Opinionated is better. One way to write steps. The LLM sees the error once, fixes it, never produces `steps:` again. Fail fast ripples the change through all consumers immediately.
+**Trade-offs:** Breaking change for existing playbooks using `steps:`. Intentional — the error message makes migration trivial (delete one line). The parser change may need a separate issue for the global (non-validator) path.
+**Sources:** `PlaybookParser.java`, `PlaybookRunnerCore.java`
+**Exploration:** quick
+**Status:** captured

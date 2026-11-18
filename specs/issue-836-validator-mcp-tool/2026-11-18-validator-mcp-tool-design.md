@@ -157,17 +157,43 @@ record ErrorStep(
 
 This ensures `ValidationSuggestion.diagnosticIndex` correlates with YAML positions. The runtime throwing path never produces `ErrorStep` — it throws instead — so existing callers are unaffected. Callers that traverse `List<ResolvedStep>` (e.g., the compiler, the evaluator) skip `ErrorStep` or handle it explicitly.
 
+#### Bare-list enforcement (D10)
+
+The `steps:` wrapper key is rejected — a bare YAML list is the only valid step container. The simplest valid playbook is:
+
+```yaml
+- log: hello
+- log: world
+```
+
+The validator checks for `steps:` as a top-level key in the content map and produces a structural error:
+
+```java
+if (content.containsKey("steps")) {
+    collector.add(new ParseError.StructureError(
+        null,
+        "Remove the 'steps:' wrapper — use a bare list instead",
+        location, null));
+}
+```
+
+This applies to the validator (assisted context). The runtime parser (`PlaybookParser`) continues to accept both forms for backward compatibility with existing developer playbooks — the migration is driven by the validator rejecting it, not the parser breaking.
+
+All catalogue example YAML and authoring metric examples use the bare-list form exclusively.
+
 #### Validation implementation
 
 `PlaybookRunnerCore.validate(Path, ValidationContext)` implementation:
 
 1. Parse YAML via `PlaybookParser.parse()` — unchanged
 2. Expand imports — unchanged
-3. Build a `PluginRegistry` filtered by schema context (`SchemaFilteredRegistry.forSchema()`), then by level if `ctx.level()` is non-null (`LevelFilteredRegistry.forLevel()`)
-4. Call `Walker.resolve(steps, filteredRegistry, annotations, collector)` — the collector accumulates `ParseError` subtypes instead of throwing
-5. Run `ValidationSuggestionGenerator` over collected diagnostics to produce layer 1+2 suggestions
-6. If `ctx.llmSuggestions()`, call `AgentProvider.invokeBlocking(config, Duration.ofSeconds(timeout))` with the diagnostics, original YAML, and catalogue context
-7. Return enriched `PlaybookValidationResult` with `collector.errors()` as diagnostics
+3. Check for `steps:` key in content — if present, add a structural error to the collector (D10)
+4. Extract step list from content (bare list from document 3, or from `steps:` key with the error already recorded)
+5. Build a `PluginRegistry` filtered by schema context (`SchemaFilteredRegistry.forSchema()`), then by level if `ctx.level()` is non-null (`LevelFilteredRegistry.forLevel()`)
+6. Call `Walker.resolve(steps, filteredRegistry, annotations, collector)` — the collector accumulates `ParseError` subtypes instead of throwing
+7. Run `ValidationSuggestionGenerator` over collected diagnostics to produce layer 1+2 suggestions
+8. If `ctx.llmSuggestions()`, call `AgentProvider.invokeBlocking(config, Duration.ofSeconds(timeout))` with the diagnostics, original YAML, and catalogue context
+9. Return enriched `PlaybookValidationResult` with `collector.errors()` as diagnostics
 
 ### 2. Step catalogue API (D2, D6, D9)
 
@@ -525,25 +551,23 @@ meta:
   level: 1
   layer: metric
   teaches: "LLM authoring capability measurement"
-
+---
 tests:
   - name: "sequential logging with validator"
-    steps:
-      - authoring-metric:
-          level: foundational
-          task: "Write a playbook that logs 'hello' then logs 'world'"
-          with-validator: true
-      - assertThat: ${result.validationPassed}
-          equals: true
+    - authoring-metric:
+        level: foundational
+        task: "Write a playbook that logs 'hello' then logs 'world'"
+        with-validator: true
+    - assertThat: ${result.validationPassed}
+        equals: true
 
   - name: "sequential logging without validator"
-    steps:
-      - authoring-metric:
-          level: foundational
-          task: "Write a playbook that logs 'hello' then logs 'world'"
-          with-validator: false
-      - assertThat: ${result.validationPassed}
-          equals: true
+    - authoring-metric:
+        level: foundational
+        task: "Write a playbook that logs 'hello' then logs 'world'"
+        with-validator: false
+    - assertThat: ${result.validationPassed}
+        equals: true
 ```
 
 #### CI integration
