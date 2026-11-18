@@ -5,7 +5,7 @@ branch:
 issue-repo: casehubio/platform
 status: active
 date: 2026-11-18
-active_issue: casehubio/platform#874
+active_issue: casehubio/platform#871
 
 ## Queue
 - [x] casehubio/platform#870 — LocationIndex import expansion
