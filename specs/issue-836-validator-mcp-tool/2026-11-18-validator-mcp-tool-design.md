@@ -78,7 +78,7 @@ The `valid` field stays for quick checks. `diagnostics` replaces the former `Lis
 | 2 — Example-augmented | `Definition` from registry | Yes | Minimal YAML snippet showing correct usage of the suggested step |
 | 3 — LLM-generated | `AgentProvider` | No — opt-in via `agent-config.yaml` | Corrected YAML + human-readable explanation of changes |
 
-**Layer 3 execution model:** Layers 1+2 run synchronously as part of the Walker's error collection and suggestion generation — validation is never blocked by layer 3. When layer 3 is enabled, it runs in a `CompletableFuture` that is submitted after layers 1+2 complete. The validate method joins on this future with a configurable timeout (default 30s) via `AgentProvider.invokeBlocking(config, timeout)`. On timeout or failure, `llmFix` is null and the layers 1+2 result is returned unaffected.
+**Layer 3 execution model:** Layers 1+2 run synchronously as part of the Walker's error collection and suggestion generation. After layers 1+2 complete, if layer 3 is enabled, call `AgentProvider.invokeBlocking(config, Duration.ofSeconds(timeout))` — this collects the `Multi<AgentEvent>` stream and awaits with the configured timeout (default 30s). On timeout or failure, `llmFix` is null and the layers 1+2 result is returned unaffected.
 
 **Layer 3 configuration:**
 
@@ -137,9 +137,25 @@ public static List<ResolvedStep> resolve(
 
 The original throwing overloads remain for backward compatibility with the runtime execution path, where `IllegalArgumentException` is the expected failure mode.
 
-#### Expression type validation
+#### `ResolvedStep.ErrorStep` — sentinel for errored steps
 
-After step resolution, scan resolved step parameters for expression patterns (`${mvel:...}`, `${jexl:...}`). When the expression engine type is not permitted by the schema's capability set (e.g., `expression-mvel` not in `assisted` capabilities), emit a `ParseError.ExpressionParseError` diagnostic.
+When a non-fatal error prevents step resolution (unknown action, ambiguous keys), the Walker collects the diagnostic and returns a sentinel `ErrorStep` to preserve index alignment between the YAML step list and the `List<ResolvedStep>`:
+
+```java
+record ErrorStep(
+        String name,
+        Map<String, Object> originalYaml,
+        ParseError error,
+        Map<String, Object> decorators,
+        List<Annotation> annotations) implements ResolvedStep {
+
+    public ErrorStep(String name, Map<String, Object> originalYaml, ParseError error) {
+        this(name, originalYaml, error, Map.of(), List.of());
+    }
+}
+```
+
+This ensures `ValidationSuggestion.diagnosticIndex` correlates with YAML positions. The runtime throwing path never produces `ErrorStep` — it throws instead — so existing callers are unaffected. Callers that traverse `List<ResolvedStep>` (e.g., the compiler, the evaluator) skip `ErrorStep` or handle it explicitly.
 
 #### Validation implementation
 
@@ -147,12 +163,11 @@ After step resolution, scan resolved step parameters for expression patterns (`$
 
 1. Parse YAML via `PlaybookParser.parse()` — unchanged
 2. Expand imports — unchanged
-3. Build a `PluginRegistry` filtered by schema context (`SchemaFilteredRegistry.forSchema()`)
+3. Build a `PluginRegistry` filtered by schema context (`SchemaFilteredRegistry.forSchema()`), then by level if `ctx.level()` is non-null (`LevelFilteredRegistry.forLevel()`)
 4. Call `Walker.resolve(steps, filteredRegistry, annotations, collector)` — the collector accumulates `ParseError` subtypes instead of throwing
-5. Scan resolved steps for disallowed expression types against schema capabilities
-6. Run `ValidationSuggestionGenerator` over collected diagnostics to produce layer 1+2 suggestions
-7. If `ctx.llmSuggestions()`, invoke `AgentProvider.invokeBlocking(config, timeout)` with the diagnostics, original YAML, and catalogue context
-8. Return enriched `PlaybookValidationResult` with `collector.errors()` as diagnostics
+5. Run `ValidationSuggestionGenerator` over collected diagnostics to produce layer 1+2 suggestions
+6. If `ctx.llmSuggestions()`, call `AgentProvider.invokeBlocking(config, Duration.ofSeconds(timeout))` with the diagnostics, original YAML, and catalogue context
+7. Return enriched `PlaybookValidationResult` with `collector.errors()` as diagnostics
 
 ### 2. Step catalogue API (D2, D6, D9)
 
@@ -214,6 +229,11 @@ public interface PlaybookLevelRegistry {
     Optional<PlaybookLevel> resolve(String name);
     Optional<PlaybookLevel> resolveByOrdinal(int ordinal);
     List<PlaybookLevel> all();
+
+    default PlaybookLevel resolveOrThrow(String name) {
+        return resolve(name).orElseThrow(() ->
+                new IllegalArgumentException("Unknown playbook level: '" + name + "'"));
+    }
 }
 ```
 
@@ -372,36 +392,36 @@ When a `Definition` has non-empty `variants`, emit per-variant `oneOf` entries i
   "oneOf": [
     {
       "properties": {
-        "speaker register": {
+        "device register": {
           "type": "object",
-          "properties": { "name": {"type": "string"}, "voice": {"type": "string"} },
+          "properties": { "name": {"type": "string"}, "location": {"type": "string"} },
           "required": ["name"]
         }
       },
-      "required": ["speaker register"]
+      "required": ["device register"]
     },
     {
       "properties": {
-        "speaker query": {
+        "device query": {
           "type": "object",
           "properties": { "id": {"type": "string"} },
           "required": ["id"]
         }
       },
-      "required": ["speaker query"]
+      "required": ["device query"]
     }
   ]
 }
 ```
 
-The variant key is `"<plugin-name> <operation>"` matching the Walker's combined-key format (`speaker register: Alice`).
+The variant key is `"<plugin-name> <operation>"` matching the Walker's combined-key format (`device register: Alice`).
 
 #### Builder API fallback
 
 Plugins not using APT register variants via the builder:
 
 ```java
-Definition.of("speaker")
+Definition.of("device")
     .absorbSiblings(true)
     .variant("register", Map.of("name", Parameter.required(STRING)))
     .variant("query", Map.of("id", Parameter.required(STRING)))
@@ -416,7 +436,19 @@ Completing the enforcement deferred from #830.
 
 MVEL is gated by the existing `EXPRESSION_MVEL` capability, which is excluded from the `assisted` schema's capability set. The `ExpressionEngineRegistry` interface is not modified — it has no schema context and shouldn't.
 
-During validation, the expression type validation pass (described in §1) scans resolved step parameters for `${mvel:...}` patterns. When `expression-mvel` is not in the schema's capability set, a `ParseError.ExpressionParseError` diagnostic is emitted. This keeps gating at the validation layer, consistent with how `SchemaFilteredRegistry` gates step availability.
+Expression engine type is a **deployment-time configuration**, not a per-expression inline prefix. `TypeAwareParamResolver.resolveExpression()` calls `engines.resolveDefault(ExpressionContext.PARAMETER)` to select the engine — there is no `${mvel:...}` syntax in the codebase. MVEL gating is therefore a **runtime enforcement concern**, following the same pattern as variable source gating:
+
+```java
+// When building the expression engine chain for playbook execution
+if (schema.capabilities().contains(PlaybookCapabilities.EXPRESSION_MVEL)) {
+    engineRegistry.register(mvelEngine);
+}
+// JQ and JEXL are always registered
+engineRegistry.register(jqEngine);
+engineRegistry.register(jexlEngine);
+```
+
+If a playbook executes under `assisted` context and the deployment's default engine for `CONDITION` or `PARAMETER` is MVEL, the runtime will fail with "No ExpressionEngine registered for type 'mvel'" — a clear error that surfaces the configuration conflict.
 
 JQ (pure JSON transform, no side effects) and JEXL (sandboxed) remain available in both contexts.
 
@@ -535,7 +567,8 @@ Tests with `meta.layer: metric` run in a separate CI job:
 | `@Variant` annotation | `yaml-plugin-api` | Zero-dep, alongside `@Plugin` |
 | Variant APT processing | `yaml-plugin-processor` | Alongside existing `StepPluginProcessor` |
 | `Definition.variants` field | `yaml-plugin-api` | On the existing record |
-| Expression type validation, env-access gating | `yaml-step-runtime` | Validation context wiring |
+| MVEL engine gating, env-access gating | `yaml-step-runtime` | Runtime enforcement under schema context |
+| `ResolvedStep.ErrorStep` | `yaml-step-runtime` | Sentinel for errored steps in multi-error collection |
 | `AuthoringMetricPlugin` | `yaml-metric-core` | Separate module — avoids `agent-api` dependency on `yaml-test-core` |
 
 ## References
@@ -552,6 +585,8 @@ Tests with `meta.layer: metric` run in a separate CI job:
 - `Definition.java` — extended with variants field (uses `Optional<StreamingTypeInfo>`)
 - `StepPluginProcessor.java` — APT extended for @Variant
 - `PlaybookCapabilities.java` — capability constants mapped to levels
+- `TypeAwareParamResolver.java` — expression resolution via `resolveDefault(ExpressionContext.PARAMETER)` (not inline prefix)
+- `ExpressionContext.java` — deployment-time engine defaults (CONDITION→mvel, PARAMETER→mvel, TRANSFORM→jq, FILTER→jq)
 - `AgentProvider.java` — `invoke()`, `invokeBlocking()`, `openSession()` for layers 3 and authoring metric
 - `ValidatePlaybookPlugin.java` — existing pattern for safe `ServiceRegistry` lookup
 - Trust model spec (`specs/issue-830-trust-model-playbook-authoring/2026-11-17-trust-model-design.md`) — deferred MVEL + env-access gating

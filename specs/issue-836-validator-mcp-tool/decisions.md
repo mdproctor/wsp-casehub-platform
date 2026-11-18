@@ -2,14 +2,15 @@
 
 ## D1: Validation pipeline — single-pass enrichment
 
-**Choice:** Modify existing `PlaybookRunnerCore.validate()` to collect `ValidationDiagnostic` records instead of catching exceptions and returning strings. Enrich `PlaybookValidationResult` with structured diagnostics.
+**Choice:** Modify the Walker to accumulate `ParseError` subtypes via `YamlErrorCollector` instead of throwing `IllegalArgumentException`. Enrich `PlaybookValidationResult` with `List<YamlError>` using the existing sealed hierarchy — no new parallel type.
 **Alternatives:**
 - Separate validation engine — reimplements parsing + resolution with richer error collection. Rejected: duplicates the parsing path, risks divergence with `PlaybookRunnerCore`.
-**Rationale:** The Walker already throws structured exceptions (`ParseError` subtypes with `SourceLocation`) that contain everything needed. We intercept them as diagnostics instead of flattening to strings. No duplication, no divergence risk.
-**Trade-offs:** Couples validation output to the existing parsing path — if parsing changes, validation changes. This is a feature, not a bug.
-**Sources:** `PlaybookRunnerCore.java:186-204`, `ParseError.java`, `Walker.java`
-**Exploration:** quick
-**Status:** captured
+- New `ValidationDiagnostic` record — rejected: duplicates `YamlError`'s `category()`, `summary()`, `location()`, `toDetailMap()` and loses the sealed hierarchy's typed detail fields.
+**Rationale:** The `ParseError` sealed hierarchy was designed for structured error reporting but was never wired into the Walker (which throws `IllegalArgumentException` with plain string messages). This issue wires it in. `YamlErrorCollector` provides the multi-error collection pattern. Adding `Severity` to `YamlError` enables warning support without a parallel type.
+**Trade-offs:** Couples validation output to the existing parsing path — if parsing changes, validation changes. Walker modification scope is larger than originally estimated (~30 error sites), but each conversion is mechanical.
+**Sources:** `PlaybookRunnerCore.java:186-204`, `ParseError.java`, `Walker.java`, `YamlErrorCollector.java`, `YamlError.java`
+**Exploration:** quick → revised after review
+**Status:** revised
 
 ## D2: Catalogue API — filtered query
 
