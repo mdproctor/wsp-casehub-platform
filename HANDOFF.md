@@ -1,50 +1,56 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #836 (WS-6b: Validator MCP tool) — Batch 2 landed + capture scoping bugfix
-**Landed:** `47ff6abb` on main (6 commits published: 3 Batch 1 + 3 Batch 2)
-**Queue:** 14 items remaining, #864 is next active
+**Last worked:** Queue sweep — 9 issues closed (8 implemented + 1 already-fixed), 3 new issues filed
+**Landed:** `ab8cc45c` on main (7 commits published)
+**Queue:** 7 items remaining, #849 is next active
 
 ## This session
 
-Implemented Batch 2 of the validator MCP tool (Walker error collection + enriched validation) and fixed a capture variable scoping bug (#294).
+Swept through S/XS issues in the epic #827 queue. Implemented 6 features and 3 fixes, closed 2 as already-resolved, deferred 1 (#863) to a slot for cross-repo migration (which another slot completed), and filed 3 follow-up issues.
 
-**What landed (3 commits this session):**
+**Implemented:**
 
-1. **Walker error collection overload + ErrorStep** — `ErrorStep` added to `ResolvedStep` sealed hierarchy. New `Walker.resolve()` overload accepting `YamlErrorCollector` + playbookFile that collects `ParseError` instances instead of throwing. Unknown keys produce `UnknownStepError`, duplicate names produce `DuplicateStepError`, structural issues produce `StructureError`. All 11 recursive paths (if/then, block, parallel, match, try/catch, etc.) propagate the collector. Original throwing overloads unchanged. `StructuralStepEvaluator.dispatchStep()`, `PlaybookRunnerCore.resolveStepType()`, and `FusionPass` updated for exhaustive switch coverage.
+1. **#864 — Capability-aware schema emission** — `StepSchemaComposer.compose()` gains a `Set<String> capabilities` parameter. Structural variants (if/then/else, parallel, race, invoke, pause/resume) and decorator properties are conditionally included. Two-arg overload delegates with all capabilities for backward compat.
 
-2. **Enriched PlaybookValidationResult + ValidationSuggestionGenerator** — `PlaybookValidationResult` now carries `List<YamlError> diagnostics` (replacing `List<String> errors`), `List<ValidationSuggestion> suggestions`, and nullable `LlmFixResult`. Backward-compatible `errors()` method returns `List<String>` via summary mapping. New types: `ValidationContext(schema, level, llmSuggestions)`, `ValidationSuggestion(diagnosticIndex, suggestion, exampleYaml)`, `LlmFixResult(correctedYaml, explanation, model)`. `ValidationSuggestionGenerator` uses Levenshtein distance to find closest-match actions for unknown steps and generates example YAML from `Definition` inputs. `PlaybookRunnerCore.validate(Path, ValidationContext)` overload with `YamlErrorCollector`-based validation, bare-list enforcement under assisted schema, and automatic suggestion generation. `ValidationContext.level()` and `llmSuggestions()` are accepted but not yet wired (deferred to Batches 3 and 4).
+2. **#862 — SourceLocation line/column tracking** — Switched `PlaybookParser` from SnakeYAML `loadAll()` to the Composer API (`composeAll()`). `LocationIndex` (IdentityHashMap-based) records each parsed mapping's start mark. Threaded through Walker so `ParseError` instances carry precise `SourceLocation(file, line, column)` instead of sentinel `-1` values.
 
-3. **Capture variable scoping fix** — `PlaybookRunnerCore.run()` top-level step loop now wires `capture:` decorator outputs into the `VariableResolver` between steps. Previously, captures worked inside blocks (via `evaluateBlock()`) but failed at the top level — `${name.field}` references threw "Unknown prefix". The built-in `result` scope masked the bug because `capture: result` collided with the built-in prefix. Custom capture names (`capture: order`, `capture: enrichment`) failed silently. Filed #867 for the `result` name collision.
+3. **#865 — Domain-grouped catalogue** — Added `domain` field to `Definition` record. `PluginRegistry` gains `availableDomains()` and `actionsInDomain(String)`. MCP-sourced steps inherit their `@McpDomain` name via `McpStepCatalogWiring`. Orthogonal to capability-based level filtering.
 
-**Code review:** Comprehensive review completed — 0 critical, 3 important (all verified as intentional/per-plan), 3 minor (trailing newlines fixed, FQN imports cleaned up). All 910 yaml-step-runtime tests pass. Full reactor build (5+ min) passes.
+4. **#841 — Parallel fail-fast + concurrency** — Added fail-fast cancellation (AtomicReference + future cancel pattern) and `concurrency` field (Semaphore gate) to `evaluateParallel` simple path. Same pattern as `DecoratorChain.executeForEachParallel`.
 
-**Blog:** "Structured Errors Are the Conversation" — why typed diagnostics and Levenshtein suggestions matter for LLM-assisted playbook authoring.
+5. **#842 — Background error observability** — Added `backgroundFailureHandler` BiConsumer to `DecoratorConfig`. Spawned background tasks now catch failures and call the handler. `StructuralStepEvaluator` wires logging. Public constructor delegates to private for consistent handler wiring.
 
-**Issues filed:** #867 (capture: result name collision with built-in result scope, XS/Low)
+6. **#840 — Capture consolidation** — Removed incorrect `captureCollector != null` guard from `evaluateBlock`'s resolver threading. Capture scoping now works independently of external CaptureCollector.
 
-## Resuming #864
+7. **#868 — Map.copyOf NPE fix** — `PlaybookRunnerCore.run()` capture scope registration replaced `Map.copyOf()` (rejects nulls) with `Collections.unmodifiableMap(new LinkedHashMap<>())`. Cherry-picked to main as hotfix for connectors.
 
-**Next issue:** #864 — StepSchemaComposer capability-aware structural keywords (S/Low)
+8. **#839 — Static ObjectMapper** — `SimulationRuntimeActivator.loadYamlMap()` now uses a static `YAML_MAPPER` field instead of per-call allocation.
 
-This overlaps with #836 Batch 3 Task 5. The StepSchemaComposer currently emits all structural keywords unconditionally. #864 adds a `Set<String> capabilities` parameter to `compose()` so structural keywords (`if/then/else`, `parallel`, `race`, etc.) are conditionally included based on the level's capability set. This is a focused change within `StepSchemaComposer` — the existing two-arg overload delegates with all capabilities for backward compat.
+9. **#843 — LoopDirective max alias** — `max` accepted as alias for `count` in loop directive parse, overriding the default 1000-iteration cap on `until` loops.
 
-**Key file:** `yaml-step-runtime/src/main/java/io/casehub/yaml/step/catalog/StepSchemaComposer.java`
+**Already resolved (closed without code):**
 
-**Design context:** The implementation plan for #836 Batches 3-5 is at `/Users/mdproctor/claude/public/casehub/platform/plans/2026-11-18-validator-mcp-tool.md`. Task 5 (catalogue API) depends on the capability-filtered `compose()` from #864. The design spec is at `docs/specs/issue-836-validator-mcp-tool/2026-11-18-validator-mcp-tool-design.md`.
+- **#838** — `advanceStateMachines` wiring already restored by #850's `stepCompletionNotifier` Consumer.
+- **#765** — `CorpusSelectionEventObserver.bindingsForEventType()` already lazily rebuilds trigger index on every event.
 
-## Queue (14 items)
+**Code review:** 0 CRITICAL, 3 WARNING (all fixed): barrier/quorum SourceLocation regression, public constructor missing bgHandler, StepSchemaComposer string literals vs constants. 3 NOTEs (all fixed): LocationIndex EMPTY mutation guard, scalar parsing documentation, error message wording.
 
-1. #864 — StepSchemaComposer capability-aware structural keywords (S/Low) ← next
-2. #862 — SourceLocation line/column tracking in PlaybookParser (M/Med)
-3. #863 — Global steps: key rejection in PlaybookParser (S/Low)
-4. #865 — Hierarchical step catalogue — domain-grouped discovery (M/Med)
-5. #838 — StepTraceCollector restore advanceStateMachines (S/Low)
-6. #839 — SimulationRuntimeActivator static ObjectMapper (XS/Low)
-7. #840 — consolidate duplicate capture logic (S/Med)
-8. #841 — parallel structural step concurrency bound + fail-fast (M/Med)
-9. #842 — background decorator error observability (S/Low)
-10. #843 — configurable iteration cap for until loops (S/Low)
-11. #765 — CorpusSelectionEventObserver rebuild trigger index (M/Med)
-12. #848 — Streaming plugins bypass validation and coercion (M/Med)
-13. #849 — Streaming + ContextParam intersection not handled in generator (S/Med)
-14. #851 — Restore module-system demonstration (M/Med)
+**Blog:** "The Line Number Your Tools Need" — SnakeYAML Composer API, identity-based position tracking, precision through the validation stack.
+
+**Issues filed:** #869 (parallel concurrency docs, XS), #870 (LocationIndex import expansion, S/Med), #871 (background structured trace, S/Med)
+
+## Resuming #849
+
+**Next issue:** #849 — Streaming + ContextParam intersection not handled in generator (S/Med)
+
+The `GraphQLResolverProcessor` streaming path skips `@ContextParam` injection — when `isStreaming && !meta.subject.isEmpty()`, the `hasNonHttpContextParams` branch is unreachable. Generator/APT code — different domain from this session's playbook work.
+
+## Queue (7 items)
+
+1. #849 — Streaming + ContextParam intersection (S/Med) ← next
+2. #851 — Restore module-system demonstration (M/Med)
+3. #867 — capture: result name collision (XS/Low)
+4. #869 — StepSchemaComposer concurrency docs (XS/Low)
+5. #870 — LocationIndex import expansion (S/Med)
+6. #871 — Background trace integration (S/Med)
+7. #848 — Streaming plugins bypass validation and coercion (M/Med) — reopened, not addressed this session
