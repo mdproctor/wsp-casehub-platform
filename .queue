@@ -9,6 +9,13 @@ active_issue: casehubio/platform#879
 
 ## Queue
 - [ ] casehubio/platform#885 — apt SchemaEmitter generates bare array type for List plugin fields ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: LocationTrackingModule with map and collection tracking
+  - [ ] Batch 2: Migration
+    - [ ] Task 2: Migrate PlaybookParser to Jackson
+    - [ ] Task 3: Simplify FileSystemModuleLoader
+  - [ ] Batch 3: Verification
+    - [ ] Task 4: Full build verification and SnakeYAML audit
 - [ ] casehubio/platform#883 — Test deferred condition with use inside branch structures
 - [ ] casehubio/platform#884 — Fix pre-existing compile errors in yaml-test-core
 - [x] casehubio/platform#870 — LocationIndex import expansion
