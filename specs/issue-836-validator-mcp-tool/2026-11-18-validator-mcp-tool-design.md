@@ -21,22 +21,27 @@ The playbook authoring surface lacks three things an LLM needs to author playboo
 
 ### 1. Enriched validation pipeline (D1, D4)
 
-Modify `PlaybookRunnerCore.validate()` to collect structured diagnostics instead of catching exceptions and returning strings. The existing `ParseError` sealed hierarchy (`UnknownStepError`, `ParameterError`, `ExpressionParseError`, `StructureError`, `DuplicateStepError`) already carries `SourceLocation` and `ErrorCategory` — we surface what's already captured internally.
+Modify the Walker and `PlaybookRunnerCore.validate()` to collect structured diagnostics instead of catching exceptions and returning strings. The existing `ParseError` sealed hierarchy (`UnknownStepError`, `ParameterError`, `ExpressionParseError`, `StructureError`, `DuplicateStepError`) carries `SourceLocation` and `ErrorCategory`, but the Walker currently throws `IllegalArgumentException` with plain string messages at every error site. The Walker must be rewritten to accumulate `ParseError` subtypes via `YamlErrorCollector` instead of throwing immediately — this wires in the structured error hierarchy that was designed for this purpose but never connected.
 
-#### New types in `yaml-step-runtime`
+#### `Severity` on `YamlError` (new, in `yaml-core`)
+
+Add `Severity` to the existing `YamlError` sealed interface as a default method:
 
 ```java
-public record ValidationDiagnostic(
-        Severity severity,
-        ErrorCategory category,
-        String message,
-        SourceLocation location,
-        Map<String, Object> detail,
-        String yamlPath) {
+public sealed interface YamlError permits ParseError, RuntimeStepError, CoordinationError {
+    // ...existing methods...
 
-    public enum Severity { ERROR, WARNING }
+    enum Severity { ERROR, WARNING }
+
+    default Severity severity() { return Severity.ERROR; }
 }
 ```
+
+All existing subtypes default to ERROR. Walker modifications that produce warnings (e.g., "try without catch or finally") override `severity()` to return WARNING in the appropriate `ParseError` subtype.
+
+No new parallel type (`ValidationDiagnostic`) is needed — `YamlError` already carries `category()`, `summary()`, `location()`, `toDetailMap()`, and now `severity()`. The sealed hierarchy gives callers compile-time access to typed detail fields (`stepName`, `referencedAction`, etc.) that a flattened `Map<String, Object>` discards.
+
+#### New types in `yaml-step-runtime`
 
 ```java
 public record ValidationSuggestion(
@@ -57,13 +62,13 @@ public record LlmFixResult(
 ```java
 public record PlaybookValidationResult(
         boolean valid,
-        List<ValidationDiagnostic> diagnostics,
+        List<YamlError> diagnostics,
         PlaybookFrontMatter frontMatter,
         List<ValidationSuggestion> suggestions,
         LlmFixResult llmFix) {}
 ```
 
-The `valid` field stays for quick checks. `diagnostics` replaces the former `List<String> errors`. `suggestions` carries layers 1+2 (always present). `llmFix` carries layer 3 (nullable — only when LLM suggestions are enabled and succeed).
+The `valid` field stays for quick checks. `diagnostics` replaces the former `List<String> errors` with the existing `YamlError` sealed hierarchy — callers pattern-match on `ParseError` subtypes for typed access to detail fields. `suggestions` carries layers 1+2 (always present). `llmFix` carries layer 3 (nullable — only when LLM suggestions are enabled and succeed).
 
 #### Three suggestion layers (D5)
 
@@ -73,7 +78,7 @@ The `valid` field stays for quick checks. `diagnostics` replaces the former `Lis
 | 2 — Example-augmented | `Definition` from registry | Yes | Minimal YAML snippet showing correct usage of the suggested step |
 | 3 — LLM-generated | `AgentProvider` | No — opt-in via `agent-config.yaml` | Corrected YAML + human-readable explanation of changes |
 
-**Layer 3 timeout/fallback:** LLM suggestion is best-effort with a configurable timeout (default 30s). If the LLM times out or fails, `llmFix` is null and layers 1+2 still return. The validation result is never blocked by layer 3.
+**Layer 3 execution model:** Layers 1+2 run synchronously as part of the Walker's error collection and suggestion generation — validation is never blocked by layer 3. When layer 3 is enabled, it runs in a `CompletableFuture` that is submitted after layers 1+2 complete. The validate method joins on this future with a configurable timeout (default 30s) via `AgentProvider.invokeBlocking(config, timeout)`. On timeout or failure, `llmFix` is null and the layers 1+2 result is returned unaffected.
 
 **Layer 3 configuration:**
 
@@ -107,7 +112,34 @@ public PlaybookValidationResult validate(Path playbookPath) {
 public PlaybookValidationResult validate(Path playbookPath, ValidationContext ctx) { ... }
 ```
 
-The `PlaybookApi.validate()` MCP method passes `ValidationContext("assisted", null, llmEnabled)` — the validator always runs in the `assisted` trust context. The schema context flows to `ExpressionEngineRegistry` and `VariableResolver` setup within this method.
+The `PlaybookApi.validate(String playbookPath)` MCP interface retains its single-argument signature — the only consumer is the MCP tool, which always validates in `assisted` context. `PlaybookBeans.validate()` constructs `ValidationContext("assisted", null, llmEnabled)` internally and passes a `SchemaFilteredRegistry.forSchema(registry, schemas, "assisted")` to the core method. If CLI/developer validation with schema context is needed later, a second MCP method `validate(String playbookPath, String schema)` can be added.
+
+#### Walker modification — structured error collection
+
+The Walker currently throws `IllegalArgumentException` with plain string messages at every error site (~30 locations in `resolveOne()`). Modify the Walker to accept a `YamlErrorCollector` parameter and accumulate `ParseError` subtypes instead of throwing:
+
+- `throw new IllegalArgumentException("unknown key '" + key + "'")` becomes `collector.add(new ParseError.UnknownStepError(stepName, key, location, null))`
+- `throw new IllegalArgumentException("duplicate step name '" + name + "'")` becomes `collector.add(new ParseError.DuplicateStepError(name, location, null))`
+- Structural errors (empty step, ambiguous keys, missing companions) become `ParseError.StructureError`
+- `LOG.warning("try without catch or finally")` becomes a `ParseError.StructureError` with `Severity.WARNING`
+
+The Walker continues processing after non-fatal errors (unknown keys, duplicate names) to collect multiple diagnostics in a single pass. Fatal errors (maximum nesting depth exceeded, ambiguous structural type + action) still terminate resolution of that step but do not prevent processing subsequent steps.
+
+A new `Walker.resolve()` overload accepts the collector:
+
+```java
+public static List<ResolvedStep> resolve(
+        List<Map<String, Object>> steps, PluginRegistry registry,
+        AnnotationMap annotations, YamlErrorCollector collector) {
+    // accumulate errors into collector instead of throwing
+}
+```
+
+The original throwing overloads remain for backward compatibility with the runtime execution path, where `IllegalArgumentException` is the expected failure mode.
+
+#### Expression type validation
+
+After step resolution, scan resolved step parameters for expression patterns (`${mvel:...}`, `${jexl:...}`). When the expression engine type is not permitted by the schema's capability set (e.g., `expression-mvel` not in `assisted` capabilities), emit a `ParseError.ExpressionParseError` diagnostic.
 
 #### Validation implementation
 
@@ -116,11 +148,11 @@ The `PlaybookApi.validate()` MCP method passes `ValidationContext("assisted", nu
 1. Parse YAML via `PlaybookParser.parse()` — unchanged
 2. Expand imports — unchanged
 3. Build a `PluginRegistry` filtered by schema context (`SchemaFilteredRegistry.forSchema()`)
-4. Build a `VariableResolver` chain, excluding `env()`/`systemProperty()` when schema is `assisted`
-5. Wrap `Walker.resolve()` in a try-catch that converts `ParseError` subtypes to `ValidationDiagnostic` records, preserving `SourceLocation`, `ErrorCategory`, and `toDetailMap()`
-6. Run `ValidationSuggestionGenerator` over diagnostics to produce layer 1+2 suggestions
-7. If `ctx.llmSuggestions()`, invoke `AgentProvider` asynchronously with the diagnostics, original YAML, and catalogue context — with timeout
-8. Return enriched `PlaybookValidationResult`
+4. Call `Walker.resolve(steps, filteredRegistry, annotations, collector)` — the collector accumulates `ParseError` subtypes instead of throwing
+5. Scan resolved steps for disallowed expression types against schema capabilities
+6. Run `ValidationSuggestionGenerator` over collected diagnostics to produce layer 1+2 suggestions
+7. If `ctx.llmSuggestions()`, invoke `AgentProvider.invokeBlocking(config, timeout)` with the diagnostics, original YAML, and catalogue context
+8. Return enriched `PlaybookValidationResult` with `collector.errors()` as diagnostics
 
 ### 2. Step catalogue API (D2, D6, D9)
 
@@ -166,7 +198,8 @@ Trust filtering is applied first, then level filtering. This prevents a high-lev
 ```java
 var trustFiltered = SchemaFilteredRegistry.forSchema(registry, schemas, schema);
 var levelFiltered = LevelFilteredRegistry.forLevel(trustFiltered, levelRegistry, levelName);
-var jsonSchema = StepSchemaComposer.compose(levelFiltered, mapper);
+var level = levelRegistry.resolveOrThrow(levelName);
+var jsonSchema = StepSchemaComposer.compose(levelFiltered, mapper, level.capabilities());
 ```
 
 #### Named level registry (D9)
@@ -186,13 +219,15 @@ public interface PlaybookLevelRegistry {
 
 New class `MapPlaybookLevelRegistry` (in `yaml-core`) with five built-in levels:
 
-| Name | Ordinal | Capabilities added |
-|------|---------|-------------------|
-| `foundational` | 1 | `steps` |
-| `basic-patterns` | 2 | + `decorators`, `control-flow` |
+| Name | Ordinal | Capabilities |
+|------|---------|-------------|
+| `foundational` | 1 | `steps`, `variable-resolution`, `control-flow` |
+| `basic-patterns` | 2 | + `decorators` |
 | `intermediate` | 3 | + `concurrency`, `modules` |
-| `advanced` | 4 | + `orchestration`, `correlation` |
-| `expert` | 5 | + all remaining (mcp-invoke, graphql-invoke, codegen, state-machine) |
+| `advanced` | 4 | + `orchestration`, `correlation`, `state-machine` |
+| `expert` | 5 | + all remaining (`mcp-invoke`, `graphql-invoke`, `codegen`) |
+
+`foundational` includes `variable-resolution` and `control-flow` because these are essential for any non-trivial playbook — `${variables}` and `if:` conditions are fundamental syntax, not advanced features. This aligns with `SHARED_CAPABILITIES` in `MapPlaybookSchemaRegistry`, which includes both. Capabilities like `concurrency` and `state-machine` are genuinely complex and belong at higher levels despite being shared across schemas.
 
 Each level includes all capabilities from lower levels. Level ordinal provides backward compatibility with existing `meta.level: 1` metadata in playbook YAML — `resolveByOrdinal(1)` returns `foundational`. The catalogue API accepts both forms: when the `level` parameter is numeric, it calls `resolveByOrdinal`; otherwise `resolve` by name. The `ValidatePlaybookPlugin` directory-mode meta check uses `resolveByOrdinal` to map existing integer metadata to named levels.
 
@@ -211,6 +246,45 @@ public final class LevelFilteredRegistry implements PluginRegistry {
         return new LevelFilteredRegistry(delegate, level.capabilities());
     }
 }
+```
+
+#### `StepSchemaComposer` — level-aware structural keywords
+
+`StepSchemaComposer.compose()` gains a `Set<String> capabilities` parameter. Structural keywords are conditionally included based on capabilities:
+
+| Structural keyword | Capability required |
+|-------------------|-------------------|
+| `block` | always (sequential grouping) |
+| `if`/`then`/`else`, `match`/`cases` | `control-flow` |
+| `try`/`catch`/`finally` | always (error handling) |
+| `parallel`, `race`, `barrier`, `quorum` | `concurrency` |
+| `invoke` | `modules` |
+| `select`, `pause`, `resume` | `orchestration` |
+
+Decorator keys (`for-each`, `retry`, `timeout`, `when`, etc.) are included when `decorators` is in the capability set. The `at`, `on-complete`, `resource`, `priority`, `cancel`, `background` shared properties are always included.
+
+```java
+public static ObjectNode compose(PluginRegistry registry, ObjectMapper mapper,
+                                  Set<String> capabilities) {
+    // ...existing action schema generation (already filtered by registry)...
+    // structural keywords conditional on capabilities
+    if (capabilities.contains("concurrency")) {
+        // emit parallel, race, barrier, quorum schemas
+    }
+    if (capabilities.contains("modules")) {
+        // emit invoke schema
+    }
+    // ...etc
+}
+```
+
+The filter composition becomes:
+
+```java
+var trustFiltered = SchemaFilteredRegistry.forSchema(registry, schemas, schema);
+var levelFiltered = LevelFilteredRegistry.forLevel(trustFiltered, levelRegistry, levelName);
+var level = levelRegistry.resolveOrThrow(levelName);
+var jsonSchema = StepSchemaComposer.compose(levelFiltered, mapper, level.capabilities());
 ```
 
 ### 3. Variant schema generation — P31 (D3)
@@ -232,14 +306,14 @@ public record Definition(
         Portability portability,
         Action action,
         String capability,
-        Optional<StreamingType> streamingType,
+        Optional<StreamingTypeInfo> streamingType,
         boolean absorbSiblings,
         Map<String, Map<String, Parameter>> variants) {}  // new — keyed by operation name
 ```
 
-When `variants` is non-empty, the plugin has per-operation parameter sets. When empty (default), `inputs` applies as-is (backward compatible).
+When `variants` is non-empty, the plugin has per-operation parameter sets. When empty (default), `inputs` applies as-is.
 
-**Constructor backward compatibility:** The existing `Definition` record has convenience constructors (7-arg, 8-arg, 9-arg). Adding `variants` as a 10th field breaks them. Add a new canonical constructor that defaults `variants` to `Map.of()`, and update the existing convenience constructors to chain through it. The builder handles new code; the positional constructors handle existing callers.
+Add `variants` to the canonical constructor with a default of `Map.of()` in the compact constructor. Fix existing callers (7-arg, 8-arg, 9-arg convenience constructors and direct instantiations) mechanically — breaking changes cost nothing on this platform.
 
 Builder extension:
 
@@ -259,25 +333,24 @@ public @interface Variant {
 }
 ```
 
-Usage — inner records within a `@Plugin` record:
+Usage — inner records within a `@Plugin` record (illustrative example):
 
 ```java
-@Plugin(value = "speaker", absorbSiblings = true)
-public record SpeakerPlugin(String operation, ...) {
+@Plugin(value = "device", absorbSiblings = true)
+public record DevicePlugin(String operation, ...) {
 
     @Variant("register")
-    public record Register(@Required String name, @Optional String voice) {}
+    public record Register(@Required String name, @Optional String location) {}
 
     @Variant("query")
     public record Query(@Required String id) {}
-
-    @Variant("deregister")
-    public record Deregister(@Required String id) {}
 
     @Execute
     public Result run() { ... }
 }
 ```
+
+**Variant schemas are catalogue-only, not runtime-enforced.** The Walker's combined-key mechanism (`device register: Alice`) maps `register` to the primaryInput key and `Alice` to `_value` — it does not perform per-variant parameter validation. Variant schemas describe the expected parameter sets for each operation in the JSON Schema and catalogue, enabling LLMs to generate correct YAML. Runtime parameter validation is a separate concern handled by the plugin's `@Execute` method.
 
 #### APT processor changes
 
@@ -341,36 +414,30 @@ Completing the enforcement deferred from #830.
 
 #### MVEL expression engine gating
 
-The `ExpressionEngineRegistry` gains schema-context awareness. When the active schema is `assisted`, MVEL compilation is refused:
+MVEL is gated by the existing `EXPRESSION_MVEL` capability, which is excluded from the `assisted` schema's capability set. The `ExpressionEngineRegistry` interface is not modified — it has no schema context and shouldn't.
 
-```java
-// In ExpressionEngineRegistry.compile() or a wrapping decorator:
-if ("assisted".equals(activeSchema) && "mvel".equals(type)) {
-    throw new ExpressionCompilationException(
-        "MVEL expressions are not available in assisted authoring context");
-}
-```
+During validation, the expression type validation pass (described in §1) scans resolved step parameters for `${mvel:...}` patterns. When `expression-mvel` is not in the schema's capability set, a `ParseError.ExpressionParseError` diagnostic is emitted. This keeps gating at the validation layer, consistent with how `SchemaFilteredRegistry` gates step availability.
 
 JQ (pure JSON transform, no side effects) and JEXL (sandboxed) remain available in both contexts.
 
-The active schema is passed through the validation context. The validator sets it to `assisted`; CLI/developer workflows default to `developer`.
-
 #### Variable source gating
 
-When building the `VariableResolver` chain under `assisted` context, `VariableSource.env()` and `systemProperty()` are excluded from the chain:
+`VariableSource.env()` and `VariableSource.systemProperty()` are not registered in production today (only used in tests). This issue formalises that as explicit runtime policy: when building the `VariableResolver` chain for playbook execution, these sources are only registered when the `ENV_ACCESS` capability is present in the active schema's capability set.
 
 ```java
-if (!"assisted".equals(activeSchema)) {
+if (schema.capabilities().contains(PlaybookCapabilities.ENV_ACCESS)) {
     resolver.addSource(VariableSource.env());
     resolver.addSource(VariableSource.systemProperty());
 }
 ```
 
-This formalises existing production behaviour (these sources aren't registered in production today) as explicit policy.
+This is a runtime enforcement concern, not a validation-path concern — the validation path does not build a `VariableResolver` chain (variable resolution happens at execution time, not parse time).
 
 ### 5. Authoring metric (D8)
 
-#### `AuthoringMetricPlugin` in `yaml-test-core`
+#### `AuthoringMetricPlugin` in `yaml-metric-core`
+
+The authoring metric plugin lives in a separate module (`yaml-metric-core`) rather than `yaml-test-core` to avoid adding an `agent-api` dependency to every playbook test consumer. Only test suites that explicitly opt into authoring metrics add `yaml-metric-core` to their classpath.
 
 ```java
 @Plugin("authoring-metric")
@@ -396,9 +463,9 @@ The difference isolates whether the language is learnable from documentation alo
 
 1. Look up `PlaybookApi` from `ServiceRegistry`
 2. Call `playbooks.catalogue(level, schema)` to get the `StepCatalogue` — step entries, parameter schemas, example YAML all from the registry
-3. Look up `AgentProvider` from `ServiceRegistry`
+3. Look up `AgentProvider` from `ServiceRegistry` — if unavailable, return a failure result with a clear message (same pattern as `ValidatePlaybookPlugin`'s `TestExecutionContext` lookup: catch `IllegalArgumentException`)
 4. **With-validator mode:** Open an agent session (`AgentProvider.openSession()`) with the validate tool registered. The LLM can iteratively generate, validate, and correct.
-5. **Without-validator mode:** Single-shot invoke (`AgentProvider.invoke()`) with catalogue as context. No tool access.
+5. **Without-validator mode:** Single-shot invoke (`AgentProvider.invokeBlocking()`) with catalogue as context. No tool access.
 6. Capture the generated YAML
 7. Evaluate via `PlaybookApi.validate()` — structured diagnostics
 8. Return `AuthoringMetricResult`
@@ -408,7 +475,7 @@ The difference isolates whether the language is learnable from documentation alo
 ```java
 public record AuthoringMetricResult(
         boolean validationPassed,
-        List<ValidationDiagnostic> diagnostics,
+        List<YamlError> diagnostics,
         String generatedYaml,
         String mode,
         String level) {}
@@ -461,25 +528,31 @@ Tests with `meta.layer: metric` run in a separate CI job:
 |-----------|--------|-----------|
 | `PlaybookLevel`, `PlaybookLevelRegistry`, `MapPlaybookLevelRegistry` | `yaml-core` | Alongside `PlaybookSchemaRegistry` — same pattern |
 | `LevelFilteredRegistry` | `yaml-core` | Alongside `SchemaFilteredRegistry` — same pattern |
-| `ValidationDiagnostic`, `ValidationSuggestion`, `ValidationSuggestionGenerator` | `yaml-step-runtime` | Alongside `PlaybookValidationResult` |
+| `YamlError.Severity` | `yaml-core` | On the existing sealed interface |
+| `ValidationSuggestion`, `ValidationSuggestionGenerator` | `yaml-step-runtime` | Alongside `PlaybookValidationResult` |
 | `LlmFixResult` | `yaml-step-runtime` | Part of validation result |
 | `StepCatalogue`, `StepEntry`, `ParameterSummary` | `yaml-step-runtime` | Returned by `PlaybookApi.catalogue()` |
 | `@Variant` annotation | `yaml-plugin-api` | Zero-dep, alongside `@Plugin` |
 | Variant APT processing | `yaml-plugin-processor` | Alongside existing `StepPluginProcessor` |
 | `Definition.variants` field | `yaml-plugin-api` | On the existing record |
-| MVEL gating, env-access gating | `yaml-step-runtime` | Validation context wiring |
-| `AuthoringMetricPlugin` | `yaml-test-core` | Test infrastructure |
+| Expression type validation, env-access gating | `yaml-step-runtime` | Validation context wiring |
+| `AuthoringMetricPlugin` | `yaml-metric-core` | Separate module — avoids `agent-api` dependency on `yaml-test-core` |
 
 ## References
 
 - `PlaybookRunnerCore.java:186-204` — existing validate() method
-- `ParseError.java` — structured error model with SourceLocation
+- `Walker.java` — step resolution, currently throws `IllegalArgumentException` (~30 sites), to be modified for `YamlErrorCollector`
+- `ParseError.java` — structured error model with SourceLocation (designed for Walker but never wired)
+- `YamlError.java` — sealed interface: `ParseError`, `RuntimeStepError`, `CoordinationError`
+- `YamlErrorCollector.java` — multi-error collection with `throwIfErrors()` → `YamlValidationException`
+- `YamlErrorMapper.java` — runtime error mapping (not validation path, but shows the pattern)
 - `SchemaFilteredRegistry.java` — trust filtering pattern reused for levels
-- `PlaybookSchemaRegistry.java` — named registry pattern for levels
-- `StepSchemaComposer.java` — JSON Schema composition, extended for variants
-- `Walker.java:343-351` — absorbSiblings logic
-- `Definition.java` — extended with variants field
+- `PlaybookSchemaRegistry.java` / `MapPlaybookSchemaRegistry.java` — named registry pattern and `SHARED_CAPABILITIES`
+- `StepSchemaComposer.java` — JSON Schema composition, extended for variants and level-awareness
+- `Definition.java` — extended with variants field (uses `Optional<StreamingTypeInfo>`)
 - `StepPluginProcessor.java` — APT extended for @Variant
 - `PlaybookCapabilities.java` — capability constants mapped to levels
+- `AgentProvider.java` — `invoke()`, `invokeBlocking()`, `openSession()` for layers 3 and authoring metric
+- `ValidatePlaybookPlugin.java` — existing pattern for safe `ServiceRegistry` lookup
 - Trust model spec (`specs/issue-830-trust-model-playbook-authoring/2026-11-17-trust-model-design.md`) — deferred MVEL + env-access gating
 - Issue #836 comment — WS-3 integration points
