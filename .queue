@@ -8,7 +8,15 @@ date: 2026-11-18
 active_issue: casehubio/platform#879
 
 ## Queue
-- [ ] casehubio/platform#885 — apt SchemaEmitter generates bare array type for List plugin fields ← active
+- [ ] casehubio/platform#879 — Eliminate dual-parse SnakeYAML dependency ← active
+  - [ ] Batch 1: Foundation
+    - [ ] Task 1: LocationTrackingModule with map and collection tracking
+  - [ ] Batch 2: Migration
+    - [ ] Task 2: Migrate PlaybookParser to Jackson
+    - [ ] Task 3: Simplify FileSystemModuleLoader
+  - [ ] Batch 3: Verification
+    - [ ] Task 4: Full build verification and SnakeYAML audit
+- [ ] casehubio/platform#885 — apt SchemaEmitter generates bare array type for List plugin fields
   - [ ] Batch 1: Foundation
     - [ ] Task 1: LocationTrackingModule with map and collection tracking
   - [ ] Batch 2: Migration
@@ -27,4 +35,3 @@ active_issue: casehubio/platform#879
 - [x] casehubio/platform#876 — Background trace step name propagation
 - [x] casehubio/platform#877 — expandBranches LocationIndex gap
 - [x] casehubio/platform#878 — Conditional import runtime evaluation
-- [ ] casehubio/platform#879 — Eliminate dual-parse SnakeYAML dependency
