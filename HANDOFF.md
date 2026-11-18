@@ -1,39 +1,38 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** 4 issues closed (#849, #851, #867, #869), 3 new issues filed, code review clean
-**Landed:** `2d6f3b6a` on main (6 commits)
-**Queue:** 5 items remaining, #870 is next active
+**Last worked:** 5 issues closed (#870, #871, #873, #874, #875), 4 follow-up issues filed (#876–#879), code review clean
+**Landed:** `c573c6ab` on main (5 commits), published to origin
+**Queue:** 4 follow-up items remaining, #876 is next
 
 ## This session
 
-Swept through S/XS issues spanning the generator, module system, capture scoping, and language documentation.
+Diagnostic infrastructure sweep — making the playbook runtime report precisely what went wrong and where, across three boundary crossings: module imports, conditional gates, and background execution.
 
 **Implemented:**
 
-1. **#849 — Streaming + @ContextParam intersection** — Fixed `GraphQLResolverProcessor.generatePluginSource()`: the streaming+subject branch now nests `hasNonHttpContextParams` to add `__principal` to the `process()` method signature. Also removed erroneous subject-param skip from the delegate call that dropped it from the SPI method invocation.
+1. **#870 — LocationIndex import expansion** (S/Med) — Module files were parsed by Jackson, creating Map/List instances not registered in the IdentityHashMap-based LocationIndex. Dual-parse approach: SnakeYAML for location tracking + Jackson for structured types, with `LocationIndex.transferFrom()` to bridge them. `ModuleLoader` gains a LocationIndex-aware overload. Validation errors on imported module steps now carry the module file's path and exact line number.
 
-2. **#851 — Module system demonstration restored** — Split the simplified `modules.playbook.yaml` into a module definition file (`composition/modules/status-panel.yaml`) and an importing playbook demonstrating typed parameters, default values, output chaining, and conditional imports. Fixed `FileSystemModuleLoader` to deduplicate module files when the same module is imported multiple times with different aliases.
+2. **#873 — Duplicate capture registration** (XS/Low) — Removed redundant `result.output()`-based capture registration in `PlaybookRunnerCore.run()`. The `captureCollector`-based path handles both simple and structural steps correctly.
 
-3. **#867 — Reserved capture names** — Added `RESERVED_CAPTURE_NAMES` validation in Walker (compile-time) and YamlTestExecutor (runtime). `capture: result` now rejected with a clear error naming the collision. The reserved set (`result`, `error`, `each`, `var`, `params`, `module`, `events`) is defined once in `StepKeywords` and referenced by both. Renamed `capture: result` → `capture: output` across 25 files.
+3. **#874 — Streaming plugin without subject** (XS/Low) — Consolidated streaming branch in `GraphQLResolverProcessor.generatePluginSource()`. All streaming mutations now use `process()` with `op.returnTypeStr()` and direct return, regardless of subject presence. Previously, streaming without subject fell through to `execute()/Result` path with wrong return type.
 
-4. **#869 — Parallel concurrency documentation** — Added `parallel:` (list and map forms), `race:`, and `try/catch/finally` subsections to the YAML language guide. Documented `concurrency`, `cancel-remaining`, `advance-after`, and `collection-timeout` with types, defaults, and examples.
+4. **#875 — Module conditional imports** (S/Low) — `ModuleExpander` now evaluates import `condition:` referencing module outputs at expansion time. Conditions with unresolvable prefixes (e.g. `${var.enabled}`) defer to runtime. Known module with missing output evaluates as falsy (skips import). Custom `buildConditionModuleSource()` returns empty string for missing outputs so the resolver fully resolves them.
 
-**Code review:** 0 CRITICAL, 1 WARNING (fixed: duplicated `RESERVED_CAPTURE_NAMES` constant → extracted to `StepKeywords`), 3 NOTEs (all advisory, no code changes needed).
+5. **#871 — Background trace integration** (S/Med) — Added `StepExecutionListener.onBackgroundFailure()` default method. `StepTraceCollector` creates FAILED trace nodes directly in `rootChildren`. `StructuralStepEvaluator` wires the existing `backgroundFailureHandler` lambda to call `listener.onBackgroundFailure()`.
 
-**Blog:** "The Name the Framework Already Owns" — variable scoping collisions, reserved naming enforcement, why the fix belongs at compile time not at the collision point.
+**Code review:** 0 CRITICAL, 1 WARNING (fixed: duplicated `loadModuleFile` methods consolidated), 2 NOTEs (unnecessary `@SuppressWarnings` removed).
 
-**Issues filed:** #873 (PlaybookRunnerCore duplicate capture registration, XS/Low), #874 (streaming plugin without subject + ContextParam, XS/Low), #875 (module conditional import testing, S/Low)
+**Blog:** "Diagnostics Break at Boundaries" — how diagnostic infrastructure fails at module imports, conditional gates, and background execution, and how to fix each gap.
 
-## Resuming #870
+**Issues filed:**
+- #876 — Background trace: propagate step name through decorator chain (XS/Low) — trace nodes always show name="background" instead of actual step name
+- #877 — expandBranches creates new maps that bypass LocationIndex (S/Med) — pre-existing issue where branch-bearing steps lose source locations
+- #878 — Conditional import: runtime evaluation for deferred conditions (M/Med) — `${var.enabled}` conditions stored but never evaluated at runtime
+- #879 — Eliminate dual-parse: capture source positions from Jackson YAML deserialization (M/High) — replace SnakeYAML dependency with Jackson-native position tracking
 
-**Next issue:** #870 — LocationIndex import expansion (S/Med)
+## Queue (4 items)
 
-LocationIndex currently only tracks mappings from the initial parse. When `expandImports` processes module imports, the expanded content (stamped sections, parameter-resolved values) has no location tracking. Extending LocationIndex to cover expanded content requires threading it through `ModuleExpander` and `PlaybookModuleBridge`.
-
-## Queue (5 items)
-
-1. #870 — LocationIndex import expansion (S/Med) ← next
-2. #871 — Background trace integration (S/Med)
-3. #873 — PlaybookRunnerCore duplicate capture registration (XS/Low)
-4. #874 — Streaming plugin without subject ContextParam intersection (XS/Low)
-5. #875 — Module conditional import testing (S/Low)
+1. #876 — Background trace step name propagation (XS/Low) ← next
+2. #877 — expandBranches LocationIndex gap (S/Med)
+3. #878 — Conditional import runtime evaluation (M/Med)
+4. #879 — Eliminate dual-parse SnakeYAML dependency (M/High)
