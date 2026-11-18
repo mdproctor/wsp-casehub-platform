@@ -123,15 +123,23 @@ The Walker currently throws `IllegalArgumentException` with plain string message
 - Structural errors (empty step, ambiguous keys, missing companions) become `ParseError.StructureError`
 - `LOG.warning("try without catch or finally")` becomes a `ParseError.StructureError` with `Severity.WARNING`
 
+**SourceLocation availability:** `PlaybookParser.parse()` uses SnakeYAML's high-level `loadAll()`, which deserializes YAML to raw `Map<String, Object>` and strips all line/column metadata. The Walker works with these deserialized collections — it has no access to YAML line numbers. Accordingly, `ParseError` instances constructed by the Walker pass `SourceLocation(playbookPath, -1, -1)` — the file path is known (passed through the validation context) but line and column are not.
+
+The Walker's existing positional tracking — `String path` (e.g., `"root → Step 3 → parallel → Step 1"`) and `stepName` — provides sufficient context for an LLM to locate errors in the YAML text without line numbers. These fields are already part of the `ParseError` subtype's typed detail (`stepName()`, `StructureError.detail()`).
+
+A follow-up issue should track parser improvements to preserve SnakeYAML mark data for precise line/column reporting. This requires switching from `loadAll()` to the lower-level `Composer` API — a larger change outside this issue's scope.
+
 The Walker continues processing after non-fatal errors (unknown keys, duplicate names) to collect multiple diagnostics in a single pass. Fatal errors (maximum nesting depth exceeded, ambiguous structural type + action) still terminate resolution of that step but do not prevent processing subsequent steps.
 
-A new `Walker.resolve()` overload accepts the collector:
+A new `Walker.resolve()` overload accepts the collector and the playbook path:
 
 ```java
 public static List<ResolvedStep> resolve(
         List<Map<String, Object>> steps, PluginRegistry registry,
-        AnnotationMap annotations, YamlErrorCollector collector) {
+        AnnotationMap annotations, YamlErrorCollector collector,
+        String playbookFile) {
     // accumulate errors into collector instead of throwing
+    // SourceLocation: new SourceLocation(playbookFile, -1, -1)
 }
 ```
 
@@ -187,13 +195,23 @@ All catalogue example YAML and authoring metric examples use the bare-list form 
 
 1. Parse YAML via `PlaybookParser.parse()` — unchanged
 2. Expand imports — unchanged
-3. Check for `steps:` key in content — if present, add a structural error to the collector (D10)
-4. Extract step list from content (bare list from document 3, or from `steps:` key with the error already recorded)
-5. Build a `PluginRegistry` filtered by schema context (`SchemaFilteredRegistry.forSchema()`), then by level if `ctx.level()` is non-null (`LevelFilteredRegistry.forLevel()`)
-6. Call `Walker.resolve(steps, filteredRegistry, annotations, collector)` — the collector accumulates `ParseError` subtypes instead of throwing
-7. Run `ValidationSuggestionGenerator` over collected diagnostics to produce layer 1+2 suggestions
-8. If `ctx.llmSuggestions()`, call `AgentProvider.invokeBlocking(config, Duration.ofSeconds(timeout))` with the diagnostics, original YAML, and catalogue context
-9. Return enriched `PlaybookValidationResult` with `collector.errors()` as diagnostics
+3. **Derive effective level:** if `ctx.level()` is non-null, use it. Otherwise, when validating under `assisted` context, extract the level from the playbook content's `meta.level` field (which is in `doc.content().get("meta")`, not in `PlaybookFrontMatter`). `PlaybookBeans.validate()` constructs `ValidationContext` with `level=null` before the content is parsed, so level derivation must happen here — after parsing — not in the caller.
+   ```java
+   String effectiveLevel = ctx.level();
+   if (effectiveLevel == null && "assisted".equals(ctx.schema())) {
+       var meta = (Map<String, Object>) content.get("meta");
+       if (meta != null && meta.containsKey("level")) {
+           effectiveLevel = String.valueOf(meta.get("level"));
+       }
+   }
+   ```
+4. Check for `steps:` key in content — if present, add a structural error to the collector (D10)
+5. Extract step list from content (bare list from document 3, or from `steps:` key with the error already recorded)
+6. Build a `PluginRegistry` filtered by schema context (`SchemaFilteredRegistry.forSchema()`), then by level if `effectiveLevel` is non-null (`LevelFilteredRegistry.forLevel()`)
+7. Call `Walker.resolve(steps, filteredRegistry, annotations, collector, playbookPath.toString())` — the collector accumulates `ParseError` subtypes instead of throwing
+8. Run `ValidationSuggestionGenerator` over collected diagnostics to produce layer 1+2 suggestions
+9. If `ctx.llmSuggestions()`, call `AgentProvider.invokeBlocking(config, Duration.ofSeconds(timeout))` with the diagnostics, original YAML, and catalogue context
+10. Return enriched `PlaybookValidationResult` with `collector.errors()` as diagnostics
 
 ### 2. Step catalogue API (D2, D6, D9)
 
@@ -554,19 +572,21 @@ meta:
 ---
 tests:
   - name: "sequential logging with validator"
-    - authoring-metric:
-        level: foundational
-        task: "Write a playbook that logs 'hello' then logs 'world'"
-        with-validator: true
-    - assertThat: ${result.validationPassed}
+    steps:
+      - authoring-metric:
+          level: foundational
+          task: "Write a playbook that logs 'hello' then logs 'world'"
+          with-validator: true
+      - assertThat: ${result.validationPassed}
         equals: true
 
   - name: "sequential logging without validator"
-    - authoring-metric:
-        level: foundational
-        task: "Write a playbook that logs 'hello' then logs 'world'"
-        with-validator: false
-    - assertThat: ${result.validationPassed}
+    steps:
+      - authoring-metric:
+          level: foundational
+          task: "Write a playbook that logs 'hello' then logs 'world'"
+          with-validator: false
+      - assertThat: ${result.validationPassed}
         equals: true
 ```
 
