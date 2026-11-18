@@ -24,3 +24,6 @@ active_issue: casehubio/platform#836
 - [ ] casehubio/platform#849 — Streaming + ContextParam intersection not handled in generator
 - [ ] casehubio/platform#851 — Restore module-system demonstration
 - [ ] casehubio/platform#867 — capture: result name collides with built-in result scope
+- [ ] casehubio/platform#869 — StepSchemaComposer concurrency docs
+- [ ] casehubio/platform#870 — LocationIndex import expansion
+- [ ] casehubio/platform#871 — Background trace integration
