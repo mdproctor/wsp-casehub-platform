@@ -35,3 +35,5 @@ active_issue: casehubio/platform#879
 - [x] casehubio/platform#876 — Background trace step name propagation
 - [x] casehubio/platform#877 — expandBranches LocationIndex gap
 - [x] casehubio/platform#878 — Conditional import runtime evaluation
+- [ ] casehubio/platform#886 — Remove orphaned parseRawWithLocations
+- [ ] casehubio/platform#887 — Migrate config-core and endpoints-config-core from SnakeYAML to Jackson
