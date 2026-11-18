@@ -1,15 +1,5 @@
-# Work Plan —
-
-## State
-branch: issue-836-validator-mcp-tool
-issue-repo: casehubio/platform
-status: active
-date: 2026-11-17
-active_issue: casehubio/platform#836
-
-## Queue
-- [ ] casehubio/platform#836 — WS-6b: Validator MCP tool + shaped plugin schemas + metric ← active
-- [ ] casehubio/platform#864 — StepSchemaComposer capability-aware structural keywords
+- [x] casehubio/platform#836 — WS-6b: Validator MCP tool + shaped plugin schemas + metric
+- [ ] casehubio/platform#864 — StepSchemaComposer capability-aware structural keywords        ← active
 - [ ] casehubio/platform#862 — SourceLocation line/column tracking in PlaybookParser
 - [ ] casehubio/platform#863 — Global steps: key rejection in PlaybookParser
 - [ ] casehubio/platform#865 — Hierarchical step catalogue — domain-grouped discovery
@@ -23,3 +13,10 @@ active_issue: casehubio/platform#836
 - [ ] casehubio/platform#848 — Streaming plugins bypass validation and coercion
 - [ ] casehubio/platform#849 — Streaming + ContextParam intersection not handled in generator
 - [ ] casehubio/platform#851 — Restore module-system demonstration
+
+## State
+branch: issue-836-validator-mcp-tool
+issue-repo: casehubio/platform
+status: active
+date: 2026-11-17
+active_issue: casehubio/platform#836
