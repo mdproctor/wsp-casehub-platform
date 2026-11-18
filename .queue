@@ -23,7 +23,7 @@ branch:
 issue-repo: casehubio/platform
 status: active
 date: 2026-11-17
-active_issue: casehubio/platform#867
+active_issue: casehubio/platform#869
 
 ## Queue
 - [x] casehubio/platform#836 — WS-6b: Validator MCP tool + shaped plugin schemas + metric
@@ -41,7 +41,7 @@ active_issue: casehubio/platform#867
 - [x] casehubio/platform#848 — Streaming plugins bypass validation and coercion
 - [x] casehubio/platform#849 — Streaming + ContextParam intersection not handled in generator
 - [x] casehubio/platform#851 — Restore module-system demonstration
-- [ ] casehubio/platform#867 — capture: result name collides with built-in result scope ← active
-- [ ] casehubio/platform#869 — StepSchemaComposer concurrency docs
+- [x] casehubio/platform#867 — capture: result name collides with built-in result scope
+- [ ] casehubio/platform#869 — StepSchemaComposer concurrency docs ← active
 - [ ] casehubio/platform#870 — LocationIndex import expansion
 - [ ] casehubio/platform#871 — Background trace integration
