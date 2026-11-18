@@ -1,14 +1,14 @@
 ## D1: Content taxonomy and directory structure
 
-**Choice:** Rename `playbooks/` module to `examples/` with three sections: `tutorials/` (progressive levels), `reference/` (pattern lookup by capability, current playbook categories), `java/` (Java SDK examples with capability matrix). Deep-dive tutorials (like yaml-composition) also live under `tutorials/`. `docs/examples/` content relocates into `examples/`.
+**Choice:** Top-level `tutorials/` and `examples/` as peers. `tutorials/` holds progressive and deep-dive teaching material. `examples/` holds use-case demonstrations organized by medium: `examples/playbooks/` (playbook use cases + capability matrix) and `examples/java/` (Java SDK use cases + capability matrix). The capability matrix cross-references tutorials. Current `playbooks/` module content moves to `examples/playbooks/`. `docs/examples/` content relocates into `examples/`. Use cases can mirror across playbooks and java.
 
 **Alternatives:**
-- Keep `playbooks/` as-is, add `levels/` inside — mixes two navigation intents (learning vs lookup) in one flat directory
-- Separate top-level `tutorials/` and `examples/` directories — fragments learning content across two roots
+- Everything under `examples/` (tutorials nested inside) — cross-referencing direction feels odd when examples point inward to their own children
+- Keep `playbooks/` as-is — mixes learning content taxonomy with module naming
 
-**Rationale:** "Examples" is the umbrella for everything you run to learn. The subdirectory tells you the learning mode: progressive (tutorials), lookup (reference), or code (java). File extensions (`.playbook.yaml`, `.java`) indicate the medium.
+**Rationale:** Tutorials are the "textbook chapters" (teach concepts). Examples are the "lab exercises" (demonstrate concepts applied). Examples cross-reference into tutorials. As siblings, the references flow naturally.
 
-**Trade-offs:** Renaming `playbooks/` to `examples/` is a module rename that touches pom.xml, CI, and any imports. Worth it for a coherent taxonomy.
+**Trade-offs:** Two top-level directories for learning content instead of one. Worth it for clean cross-referencing.
 
 **Sources:** Existing `playbooks/` structure, `docs/examples/`, pages repo `tutorials/`, direction doc (parent#540)
 
@@ -35,17 +35,35 @@
 
 ## D3: Scenario threading approach
 
-**Choice:** Use multiple connected scenarios across levels rather than forcing one scenario through all levels. The story arc evolves (e.g., build a data pipeline → monitor the services it calls → alert when things go wrong). Each phase naturally fits the capabilities being taught at that stage.
+**Choice:** Use-case examples (data-pipeline, api-integration, case-processing) with a capability matrix. Each use case naturally exercises multiple capabilities. Together they cover the full surface. The matrix cross-references which capabilities and tutorial levels each example demonstrates. Use all three proposed scenarios rather than forcing one through all levels.
 
 **Alternatives:**
 - Single scenario throughout — some capabilities feel forced into the narrative
-- Independent unrelated scenarios per level — no learning continuity
+- Numbered levels with one concept each — ends up mirroring reference categories without adding value
 
-**Rationale:** "Why not all 3? Do one then the other." — each scenario phase naturally exercises the capabilities at its complexity tier. The connected arc provides continuity without forcing fit.
+**Rationale:** Same model as Java examples: folder of use cases + capability matrix. The matrix makes it clear what levels/capabilities are demonstrated by each use case. Realistic examples that happen to demonstrate capabilities.
 
-**Trade-offs:** Slightly harder for a reader to track than a single scenario, but each phase builds on the world the previous one established.
+**Trade-offs:** No single linear progression — reader navigates via matrix. This is the intended design.
 
-**Sources:** User direction, direction doc threading requirement
+**Sources:** User direction, Java examples convention
+
+**Exploration:** quick
+
+**Status:** captured
+
+## D4: Tutorial naming convention
+
+**Choice:** Leveled tutorials use numbered prefix + category name: `01-basic-steps/`, `02-captures/`, `03-flow-control/`, etc. Number provides ordering, name provides discoverability. Each tutorial directory is a grouping (e.g., `tutorials/platform-playbooks/01-basic-steps/`).
+
+**Alternatives:**
+- Unnumbered directories with ordering in a manifest file — discoverable but ordering isn't visible in filesystem
+- Pure numeric directories — ordering visible but meaningless names
+
+**Rationale:** Filesystem ordering matches learning order. A reader can `ls` the directory and see the progression. The name tells them what they'll learn without opening files.
+
+**Trade-offs:** Renaming or reordering levels requires renumbering directories. Acceptable for content that stabilises quickly.
+
+**Sources:** Common convention in framework tutorials (Rust book, Django tutorial)
 
 **Exploration:** quick
 
