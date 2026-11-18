@@ -14,3 +14,6 @@ active_issue: casehubio/platform#871
 - [ ] casehubio/platform#874 — Streaming plugin without subject ContextParam intersection
 - [ ] casehubio/platform#875 — Module conditional import testing
 - [ ] casehubio/platform#871 — Background trace integration
+- [ ] casehubio/platform#876 — Background trace step name propagation
+- [ ] casehubio/platform#877 — expandBranches LocationIndex gap
+- [ ] casehubio/platform#878 — Conditional import runtime evaluation
