@@ -29,8 +29,9 @@ Brainstormed, designed, and began implementing the validator MCP tool for LLM-as
 **Issues filed this session:**
 - #862 — SourceLocation line/column tracking in PlaybookParser (M/Med — SnakeYAML Composer API)
 - #863 — Global `steps:` key rejection in PlaybookParser (S/Low)
-- #864 — StepSchemaComposer capability-aware structural keyword emission (S/Low)
+- #864 — StepSchemaComposer capability-aware structural keyword emission (S/Low — overlaps with #836 Batch 3 Task 5)
 - #865 — Hierarchical step catalogue — domain-grouped discovery (M/Med — filtering + discovery)
+- #866 — Lifecycle guard error message missing reorder/remove/advance commands (XS/Low — fixed in soredium, synced)
 
 **Blog:** "The Vocabulary Your Author Needs" — why level-filtered catalogues produce more correct LLM-authored playbooks
 
@@ -50,10 +51,12 @@ This is the most complex batch — the Walker has ~30 `IllegalArgumentException`
 
 **All foundation types are in place** — the next session can proceed directly to Walker modification.
 
-## Next in queue
+## Queue (15 items)
 
-#836 is the active issue (reopened, Batches 2-5 pending). After #836:
-- #839, #840, #841, #842, #843 — small standalone fixes (XS-S/Low)
-- #765 — CorpusSelectionEventObserver trigger index rebuild (S/Low)
-- #848, #849 — Streaming plugin validation + ContextParam intersection (S-M/Med)
-- #851 — Restore module-system demonstration (S/Low)
+#836 is active (reopened, Batches 2-5 pending). Follow-on issues ordered right after:
+1. #836 — WS-6b: Validator MCP tool (active, Batches 2-5)
+2. #864 — StepSchemaComposer capability-aware (S/Low — overlaps Batch 3)
+3. #862 — SourceLocation line/column tracking (M/Med)
+4. #863 — Global steps: rejection (S/Low)
+5. #865 — Hierarchical catalogue discovery (M/Med)
+6. #838–#843, #765, #848, #849, #851 — standalone fixes and features
