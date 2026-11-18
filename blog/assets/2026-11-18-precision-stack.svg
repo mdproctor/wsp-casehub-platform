@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 340" font-family="Inter, system-ui, sans-serif">
+  <defs>
+    <linearGradient id="layerGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0f4ff"/>
+      <stop offset="100%" stop-color="#e8eeff"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/>
+    </marker>
+  </defs>
+
+  <!-- Layer boxes -->
+  <rect x="40" y="20" width="260" height="70" rx="8" fill="url(#layerGrad)" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="170" y="48" text-anchor="middle" font-size="14" font-weight="600" fill="#1e293b">PlaybookParser</text>
+  <text x="170" y="68" text-anchor="middle" font-size="11" fill="#64748b">SnakeYAML Composer → LocationIndex</text>
+
+  <rect x="40" y="110" width="260" height="70" rx="8" fill="url(#layerGrad)" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="170" y="138" text-anchor="middle" font-size="14" font-weight="600" fill="#1e293b">Walker</text>
+  <text x="170" y="158" text-anchor="middle" font-size="11" fill="#64748b">locationOf(step, file) → SourceLocation</text>
+
+  <rect x="40" y="200" width="260" height="70" rx="8" fill="url(#layerGrad)" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="170" y="228" text-anchor="middle" font-size="14" font-weight="600" fill="#1e293b">Validator</text>
+  <text x="170" y="248" text-anchor="middle" font-size="11" fill="#64748b">ParseError carries file:line:column</text>
+
+  <rect x="40" y="290" width="260" height="40" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="170" y="315" text-anchor="middle" font-size="13" font-weight="600" fill="#92400e">Editor / LLM receives precise location</text>
+
+  <!-- Arrows between layers -->
+  <line x1="170" y1="90" x2="170" y2="110" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="170" y1="180" x2="170" y2="200" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="170" y1="270" x2="170" y2="290" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Right side: what each layer adds -->
+  <rect x="380" y="20" width="300" height="70" rx="8" fill="#fff" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="395" y="43" font-size="12" font-weight="600" fill="#334155">Before</text>
+  <text x="395" y="60" font-size="11" fill="#94a3b8">loadAll() → Map&lt;String, Object&gt;</text>
+  <text x="395" y="75" font-size="11" fill="#94a3b8">line/column discarded by deserialiser</text>
+
+  <rect x="380" y="110" width="300" height="70" rx="8" fill="#fff" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="395" y="133" font-size="12" font-weight="600" fill="#334155">After</text>
+  <text x="395" y="150" font-size="11" fill="#059669">composeAll() → Node tree with Marks</text>
+  <text x="395" y="165" font-size="11" fill="#059669">IdentityHashMap records each Map's position</text>
+
+  <rect x="380" y="200" width="300" height="70" rx="8" fill="#fff" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="395" y="223" font-size="12" font-weight="600" fill="#334155">Result</text>
+  <text x="395" y="240" font-size="11" fill="#059669">SourceLocation("playbook.yaml", 3, 5)</text>
+  <text x="395" y="255" font-size="11" fill="#94a3b8">instead of SourceLocation(file, -1, -1)</text>
+
+  <!-- Connecting dotted lines -->
+  <line x1="300" y1="55" x2="380" y2="55" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="300" y1="145" x2="380" y2="145" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="300" y1="235" x2="380" y2="235" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,3"/>
+</svg>
