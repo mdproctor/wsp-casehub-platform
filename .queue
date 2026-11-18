@@ -1,22 +1,15 @@
 # Work Plan —
 
 ## State
-branch: main
+branch: 
 issue-repo: casehubio/platform
 status: active
 date: 2026-11-18
 active_issue: casehubio/platform#879
 
 ## Queue
-- [ ] casehubio/platform#879 — Eliminate dual-parse SnakeYAML dependency ← active
-  - [x] Batch 1: Foundation
-    - [x] Task 1: LocationTrackingModule with map and collection tracking
-  - [x] Batch 2: Migration
-    - [x] Task 2: Migrate PlaybookParser to Jackson
-    - [x] Task 3: Simplify FileSystemModuleLoader
-  - [x] Batch 3: Verification
-    - [x] Task 4: Full build verification and SnakeYAML audit
-- [ ] casehubio/platform#885 — apt SchemaEmitter generates bare array type for List plugin fields
+- [x] casehubio/platform#879 — Eliminate dual-parse SnakeYAML dependency
+- [ ] casehubio/platform#885 — apt SchemaEmitter generates bare array type for List plugin fields ← active
   - [ ] Batch 1: Foundation
     - [ ] Task 1: LocationTrackingModule with map and collection tracking
   - [ ] Batch 2: Migration
