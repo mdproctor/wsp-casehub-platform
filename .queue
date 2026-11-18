@@ -11,21 +11,12 @@
 - [x] casehubio/platform#843 — configurable iteration cap for until loops
 - [x] casehubio/platform#765 — feat: CorpusSelectionEventObserver rebuild trigger index on profile activation
 - [x] casehubio/platform#848 — Streaming plugins bypass validation and coercion
-- [ ] casehubio/platform#849 — Streaming + ContextParam intersection not handled in generator        ← active
+- [x] casehubio/platform#849 — Streaming + ContextParam intersection not handled in generator
 - [ ] casehubio/platform#851 — Restore module-system demonstration
 - [ ] casehubio/platform#867 — capture: result name collides with built-in result scope
 - [ ] casehubio/platform#869 — StepSchemaComposer concurrency docs
 - [ ] casehubio/platform#870 — LocationIndex import expansion
 - [ ] casehubio/platform#871 — Background trace integration
-
-## State
-branch: issue-836-validator-mcp-tool
-issue-repo: casehubio/platform
-status: active
-date: 2026-11-17
-active_issue: casehubio/platform#870
-
-## Queue
 - [x] casehubio/platform#836 — WS-6b: Validator MCP tool + shaped plugin schemas + metric
 - [x] casehubio/platform#864 — StepSchemaComposer capability-aware structural keywords
 - [x] casehubio/platform#862 — SourceLocation line/column tracking in PlaybookParser
@@ -43,8 +34,15 @@ active_issue: casehubio/platform#870
 - [x] casehubio/platform#851 — Restore module-system demonstration
 - [x] casehubio/platform#867 — capture: result name collides with built-in result scope
 - [x] casehubio/platform#869 — StepSchemaComposer concurrency docs
-- [ ] casehubio/platform#870 — LocationIndex import expansion ← active
+- [ ] casehubio/platform#870 — LocationIndex import expansion        ← active
 - [ ] casehubio/platform#871 — Background trace integration
 - [ ] casehubio/platform#873 — PlaybookRunnerCore duplicate capture registration
 - [ ] casehubio/platform#874 — Streaming plugin without subject ContextParam intersection
 - [ ] casehubio/platform#875 — Module conditional import testing
+
+## State
+branch: issue-836-validator-mcp-tool
+issue-repo: casehubio/platform
+status: active
+date: 2026-11-17
+active_issue: casehubio/platform#870
