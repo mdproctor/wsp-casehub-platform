@@ -1,7 +1,7 @@
 # Work Plan —
 
 ## State
-branch: issue-836-validator-mcp-tool
+branch: 
 issue-repo: casehubio/platform
 status: active
 date: 2026-11-17
@@ -9,8 +9,8 @@ active_issue: casehubio/platform#836
 
 ## Queue
 - [x] casehubio/platform#836 — WS-6b: Validator MCP tool + shaped plugin schemas + metric
-- [ ] casehubio/platform#864 — StepSchemaComposer capability-aware structural keywords ← active
-- [ ] casehubio/platform#862 — SourceLocation line/column tracking in PlaybookParser
+- [x] casehubio/platform#864 — StepSchemaComposer capability-aware structural keywords
+- [ ] casehubio/platform#862 — SourceLocation line/column tracking in PlaybookParser ← active
 - [ ] casehubio/platform#863 — Global steps: key rejection in PlaybookParser
 - [ ] casehubio/platform#865 — Hierarchical step catalogue — domain-grouped discovery
 - [ ] casehubio/platform#838 — StepTraceCollector restore advanceStateMachines
