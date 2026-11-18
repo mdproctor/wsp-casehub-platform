@@ -45,3 +45,6 @@ active_issue: casehubio/platform#870
 - [x] casehubio/platform#869 — StepSchemaComposer concurrency docs
 - [ ] casehubio/platform#870 — LocationIndex import expansion ← active
 - [ ] casehubio/platform#871 — Background trace integration
+- [ ] casehubio/platform#873 — PlaybookRunnerCore duplicate capture registration
+- [ ] casehubio/platform#874 — Streaming plugin without subject ContextParam intersection
+- [ ] casehubio/platform#875 — Module conditional import testing
