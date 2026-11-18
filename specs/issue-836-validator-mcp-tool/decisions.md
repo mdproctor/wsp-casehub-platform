@@ -13,7 +13,7 @@
 
 ## D2: Catalogue API — filtered query
 
-**Choice:** Add `catalogue(int level, String schema)` to `PlaybookApi` returning a `StepCatalogue` record with filtered Definition summaries, JSON Schema, and example YAML snippets. Trust filtering via `SchemaFilteredRegistry`, level filtering via new `LevelFilteredRegistry` wrapper.
+**Choice:** Add `catalogue(String level, String schema)` to `PlaybookApi` returning a `StepCatalogue` record with filtered Definition summaries, JSON Schema, and example YAML snippets. Trust filtering via `SchemaFilteredRegistry`, level filtering via new `LevelFilteredRegistry` wrapper.
 **Alternatives:**
 - Full catalogue with metadata — return everything annotated with level/trust availability. Rejected: defeats the "small vocabulary" goal stated in the issue.
 **Rationale:** The issue explicitly says "a model sees a small vocabulary, not 600 operations." Filtering server-side gives the LLM exactly what it needs at each level. Reuses `SchemaFilteredRegistry` pattern.

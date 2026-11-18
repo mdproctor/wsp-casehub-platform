@@ -87,16 +87,40 @@ casehub:
         timeout-seconds: 30
 ```
 
+#### Validation context
+
+The current `validate(Path)` signature has no way to carry the schema context. Add a `ValidationContext` record and an overloaded method:
+
+```java
+public record ValidationContext(
+        String schema,          // "assisted" or "developer", default "developer"
+        String level,           // optional level name for catalogue-aware validation
+        boolean llmSuggestions) {} // layer 3 enabled?
+```
+
+```java
+// New overload — the original delegates with developer defaults
+public PlaybookValidationResult validate(Path playbookPath) {
+    return validate(playbookPath, new ValidationContext("developer", null, false));
+}
+
+public PlaybookValidationResult validate(Path playbookPath, ValidationContext ctx) { ... }
+```
+
+The `PlaybookApi.validate()` MCP method passes `ValidationContext("assisted", null, llmEnabled)` — the validator always runs in the `assisted` trust context. The schema context flows to `ExpressionEngineRegistry` and `VariableResolver` setup within this method.
+
 #### Validation implementation
 
-`PlaybookRunnerCore.validate()` changes:
+`PlaybookRunnerCore.validate(Path, ValidationContext)` implementation:
 
 1. Parse YAML via `PlaybookParser.parse()` — unchanged
 2. Expand imports — unchanged
-3. Wrap `Walker.resolve()` in a try-catch that converts `ParseError` subtypes to `ValidationDiagnostic` records, preserving `SourceLocation`, `ErrorCategory`, and `toDetailMap()`
-4. Run `ValidationSuggestionGenerator` over diagnostics to produce layer 1+2 suggestions
-5. If layer 3 enabled, invoke `AgentProvider` asynchronously with the diagnostics, original YAML, and catalogue context — with timeout
-6. Return enriched `PlaybookValidationResult`
+3. Build a `PluginRegistry` filtered by schema context (`SchemaFilteredRegistry.forSchema()`)
+4. Build a `VariableResolver` chain, excluding `env()`/`systemProperty()` when schema is `assisted`
+5. Wrap `Walker.resolve()` in a try-catch that converts `ParseError` subtypes to `ValidationDiagnostic` records, preserving `SourceLocation`, `ErrorCategory`, and `toDetailMap()`
+6. Run `ValidationSuggestionGenerator` over diagnostics to produce layer 1+2 suggestions
+7. If `ctx.llmSuggestions()`, invoke `AgentProvider` asynchronously with the diagnostics, original YAML, and catalogue context — with timeout
+8. Return enriched `PlaybookValidationResult`
 
 ### 2. Step catalogue API (D2, D6, D9)
 
@@ -170,7 +194,7 @@ New class `MapPlaybookLevelRegistry` (in `yaml-core`) with five built-in levels:
 | `advanced` | 4 | + `orchestration`, `correlation` |
 | `expert` | 5 | + all remaining (mcp-invoke, graphql-invoke, codegen, state-machine) |
 
-Each level includes all capabilities from lower levels. Level ordinal provides backward compatibility with existing `meta.level: 1` metadata in playbook YAML.
+Each level includes all capabilities from lower levels. Level ordinal provides backward compatibility with existing `meta.level: 1` metadata in playbook YAML — `resolveByOrdinal(1)` returns `foundational`. The catalogue API accepts both forms: when the `level` parameter is numeric, it calls `resolveByOrdinal`; otherwise `resolve` by name. The `ValidatePlaybookPlugin` directory-mode meta check uses `resolveByOrdinal` to map existing integer metadata to named levels.
 
 #### `LevelFilteredRegistry`
 
@@ -214,6 +238,8 @@ public record Definition(
 ```
 
 When `variants` is non-empty, the plugin has per-operation parameter sets. When empty (default), `inputs` applies as-is (backward compatible).
+
+**Constructor backward compatibility:** The existing `Definition` record has convenience constructors (7-arg, 8-arg, 9-arg). Adding `variants` as a 10th field breaks them. Add a new canonical constructor that defaults `variants` to `Map.of()`, and update the existing convenience constructors to chain through it. The builder handles new code; the positional constructors handle existing callers.
 
 Builder extension:
 
