@@ -1,3 +1,13 @@
+# Work Plan —
+
+## State
+branch: issue-877-expand-branches-location-index
+issue-repo: casehubio/platform
+status: active
+date: 2026-11-18
+active_issue: casehubio/platform#876
+
+## Queue
 - [x] casehubio/platform#870 — LocationIndex import expansion
 - [x] casehubio/platform#870 — LocationIndex import expansion
 - [x] casehubio/platform#873 — PlaybookRunnerCore duplicate capture registration
@@ -5,13 +15,6 @@
 - [x] casehubio/platform#875 — Module conditional import testing
 - [x] casehubio/platform#871 — Background trace integration
 - [x] casehubio/platform#876 — Background trace step name propagation
-- [ ] casehubio/platform#877 — expandBranches LocationIndex gap        ← active
+- [ ] casehubio/platform#877 — expandBranches LocationIndex gap ← active
 - [ ] casehubio/platform#878 — Conditional import runtime evaluation
 - [ ] casehubio/platform#879 — Eliminate dual-parse SnakeYAML dependency
-
-## State
-branch: issue-876-background-trace-step-name
-issue-repo: casehubio/platform
-status: active
-date: 2026-11-18
-active_issue: casehubio/platform#876
