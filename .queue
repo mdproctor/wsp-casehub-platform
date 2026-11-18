@@ -19,8 +19,8 @@ active_issue: casehubio/platform#836
 - [x] casehubio/platform#841 — parallel structural step needs concurrency bound and fail-fast
 - [x] casehubio/platform#842 — background decorator error observability
 - [x] casehubio/platform#843 — configurable iteration cap for until loops
-- [ ] casehubio/platform#765 — feat: CorpusSelectionEventObserver rebuild trigger index on profile activation ← active
-- [ ] casehubio/platform#848 — Streaming plugins bypass validation and coercion
+- [x] casehubio/platform#765 — feat: CorpusSelectionEventObserver rebuild trigger index on profile activation
+- [ ] casehubio/platform#848 — Streaming plugins bypass validation and coercion ← active
 - [ ] casehubio/platform#849 — Streaming + ContextParam intersection not handled in generator
 - [ ] casehubio/platform#851 — Restore module-system demonstration
 - [ ] casehubio/platform#867 — capture: result name collides with built-in result scope
