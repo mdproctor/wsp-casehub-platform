@@ -13,8 +13,8 @@ active_issue: casehubio/platform#836
 - [x] casehubio/platform#862 — SourceLocation line/column tracking in PlaybookParser
 - [x] casehubio/platform#863 — Global steps: key rejection in PlaybookParser
 - [x] casehubio/platform#865 — Hierarchical step catalogue — domain-grouped discovery
-- [ ] casehubio/platform#838 — StepTraceCollector restore advanceStateMachines ← active
-- [ ] casehubio/platform#839 — SimulationRuntimeActivator static ObjectMapper
+- [x] casehubio/platform#838 — StepTraceCollector restore advanceStateMachines
+- [ ] casehubio/platform#839 — SimulationRuntimeActivator static ObjectMapper ← active
 - [ ] casehubio/platform#840 — consolidate duplicate capture logic
 - [ ] casehubio/platform#841 — parallel structural step needs concurrency bound and fail-fast
 - [ ] casehubio/platform#842 — background decorator error observability
