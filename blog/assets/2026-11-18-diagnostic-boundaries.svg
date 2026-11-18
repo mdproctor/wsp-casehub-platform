@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 340" font-family="'Inter', 'Segoe UI', system-ui, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="720" height="340" fill="#f8fafc" rx="8"/>
+
+  <!-- Main playbook box -->
+  <rect x="20" y="30" width="200" height="100" rx="6" fill="#e0e7ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="120" y="55" text-anchor="middle" font-weight="600" fill="#312e81">Main Playbook</text>
+  <text x="120" y="75" text-anchor="middle" fill="#4338ca" font-size="11">SnakeYAML parse</text>
+  <text x="120" y="92" text-anchor="middle" fill="#4338ca" font-size="11">→ LocationIndex ✓</text>
+  <text x="120" y="109" text-anchor="middle" fill="#4338ca" font-size="11">line:col for every map</text>
+
+  <!-- Module file box -->
+  <rect x="280" y="30" width="200" height="100" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="380" y="55" text-anchor="middle" font-weight="600" fill="#78350f">Module File</text>
+  <text x="380" y="75" text-anchor="middle" fill="#92400e" font-size="11">Jackson parse</text>
+  <text x="380" y="92" text-anchor="middle" fill="#92400e" font-size="11">→ LocationIndex ✗</text>
+  <text x="380" y="109" text-anchor="middle" fill="#92400e" font-size="11">different map instances</text>
+
+  <!-- Bridge -->
+  <rect x="540" y="30" width="160" height="100" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="620" y="55" text-anchor="middle" font-weight="600" fill="#14532d">Dual-Parse Bridge</text>
+  <text x="620" y="75" text-anchor="middle" fill="#166534" font-size="11">SnakeYAML + Jackson</text>
+  <text x="620" y="92" text-anchor="middle" fill="#166534" font-size="11">transferFrom() walks</text>
+  <text x="620" y="109" text-anchor="middle" fill="#166534" font-size="11">both trees in parallel</text>
+
+  <!-- Arrows top row -->
+  <line x1="220" y1="80" x2="275" y2="80" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="248" y="73" text-anchor="middle" fill="#64748b" font-size="10">import</text>
+  <line x1="480" y1="80" x2="535" y2="80" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="508" y="73" text-anchor="middle" fill="#16a34a" font-size="10">fix</text>
+
+  <!-- Conditional import box -->
+  <rect x="20" y="170" width="220" height="80" rx="6" fill="#fce7f3" stroke="#db2777" stroke-width="1.5"/>
+  <text x="130" y="195" text-anchor="middle" font-weight="600" fill="#831843">Conditional Import</text>
+  <text x="130" y="215" text-anchor="middle" fill="#9d174d" font-size="11">condition: "${module.a.output}"</text>
+  <text x="130" y="232" text-anchor="middle" fill="#9d174d" font-size="11">stored but never evaluated → now gates</text>
+
+  <!-- Background trace box -->
+  <rect x="280" y="170" width="220" height="80" rx="6" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.5"/>
+  <text x="390" y="195" text-anchor="middle" font-weight="600" fill="#713f12">Background Failure</text>
+  <text x="390" y="215" text-anchor="middle" fill="#854d0e" font-size="11">spawned task fails</text>
+  <text x="390" y="232" text-anchor="middle" fill="#854d0e" font-size="11">logged but no trace → now FAILED node</text>
+
+  <!-- Walker box -->
+  <rect x="540" y="170" width="160" height="80" rx="6" fill="#e0e7ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="620" y="195" text-anchor="middle" font-weight="600" fill="#312e81">Walker Validation</text>
+  <text x="620" y="215" text-anchor="middle" fill="#4338ca" font-size="11">locationOf(step)</text>
+  <text x="620" y="232" text-anchor="middle" fill="#4338ca" font-size="11">→ module.yaml:7:5</text>
+
+  <!-- Bottom label -->
+  <text x="360" y="300" text-anchor="middle" font-size="15" font-weight="600" fill="#1e293b">Three boundaries where diagnostic precision was lost</text>
+  <text x="360" y="320" text-anchor="middle" font-size="12" fill="#64748b">Module imports • Conditional gates • Async threads</text>
+</svg>
