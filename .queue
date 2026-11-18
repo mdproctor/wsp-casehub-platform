@@ -23,4 +23,25 @@ branch: issue-836-validator-mcp-tool
 issue-repo: casehubio/platform
 status: active
 date: 2026-11-17
-active_issue: casehubio/platform#836
+active_issue: casehubio/platform#851
+
+## Queue
+- [x] casehubio/platform#836 — WS-6b: Validator MCP tool + shaped plugin schemas + metric
+- [x] casehubio/platform#864 — StepSchemaComposer capability-aware structural keywords
+- [x] casehubio/platform#862 — SourceLocation line/column tracking in PlaybookParser
+- [x] casehubio/platform#863 — Global steps: key rejection in PlaybookParser
+- [x] casehubio/platform#865 — Hierarchical step catalogue — domain-grouped discovery
+- [x] casehubio/platform#838 — StepTraceCollector restore advanceStateMachines
+- [x] casehubio/platform#839 — SimulationRuntimeActivator static ObjectMapper
+- [x] casehubio/platform#840 — consolidate duplicate capture logic
+- [x] casehubio/platform#841 — parallel structural step needs concurrency bound and fail-fast
+- [x] casehubio/platform#842 — background decorator error observability
+- [x] casehubio/platform#843 — configurable iteration cap for until loops
+- [x] casehubio/platform#765 — feat: CorpusSelectionEventObserver rebuild trigger index on profile activation
+- [x] casehubio/platform#848 — Streaming plugins bypass validation and coercion
+- [x] casehubio/platform#849 — Streaming + ContextParam intersection not handled in generator
+- [ ] casehubio/platform#851 — Restore module-system demonstration ← active
+- [ ] casehubio/platform#867 — capture: result name collides with built-in result scope
+- [ ] casehubio/platform#869 — StepSchemaComposer concurrency docs
+- [ ] casehubio/platform#870 — LocationIndex import expansion
+- [ ] casehubio/platform#871 — Background trace integration
