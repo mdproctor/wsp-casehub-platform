@@ -1,43 +1,35 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #879 closed, 2 follow-up issues filed (#886, #887)
-**Landed:** `b975807b` on main (3 commits), not yet published
-**Queue:** 5 items remaining, #885 is next
+**Last worked:** #885, #883, #884, #886, #887 closed; 2 follow-up issues filed (#888, #889)
+**Landed:** `ba7c64ed` on main (7 commits), not yet published
+**Queue:** 2 items remaining, #888 is next
 
 ## This session
 
-Eliminated direct SnakeYAML API usage from `yaml-step-runtime` (#879). The dual-parse pattern — Jackson for typed `YamlModuleFile` deserialization, SnakeYAML `composeAll`/`convertNode` for source position tracking, then `transferFrom` to bridge positions between object identities — was replaced with a single-pass Jackson `BeanDeserializerModifier` approach.
+Closed 5 issues — the tail of the SnakeYAML migration (#879) plus APT schema improvements.
 
-**New classes in yaml-jackson:**
-- `LocationTrackingModule` — Jackson Module with `LOCATION_INDEX_KEY` and `FILE_PATH_KEY` context attributes
-- `LocationTrackingModifier` — wraps `MapDeserializer` and `CollectionDeserializer`
-- `LocationTrackingMapDeserializer` / `LocationTrackingCollectionDeserializer` — capture `JsonLocation` before delegating, register in `LocationIndex`
-- `LocationTrackingHelper` — shared recording logic
+**#885 (S/Med):** `SchemaEmitter` APT now generates proper `items` schema for `List<T>` plugin fields. Refactored from `toJsonType(String)` to `writeProperty(TypeMirror)` — extracts type arguments via `DeclaredType.getTypeArguments()`. For `List<Record>`, generates full `items` with `properties` and `required`. For `List<SimpleType>`, generates `items` with the basic JSON type. Code review caught a regression: the `startsWith("java.util.List")` fallback was removed from `toJsonType`, breaking raw List and nested record List components — fixed in `ba7c64ed`.
 
-**Modified in yaml-step-runtime:**
-- `PlaybookParser` — replaced `composeAll`/`convertNode`/`resolveScalar` with Jackson `ObjectMapper` + `MappingIterator`. Static `MAPPER` field. `parseRawWithLocations` reduced to package-private (only test caller remains).
-- `FileSystemModuleLoader` — single Jackson parse with `LocationTrackingModule` replaces dual-parse + `transferFrom`. `PlaybookParser` import removed.
+**#883 (XS/Low):** Two test playbooks verifying `use:` steps inside `if/then` branches respect deferred import conditions. Truthy → branch executes; falsy → branch skipped.
 
-**Code review:** 0 CRITICAL, 0 WARNING, 2 NOTEs (both fixed: orphaned public method → package-private, FQN → import).
+**#884 (XS/Low):** Hardened 4 `Map.of()` call sites in `PlaybookModuleBridgeTest` with explicit `Map.<String, Object>of()` to prevent type inference ambiguity with overloaded `expandUseSteps`.
 
-**Blog:** "The Parse You Already Paid For" — Jackson BeanDeserializerModifier for position tracking.
+**#886 (XS/Low):** Removed orphaned `parseRawWithLocations` and `RawParseResult` from `PlaybookParser`. Single test caller was redundant with `LocationTrackingModuleTest`.
+
+**#887 (XS/Low):** Migrated `YamlPreferenceLoader` (config-core) and `YamlEndpointLoader` (endpoints-config-core) from `Yaml.load()` to `ObjectMapper(YAMLFactory).readValue()`. Handles empty input via `MismatchedInputException` (Jackson throws where SnakeYAML returned null). POM deps switched from `snakeyaml` to `jackson-dataformat-yaml`. Zero direct SnakeYAML imports remain in platform production code.
+
+**Blog:** "The Type Your Schema Forgot" — APT TypeMirror vs toString() for schema generation, final SnakeYAML removal.
 
 **Issues filed:**
-- #886 — Remove orphaned `parseRawWithLocations` entirely (XS/Low)
-- #887 — Migrate config-core and endpoints-config-core from direct SnakeYAML to Jackson (XS/Low)
+- #888 — Nested record components lose TypeMirror — List fields lack items schema (S/Med)
+- #889 — Standalone record fields lack nested properties schema (S/Low)
 
-## Queue (5 items)
+## Queue (2 items)
 
-1. #885 — SchemaEmitter bare array type for List<T> plugin fields (S/Med) ← next
-2. #883 — Test deferred condition with use inside branch structures (XS/Low)
-3. #884 — Fix pre-existing compile errors in yaml-test-core (XS/Low)
-4. #886 — Remove orphaned parseRawWithLocations (XS/Low)
-5. #887 — Migrate config-core/endpoints-config-core from SnakeYAML (XS/Low)
-
-**Note:** The task hierarchy under #885 in the .queue is stale (injected under wrong issue during queue reorder). It will be overwritten when #885's actual plan is created.
+1. #888 — SchemaEmitter nested record components lose TypeMirror (S/Med) ← next
+2. #889 — SchemaEmitter standalone record fields lack nested properties (S/Low)
 
 ## References
 
-- Blog: `blog/2026-11-18-mdp06-the-parse-you-already-paid-for.md`
-- Design spec: `specs/issue-879-eliminate-snakeyaml-dual-parse/2026-11-18-eliminate-snakeyaml-dual-parse-design.md`
-- Key files: `yaml-jackson/.../LocationTrackingModule.java`, `yaml-step-runtime/.../PlaybookParser.java`, `yaml-step-runtime/.../FileSystemModuleLoader.java`
+- Blog: `docs/blog/2026-11-19-mdp01-the-type-your-schema-forgot.md`
+- Key files: `yaml-plugin-processor/.../SchemaEmitter.java`, `config-core/.../YamlPreferenceLoader.java`, `endpoints-config-core/.../YamlEndpointLoader.java`
