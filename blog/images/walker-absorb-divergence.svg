@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 400" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#374151"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#dc2626"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#16a34a"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="360" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#111827">Walker Sibling Key Resolution — Two Paths, Two Answers</text>
+
+  <!-- YAML step -->
+  <rect x="230" y="50" width="260" height="70" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="250" y="72" font-size="11" font-family="monospace" fill="#374151">- agent-query extractor: &gt;</text>
+  <text x="250" y="88" font-size="11" font-family="monospace" fill="#374151">    Extract from this invoice...</text>
+  <text x="250" y="104" font-size="11" font-family="monospace" fill="#b91c1c">  response-format:</text>
+  <text x="250" y="112" font-size="9" font-family="monospace" fill="#6b7280">    type: json</text>
+
+  <!-- Fork arrow -->
+  <line x1="360" y1="120" x2="360" y2="145" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Walker box -->
+  <rect x="280" y="145" width="160" height="35" rx="6" fill="#e0e7ff" stroke="#818cf8" stroke-width="1.5"/>
+  <text x="360" y="167" text-anchor="middle" font-size="13" font-weight="600" fill="#3730a3">Walker</text>
+
+  <!-- Two paths -->
+  <line x1="320" y1="180" x2="160" y2="220" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="400" y1="180" x2="560" y2="220" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Left path: validate-playbook -->
+  <rect x="40" y="220" width="240" height="45" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="160" y="240" text-anchor="middle" font-size="12" font-weight="600" fill="#92400e">validate-playbook</text>
+  <text x="160" y="255" text-anchor="middle" font-size="10" fill="#78350f">Catalog stubs · absorbSiblings=true</text>
+
+  <line x1="160" y1="265" x2="160" y2="300" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+
+  <rect x="80" y="300" width="160" height="35" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="160" y="322" text-anchor="middle" font-size="12" font-weight="600" fill="#166534">✓ Compilation passes</text>
+
+  <!-- Right path: run-playbook -->
+  <rect x="440" y="220" width="240" height="45" rx="6" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="560" y="240" text-anchor="middle" font-size="12" font-weight="600" fill="#991b1b">run-playbook</text>
+  <text x="560" y="255" text-anchor="middle" font-size="10" fill="#7f1d1d">AgentSessionPlugins · absorbSiblings=false</text>
+
+  <line x1="560" y1="265" x2="560" y2="300" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+
+  <rect x="470" y="300" width="180" height="35" rx="6" fill="#fecaca" stroke="#dc2626" stroke-width="1.5"/>
+  <text x="560" y="322" text-anchor="middle" font-size="12" font-weight="600" fill="#991b1b">✗ Unknown key error</text>
+
+  <!-- Fix annotation -->
+  <rect x="440" y="355" width="240" height="35" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="560" y="377" text-anchor="middle" font-size="11" font-weight="500" fill="#166534">Fix: .absorbSiblings(true) on query def</text>
+</svg>
