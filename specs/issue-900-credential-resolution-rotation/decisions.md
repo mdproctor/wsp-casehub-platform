@@ -9,3 +9,15 @@
 **Sources:** StaticCredentialStore.java, StaticCredentialEntity.java, V2__add_static_credentials.sql, WorkerCredentialStore (lookup-by-token pattern)
 **Exploration:** quick
 **Status:** captured
+
+## D2: SPI evolution — adding resolve/rotate/revoke
+
+**Choice:** Add default methods to `StaticCredentialStore`. `resolve()` defaults to `Optional.empty()`, `rotate()` defaults to `throw UnsupportedOperationException`, `revoke()` defaults to no-op. Existing implementations compile without changes.
+**Alternatives:**
+- Sub-interface `RotatableCredentialStore extends StaticCredentialStore` — clean separation but two interfaces for one store, no platform precedent
+- Separate `StaticCredentialResolver` SPI — splits read/write of same entity, coordination complexity
+**Rationale:** Matches `WorkerCredentialStore` pattern exactly (all methods have default no-op/empty implementations). Keeps one interface, one injection point.
+**Trade-offs:** Interface grows from 4 to 7 methods.
+**Sources:** WorkerCredentialStore.java (default method pattern), StaticCredentialStore.java
+**Exploration:** quick
+**Status:** captured
