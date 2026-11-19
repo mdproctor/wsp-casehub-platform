@@ -55,6 +55,10 @@ public interface StaticCredentialStore {
 
 **Behavioral changes to existing methods:** `find()` returns only the ACTIVE credential. `findAll()` returns only ACTIVE credentials. This preserves backward compatibility — existing callers expect live credentials.
 
+**`store()` semantics in the multi-row model:** `store()` performs upsert-by-composite-key with ACTIVE status. If an ACTIVE credential already exists for `(actorId, provider, tenancyId)`, it is replaced (same as current behavior). `store()` does NOT create GRACE_PERIOD or REVOKED rows — that is `rotate()`'s and `revoke()`'s job. Callers migrating from the old `store()`-to-rotate pattern get identical behavior.
+
+**`delete()` semantics:** `delete()` removes ALL rows for the `(actorId, provider, tenancyId)` tuple — ACTIVE, GRACE_PERIOD, and REVOKED. This is a hard delete, not a state change. Use `revoke()` for security-incident invalidation with audit trail retention; use `delete()` only for complete credential removal (e.g., actor deprovisioning).
+
 ## `CredentialState` Enum
 
 ```java
@@ -169,12 +173,12 @@ ALTER TABLE authn_static_credential
     ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     ADD COLUMN expires_at TIMESTAMP;
 
--- Step 2: Backfill id and credential_hash for existing rows
-UPDATE authn_static_credential
-    SET id = gen_random_uuid()::text,
-        credential_hash = encode(sha256(credential::bytea), 'hex');
+-- Step 2: Backfill id (UUIDv7 via application-level migration, not gen_random_uuid())
+-- and credential_hash. The backfill runs as a Java-based Flyway migration (V3.1)
+-- to use UUIDv7 and to avoid logging raw credential values in SQL statement logs.
+-- V3 handles DDL only; V3.1 handles data backfill in Java.
 
--- Step 3: Make id non-null and primary key
+-- Step 3: Make id non-null and primary key (runs after V3.1 backfill)
 ALTER TABLE authn_static_credential ALTER COLUMN id SET NOT NULL;
 ALTER TABLE authn_static_credential ALTER COLUMN credential_hash SET NOT NULL;
 ALTER TABLE authn_static_credential DROP CONSTRAINT authn_static_credential_pkey;
@@ -192,6 +196,10 @@ CREATE UNIQUE INDEX idx_static_cred_grace
     ON authn_static_credential(actor_id, provider, tenancy_id) WHERE status = 'GRACE_PERIOD';
 ```
 
+**Migration is split:** V3 (SQL) handles DDL — column additions, PK change, indexes. V3.1 (Java-based Flyway migration) handles data backfill — generates UUIDv7 IDs and computes SHA-256 hashes in Java, avoiding both `gen_random_uuid()` (which produces v4, not v7) and raw credential exposure in PostgreSQL statement logs.
+
+**H2 test compatibility:** Partial unique indexes (`WHERE status = ...`) are PostgreSQL-specific. For H2 tests, the application-level enforcement via `SELECT FOR UPDATE` within `@Transactional rotate()` provides the same invariant. This is consistent with existing Flyway conventions in the codebase (PostgreSQL-specific features are allowed with H2 compatibility noted).
+
 **Partial unique indexes** enforce at-most-one ACTIVE and at-most-one GRACE_PERIOD credential per `(actor, provider, tenant)` at the database level.
 
 ## Hashing Strategy
@@ -201,7 +209,7 @@ Hashing is a store implementation concern, not an SPI concern.
 **JPA implementation:**
 - `store()` computes `SHA-256(record.credential())` → hex string → `credential_hash` column
 - `lookup(rawCredential)` computes `SHA-256(rawCredential)` → queries `WHERE credential_hash = ? AND status IN ('ACTIVE', 'GRACE_PERIOD') AND (expires_at IS NULL OR expires_at > NOW())`
-- Constant-time comparison via `MessageDigest.isEqual()` on the hash bytes after DB retrieval (belt-and-suspenders — the DB query is the primary match, but timing-safe comparison prevents timing side-channel on hash collisions)
+- No additional constant-time comparison needed in JPA — the DB query is an equality check on the hash, and SHA-256 collision probability is negligible (2^-128). The DB query timing is dominated by I/O, not comparison.
 - `find()`/`findAll()` return records with `credential = null` — the raw credential cannot be reconstructed
 
 **In-memory implementation:**
