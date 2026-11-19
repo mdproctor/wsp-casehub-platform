@@ -34,3 +34,15 @@
 **Exploration:** quick
 **Depends on:** D1 (credential_hash column in new schema)
 **Status:** captured
+
+## D4: StaticCredentialRecord evolution — adding state fields
+
+**Choice:** Add `CredentialState state` and `Instant expiresAt` to the existing record with defaults. Compact constructor defaults `state` to `ACTIVE` and `expiresAt` to `null`. Add backward-compatible convenience constructor with original 7 fields.
+**Alternatives:**
+- New `StaticCredentialEntry` wrapper record — two record types for same concept, mapping overhead, `find()` and `resolve()` return different types
+**Rationale:** One type throughout, zero existing call-site changes via backward-compatible constructor. Record grows from 7 to 9 fields (plus `id`) — still reasonable.
+**Trade-offs:** Nullable `expiresAt` (null means no expiry, which is the common case for ACTIVE credentials).
+**Sources:** StaticCredentialRecord.java, WorkerCredential.java (expiresAt + isExpired() pattern)
+**Exploration:** quick
+**Depends on:** D1 (state and expiresAt columns)
+**Status:** captured
