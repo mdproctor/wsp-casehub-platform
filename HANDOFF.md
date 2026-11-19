@@ -1,30 +1,37 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #888, #889 closed; 1 follow-up issue filed (#890)
-**Landed:** `c789f2a3` on main, not yet published
-**Queue:** 1 item remaining, #890 is next
+**Last worked:** #853, #872 landed; 6 issues closed (5 already-fixed); 1 follow-up filed (#891)
+**Landed:** `496d486c` on main, published
+**Queue:** 10 items remaining, #848 is next
 
-## This session (continued)
+## This session
 
-Extended SchemaEmitter with recursive type handling for nested records (#888, #889), plus code review hardening.
+Queue triage session — eight issues handled, two with code changes.
 
-**#888 (S/Med):** `writeArrayRecordProperty` now calls `writeProperty` recursively for each nested record component instead of `toJsonType(String)`. Nested `List<String>` fields inside records used as `List<Record>` elements now get proper `items` schemas.
+**#853 (S/Med) — fix:** `AgentSessionPlugins.queryDefinition()` lacked `absorbSiblings(true)`, causing the Walker to reject `response-format` as an unknown key during `run-playbook` execution while `validate-playbook` compilation passed (compilation stubs had `absorbSiblings=true`). One-line fix + test update from error-assertion to success-assertion.
 
-**#889 (S/Low):** `writeProperty` detects standalone record types and emits full `properties` + `required` via shared `writeRecordSchema`. Refactored `writeArrayRecordProperty` to reuse `writeRecordSchema`, eliminating duplication. Added JSON validity test that parses all schema outputs with Jackson ObjectMapper.
+**#872 (XS/Low) — feat:** Added `Records.toMapNonNull()` — null-safe variant of `toMap()` that skips null values and empty Optionals. Code review caught that nested records used the null-preserving `toMap` path; refactored both methods into a shared `toMap(record, omitNulls)` with recursive flag propagation.
 
-**Code review finding → #890:** The non-record List branch (`List<List<T>>`, `List<Map<>>`) still uses `toJsonType(String)` fallback — no recursive `items`. Filed as XS/Low enhancement.
+**Already-fixed closures:** #866 (lifecycle guard error msg — soredium already updated), #846 (test failures — fixed by prior #884), #657 (corruption triage — old `corruption.py` replaced), #730 (step lifecycle wiring — `StepTraceCollector` → `stepCompletionNotifier` already wired), #731 (CDI event observer — `CorpusSelectionEventObserver` already implements). **Not-applicable:** #717 (playbook UI rendering — no frontend in this repo).
 
-**Blog:** Revised "The Type Your Schema Forgot" — added recursive type walking section with new SVG diagram.
+**Filed:** #891 — `AgentSessionQueryHandler` ignores `SessionQuery.responseFormat()` in production (S/Med).
 
-## Prior session
+**Blog:** "The Two Walkers Problem" — Walker sibling absorption divergence and recursive null propagation.
 
-Closed #885, #883, #884, #886, #887 — SnakeYAML migration tail and APT schema items generation. See git log for details.
+## Queue (10 items)
 
-## Queue (1 item)
-
-1. #890 — SchemaEmitter non-record List items no recursive items (XS/Low) ← next
+1. #848 — Streaming plugins bypass validation and coercion ← next
+2. #586 — Update generator-common to depend on mcp-api
+3. #732 — MCP tool for runtime corpus phase inspection
+4. #733 — Per-phase corpus-files
+5. #639 — AgentSessionConfig.withModelParameters
+6. #826 — Budget pool telemetry types for LLM cost
+7. #697 — AgentSession.clear for non-Claude backends
+8. #251 — ts-core TsjTsExecutor JVM-native TS execution
+9. #284 — Capacity MCP tools
+10. #891 — AgentSessionPlugins absorbs response-format but never reads it
 
 ## References
 
-- Blog: `docs/blog/2026-11-19-mdp01-the-type-your-schema-forgot.md`
-- Key file: `yaml-plugin-processor/.../SchemaEmitter.java`
+- Blog: `docs/blog/2026-11-19-mdp02-the-two-walkers-problem.md`
+- Key files: `AgentSessionPlugins.java`, `Records.java`
