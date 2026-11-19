@@ -1,3 +1,14 @@
+# Work Plan —
+
+## State
+branch: 
+issue-repo: casehubio/platform
+status: active
+covers: casehubio/platform#848
+date: 2026-11-18
+active_issue: casehubio/platform#893
+
+## Queue
 - [x] casehubio/platform#879 — Eliminate dual-parse SnakeYAML dependency
 - [x] casehubio/platform#885 — apt SchemaEmitter generates bare array type for List plugin fields
 - [x] casehubio/platform#883 — Test deferred condition with use inside branch structures
@@ -24,21 +35,20 @@
 - [x] casehubio/platform#730 — Playbook step lifecycle wiring for StateMachineSelector
 - [x] casehubio/platform#731 — CDI event observer wiring for StateMachineSelector
 - [x] casehubio/platform#872 — Records.toMap preserves null values
-- [ ] casehubio/platform#848 — Streaming plugins bypass validation and coercion        ← active
-- [ ] casehubio/platform#586 — Update generator-common to depend on mcp-api
-- [ ] casehubio/platform#732 — MCP tool for runtime corpus phase inspection
-- [ ] casehubio/platform#733 — Per-phase corpus-files
-- [ ] casehubio/platform#639 — AgentSessionConfig.withModelParameters
-- [ ] casehubio/platform#826 — Budget pool telemetry types for LLM cost
-- [ ] casehubio/platform#697 — AgentSession.clear for non-Claude backends
-- [ ] casehubio/platform#251 — ts-core TsjTsExecutor JVM-native TS execution
-- [ ] casehubio/platform#284 — Capacity MCP tools
+- [x] casehubio/platform#848 — Streaming plugins bypass validation and coercion
+- [x] casehubio/platform#586 — Update generator-common to depend on mcp-api
+- [x] casehubio/platform#732 — MCP tool for runtime corpus phase inspection
+- [x] casehubio/platform#733 — Per-phase corpus-files
+- [x] casehubio/platform#639 — AgentSessionConfig.withModelParameters
+- [x] casehubio/platform#826 — Budget pool telemetry types for LLM cost
+- [x] casehubio/platform#697 — AgentSession.clear for non-Claude backends
+- [x] casehubio/platform#251 — ts-core TsjTsExecutor JVM-native TS execution
+- [ ] casehubio/platform#284 — Capacity MCP tools ← active
 - [ ] casehubio/platform#891 — AgentSessionPlugins absorbs response-format but never reads it
+- [ ] casehubio/platform#893 — Migrate test yaml from steps wrapper
+- [ ] casehubio/platform#894 — ModelParameters range validation
+- [ ] casehubio/platform#895 — Walker parallel key validation
+- [ ] casehubio/platform#896 — YamlTestDiscovery first-doc guard
 
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-covers: casehubio/platform#848
-date: 2026-11-18
-active_issue: casehubio/platform#848
+## Deferred
+- [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
