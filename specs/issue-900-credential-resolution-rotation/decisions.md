@@ -13,7 +13,12 @@
 
 ## D2: SPI evolution — adding lookup/rotate/revoke
 
-**Choice:** Add default methods to `StaticCredentialStore`. `lookup(String credential)` defaults to `Optional.empty()`, `rotate()` defaults to `throw UnsupportedOperationException`, `revoke()` defaults to `throw UnsupportedOperationException`. Existing implementations compile without changes. Contract test for new methods required per PP-20260601-81b9e5.
+**Choice:** Add default methods to `StaticCredentialStore` with composite-key signatures:
+- `lookup(String credential) → Optional<StaticCredentialRecord>` — defaults to `Optional.empty()`
+- `rotate(String actorId, String provider, String tenancyId, String newCredential) → StaticCredentialRecord` — defaults to `throw UnsupportedOperationException`
+- `revoke(String actorId, String provider, String tenancyId)` — defaults to `throw UnsupportedOperationException`
+
+Composite-key signatures work because D6's invariant guarantees exactly one ACTIVE credential per (actor, provider, tenant) — the composite key unambiguously identifies the target. `rotate()` targets the ACTIVE credential, marks it GRACE_PERIOD, and inserts a new ACTIVE. `revoke()` targets all non-REVOKED credentials for the tuple (both ACTIVE and GRACE_PERIOD are invalidated during a security incident). Existing implementations compile without changes. Contract test for new methods required per PP-20260601-81b9e5.
 **Alternatives:**
 - Sub-interface `RotatableCredentialStore extends StaticCredentialStore` — clean separation but splits what should be one coherent interface. `GraphCaseMemoryStore extends CaseMemoryStore` is a precedent, but that adds a fundamentally different query paradigm (graph queries); rotation/revocation are lifecycle operations on the same entity, not a new query model. All consumers need rotation — no use case for injecting the base type without wanting lifecycle methods available.
 - Separate `StaticCredentialResolver` SPI — splits read/write of same entity, coordination complexity
@@ -22,7 +27,7 @@
 **Trade-offs:** Interface grows from 4 to 7 methods. `revoke()` throwing by default means `NoOpStaticCredentialStore` must override with `{}` (matches `NoOpCaseMemoryStore.eraseById()` pattern).
 **Sources:** WorkerCredentialStore.java (default method pattern, `lookup()` naming), StaticCredentialStore.java, CredentialResolver.java (naming collision avoided), PP-20260528-557f5c (spi-deletion-default-throws), PP-20260601-81b9e5 (spi-evolution-default-methods — contract test mandate)
 **Exploration:** quick
-**Status:** revised — renamed `resolve()` to `lookup()` (R1-08); `revoke()` default changed from no-op to throw (R1-07); added contract test mandate (R1-10); expanded sub-interface rationale with GraphCaseMemoryStore analysis (R1-09)
+**Status:** revised — renamed `resolve()` to `lookup()` (R1-08); `revoke()` default changed from no-op to throw (R1-07); added contract test mandate (R1-10); expanded sub-interface rationale with GraphCaseMemoryStore analysis (R1-09); added explicit method signatures with composite keys (R2-02)
 
 ## D3: Hashing strategy — where hashing happens
 
@@ -42,28 +47,32 @@
 
 ## D4: StaticCredentialRecord evolution — adding state fields
 
-**Choice:** Add `CredentialState state` and `Instant expiresAt` to the existing record with defaults. Compact constructor defaults `state` to `ACTIVE` and `expiresAt` to `null`. Add backward-compatible convenience constructor with original 7 fields.
+**Choice:** Add `CredentialState state` and `Instant expiresAt` to the existing record with defaults. Compact constructor defaults `state` to `ACTIVE` and `expiresAt` to `null`. Add backward-compatible convenience constructor with original 7 fields. No surrogate `id` on the domain record — `id` is a persistence concern internal to the JPA entity; no SPI method signature uses it (D2's composite-key signatures make it unnecessary).
+**Credential nullability:** `Objects.requireNonNull(credential, "credential")` is removed from the compact constructor. `credential` becomes nullable on the record: non-null on write (store() validates), null on read (raw credential not persisted after hashing per D3). Validation moves from the record constructor to `store()` implementations, which reject null credentials before hashing. Existing code that reads `.credential()` after `find()`/`findAll()` (e.g. `ServiceConnectionE2ETest` line 75) must be updated.
 **Alternatives:**
-- New `StaticCredentialEntry` wrapper record — two record types for same concept, mapping overhead, `find()` and `resolve()` return different types
-**Rationale:** One type throughout, zero existing call-site changes via backward-compatible constructor. Record grows from 7 to 9 fields (plus `id`) — still reasonable.
-**Trade-offs:** Nullable `expiresAt` (null means no expiry, which is the common case for ACTIVE credentials).
-**Sources:** StaticCredentialRecord.java, WorkerCredential.java (expiresAt + isExpired() pattern)
+- New `StaticCredentialEntry` wrapper record — two record types for same concept, mapping overhead, `find()` and `findAll()` return different types
+- Keep `requireNonNull(credential)` and use sentinel value (empty string) on read — semantically wrong; a present empty string is different from an absent credential
+- Include surrogate `id` on the domain record — persistence leak; no SPI method needs it since composite-key signatures (D2) plus the ACTIVE invariant (D6) unambiguously identify targets
+**Rationale:** One type throughout, zero existing call-site changes via backward-compatible constructor. Record grows from 7 to 9 fields — still reasonable. Nullable `credential` correctly models the read vs. write asymmetry introduced by D3's hashing design.
+**Trade-offs:** Nullable `expiresAt` (null means no expiry, which is the common case for ACTIVE credentials). Nullable `credential` (null on read path — a semantic change from the current non-null contract).
+**Sources:** StaticCredentialRecord.java, WorkerCredential.java (expiresAt + isExpired() pattern), ServiceConnectionE2ETest.java (existing .credential() read-back usage)
 **Exploration:** quick
-**Depends on:** D1 (state and expiresAt columns)
-**Status:** captured
+**Depends on:** D1 (state and expiresAt columns), D2 (composite-key signatures — no id needed), D3 (hashing makes credential write-only)
+**Status:** revised — removed `id` from domain record (R1-16/R2-02); made `credential` nullable with constructor validation moved to store() (R2-03)
 
 ## D5: CredentialState enum values and lifecycle
 
-**Choice:** `CredentialState` enum with three values: `ACTIVE` (current valid credential), `GRACE_PERIOD` (old credential still accepted during rotation window, with `expires_at` set), `REVOKED` (credential explicitly invalidated — security incident, manual revocation). REVOKED credentials are retained in the database for audit trail purposes — not deleted. Terminal states: REVOKED (never re-activated). `find()` filters to ACTIVE by default. `findAll()` returns all states for administrative views.
+**Choice:** `CredentialState` enum with three values: `ACTIVE` (current valid credential), `GRACE_PERIOD` (old credential still accepted during rotation window, with `expires_at` set), `REVOKED` (credential explicitly invalidated — security incident, manual revocation). REVOKED credentials are retained in the database for audit trail purposes — not deleted. Terminal states: REVOKED (never re-activated). Both `find()` and `findAll()` filter to ACTIVE by default — consistent behavior, no silent contract break for existing callers. Admin views requiring all states are a separate concern, served by a dedicated method when that need arises.
 **Alternatives:**
 - Two values only (ACTIVE, GRACE_PERIOD) with physical deletion for revocation — loses audit trail of security events
 - Four values adding EXPIRED — unnecessary; GRACE_PERIOD credentials with `expires_at < NOW` are implicitly expired, queryable without a separate state
-**Rationale:** Three states capture the complete lifecycle. REVOKED is semantically distinct from expired (security intent vs. time-based). Retaining revoked credentials enables post-incident analysis.
-**Trade-offs:** Query surface must handle three states. `findAll()` callers must be aware of non-ACTIVE results.
+- `findAll()` returns all states by default — silent behavioral change for existing callers who assume every returned record is a live credential; creates an asymmetry with `find()` (ACTIVE-only) that is non-obvious and error-prone
+**Rationale:** Three states capture the complete lifecycle. REVOKED is semantically distinct from expired (security intent vs. time-based). Retaining revoked credentials enables post-incident analysis. Filtering to ACTIVE by default on both `find()` and `findAll()` preserves backward compatibility — existing callers currently get one record per provider from `findAll()`, and that behavior is preserved.
+**Trade-offs:** Query surface must handle three states in JPA implementations internally. Admin/audit queries for non-ACTIVE credentials require a separate method (not part of issue #900 scope).
 **Sources:** Issue #900 (mentions REVOKED), WorkerCredentialStore (revoke pattern)
 **Exploration:** quick (surfaced by review R1-04)
 **Depends on:** D1 (status column)
-**Status:** captured
+**Status:** revised — `findAll()` now filters to ACTIVE by default, consistent with `find()` (R2-04)
 
 ## D6: Invariant enforcement and concurrency control for rotation
 
