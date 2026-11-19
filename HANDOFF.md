@@ -1,35 +1,30 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #885, #883, #884, #886, #887 closed; 2 follow-up issues filed (#888, #889)
-**Landed:** `ba7c64ed` on main (7 commits), not yet published
-**Queue:** 2 items remaining, #888 is next
+**Last worked:** #888, #889 closed; 1 follow-up issue filed (#890)
+**Landed:** `c789f2a3` on main, not yet published
+**Queue:** 1 item remaining, #890 is next
 
-## This session
+## This session (continued)
 
-Closed 5 issues — the tail of the SnakeYAML migration (#879) plus APT schema improvements.
+Extended SchemaEmitter with recursive type handling for nested records (#888, #889), plus code review hardening.
 
-**#885 (S/Med):** `SchemaEmitter` APT now generates proper `items` schema for `List<T>` plugin fields. Refactored from `toJsonType(String)` to `writeProperty(TypeMirror)` — extracts type arguments via `DeclaredType.getTypeArguments()`. For `List<Record>`, generates full `items` with `properties` and `required`. For `List<SimpleType>`, generates `items` with the basic JSON type. Code review caught a regression: the `startsWith("java.util.List")` fallback was removed from `toJsonType`, breaking raw List and nested record List components — fixed in `ba7c64ed`.
+**#888 (S/Med):** `writeArrayRecordProperty` now calls `writeProperty` recursively for each nested record component instead of `toJsonType(String)`. Nested `List<String>` fields inside records used as `List<Record>` elements now get proper `items` schemas.
 
-**#883 (XS/Low):** Two test playbooks verifying `use:` steps inside `if/then` branches respect deferred import conditions. Truthy → branch executes; falsy → branch skipped.
+**#889 (S/Low):** `writeProperty` detects standalone record types and emits full `properties` + `required` via shared `writeRecordSchema`. Refactored `writeArrayRecordProperty` to reuse `writeRecordSchema`, eliminating duplication. Added JSON validity test that parses all schema outputs with Jackson ObjectMapper.
 
-**#884 (XS/Low):** Hardened 4 `Map.of()` call sites in `PlaybookModuleBridgeTest` with explicit `Map.<String, Object>of()` to prevent type inference ambiguity with overloaded `expandUseSteps`.
+**Code review finding → #890:** The non-record List branch (`List<List<T>>`, `List<Map<>>`) still uses `toJsonType(String)` fallback — no recursive `items`. Filed as XS/Low enhancement.
 
-**#886 (XS/Low):** Removed orphaned `parseRawWithLocations` and `RawParseResult` from `PlaybookParser`. Single test caller was redundant with `LocationTrackingModuleTest`.
+**Blog:** Revised "The Type Your Schema Forgot" — added recursive type walking section with new SVG diagram.
 
-**#887 (XS/Low):** Migrated `YamlPreferenceLoader` (config-core) and `YamlEndpointLoader` (endpoints-config-core) from `Yaml.load()` to `ObjectMapper(YAMLFactory).readValue()`. Handles empty input via `MismatchedInputException` (Jackson throws where SnakeYAML returned null). POM deps switched from `snakeyaml` to `jackson-dataformat-yaml`. Zero direct SnakeYAML imports remain in platform production code.
+## Prior session
 
-**Blog:** "The Type Your Schema Forgot" — APT TypeMirror vs toString() for schema generation, final SnakeYAML removal.
+Closed #885, #883, #884, #886, #887 — SnakeYAML migration tail and APT schema items generation. See git log for details.
 
-**Issues filed:**
-- #888 — Nested record components lose TypeMirror — List fields lack items schema (S/Med)
-- #889 — Standalone record fields lack nested properties schema (S/Low)
+## Queue (1 item)
 
-## Queue (2 items)
-
-1. #888 — SchemaEmitter nested record components lose TypeMirror (S/Med) ← next
-2. #889 — SchemaEmitter standalone record fields lack nested properties (S/Low)
+1. #890 — SchemaEmitter non-record List items no recursive items (XS/Low) ← next
 
 ## References
 
 - Blog: `docs/blog/2026-11-19-mdp01-the-type-your-schema-forgot.md`
-- Key files: `yaml-plugin-processor/.../SchemaEmitter.java`, `config-core/.../YamlPreferenceLoader.java`, `endpoints-config-core/.../YamlEndpointLoader.java`
+- Key file: `yaml-plugin-processor/.../SchemaEmitter.java`
