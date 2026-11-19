@@ -21,3 +21,16 @@
 **Sources:** WorkerCredentialStore.java (default method pattern), StaticCredentialStore.java
 **Exploration:** quick
 **Status:** captured
+
+## D3: Hashing strategy — where hashing happens
+
+**Choice:** Hash at the store implementation boundary. SPI stays hash-agnostic — `store()` and `resolve()` accept raw credentials. JPA stores credential hash in `credential_hash` column; in-memory stores keep raw values with constant-time comparison.
+**Alternatives:**
+- Platform-api utility with pre-hashing — uniform but couples SPI to hashing, complicates record semantics
+- Hash in the record itself — mixes persistence and domain concerns, `credential()` accessor meaning changes
+**Rationale:** Hashing is a persistence/security concern, not a domain concern. Each implementation secures storage as appropriate for its context (JPA = production, in-memory = test/ephemeral).
+**Trade-offs:** In-memory store doesn't hash — acceptable since it's test/ephemeral only.
+**Sources:** Issue #900 (SHA-256 requirement), StaticCredentialEntity.java, WorkerCredentialStore (no hashing precedent)
+**Exploration:** quick
+**Depends on:** D1 (credential_hash column in new schema)
+**Status:** captured
