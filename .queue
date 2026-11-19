@@ -1,12 +1,12 @@
 # Work Plan —
 
 ## State
-branch: 
+branch: issue-900-credential-resolution-rotation
 issue-repo: casehubio/platform
 status: active
 covers: casehubio/platform#848
 date: 2026-11-18
-active_issue: casehubio/platform#893
+active_issue: casehubio/platform#900
 
 ## Queue
 - [x] casehubio/platform#879 — Eliminate dual-parse SnakeYAML dependency
@@ -43,12 +43,13 @@ active_issue: casehubio/platform#893
 - [x] casehubio/platform#826 — Budget pool telemetry types for LLM cost
 - [x] casehubio/platform#697 — AgentSession.clear for non-Claude backends
 - [x] casehubio/platform#251 — ts-core TsjTsExecutor JVM-native TS execution
-- [ ] casehubio/platform#284 — Capacity MCP tools ← active
-- [ ] casehubio/platform#891 — AgentSessionPlugins absorbs response-format but never reads it
-- [ ] casehubio/platform#893 — Migrate test yaml from steps wrapper
-- [ ] casehubio/platform#894 — ModelParameters range validation
-- [ ] casehubio/platform#895 — Walker parallel key validation
-- [ ] casehubio/platform#896 — YamlTestDiscovery first-doc guard
+- [x] casehubio/platform#284 — Capacity MCP tools
+- [x] casehubio/platform#891 — AgentSessionPlugins absorbs response-format but never reads it
+- [x] casehubio/platform#893 — Migrate test yaml from steps wrapper
+- [x] casehubio/platform#894 — ModelParameters range validation
+- [x] casehubio/platform#895 — Walker parallel key validation
+- [x] casehubio/platform#896 — YamlTestDiscovery first-doc guard
+- [ ] casehubio/platform#900 — credential resolution + rotation for StaticCredentialStore ← active
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
