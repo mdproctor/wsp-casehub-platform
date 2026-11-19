@@ -1,37 +1,41 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #853, #872 landed; 6 issues closed (5 already-fixed); 1 follow-up filed (#891)
-**Landed:** `496d486c` on main, published
-**Queue:** 10 items remaining, #848 is next
+**Last worked:** #848, #586, #639, #893 landed; #732, #733, #826, #697 closed (already-fixed/not-actionable); #251 deferred; 3 follow-ups filed (#894, #895, #896)
+**Landed:** `00fa423b` on main, published
+**Queue:** 5 items remaining, #891 is next
 
 ## This session
 
-Queue triage session — eight issues handled, two with code changes.
+Queue triage + format unification session — eight issues handled, four with code changes.
 
-**#853 (S/Med) — fix:** `AgentSessionPlugins.queryDefinition()` lacked `absorbSiblings(true)`, causing the Walker to reject `response-format` as an unknown key during `run-playbook` execution while `validate-playbook` compilation passed (compilation stubs had `absorbSiblings=true`). One-line fix + test update from error-assertion to success-assertion.
+**#848 (S/Med) — fix:** Streaming plugin factory in `PluginScanner.buildStreamingTypeInfo()` bypassed `coerceParams()` and `Validator.validateStep()`. String-typed numeric fields silently became 0, missing `@Required` fields silently became null. Added coercion + validation + java-typed input checks to match the non-streaming action path. Two new tests: coercion (string "5" → int) and required-field rejection.
 
-**#872 (XS/Low) — feat:** Added `Records.toMapNonNull()` — null-safe variant of `toMap()` that skips null values and empty Optionals. Code review caught that nested records used the null-preserving `toMap` path; refactored both methods into a shared `toMap(record, omitNulls)` with recursive flag propagation.
+**#586 (S/Low) — fix:** Swapped `graphql-spring-generator` test dependency from `platform-api` to `mcp-api`. All test imports were in `io.casehub.platform.api.mcp.*` which lives in the lighter `mcp-api` module. Confirmed by `mcp-standalone-test`'s `bannedDependencies` enforcer.
 
-**Already-fixed closures:** #866 (lifecycle guard error msg — soredium already updated), #846 (test failures — fixed by prior #884), #657 (corruption triage — old `corruption.py` replaced), #730 (step lifecycle wiring — `StepTraceCollector` → `stepCompletionNotifier` already wired), #731 (CDI event observer — `CorpusSelectionEventObserver` already implements). **Not-applicable:** #717 (playbook UI rendering — no frontend in this repo).
+**#639 (S/Low) — feat:** Added `ModelParameters` record (temperature, maxTokens, topP, topK) with fluent withers, and `withModelParameters()` to both `AgentSessionConfig` and `AgentSessionInit`. All existing withers preserve the new field.
 
-**Filed:** #891 — `AgentSessionQueryHandler` ignores `SessionQuery.responseFormat()` in production (S/Med).
+**#893 (S/Med) — fix:** Eliminated `steps:` from every parser path and schema:
+- `YamlTestDiscovery` now supports multi-document YAML and rejects top-level `steps:` and `tests:` wrapper
+- 14 `.test.yaml` files migrated to bare-list format across 3 modules
+- Parallel map form (`parallel: { steps: [...], advance-after: N }`) replaced with sibling keys
+- `playbook-document.schema.json` updated: removed `steps:`, `tests:`, `testCase`
+- `StepSchemaComposer` generates flat format only
 
-**Blog:** "The Two Walkers Problem" — Walker sibling absorption divergence and recursive null propagation.
+**Already-fixed closures:** #732 (CorpusSelectorService already implemented), #733 (resolvePhaseRecords already supports per-phase corpus-files), #826 (budget types already in agent-api). **Not-actionable:** #697 (no non-Claude multi-turn sessions exist). **Deferred:** #251 (TSJ upstream blocked).
 
-## Queue (10 items)
+**Filed from code review:** #894 (ModelParameters range validation), #895 (Walker: parallel policy keys only on parallel steps), #896 (YamlTestDiscovery first-doc guard).
 
-1. #848 — Streaming plugins bypass validation and coercion ← next
-2. #586 — Update generator-common to depend on mcp-api
-3. #732 — MCP tool for runtime corpus phase inspection
-4. #733 — Per-phase corpus-files
-5. #639 — AgentSessionConfig.withModelParameters
-6. #826 — Budget pool telemetry types for LLM cost
-7. #697 — AgentSession.clear for non-Claude backends
-8. #251 — ts-core TsjTsExecutor JVM-native TS execution
-9. #284 — Capacity MCP tools
-10. #891 — AgentSessionPlugins absorbs response-format but never reads it
+**Blog:** "The Key That Wouldn't Die" — format migration that only covered one parser path.
+
+## Queue (5 items)
+
+1. #891 — AgentSessionPlugins absorbs response-format but never reads it ← next
+2. #893 — Migrate test yaml from steps wrapper (already landed — stale queue entry)
+3. #894 — ModelParameters range validation
+4. #895 — Walker parallel key validation
+5. #896 — YamlTestDiscovery first-doc guard
 
 ## References
 
-- Blog: `docs/blog/2026-11-19-mdp02-the-two-walkers-problem.md`
-- Key files: `AgentSessionPlugins.java`, `Records.java`
+- Blog: `blog/2026-11-19-mdp03-the-key-that-wouldnt-die.md`
+- Key files: `PluginScanner.java`, `YamlTestDiscovery.java`, `Walker.java`, `ModelParameters.java`, `AgentSessionConfig.java`
