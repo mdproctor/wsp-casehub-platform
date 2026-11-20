@@ -6,10 +6,13 @@ issue-repo: casehubio/platform
 status: active
 covers: casehubio/platform#910
 date: 2026-11-18
-active_issue: casehubio/platform#910
+active_issue: casehubio/platform#898
 
 ## Queue
 - [x] casehubio/platform#879 — Eliminate dual-parse SnakeYAML dependency
+- [ ] casehubio/platform#898 — issue 898
+- [ ] casehubio/platform#902 — issue 902
+- [ ] casehubio/platform#904 — issue 904
 - [x] casehubio/platform#885 — apt SchemaEmitter generates bare array type for List plugin fields
 - [x] casehubio/platform#883 — Test deferred condition with use inside branch structures
 - [x] casehubio/platform#884 — Fix pre-existing compile errors in yaml-test-core
