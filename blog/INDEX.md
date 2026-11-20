@@ -52,3 +52,4 @@
 | [2026-11-19-mdp02-the-two-walkers-problem.md](2026-11-19-mdp02-the-two-walkers-problem.md) | 2026-11-19 | Data contract mismatches at plugin execution boundaries — Walker sibling absorption divergence and recursive null propagation in Records.toMap |
 | [2026-11-19-mdp03-the-key-that-wouldnt-die.md](2026-11-19-mdp03-the-key-that-wouldnt-die.md) | 2026-11-19 | Format migration that only covered one parser path — eliminating steps: from test files, multi-test format, parallel map form, and schema |
 | [2026-11-20-mdp02-less-ceremony-more-signal.md](2026-11-20-mdp02-less-ceremony-more-signal.md) | 2026-11-20 | Generated REST from @McpDomain, structural pattern matching in assertions, steps: rejection across all formats |
+| [2026-11-20-mdp03-the-template-that-reads-the-room.md](2026-11-20-mdp03-the-template-that-reads-the-room.md) | 2026-11-20 | TemplateExtractor and TemplateRegistry — deterministic variable extraction from prose for governance protocol vocabulary |
