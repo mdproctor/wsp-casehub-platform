@@ -4,7 +4,7 @@
 branch: 
 issue-repo: casehubio/platform
 status: active
-covers: casehubio/platform#911
+covers: casehubio/platform#915
 date: 2026-11-18
 active_issue: casehubio/platform#920
 
@@ -56,8 +56,8 @@ active_issue: casehubio/platform#920
 - [x] casehubio/platform#895 — Walker parallel key validation
 - [x] casehubio/platform#896 — YamlTestDiscovery first-doc guard
 - [x] casehubio/platform#900 — credential resolution + rotation for StaticCredentialStore
-- [ ] casehubio/platform#914 — WebAuthn delete ownership SPI ← active
-- [ ] casehubio/platform#915 — restore StepRunner pipeline coverage
+- [ ] casehubio/platform#914 — WebAuthn delete ownership SPI ← done on issue-920-resolve-playbook-cross-root
+- [ ] casehubio/platform#915 — restore StepRunner pipeline coverage ← active
 - [ ] casehubio/platform#916 — Spring REST for authn endpoints
 - [ ] casehubio/platform#903 — regression variable resolution yaml-test-core
 - [ ] casehubio/platform#913 — Spring-parity-mcp-server
