@@ -27,12 +27,15 @@ Key changes:
 2. **#910 branch not created:** The queue shows #910 as active but both repos are on main. Run `work start #910` after clearing the stale .plan.
 3. **Conflict resolved:** `c3d0dd4f` (fix #902) was superseded by remote `b84b7607` (fix #908) — same agent-interaction test migration. Skipped during rebase, no content lost.
 
-## Queue (4 items)
+## Queue (7 items)
 
-1. #910 — PostgreSQL partial unique indexes for credential rotation (XS/Low) ← next
-2. #911 — Contract test base for StaticCredentialStore (S/Low)
-3. #912 — Credential grace period cleanup scheduler (S/Low)
-4. #913 — Spring parity for mcp-server module (S/Med)
+1. #898 — ← next (priority, user-scheduled)
+2. #902 — (priority, user-scheduled)
+3. #904 — (priority, user-scheduled)
+4. #910 — PostgreSQL partial unique indexes for credential rotation (XS/Low)
+5. #911 — Contract test base for StaticCredentialStore (S/Low)
+6. #912 — Credential grace period cleanup scheduler (S/Low)
+7. #913 — Spring parity for mcp-server module (S/Med)
 
 ## References
 
