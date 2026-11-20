@@ -1,8 +1,19 @@
+# Work Plan —
+
+## State
+branch: main
+issue-repo: casehubio/platform
+status: active
+covers: casehubio/platform#911
+date: 2026-11-18
+active_issue: casehubio/platform#911
+
+## Queue
 - [x] casehubio/platform#898 — issue 898
 - [x] casehubio/platform#902 — issue 902
 - [x] casehubio/platform#904 — issue 904
 - [x] casehubio/platform#910 — PostgreSQL partial unique indexes
-- [ ] casehubio/platform#911 — contract test base StaticCredentialStore        ← active
+- [ ] casehubio/platform#911 — contract test base StaticCredentialStore ← active
 - [ ] casehubio/platform#912 — credential grace period cleanup scheduler
 - [ ] casehubio/platform#913 — Spring parity mcp-server
 - [x] casehubio/platform#879 — Eliminate dual-parse SnakeYAML dependency
@@ -49,14 +60,7 @@
 - [ ] casehubio/platform#914 — WebAuthn delete ownership SPI
 - [ ] casehubio/platform#915 — restore StepRunner pipeline coverage
 - [ ] casehubio/platform#916 — Spring REST for authn endpoints
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-covers: casehubio/platform#911
-date: 2026-11-18
-active_issue: casehubio/platform#898
+- [ ] casehubio/platform#903 — regression variable resolution yaml-test-core
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
