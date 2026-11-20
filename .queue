@@ -1,14 +1,3 @@
-# Work Plan —
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-covers: casehubio/platform#915
-date: 2026-11-18
-active_issue: casehubio/platform#920
-
-## Queue
 - [x] casehubio/platform#898 — issue 898
 - [x] casehubio/platform#902 — issue 902
 - [x] casehubio/platform#904 — issue 904
@@ -56,11 +45,19 @@ active_issue: casehubio/platform#920
 - [x] casehubio/platform#895 — Walker parallel key validation
 - [x] casehubio/platform#896 — YamlTestDiscovery first-doc guard
 - [x] casehubio/platform#900 — credential resolution + rotation for StaticCredentialStore
-- [ ] casehubio/platform#914 — WebAuthn delete ownership SPI ← done on issue-920-resolve-playbook-cross-root
-- [ ] casehubio/platform#915 — restore StepRunner pipeline coverage ← active
+- [x] casehubio/platform#914 — WebAuthn delete ownership SPI
+- [ ] casehubio/platform#915 — restore StepRunner pipeline coverage        ← active
 - [ ] casehubio/platform#916 — Spring REST for authn endpoints
 - [ ] casehubio/platform#903 — regression variable resolution yaml-test-core
 - [ ] casehubio/platform#913 — Spring-parity-mcp-server
+
+## State
+branch: 
+issue-repo: casehubio/platform
+status: active
+covers: casehubio/platform#915
+date: 2026-11-18
+active_issue: casehubio/platform#920
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
