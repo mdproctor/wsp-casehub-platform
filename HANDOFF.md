@@ -1,41 +1,40 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #848, #586, #639, #893 landed; #732, #733, #826, #697 closed (already-fixed/not-actionable); #251 deferred; 3 follow-ups filed (#894, #895, #896)
-**Landed:** `00fa423b` on main, published
-**Queue:** 5 items remaining, #891 is next
+**Last worked:** #900 (credential resolution + rotation) implemented and ready to land; #909 closed (already fixed); 4 follow-ups filed (#910–#913)
+**Branch:** `issue-900-credential-resolution-rotation` — 5 commits after squash, squash-reviewed
+**Queue:** 4 new items (#910–#913), plus any remaining from previous session
 
 ## This session
 
-Queue triage + format unification session — eight issues handled, four with code changes.
+Single-issue deep implementation session — #900 (M/Med): credential resolution + rotation for `StaticCredentialStore`.
 
-**#848 (S/Med) — fix:** Streaming plugin factory in `PluginScanner.buildStreamingTypeInfo()` bypassed `coerceParams()` and `Validator.validateStep()`. String-typed numeric fields silently became 0, missing `@Required` fields silently became null. Added coercion + validation + java-typed input checks to match the non-streaming action path. Two new tests: coercion (string "5" → int) and required-field rejection.
+**Design phase:** Brainstormed 4 design decisions (D1–D4), Standard decision review surfaced 2 additional decisions (D5–D6, totalling 27 issues reviewed), Light spec review (12 issues). Spec written and committed.
 
-**#586 (S/Low) — fix:** Swapped `graphql-spring-generator` test dependency from `platform-api` to `mcp-api`. All test imports were in `io.casehub.platform.api.mcp.*` which lives in the lighter `mcp-api` module. Confirmed by `mcp-standalone-test`'s `bannedDependencies` enforcer.
+**#900 (M/Med) — feat:** Extended `StaticCredentialStore` with inbound credential lookup, three-state lifecycle (ACTIVE/GRACE_PERIOD/REVOKED), rotation with configurable grace period, revocation, and SHA-256 hashed storage.
 
-**#639 (S/Low) — feat:** Added `ModelParameters` record (temperature, maxTokens, topP, topK) with fluent withers, and `withModelParameters()` to both `AgentSessionConfig` and `AgentSessionInit`. All existing withers preserve the new field.
+Key changes:
+- **platform-api:** `CredentialState` enum, `StaticCredentialRecord` updated with `state`/`expiresAt` (backward-compatible 7-arg constructor preserved), `isExpired()` method. Three new default methods on `StaticCredentialStore`: `lookup(credential)`, `rotate(actorId, provider, tenancyId, newCredential)`, `revoke(actorId, provider, tenancyId)`.
+- **authn-inmem:** Full `InMemoryStaticCredentialStore` — lookup with constant-time comparison (`MessageDigest.isEqual`), rotate with configurable TTL, revoke. 11 new tests.
+- **authn-social-jpa-common:** `StaticCredentialEntity` migrated from composite PK to surrogate UUIDv7. `CredentialHasher` utility (SHA-256 hex). `StaticCredentialId` deleted (dead code).
+- **authn-social-jpa:** `JpaStaticCredentialStore` — lookup by credential hash, rotate with `PESSIMISTIC_WRITE` row-level locking, revoke via bulk UPDATE. Flyway V3 (DDL) + V3.1 (Java backfill) + V3.2 (PK change + indexes).
+- **authn-social-spring-jpa:** `SpringStaticCredentialStore` + `StaticCredentialRepository` — full Spring Data JPA implementation. `SocialJpaAutoConfiguration` updated for grace period TTL injection.
+- **platform:** `NoOpStaticCredentialStore` overrides `revoke()` with empty body.
 
-**#893 (S/Med) — fix:** Eliminated `steps:` from every parser path and schema:
-- `YamlTestDiscovery` now supports multi-document YAML and rejects top-level `steps:` and `tests:` wrapper
-- 14 `.test.yaml` files migrated to bare-list format across 3 modules
-- Parallel map form (`parallel: { steps: [...], advance-after: N }`) replaced with sibling keys
-- `playbook-document.schema.json` updated: removed `steps:`, `tests:`, `testCase`
-- `StepSchemaComposer` generates flat format only
+**Code review findings (all fixed):** null credential validation added to `store()` in both InMemory and JPA, dead `StaticCredentialId.java` deleted, `ResultSet` wrapped in try-with-resources in V3.1 migration.
 
-**Already-fixed closures:** #732 (CorpusSelectorService already implemented), #733 (resolvePhaseRecords already supports per-phase corpus-files), #826 (budget types already in agent-api). **Not-actionable:** #697 (no non-Claude multi-turn sessions exist). **Deferred:** #251 (TSJ upstream blocked).
+**Filed:** #909 (dead StaticCredentialId — already fixed, closed), #910 (PostgreSQL partial unique indexes — XS/Low), #911 (contract test base — S/Low), #912 (grace period cleanup scheduler — S/Low), #913 (Spring parity mcp-server — S/Med, pre-existing).
 
-**Filed from code review:** #894 (ModelParameters range validation), #895 (Walker: parallel policy keys only on parallel steps), #896 (YamlTestDiscovery first-doc guard).
+**Blog:** "The Gap Between Store and Rotate" — credential lifecycle design, rotation without dropped requests, hashing at the store boundary.
 
-**Blog:** "The Key That Wouldn't Die" — format migration that only covered one parser path.
+## Queue (4 items)
 
-## Queue (5 items)
-
-1. #891 — AgentSessionPlugins absorbs response-format but never reads it ← next
-2. #893 — Migrate test yaml from steps wrapper (already landed — stale queue entry)
-3. #894 — ModelParameters range validation
-4. #895 — Walker parallel key validation
-5. #896 — YamlTestDiscovery first-doc guard
+1. #910 — PostgreSQL partial unique indexes for credential rotation (XS/Low)
+2. #911 — Contract test base for StaticCredentialStore (S/Low)
+3. #912 — Credential grace period cleanup scheduler (S/Low)
+4. #913 — Spring parity for mcp-server module (S/Med)
 
 ## References
 
-- Blog: `blog/2026-11-19-mdp03-the-key-that-wouldnt-die.md`
-- Key files: `PluginScanner.java`, `YamlTestDiscovery.java`, `Walker.java`, `ModelParameters.java`, `AgentSessionConfig.java`
+- Spec: `docs/specs/issue-900-credential-resolution-rotation/2026-11-19-credential-resolution-rotation-design.md`
+- Blog: `docs/blog/2026-11-20-mdp01-the-gap-between-store-and-rotate.md`
+- Key files: `StaticCredentialStore.java`, `StaticCredentialRecord.java`, `CredentialState.java`, `InMemoryStaticCredentialStore.java`, `JpaStaticCredentialStore.java`, `SpringStaticCredentialStore.java`, `CredentialHasher.java`
