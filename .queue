@@ -45,7 +45,7 @@
 - [ ] casehubio/platform#913 — Spring parity mcp-server
 
 ## State
-branch: 
+branch: main
 issue-repo: casehubio/platform
 status: active
 covers: casehubio/platform#910
