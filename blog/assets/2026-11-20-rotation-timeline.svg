@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 180">
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .time { font-size: 11px; fill: #666; }
+    .key { font-size: 12px; font-weight: 600; }
+    .label { font-size: 10px; fill: #888; }
+  </style>
+
+  <!-- Timeline axis -->
+  <line x1="60" y1="90" x2="680" y2="90" stroke="#ccc" stroke-width="2"/>
+
+  <!-- T0: rotate() called -->
+  <line x1="200" y1="30" x2="200" y2="150" stroke="#555" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="200" y="20" text-anchor="middle" class="time">T₀: rotate()</text>
+
+  <!-- T1: grace expires -->
+  <line x1="500" y1="30" x2="500" y2="150" stroke="#dc3545" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="500" y="20" text-anchor="middle" class="time">T₁: grace expires</text>
+
+  <!-- Key v1 bar -->
+  <rect x="80" y="55" width="420" height="20" rx="4" fill="#28a745" opacity="0.8"/>
+  <rect x="200" y="55" width="300" height="20" rx="4" fill="#ffc107" opacity="0.8"/>
+  <text x="140" y="69" text-anchor="middle" class="key" fill="white">key-v1</text>
+  <text x="140" y="45" text-anchor="middle" class="label">ACTIVE</text>
+  <text x="350" y="45" text-anchor="middle" class="label">GRACE_PERIOD</text>
+
+  <!-- Key v2 bar -->
+  <rect x="200" y="105" width="480" height="20" rx="4" fill="#28a745" opacity="0.8"/>
+  <text x="440" y="119" text-anchor="middle" class="key" fill="white">key-v2</text>
+  <text x="440" y="140" text-anchor="middle" class="label">ACTIVE</text>
+
+  <!-- Both valid bracket -->
+  <line x1="200" y1="78" x2="200" y2="102" stroke="#555" stroke-width="1"/>
+  <line x1="500" y1="78" x2="500" y2="102" stroke="#555" stroke-width="1"/>
+  <text x="350" y="98" text-anchor="middle" class="label">both keys valid</text>
+</svg>
