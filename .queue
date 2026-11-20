@@ -1,10 +1,10 @@
 # Work Plan —
 
 ## State
-branch: issue-900-credential-resolution-rotation
+branch: 
 issue-repo: casehubio/platform
 status: active
-covers: casehubio/platform#848
+covers: casehubio/platform#910
 date: 2026-11-18
 active_issue: casehubio/platform#900
 
@@ -49,8 +49,8 @@ active_issue: casehubio/platform#900
 - [x] casehubio/platform#894 — ModelParameters range validation
 - [x] casehubio/platform#895 — Walker parallel key validation
 - [x] casehubio/platform#896 — YamlTestDiscovery first-doc guard
-- [ ] casehubio/platform#900 — credential resolution + rotation for StaticCredentialStore ← active
-- [ ] casehubio/platform#910 — PostgreSQL partial unique indexes
+- [ ] casehubio/platform#900 — credential resolution + rotation for StaticCredentialStore ← done on issue-900-credential-resolution-rotation
+- [ ] casehubio/platform#910 — PostgreSQL partial unique indexes ← active
 - [ ] casehubio/platform#911 — contract test base StaticCredentialStore
 - [ ] casehubio/platform#912 — credential grace period cleanup scheduler
 - [ ] casehubio/platform#913 — Spring parity mcp-server
