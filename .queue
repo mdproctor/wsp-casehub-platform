@@ -50,6 +50,10 @@ active_issue: casehubio/platform#900
 - [x] casehubio/platform#895 — Walker parallel key validation
 - [x] casehubio/platform#896 — YamlTestDiscovery first-doc guard
 - [ ] casehubio/platform#900 — credential resolution + rotation for StaticCredentialStore ← active
+- [ ] casehubio/platform#910 — PostgreSQL partial unique indexes
+- [ ] casehubio/platform#911 — contract test base StaticCredentialStore
+- [ ] casehubio/platform#912 — credential grace period cleanup scheduler
+- [ ] casehubio/platform#913 — Spring parity mcp-server
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
