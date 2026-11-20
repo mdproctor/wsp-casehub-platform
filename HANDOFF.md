@@ -1,40 +1,48 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #921 done on branch `issue-921-template-variable-extraction`.
-**Branch:** `issue-921-template-variable-extraction` (from main). Marked done, not yet landed.
-**Queue:** #915 is next (restore StepRunner pipeline coverage)
+**Last worked:** #919 (blocked) on branch `issue-916-spring-rest-authn-endpoints`.
+**Branch:** `issue-916-spring-rest-authn-endpoints` (stacked on `issue-921-template-variable-extraction`).
+**Active item:** #923 (optional segments in TemplateExtractor) — not started.
 
 ## Session summary
 
-Single-issue session — template-based variable extraction from prose (#921, S/Med).
+Five-issue session — Spring parity, contract testing, and triage of blocked issues.
 
-**#921 (S/Med) — feat:** `TemplateExtractor` and `TemplateRegistry` in `io.casehub.yaml.core.resolver` (yaml-core). Compiles `${variable}` templates into named-group regex patterns for deterministic extraction of structured data from agent prose. Lazy `.+?` matching between variables, greedy `.+` for the last. `TemplateRegistry` provides ordered multi-template matching. 29 tests. Code review hardened: compile-time validation of variable names (regex group constraints + duplicate rejection), unmodifiable result maps.
+**#916 (S/Low) — feat:** Spring REST controllers for three authn domains. Extracted `ConnectionEndpointCore`, `WebAuthnEndpointCore`, `SocialAuthEndpointCore` to `authn-core` with `@McpDomain` and constructor injection. Deleted CDI endpoint classes. `AuthnBeans` now `@Produces` core POJOs. graphql-spring-generator configured in `authn-spring` — generates 6 Spring controllers (3 REST + 3 GraphQL). Key discovery: APT's `getClass().getClassLoader()` reads the annotation processor classpath, not the compilation classpath — `authn-core` had to be added to `annotationProcessorPaths` for Jandex domain discovery.
 
-**Blog:** "The Template That Reads the Room" — governance protocol vocabulary via template extraction.
+**#913 (S/Med) — already resolved:** `mcp-server` exception already exists in `spring-parity-exceptions.txt` (commit `a3b60638`, #905).
 
-**Filed:** #923 (optional segments in TemplateExtractor, S/Med), #924 (governance protocol runtime integration, M/Med), #925 (dotted variable name support, S/Low). All three scheduled in queue.
+**#917 (XS/Low) — blocked:** `CredentialRetentionPurge` from #912 hasn't landed on main. Can't mirror what doesn't exist yet. Commented on issue.
 
-## Branches to land
+**#918 (S/Low) — feat:** `AbstractWorkerCredentialStoreTest` contract test base in `testing` module. 12 tests covering all 6 `WorkerCredentialStore` SPI methods. `InMemoryWorkerCredentialStoreTest` in `acl-inmem-core` extends the base, adds 2 implementation-specific lazy eviction tests (14 total).
 
-1. `issue-921-template-variable-extraction` — from main, 2 commits
+**#919 (XS/Low) — blocked:** `AbstractStaticCredentialStoreTest` from #911 hasn't landed on main. Commented on issue.
+
+**Blog:** "The Classloader Nobody Checks" — APT classloader vs compilation classpath for Jandex scanning.
+
+## Branches to land (in order)
+
+1. `issue-921-template-variable-extraction` — from main, 2 commits (#921)
+2. `issue-916-spring-rest-authn-endpoints` — stacked on above, 6 commits (#916, #918, code review fix)
 
 ## Queue state
 
 | # | Issue | Status |
 |---|-------|--------|
-| #921 | template-variable-extraction | done, not landed |
-| #915 | restore-StepRunner-pipeline-coverage | next |
-| #916 | Spring-REST-authn-endpoints | queued |
-| #913 | Spring-parity-mcp-server | queued |
-| #917 | Spring-parity-CredentialRetentionPurge | queued |
-| #918 | Contract-test-WorkerCredentialStore | queued |
-| #919 | Spring-contract-StaticCredentialStore | queued |
-| #923 | optional-segments-TemplateExtractor | queued |
+| #921 | template-variable-extraction | done on branch 1 |
+| #915 | restore-StepRunner-pipeline-coverage | done on branch 1 |
+| #916 | Spring-REST-authn-endpoints | done on branch 2 |
+| #913 | Spring-parity-mcp-server | done (already resolved) |
+| #917 | Spring-parity-CredentialRetentionPurge | done (blocked by #912) |
+| #918 | Contract-test-WorkerCredentialStore | done on branch 2 |
+| #919 | Spring-contract-StaticCredentialStore | done (blocked by #911) |
+| #923 | optional-segments-TemplateExtractor | active, not started |
 | #924 | governance-protocol-integration | queued |
 | #925 | dotted-variable-names-TemplateExtractor | queued |
 
 ## Attention for next session
 
-1. **One branch needs landing** — `issue-921-template-variable-extraction` (2 commits, from main).
-2. **#915 is next** — test restoration in yaml-test-core, different domain from template extraction. Fresh session context is fine.
-3. **Three new issues filed this session** — #923, #924, #925 are template extraction follow-ups, all queued at the end.
+1. **Two branches need landing in order** — first `issue-921-template-variable-extraction` (from main), then `issue-916-spring-rest-authn-endpoints` (stacked).
+2. **#923 is next** — optional segments in TemplateExtractor (yaml-core domain). Fresh session context recommended — different domain from this session's Spring parity work.
+3. **Two issues blocked by unlanded work** — #917 (blocked by #912) and #919 (blocked by #911). These will unblock when their respective branches land via work-end.
+4. **Pre-existing test failure** — `authn-social-jpa` fails with missing `AbstractStaticCredentialStoreTest` class (from unlanded #911). Not caused by this branch's changes.
