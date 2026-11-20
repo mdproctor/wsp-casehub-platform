@@ -1,3 +1,14 @@
+# Work Plan —
+
+## State
+branch: main
+issue-repo: casehubio/platform
+status: active
+covers: casehubio/platform#910
+date: 2026-11-18
+active_issue: casehubio/platform#910
+
+## Queue
 - [x] casehubio/platform#879 — Eliminate dual-parse SnakeYAML dependency
 - [x] casehubio/platform#885 — apt SchemaEmitter generates bare array type for List plugin fields
 - [x] casehubio/platform#883 — Test deferred condition with use inside branch structures
@@ -39,18 +50,10 @@
 - [x] casehubio/platform#895 — Walker parallel key validation
 - [x] casehubio/platform#896 — YamlTestDiscovery first-doc guard
 - [x] casehubio/platform#900 — credential resolution + rotation for StaticCredentialStore
-- [ ] casehubio/platform#910 — PostgreSQL partial unique indexes        ← active
+- [ ] casehubio/platform#910 — PostgreSQL partial unique indexes ← active
 - [ ] casehubio/platform#911 — contract test base StaticCredentialStore
 - [ ] casehubio/platform#912 — credential grace period cleanup scheduler
 - [ ] casehubio/platform#913 — Spring parity mcp-server
-
-## State
-branch: main
-issue-repo: casehubio/platform
-status: active
-covers: casehubio/platform#910
-date: 2026-11-18
-active_issue: casehubio/platform#900
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
