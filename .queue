@@ -6,7 +6,7 @@ issue-repo: casehubio/platform
 status: active
 covers: casehubio/platform#915
 date: 2026-11-18
-active_issue: casehubio/platform#920
+active_issue: casehubio/platform#921
 
 ## Queue
 - [x] casehubio/platform#898 — issue 898
@@ -57,11 +57,14 @@ active_issue: casehubio/platform#920
 - [x] casehubio/platform#896 — YamlTestDiscovery first-doc guard
 - [x] casehubio/platform#900 — credential resolution + rotation for StaticCredentialStore
 - [x] casehubio/platform#914 — WebAuthn delete ownership SPI
-- [ ] casehubio/platform#915 — restore StepRunner pipeline coverage ← active
-- [ ] casehubio/platform#916 — Spring REST for authn endpoints
-- [ ] casehubio/platform#903 — regression variable resolution yaml-test-core
+- [x] casehubio/platform#903 — regression variable resolution yaml-test-core
+- [ ] casehubio/platform#921 — template-variable-extraction ← active
+- [ ] casehubio/platform#915 — restore-StepRunner-pipeline-coverage
+- [ ] casehubio/platform#916 — Spring-REST-authn-endpoints
 - [ ] casehubio/platform#913 — Spring-parity-mcp-server
-- [ ] casehubio/platform#921 — template-variable-extraction
+- [ ] casehubio/platform#917 — Spring-parity-CredentialRetentionPurge
+- [ ] casehubio/platform#918 — Contract-test-WorkerCredentialStore
+- [ ] casehubio/platform#919 — Spring-contract-StaticCredentialStore
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
