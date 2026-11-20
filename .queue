@@ -4,7 +4,7 @@
 branch: 
 issue-repo: casehubio/platform
 status: active
-covers: casehubio/platform#915
+covers: casehubio/platform#916
 date: 2026-11-18
 active_issue: casehubio/platform#921
 
@@ -58,13 +58,16 @@ active_issue: casehubio/platform#921
 - [x] casehubio/platform#900 — credential resolution + rotation for StaticCredentialStore
 - [x] casehubio/platform#914 — WebAuthn delete ownership SPI
 - [x] casehubio/platform#903 — regression variable resolution yaml-test-core
-- [ ] casehubio/platform#921 — template-variable-extraction ← active
-- [ ] casehubio/platform#915 — restore-StepRunner-pipeline-coverage
-- [ ] casehubio/platform#916 — Spring-REST-authn-endpoints
+- [ ] casehubio/platform#921 — template-variable-extraction ← done on issue-921-template-variable-extraction
+- [ ] casehubio/platform#915 — restore-StepRunner-pipeline-coverage ← done on issue-921-template-variable-extraction
+- [ ] casehubio/platform#916 — Spring-REST-authn-endpoints ← active
 - [ ] casehubio/platform#913 — Spring-parity-mcp-server
 - [ ] casehubio/platform#917 — Spring-parity-CredentialRetentionPurge
 - [ ] casehubio/platform#918 — Contract-test-WorkerCredentialStore
 - [ ] casehubio/platform#919 — Spring-contract-StaticCredentialStore
+- [ ] casehubio/platform#923 — optional-segments-TemplateExtractor
+- [ ] casehubio/platform#924 — governance-protocol-integration
+- [ ] casehubio/platform#925 — dotted-variable-names-TemplateExtractor
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
