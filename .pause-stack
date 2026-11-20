@@ -10,3 +10,7 @@
   issue: 914
   paused: 2026-11-20T09:16:45Z
   epic_active_issue: casehubio/platform#911
+- branch: main
+  issue: 911
+  paused: 2026-11-20T09:18:15Z
+  epic_active_issue: casehubio/platform#914
