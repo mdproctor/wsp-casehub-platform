@@ -1,44 +1,34 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #900 landed on main (d0b2430b), published. #909 closed (already fixed). 4 follow-ups filed (#910–#913).
-**Branch:** main (clean, pushed to origin)
-**Queue:** 4 items remaining, #910 is next but branch not yet created
+**Last worked:** #898, #902, #904 landed on main. 3 follow-up issues filed (#914–#916).
+**Branch:** main (clean, all three branches landed and closed)
+**Queue:** 7 items remaining, #910 is next
 
 ## Session summary
 
-Single-issue deep implementation session — #900 (M/Med): credential resolution + rotation for `StaticCredentialStore`.
+Three-issue session — all S/Low or S/Med, all landed on main as single squashed commits.
 
-**#900 (M/Med) — feat:** Extended `StaticCredentialStore` with inbound credential lookup, three-state lifecycle (ACTIVE/GRACE_PERIOD/REVOKED), rotation with configurable grace period, revocation, and SHA-256 hashed storage.
+**#898 (S/Low) — feat:** REST endpoints for ServiceConnection, WebAuthn credential management, and social auth OAuth flows. Three `@McpDomain` endpoint classes in `authn/` module delegating to existing SPIs, with `@ContextParam` resolving actorId/tenancyId from `CurrentPrincipal`. graphql-generator APT produces 11 JAX-RS REST endpoints. Ownership guard added to `deleteCredential` during review.
 
-Key changes:
-- **platform-api:** `CredentialState` enum, `StaticCredentialRecord` updated with `state`/`expiresAt` (backward-compatible 7-arg constructor preserved), `isExpired()`. Three new default methods on `StaticCredentialStore`: `lookup(credential)`, `rotate(actorId, provider, tenancyId, newCredential)`, `revoke(actorId, provider, tenancyId)`.
-- **authn-inmem:** Full `InMemoryStaticCredentialStore` with 11 new tests.
-- **authn-social-jpa-common:** `StaticCredentialEntity` migrated to surrogate UUIDv7 PK. `CredentialHasher` utility. `StaticCredentialId` deleted.
-- **authn-social-jpa:** `JpaStaticCredentialStore` with SHA-256 hashing, `PESSIMISTIC_WRITE` rotation. Flyway V3/V3.1/V3.2.
-- **authn-social-spring-jpa:** Full Spring Data JPA implementation.
+**#902 (S/Med) — fix:** `PlaybookParser.rejectStepsWrapper()` now runs for all format variants (single-doc, legacy multi-doc, versioned). Schema gained `"not": {"required": ["steps"]}`. `AnnotationExtractor` updated to treat `---` as step-section boundary. 70 playbook files got `yaml-language-server` modelines.
 
-**Blog:** "The Gap Between Store and Rotate" — published.
+**#904 (S/Low) — feat:** Structural pattern matching in `MatcherRegistry.matchRegex()` — when `matches` receives a map, it performs structural assertion using existing matchers as constraint vocabulary.
 
-**Filed:** #910 (PostgreSQL partial unique indexes, XS/Low), #911 (contract test base, S/Low), #912 (cleanup scheduler, S/Low), #913 (Spring parity mcp-server, S/Med).
+**Blog:** "Less Ceremony, More Signal" — covers all three issues.
 
-## Attention for next session
-
-1. **Stale .plan file:** `/Users/mdproctor/claude/public/casehub/platform/.plan` references `issue-724-streaming-playbook-sse` — a stale plan from a different branch. Delete it before running `work start` for #910.
-2. **#910 branch not created:** The queue shows #910 as active but both repos are on main. Run `work start #910` after clearing the stale .plan.
-3. **Conflict resolved:** `c3d0dd4f` (fix #902) was superseded by remote `b84b7607` (fix #908) — same agent-interaction test migration. Skipped during rebase, no content lost.
+**Filed:** #914 (WebAuthn SPI delete ownership, XS/Low), #915 (restore StepRunner pipeline coverage, XS/Low), #916 (Spring REST for authn endpoints, S/Low).
 
 ## Queue (7 items)
 
-1. #898 — ← next (priority, user-scheduled)
-2. #902 — (priority, user-scheduled)
-3. #904 — (priority, user-scheduled)
-4. #910 — PostgreSQL partial unique indexes for credential rotation (XS/Low)
-5. #911 — Contract test base for StaticCredentialStore (S/Low)
-6. #912 — Credential grace period cleanup scheduler (S/Low)
-7. #913 — Spring parity for mcp-server module (S/Med)
+1. #910 — PostgreSQL partial unique indexes (XS/Low)
+2. #911 — Contract test base for StaticCredentialStore (S/Low)
+3. #912 — Credential grace period cleanup scheduler (S/Low)
+4. #913 — Spring parity for mcp-server module (S/Med)
+5. #914 — WebAuthn SPI delete ownership (XS/Low)
+6. #915 — Restore StepRunner pipeline coverage (XS/Low)
+7. #916 — Spring REST for authn endpoints (S/Low)
 
 ## References
 
-- Spec: `docs/specs/issue-900-credential-resolution-rotation/2026-11-19-credential-resolution-rotation-design.md`
-- Blog: `docs/blog/2026-11-20-mdp01-the-gap-between-store-and-rotate.md`
-- Key files: `StaticCredentialStore.java`, `StaticCredentialRecord.java`, `CredentialState.java`, `InMemoryStaticCredentialStore.java`, `JpaStaticCredentialStore.java`, `SpringStaticCredentialStore.java`, `CredentialHasher.java`
+- Blog: `docs/blog/2026-11-20-mdp02-less-ceremony-more-signal.md`
+- Key files: `ConnectionEndpoint.java`, `WebAuthnEndpoint.java`, `SocialAuthEndpoint.java`, `MatcherRegistry.java`, `PlaybookParser.java`, `AnnotationExtractor.java`
