@@ -1,3 +1,14 @@
+# Work Plan —
+
+## State
+branch: 
+issue-repo: casehubio/platform
+status: active
+covers: casehubio/platform#923
+date: 2026-11-18
+active_issue: casehubio/platform#921
+
+## Queue
 - [x] casehubio/platform#898 — issue 898
 - [x] casehubio/platform#902 — issue 902
 - [x] casehubio/platform#904 — issue 904
@@ -49,22 +60,23 @@
 - [x] casehubio/platform#903 — regression variable resolution yaml-test-core
 - [ ] casehubio/platform#921 — template-variable-extraction ← done on issue-921-template-variable-extraction
 - [ ] casehubio/platform#915 — restore-StepRunner-pipeline-coverage ← done on issue-921-template-variable-extraction
-- [ ] casehubio/platform#916 — Spring-REST-authn-endpoints        ← active
-- [ ] casehubio/platform#913 — Spring-parity-mcp-server
-- [ ] casehubio/platform#917 — Spring-parity-CredentialRetentionPurge
-- [ ] casehubio/platform#918 — Contract-test-WorkerCredentialStore
-- [ ] casehubio/platform#919 — Spring-contract-StaticCredentialStore
-- [ ] casehubio/platform#923 — optional-segments-TemplateExtractor
+- [ ] casehubio/platform#916 — Spring-REST-authn-endpoints ← done on issue-916-spring-rest-authn-endpoints
+  - [x] Batch 1: Extract core POJOs
+    - [x] Task 1: ConnectionEndpointCore
+    - [x] Task 2: WebAuthnEndpointCore
+    - [x] Task 3: SocialAuthEndpointCore
+  - [x] Batch 2: Wire and delete
+    - [x] Task 4: CDI wiring and endpoint deletion
+    - [x] Task 5: Spring generator and bean wiring
+  - [x] Batch 3: Verify
+    - [x] Task 6: Full build and CLAUDE.md
+- [ ] casehubio/platform#913 — Spring-parity-mcp-server ← done on issue-916-spring-rest-authn-endpoints
+- [ ] casehubio/platform#917 — Spring-parity-CredentialRetentionPurge ← done on issue-916-spring-rest-authn-endpoints
+- [ ] casehubio/platform#918 — Contract-test-WorkerCredentialStore ← done on issue-916-spring-rest-authn-endpoints
+- [ ] casehubio/platform#919 — Spring-contract-StaticCredentialStore ← done on issue-916-spring-rest-authn-endpoints
+- [ ] casehubio/platform#923 — optional-segments-TemplateExtractor ← active
 - [ ] casehubio/platform#924 — governance-protocol-integration
 - [ ] casehubio/platform#925 — dotted-variable-names-TemplateExtractor
-
-## State
-branch: issue-916-spring-rest-authn-endpoints
-issue-repo: casehubio/platform
-status: active
-covers: casehubio/platform#916
-date: 2026-11-18
-active_issue: casehubio/platform#921
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
