@@ -1,31 +1,40 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #911, #912 done on stacked branches. #920 done on separate branch. 4 follow-up issues filed (#917–#920).
-**Branch:** `issue-920-resolve-playbook-cross-root` (from main). Stacked branches `issue-911-credential-contract-tests` → `issue-912-credential-grace-cleanup` also pending landing.
-**Queue:** #914 is next after landing
+**Last worked:** #921 done on branch `issue-921-template-variable-extraction`.
+**Branch:** `issue-921-template-variable-extraction` (from main). Marked done, not yet landed.
+**Queue:** #915 is next (restore StepRunner pipeline coverage)
 
 ## Session summary
 
-Three-issue session — two credential lifecycle issues (S/Low) and one connectors-blocking playbook fix (S/Med).
+Single-issue session — template-based variable extraction from prose (#921, S/Med).
 
-**#911 (S/Low) — test:** `AbstractStaticCredentialStoreTest` contract test base in `testing/` module. 25 tests covering all 7 `StaticCredentialStore` SPI methods. Key design: credential values not asserted after `find()`/`findAll()` because JPA hashes and returns null — `lookup()` used for roundtrip verification. Subclasses: `InMemoryStaticCredentialStoreTest` + `JpaStaticCredentialStoreContractTest`.
+**#921 (S/Med) — feat:** `TemplateExtractor` and `TemplateRegistry` in `io.casehub.yaml.core.resolver` (yaml-core). Compiles `${variable}` templates into named-group regex patterns for deterministic extraction of structured data from agent prose. Lazy `.+?` matching between variables, greedy `.+` for the last. `TemplateRegistry` provides ordered multi-template matching. 29 tests. Code review hardened: compile-time validation of variable names (regex group constraints + duplicate rejection), unmodifiable result maps.
 
-**#912 (S/Low) — feat:** `CredentialRetentionPurge @Scheduled` in `authn-social-jpa`. Two purge jobs with separate staggered cron keys: revoked purge at 03:00 (365d), grace purge at 03:30 (30d past expiry). 5 tests.
+**Blog:** "The Template That Reads the Room" — governance protocol vocabulary via template extraction.
 
-**#920 (S/Med) — fix:** `resolvePlaybook()` cross-root classpath scanning. Two changes: (1) search by full resource path instead of iterating root directories, (2) handle jar: URLs via `FileSystems` for playbooks in dependency JARs. Unblocks connectors.
-
-**Blog:** "The Contract Your Hash Can't Keep" — contract testing for hash-vs-plaintext SPIs + credential lifecycle completion.
-
-**Filed:** #917 (Spring retention purge, XS/Low), #918 (WorkerCredentialStore contract tests, S/Low), #919 (Spring StaticCredentialStore test, XS/Low).
+**Filed:** #923 (optional segments in TemplateExtractor, S/Med), #924 (governance protocol runtime integration, M/Med), #925 (dotted variable name support, S/Low). All three scheduled in queue.
 
 ## Branches to land
 
-1. `issue-911-credential-contract-tests` — stacked on main
-2. `issue-912-credential-grace-cleanup` — stacked on #911
-3. `issue-920-resolve-playbook-cross-root` — independent, from main
+1. `issue-921-template-variable-extraction` — from main, 2 commits
+
+## Queue state
+
+| # | Issue | Status |
+|---|-------|--------|
+| #921 | template-variable-extraction | done, not landed |
+| #915 | restore-StepRunner-pipeline-coverage | next |
+| #916 | Spring-REST-authn-endpoints | queued |
+| #913 | Spring-parity-mcp-server | queued |
+| #917 | Spring-parity-CredentialRetentionPurge | queued |
+| #918 | Contract-test-WorkerCredentialStore | queued |
+| #919 | Spring-contract-StaticCredentialStore | queued |
+| #923 | optional-segments-TemplateExtractor | queued |
+| #924 | governance-protocol-integration | queued |
+| #925 | dotted-variable-names-TemplateExtractor | queued |
 
 ## Attention for next session
 
-1. **Three branches need landing** — #911 and #912 are stacked (land in order). #920 is independent.
-2. **Connectors unblocked** — #920 installed to local .m2. Connectors can pick up the SNAPSHOT.
-3. **#913 is next non-trivial work** — Spring parity for mcp-server (S/Med), topic change from credential lifecycle.
+1. **One branch needs landing** — `issue-921-template-variable-extraction` (2 commits, from main).
+2. **#915 is next** — test restoration in yaml-test-core, different domain from template extraction. Fresh session context is fine.
+3. **Three new issues filed this session** — #923, #924, #925 are template extraction follow-ups, all queued at the end.
