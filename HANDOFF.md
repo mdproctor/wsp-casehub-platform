@@ -1,39 +1,31 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #898, #902, #903, #904 landed on main. Pre-existing yaml-test-core failures fixed (steps: migration). 3 follow-up issues filed (#914–#916).
-**Branch:** main (clean, pushed to origin)
-**Queue:** 7 items remaining, #911 is next (paused, branch exists but no work started)
+**Last worked:** #911, #912 done on stacked branches. #920 done on separate branch. 4 follow-up issues filed (#917–#920).
+**Branch:** `issue-920-resolve-playbook-cross-root` (from main). Stacked branches `issue-911-credential-contract-tests` → `issue-912-credential-grace-cleanup` also pending landing.
+**Queue:** #914 is next after landing
 
 ## Session summary
 
-Five-issue session spanning REST endpoints, parser linting, structural assertions, regression fix, and test migration.
+Three-issue session — two credential lifecycle issues (S/Low) and one connectors-blocking playbook fix (S/Med).
 
-**#898 (S/Low) — feat:** REST endpoints for authn SPIs via `@McpDomain`. 3 endpoint classes, 11 generated JAX-RS endpoints. Ownership guard on `deleteCredential`.
+**#911 (S/Low) — test:** `AbstractStaticCredentialStoreTest` contract test base in `testing/` module. 25 tests covering all 7 `StaticCredentialStore` SPI methods. Key design: credential values not asserted after `find()`/`findAll()` because JPA hashes and returns null — `lookup()` used for roundtrip verification. Subclasses: `InMemoryStaticCredentialStoreTest` + `JpaStaticCredentialStoreContractTest`.
 
-**#902 (S/Med) — fix:** `steps:` rejection across all PlaybookParser format paths. Schema enforcement via `"not": {"required": ["steps"]}`. AnnotationExtractor `---` awareness. 70 playbook modelines.
+**#912 (S/Low) — feat:** `CredentialRetentionPurge @Scheduled` in `authn-social-jpa`. Two purge jobs with separate staggered cron keys: revoked purge at 03:00 (365d), grace purge at 03:30 (30d past expiry). 5 tests.
 
-**#903 (S/Low) — fix:** Restored `resolvePlaybook()` qualified ID resolution accidentally reverted during #900 rebase.
+**#920 (S/Med) — fix:** `resolvePlaybook()` cross-root classpath scanning. Two changes: (1) search by full resource path instead of iterating root directories, (2) handle jar: URLs via `FileSystems` for playbooks in dependency JARs. Unblocks connectors.
 
-**#904 (S/Low) — feat:** Structural pattern matching in `MatcherRegistry` — map-valued `matches` performs field-by-field assertion using existing matchers as constraint vocabulary.
+**Blog:** "The Contract Your Hash Can't Keep" — contract testing for hash-vs-plaintext SPIs + credential lifecycle completion.
 
-**yaml-test-core migration:** 22 YAML fixtures + 4 Java test classes migrated from `steps:` wrapper to multi-doc bare-list format. 128 tests now pass (was 35 failures).
+**Filed:** #917 (Spring retention purge, XS/Low), #918 (WorkerCredentialStore contract tests, S/Low), #919 (Spring StaticCredentialStore test, XS/Low).
 
-**Blog:** "Less Ceremony, More Signal" — published.
+## Branches to land
 
-**Filed:** #914 (WebAuthn SPI delete ownership, XS/Low), #915 (restore StepRunner pipeline coverage, XS/Low), #916 (Spring REST for authn endpoints, S/Low).
-
-## Queue (7 items)
-
-1. #911 — Contract test base for StaticCredentialStore (S/Low) ← next
-2. #912 — Credential grace period cleanup scheduler (S/Low)
-3. #913 — Spring parity for mcp-server module (S/Med)
-4. #914 — WebAuthn SPI delete ownership (XS/Low)
-5. #915 — Restore StepRunner pipeline coverage (XS/Low)
-6. #916 — Spring REST for authn endpoints (S/Low)
-7. #903 — regression variable resolution yaml-test-core (CLOSED)
+1. `issue-911-credential-contract-tests` — stacked on main
+2. `issue-912-credential-grace-cleanup` — stacked on #911
+3. `issue-920-resolve-playbook-cross-root` — independent, from main
 
 ## Attention for next session
 
-1. **#911 branch exists** — `issue-911-credential-contract-tests` created but no work done. Run `work continue` to pick it up.
-2. **#903 in queue but closed** — can be removed from queue on next session.
-3. **#901 still deferred** — blocked on self-organising societies design (not yet scoped). #900 prerequisite is now landed.
+1. **Three branches need landing** — #911 and #912 are stacked (land in order). #920 is independent.
+2. **Connectors unblocked** — #920 installed to local .m2. Connectors can pick up the SNAPSHOT.
+3. **#913 is next non-trivial work** — Spring parity for mcp-server (S/Med), topic change from credential lifecycle.
