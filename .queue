@@ -1,3 +1,14 @@
+# Work Plan —
+
+## State
+branch: 
+issue-repo: casehubio/platform
+status: active
+covers: 
+date: 2026-11-18
+active_issue: casehubio/platform#928
+
+## Queue
 - [x] casehubio/platform#898 — issue 898
 - [x] casehubio/platform#902 — issue 902
 - [x] casehubio/platform#904 — issue 904
@@ -59,16 +70,10 @@
 - [x] casehubio/platform#925 — dotted-variable-names-TemplateExtractor
 - [x] casehubio/platform#928 — trailing-dots-hyphens
 - [x] casehubio/platform#929 — sanitized-group-collision
-- [ ] casehubio/platform#930 — yaml-protocol-parsing        ← active
-- [ ] casehubio/platform#931 — PlaybookRunnerCore-run-overload
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-covers: casehubio/platform#930
-date: 2026-11-18
-active_issue: casehubio/platform#928
+- [ ] casehubio/platform#930 — yaml-protocol-parsing ← done on issue-930-yaml-protocol-parsing
+- [ ] casehubio/platform#931 — PlaybookRunnerCore-run-overload ← done on issue-931-playbook-runner-string-overload
+- [ ] casehubio/platform#932 — refactor-playbook-runner-shared-logic
+- [ ] casehubio/platform#933 — cleanup-unused-stepLookup
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
