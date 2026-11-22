@@ -1,14 +1,3 @@
-# Work Plan —
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-covers: 
-date: 2026-11-18
-active_issue: casehubio/platform#921
-
-## Queue
 - [x] casehubio/platform#898 — issue 898
 - [x] casehubio/platform#902 — issue 902
 - [x] casehubio/platform#904 — issue 904
@@ -58,9 +47,9 @@ active_issue: casehubio/platform#921
 - [x] casehubio/platform#900 — credential resolution + rotation for StaticCredentialStore
 - [x] casehubio/platform#914 — WebAuthn delete ownership SPI
 - [x] casehubio/platform#903 — regression variable resolution yaml-test-core
-- [ ] casehubio/platform#921 — template-variable-extraction ← done on issue-921-template-variable-extraction
-- [ ] casehubio/platform#915 — restore-StepRunner-pipeline-coverage ← done on issue-921-template-variable-extraction
-- [ ] casehubio/platform#916 — Spring-REST-authn-endpoints ← done on issue-916-spring-rest-authn-endpoints
+- [x] casehubio/platform#921 — template-variable-extraction
+- [x] casehubio/platform#915 — restore-StepRunner-pipeline-coverage
+- [x] casehubio/platform#916 — Spring-REST-authn-endpoints
   - [x] Batch 1: Extract core POJOs
     - [x] Task 1: ConnectionEndpointCore
     - [x] Task 2: WebAuthnEndpointCore
@@ -70,12 +59,12 @@ active_issue: casehubio/platform#921
     - [x] Task 5: Spring generator and bean wiring
   - [x] Batch 3: Verify
     - [x] Task 6: Full build and CLAUDE.md
-- [ ] casehubio/platform#913 — Spring-parity-mcp-server ← done on issue-916-spring-rest-authn-endpoints
-- [ ] casehubio/platform#917 — Spring-parity-CredentialRetentionPurge ← done on issue-916-spring-rest-authn-endpoints
-- [ ] casehubio/platform#918 — Contract-test-WorkerCredentialStore ← done on issue-916-spring-rest-authn-endpoints
-- [ ] casehubio/platform#919 — Spring-contract-StaticCredentialStore ← done on issue-916-spring-rest-authn-endpoints
-- [ ] casehubio/platform#923 — optional-segments-TemplateExtractor ← done on issue-923-optional-segments-template
-- [ ] casehubio/platform#924 — governance-protocol-integration ← done on issue-924-governance-protocol-integ
+- [x] casehubio/platform#913 — Spring-parity-mcp-server
+- [x] casehubio/platform#917 — Spring-parity-CredentialRetentionPurge
+- [x] casehubio/platform#918 — Contract-test-WorkerCredentialStore
+- [x] casehubio/platform#919 — Spring-contract-StaticCredentialStore
+- [x] casehubio/platform#923 — optional-segments-TemplateExtractor
+- [x] casehubio/platform#924 — governance-protocol-integration
   - [x] Batch 1: Batch 1
     - [x] Task 1: ProtocolDefinition and ProtocolMatchResult types
     - [x] Task 2: ProtocolEvaluator and delete skeleton
@@ -84,6 +73,13 @@ active_issue: casehubio/platform#921
 - [ ] casehubio/platform#928 — trailing-dots-hyphens
 - [ ] casehubio/platform#929 — sanitized-group-collision
 - [ ] casehubio/platform#930 — yaml-protocol-parsing
+
+## State
+branch: 
+issue-repo: casehubio/platform
+status: active
+date: 2026-11-18
+active_issue: casehubio/platform#921
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
