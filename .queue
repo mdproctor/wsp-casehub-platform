@@ -58,7 +58,7 @@
 - [x] casehubio/platform#924 — governance-protocol-integration
 - [x] casehubio/platform#925 — dotted-variable-names-TemplateExtractor
 - [x] casehubio/platform#928 — trailing-dots-hyphens
-- [ ] casehubio/platform#929 — sanitized-group-collision ← done on issue-928-trailing-dots-hyphens
+- [x] casehubio/platform#929 — sanitized-group-collision
 - [ ] casehubio/platform#930 — yaml-protocol-parsing        ← active
 - [ ] casehubio/platform#931 — PlaybookRunnerCore-run-overload
 
