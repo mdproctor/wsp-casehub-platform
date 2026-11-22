@@ -62,8 +62,8 @@
 - [x] casehubio/platform#930 — yaml-protocol-parsing
 - [x] casehubio/platform#931 — PlaybookRunnerCore-run-overload
 - [x] casehubio/platform#932 — refactor-playbook-runner-shared-logic
-- [ ] casehubio/platform#933 — cleanup-unused-stepLookup ← done on issue-932-playbook-runner-shared-logic
-- [ ] casehubio/platform#934 — comprehensive-review-and-audit
+- [x] casehubio/platform#933 — cleanup-unused-stepLookup
+- [ ] casehubio/platform#934 — comprehensive-review-and-audit        ← active
 
 ## State
 branch: 
