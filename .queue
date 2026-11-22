@@ -4,7 +4,7 @@
 branch: 
 issue-repo: casehubio/platform
 status: active
-covers: casehubio/platform#923
+covers: 
 date: 2026-11-18
 active_issue: casehubio/platform#921
 
@@ -74,9 +74,16 @@ active_issue: casehubio/platform#921
 - [ ] casehubio/platform#917 — Spring-parity-CredentialRetentionPurge ← done on issue-916-spring-rest-authn-endpoints
 - [ ] casehubio/platform#918 — Contract-test-WorkerCredentialStore ← done on issue-916-spring-rest-authn-endpoints
 - [ ] casehubio/platform#919 — Spring-contract-StaticCredentialStore ← done on issue-916-spring-rest-authn-endpoints
-- [ ] casehubio/platform#923 — optional-segments-TemplateExtractor ← active
-- [ ] casehubio/platform#924 — governance-protocol-integration
-- [ ] casehubio/platform#925 — dotted-variable-names-TemplateExtractor
+- [ ] casehubio/platform#923 — optional-segments-TemplateExtractor ← done on issue-923-optional-segments-template
+- [ ] casehubio/platform#924 — governance-protocol-integration ← done on issue-924-governance-protocol-integ
+  - [x] Batch 1: Batch 1
+    - [x] Task 1: ProtocolDefinition and ProtocolMatchResult types
+    - [x] Task 2: ProtocolEvaluator and delete skeleton
+    - [x] Task 3: CLAUDE.md update and build verification
+- [ ] casehubio/platform#925 — dotted-variable-names-TemplateExtractor ← done on issue-925-dotted-variable-names
+- [ ] casehubio/platform#928 — trailing-dots-hyphens
+- [ ] casehubio/platform#929 — sanitized-group-collision
+- [ ] casehubio/platform#930 — yaml-protocol-parsing
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
