@@ -1,48 +1,35 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #919 (blocked) on branch `issue-916-spring-rest-authn-endpoints`.
-**Branch:** `issue-916-spring-rest-authn-endpoints` (stacked on `issue-921-template-variable-extraction`).
-**Active item:** #923 (optional segments in TemplateExtractor) — not started.
+**Last worked:** #925 (dotted variable names) — landed on main.
+**Branch:** `main` — all work landed.
+**Active item:** #928 (trailing dots/hyphens validation) — not started.
 
 ## Session summary
 
-Five-issue session — Spring parity, contract testing, and triage of blocked issues.
+Three-issue session — template extraction arc: optional segments, governance protocol integration, and dotted variable names. All landed.
 
-**#916 (S/Low) — feat:** Spring REST controllers for three authn domains. Extracted `ConnectionEndpointCore`, `WebAuthnEndpointCore`, `SocialAuthEndpointCore` to `authn-core` with `@McpDomain` and constructor injection. Deleted CDI endpoint classes. `AuthnBeans` now `@Produces` core POJOs. graphql-spring-generator configured in `authn-spring` — generates 6 Spring controllers (3 REST + 3 GraphQL). Key discovery: APT's `getClass().getClassLoader()` reads the annotation processor classpath, not the compilation classpath — `authn-core` had to be added to `annotationProcessorPaths` for Jandex domain discovery.
+**#923 (S/Med) — feat:** Optional segment syntax in `TemplateExtractor`. Bracket syntax `[...]` becomes `(?:...)?` regex groups. Variables inside unmatched optional segments are absent from the result map (not empty string). Escaped brackets `\[` `\]` treated as literals. Nested brackets rejected at compile time.
 
-**#913 (S/Med) — already resolved:** `mcp-server` exception already exists in `spring-parity-exceptions.txt` (commit `a3b60638`, #905).
+**#924 (M/Med) — feat:** Wired `TemplateExtractor` and `TemplateRegistry` into the governance protocol runtime. Three new types in `coordination-core/protocol/`: `ProtocolDefinition` (record: name + ordered template map), `ProtocolEvaluator` (ConcurrentHashMap-backed, thread-safe, register/evaluate/deregister), `ProtocolMatchResult` (sealed: Matched/Unmatched). Deleted hollow `PlaybookProtocolEvaluator` skeleton.
 
-**#917 (XS/Low) — blocked:** `CredentialRetentionPurge` from #912 hasn't landed on main. Can't mirror what doesn't exist yet. Commented on issue.
+**#925 (S/Low) — feat:** Dotted and hyphenated variable names in `TemplateExtractor`. `${context.user}` and `${my-var}` now work. Internally sanitized to Java regex-safe group names (`0DOT0`, `0HYPHEN0`) since Java regex named groups only accept `[a-zA-Z][a-zA-Z0-9]*` — underscores are not valid either (discovered empirically).
 
-**#918 (S/Low) — feat:** `AbstractWorkerCredentialStoreTest` contract test base in `testing` module. 12 tests covering all 6 `WorkerCredentialStore` SPI methods. `InMemoryWorkerCredentialStoreTest` in `acl-inmem-core` extends the base, adds 2 implementation-specific lazy eviction tests (14 total).
+**Code review finding fixed:** Removed unused `groupToOriginal` field from `TemplateExtractor` — the field was populated but never read; `sanitizeGroupName()` is a pure function called at both compile and extract time.
 
-**#919 (XS/Low) — blocked:** `AbstractStaticCredentialStoreTest` from #911 hasn't landed on main. Commented on issue.
+**Blog:** "Wiring the Protocol Runtime" — optional segments, dotted names, and the protocol evaluator.
 
-**Blog:** "The Classloader Nobody Checks" — APT classloader vs compilation classpath for Jandex scanning.
-
-## Branches to land (in order)
-
-1. `issue-921-template-variable-extraction` — from main, 2 commits (#921)
-2. `issue-916-spring-rest-authn-endpoints` — stacked on above, 6 commits (#916, #918, code review fix)
+**Issues filed:** #928 (trailing dots/hyphens), #929 (sanitized group name collisions), #930 (YAML protocol definition parsing).
 
 ## Queue state
 
 | # | Issue | Status |
 |---|-------|--------|
-| #921 | template-variable-extraction | done on branch 1 |
-| #915 | restore-StepRunner-pipeline-coverage | done on branch 1 |
-| #916 | Spring-REST-authn-endpoints | done on branch 2 |
-| #913 | Spring-parity-mcp-server | done (already resolved) |
-| #917 | Spring-parity-CredentialRetentionPurge | done (blocked by #912) |
-| #918 | Contract-test-WorkerCredentialStore | done on branch 2 |
-| #919 | Spring-contract-StaticCredentialStore | done (blocked by #911) |
-| #923 | optional-segments-TemplateExtractor | active, not started |
-| #924 | governance-protocol-integration | queued |
-| #925 | dotted-variable-names-TemplateExtractor | queued |
+| #928 | trailing-dots-hyphens | active, not started |
+| #929 | sanitized-group-collision | queued |
+| #930 | yaml-protocol-parsing | queued |
 
 ## Attention for next session
 
-1. **Two branches need landing in order** — first `issue-921-template-variable-extraction` (from main), then `issue-916-spring-rest-authn-endpoints` (stacked).
-2. **#923 is next** — optional segments in TemplateExtractor (yaml-core domain). Fresh session context recommended — different domain from this session's Spring parity work.
-3. **Two issues blocked by unlanded work** — #917 (blocked by #912) and #919 (blocked by #911). These will unblock when their respective branches land via work-end.
-4. **Pre-existing test failure** — `authn-social-jpa` fails with missing `AbstractStaticCredentialStoreTest` class (from unlanded #911). Not caused by this branch's changes.
+1. **#928 is next** — tighten `VALID_VAR_NAME` regex to reject trailing dots and hyphens (`${abc.}`, `${abc-}`). XS/Low — straightforward regex fix + tests.
+2. **#929** — guard against sanitized group name collisions. XS/Low — add a check after sanitizing.
+3. **#930** — YAML protocol definition parsing. S/Low — parse a `templates:` section into `ProtocolDefinition`.
