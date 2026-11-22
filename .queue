@@ -69,8 +69,8 @@
     - [x] Task 1: ProtocolDefinition and ProtocolMatchResult types
     - [x] Task 2: ProtocolEvaluator and delete skeleton
     - [x] Task 3: CLAUDE.md update and build verification
-- [ ] casehubio/platform#925 — dotted-variable-names-TemplateExtractor ← done on issue-925-dotted-variable-names
-- [ ] casehubio/platform#928 — trailing-dots-hyphens
+- [x] casehubio/platform#925 — dotted-variable-names-TemplateExtractor
+- [ ] casehubio/platform#928 — trailing-dots-hyphens        ← active
 - [ ] casehubio/platform#929 — sanitized-group-collision
 - [ ] casehubio/platform#930 — yaml-protocol-parsing
 
