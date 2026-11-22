@@ -1,3 +1,14 @@
+# Work Plan —
+
+## State
+branch: 
+issue-repo: casehubio/platform
+status: active
+date: 2026-11-18
+active_issue: casehubio/platform#928
+covers: casehubio/platform#930
+
+## Queue
 - [x] casehubio/platform#898 — issue 898
 - [x] casehubio/platform#902 — issue 902
 - [x] casehubio/platform#904 — issue 904
@@ -50,36 +61,17 @@
 - [x] casehubio/platform#921 — template-variable-extraction
 - [x] casehubio/platform#915 — restore-StepRunner-pipeline-coverage
 - [x] casehubio/platform#916 — Spring-REST-authn-endpoints
-  - [x] Batch 1: Extract core POJOs
-    - [x] Task 1: ConnectionEndpointCore
-    - [x] Task 2: WebAuthnEndpointCore
-    - [x] Task 3: SocialAuthEndpointCore
-  - [x] Batch 2: Wire and delete
-    - [x] Task 4: CDI wiring and endpoint deletion
-    - [x] Task 5: Spring generator and bean wiring
-  - [x] Batch 3: Verify
-    - [x] Task 6: Full build and CLAUDE.md
 - [x] casehubio/platform#913 — Spring-parity-mcp-server
 - [x] casehubio/platform#917 — Spring-parity-CredentialRetentionPurge
 - [x] casehubio/platform#918 — Contract-test-WorkerCredentialStore
 - [x] casehubio/platform#919 — Spring-contract-StaticCredentialStore
 - [x] casehubio/platform#923 — optional-segments-TemplateExtractor
 - [x] casehubio/platform#924 — governance-protocol-integration
-  - [x] Batch 1: Batch 1
-    - [x] Task 1: ProtocolDefinition and ProtocolMatchResult types
-    - [x] Task 2: ProtocolEvaluator and delete skeleton
-    - [x] Task 3: CLAUDE.md update and build verification
 - [x] casehubio/platform#925 — dotted-variable-names-TemplateExtractor
-- [ ] casehubio/platform#928 — trailing-dots-hyphens        ← active
-- [ ] casehubio/platform#929 — sanitized-group-collision
-- [ ] casehubio/platform#930 — yaml-protocol-parsing
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-date: 2026-11-18
-active_issue: casehubio/platform#921
+- [ ] casehubio/platform#928 — trailing-dots-hyphens ← done on issue-928-trailing-dots-hyphens
+- [ ] casehubio/platform#929 — sanitized-group-collision ← done on issue-928-trailing-dots-hyphens
+- [ ] casehubio/platform#930 — yaml-protocol-parsing ← active
+- [ ] casehubio/platform#931 — PlaybookRunnerCore-run-overload
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
