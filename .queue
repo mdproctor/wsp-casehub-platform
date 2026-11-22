@@ -60,8 +60,8 @@
 - [x] casehubio/platform#928 — trailing-dots-hyphens
 - [x] casehubio/platform#929 — sanitized-group-collision
 - [x] casehubio/platform#930 — yaml-protocol-parsing
-- [ ] casehubio/platform#931 — PlaybookRunnerCore-run-overload ← done on issue-931-playbook-runner-string-overload
-- [ ] casehubio/platform#932 — refactor-playbook-runner-shared-logic
+- [x] casehubio/platform#931 — PlaybookRunnerCore-run-overload
+- [ ] casehubio/platform#932 — refactor-playbook-runner-shared-logic        ← active
 - [ ] casehubio/platform#933 — cleanup-unused-stepLookup
 
 ## State
