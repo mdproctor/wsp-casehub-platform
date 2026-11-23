@@ -1,10 +1,10 @@
 # Work Plan —
 
 ## State
-branch: issue-922-template-message-extraction
+branch: 
 issue-repo: casehubio/platform
 status: active
-covers: casehubio/platform#922
+covers: casehubio/platform#942
 date: 2026-11-18
 active_issue: casehubio/platform#928
 
@@ -77,7 +77,7 @@ active_issue: casehubio/platform#928
 - [x] casehubio/platform#934 — comprehensive-review-and-audit
 - [x] casehubio/platform#935 — authn-social-jpa classpath failure
 - [ ] casehubio/platform#936 — seed-catalog instanceId mismatch ← done on issue-936-seed-catalog-instanceid
-- [ ] casehubio/platform#922 — issue-922 ← active
+- [ ] casehubio/platform#922 — issue-922 ← done on issue-922-template-message-extraction
   - [x] Batch 1: API-Foundation
     - [x] Task 1: Core types and VariableConstraint
     - [x] Task 2: RegexMessageMatcher
@@ -85,7 +85,7 @@ active_issue: casehubio/platform#928
     - [x] Task 3: OpenNLP tokenizer and TwoTierMatcher
   - [x] Batch 3: Verification
     - [x] Task 4: Full build and cross-module test
-- [ ] casehubio/platform#942 — move-opennlp-models-to-maven-or-lfs
+- [ ] casehubio/platform#942 — move-opennlp-models-to-maven-or-lfs ← active
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
