@@ -1,3 +1,14 @@
+# Work Plan —
+
+## State
+branch: 
+issue-repo: casehubio/platform
+status: active
+covers: 
+date: 2026-11-18
+active_issue: casehubio/platform#928
+
+## Queue
 - [x] casehubio/platform#898 — issue 898
 - [x] casehubio/platform#902 — issue 902
 - [x] casehubio/platform#904 — issue 904
@@ -68,17 +79,10 @@
 - [x] casehubio/platform#936 — seed-catalog instanceId mismatch
 - [x] casehubio/platform#922 — issue-922
 - [x] casehubio/platform#942 — move-opennlp-models-to-maven-or-lfs
-- [ ] casehubio/platform#944 — variable-type-validation-TemplateExtractor        ← active
-- [ ] casehubio/platform#945 — nlp-fallback-keyword-scoped-candidate-selection
-- [ ] casehubio/platform#946 — playbook-template-declaration-executor-wiring
-- [ ] casehubio/platform#947 — unmatched-response-handling-pass-through-rephrase
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-date: 2026-11-18
-active_issue: casehubio/platform#928
+- [ ] casehubio/platform#944 — variable-type-validation-TemplateExtractor ← done on issue-944-variable-type-validation
+- [ ] casehubio/platform#945 — nlp-fallback-keyword-scoped-candidate-selection ← done on issue-945-nlp-fallback-protocol-evaluator
+- [ ] casehubio/platform#946 — playbook-template-declaration-executor-wiring ← done on issue-946-playbook-template-wiring
+- [ ] casehubio/platform#947 — unmatched-response-handling-pass-through-rephrase ← done on issue-947-unmatched-pass-through-rephrase
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
