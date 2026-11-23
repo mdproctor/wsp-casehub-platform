@@ -67,43 +67,45 @@
 
 ## D6: Module structure
 
-**Choice:** Two modules: `message-extraction-api` (SPI types: NlpTokenizer, AnnotatedToken, MessageSchema, MessageType, MessageMatch, variable constraints) and `message-extraction` (regex matcher, structural matcher, pattern compiler, OpenNLP default NlpTokenizer, bundled OpenNLP models for English).
+**Choice:** Two modules: `message-extraction-api` (SPI types + regex matcher: NlpTokenizer, AnnotatedToken, MessageSchema, MessageType, MessageMatch, MessageMatcher interface, RegexMessageMatcher, variable constraints — zero external dependencies) and `message-extraction` (NLP structural matcher, TwoTierMessageMatcher, OpenNLP default NlpTokenizer, bundled OpenNLP models for English).
 **Alternatives:**
-- Single module with SPI and impl together — simpler, but API consumers forced to depend on OpenNLP transitively
-- Three modules (-api, -core, -opennlp) — over-engineered before second impl exists
-**Rationale:** Thin API module lets consumers (coordination-core, governance) depend on types without pulling OpenNLP. The impl module bundles the full two-tier engine (regex + NLP) together with OpenNLP models as classpath resources (~7–10MB for English: sentence detector, tokenizer, POS tagger, lemmatizer dictionary). Split -opennlp out when a second tokenizer impl arrives.
-**Trade-offs:** Two modules instead of one. The API module is very small (interfaces + records). OpenNLP models bundled in the impl jar — consumers who depend on message-extraction-api only are unaffected.
+- Single module with SPI and impl together — API consumers forced to depend on OpenNLP transitively
+- Three modules (-api, -core, -opennlp) — over-engineered; the regex matcher in -api eliminates the need for a separate -core
+- Regex matcher in impl alongside OpenNLP (previous D6) — forces OpenNLP on consumers who only need exact matching, inflating coordination-core's transitive footprint from ~50KB (yaml-core) to ~7–10MB
+**Rationale:** The regex matcher is pure Java with zero external dependencies — architecturally equivalent to TemplateExtractor in yaml-core. Placing it in -api means consumers like coordination-core get regex matching (identical capability to current TemplateExtractor) without pulling OpenNLP. The -impl module adds the NLP fallback tier on top: TwoTierMessageMatcher wraps RegexMessageMatcher (from -api) with NlpMessageMatcher to provide both tiers. This makes D2's two-tier approach genuinely modular: -api gives you the regex tier, -impl adds NLP. Follows the platform-api precedent where zero-dep final classes with operational logic (Path validation/parsing, PathParser static factories) coexist with interfaces and records.
+**Trade-offs:** The -api module includes regex matching logic, not just types — but remains zero-dep, consistent with platform-api's constraint. Consumers who want the NLP fallback add message-extraction explicitly.
 **Depends on:** D1 (standalone), D3 (SPI)
-**Sources:** casehub-platform module patterns (agent-api/agent-claude, platform-api/platform)
+**Sources:** casehub-platform module patterns (agent-api/agent-claude, platform-api/platform), TemplateExtractor in yaml-core (zero-dep matcher precedent), Path/PathParser in platform-api (operational logic in -api precedent)
 **Exploration:** quick
-**Status:** revised — added explicit model distribution strategy (R1-10): OpenNLP models bundled as classpath resources in impl jar.
+**Status:** revised — regex matcher moved from impl to -api module (R2-02). Previous placement forced ~7–10MB OpenNLP transitive on regex-only consumers like coordination-core. Model distribution strategy (R1-10): OpenNLP models bundled as classpath resources in impl jar.
 
-## D7: Output model — sealed match result
+## D7: Output model — sealed match result with tier-specific scoring
 
-**Choice:** The extraction engine returns a sealed interface match result with Matched(templateName, params, score) and Unmatched(input) variants. This follows the existing ProtocolMatchResult pattern in coordination-core.
+**Choice:** The extraction engine returns a sealed interface match result with Matched(templateName, params, score) and Unmatched(input) variants. Score semantics are tier-specific: regex tier produces score 1.0 (exact match); NLP tier produces a coverage score in (0, 1.0] based on the ratio of matched structural elements to total template elements. This follows the existing ProtocolMatchResult pattern in coordination-core.
 **Alternatives:**
 - Function call model (original D5 framing) — implies a dispatch table mapping template names to handlers; more prescriptive than necessary for a standalone engine
 - Event model — decoupled via event bus, but adds indirection without benefit for synchronous extraction
 - Raw Map return — loses type safety and match/no-match distinction
-**Rationale:** The sealed interface pattern is established in the platform (ProtocolMatchResult.Matched/Unmatched). It doesn't prescribe how consumers handle the result — pattern matching, dispatch table, or event emission are all consumer choices. Adding a score field (from the NLP structural matcher's coverage score) enables best-match selection when multiple templates partially match.
-**Trade-offs:** Consumers must pattern-match on the sealed interface. This is intentional — it forces handling of both matched and unmatched cases.
+- Unscored match result — loses the ability to distinguish exact from approximate matches and to threshold on match quality
+**Rationale:** The sealed interface pattern is established in the platform (ProtocolMatchResult.Matched/Unmatched). It doesn't prescribe how consumers handle the result. The score field enables consumers to: distinguish regex matches (1.0) from NLP matches (<1.0); reject low-confidence matches via threshold; select the best match when multiple templates partially match. Consumers using only the regex tier (via message-extraction-api) always see score 1.0.
+**Trade-offs:** Consumers must pattern-match on the sealed interface. Score interpretation requires understanding tier semantics — mitigated by the clear 1.0 / (0, 1.0] boundary between tiers.
 **Depends on:** D1 (standalone engine)
 **Sources:** ProtocolMatchResult sealed interface in coordination-core, issue #922 "Score by coverage. Select the best match."
-**Exploration:** surfaced by review (R1-06)
-**Status:** captured
+**Exploration:** surfaced by review (R1-06), score semantics specified (R2-03)
+**Status:** revised — added explicit score semantics across tiers (R2-03). Regex tier: 1.0. NLP tier: coverage ratio in (0, 1.0].
 
-## D8: Migration story — ProtocolEvaluator becomes a consumer
+## D8: Migration story — ProtocolEvaluator becomes a consumer of message-extraction-api
 
-**Choice:** The message-extraction engine is the successor to TemplateExtractor/TemplateRegistry for response matching. ProtocolEvaluator in coordination-core becomes a consumer of message-extraction, delegating matching to the new engine instead of TemplateRegistry. TemplateExtractor in yaml-core continues to serve YAML variable resolution (forward direction) unchanged.
+**Choice:** The message-extraction engine is the successor to TemplateExtractor/TemplateRegistry for response matching. ProtocolEvaluator in coordination-core depends on `message-extraction-api` (which includes RegexMessageMatcher — zero external deps), not `message-extraction` (which adds OpenNLP). TemplateExtractor in yaml-core continues to serve YAML variable resolution (forward direction) unchanged.
 **Alternatives:**
 - Run both systems in parallel — two template matching systems for the same purpose; maintenance and coherence problem
+- coordination-core depends on message-extraction (full engine with OpenNLP) — changes coordination-core's transitive footprint from ~50KB (yaml-core, zero-dep) to ~7–10MB (OpenNLP + models), a ~200x increase not justified if regex matching suffices for the protocol use case
 - Message-extraction replaces yaml-core TemplateExtractor entirely — breaks yaml-core's J2CL-safe zero-dep constraint
-- ProtocolEvaluator delegates internally to message-extraction — coordination-core gains a new dependency, but this is the correct architectural direction
-**Rationale:** TemplateExtractor serves two architecturally distinct purposes: YAML variable resolution (forward: template → rendered string) and protocol response matching (reverse: string → extracted variables). YAML variable resolution stays in yaml-core (zero-dep, J2CL-safe). Response matching moves to message-extraction, which provides the two-tier (regex + NLP) capability. ProtocolEvaluator gains a dependency on message-extraction-api (types) or message-extraction (full engine), replacing its current yaml-core TemplateRegistry dependency for matching.
-**Trade-offs:** coordination-core gains a new module dependency. Migration is mechanical — ProtocolEvaluator.evaluate() changes from using TemplateRegistry.match() to using the new engine's match method. Existing ProtocolEvaluatorTest validates the same protocol-level behavior.
-**Sources:** ProtocolEvaluator in coordination-core, TemplateExtractor/TemplateRegistry in yaml-core, VariableResolver in yaml-core (uses TemplateExtractor for forward resolution only)
-**Exploration:** surfaced by review (R1-08)
-**Status:** captured
+**Rationale:** ProtocolEvaluator's current matching via TemplateRegistry is regex-based. RegexMessageMatcher in message-extraction-api provides identical capability (compiled regex patterns, first-match-wins, variable extraction) with zero footprint increase — message-extraction-api is zero-dep, comparable to yaml-core. If the NLP fallback proves necessary for protocol evaluation, coordination-core can upgrade to depending on message-extraction without API changes (both tiers implement the same MessageMatcher interface). TemplateExtractor in yaml-core continues to serve YAML variable resolution (forward direction) unchanged.
+**Trade-offs:** coordination-core gains a dependency on message-extraction-api (zero-dep, comparable footprint to yaml-core). Migration is mechanical: ProtocolEvaluator.evaluate() changes from TemplateRegistry.match() to RegexMessageMatcher.match(). No transitive footprint increase for coordination-core's consumers (playbook-compiler, etc.). If NLP fallback proves necessary later, the dependency can be upgraded to message-extraction — a deliberate opt-in, not a default.
+**Sources:** ProtocolEvaluator in coordination-core, TemplateExtractor/TemplateRegistry in yaml-core, D6 module structure (regex matcher in -api), coordination-core pom.xml (current yaml-core dependency)
+**Exploration:** surfaced by review (R1-08), dependency target and footprint refined (R2-01, R2-02)
+**Status:** revised — dependency target resolved to message-extraction-api (R2-01). Transitive footprint concern eliminated by regex matcher placement in -api (R2-02).
 
 ## D9: Language scope — English only
 
