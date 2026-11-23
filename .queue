@@ -66,7 +66,7 @@
 - [x] casehubio/platform#934 — comprehensive-review-and-audit
 - [x] casehubio/platform#935 — authn-social-jpa classpath failure
 - [x] casehubio/platform#936 — seed-catalog instanceId mismatch
-- [ ] casehubio/platform#922 — issue-922 ← done on issue-922-template-message-extraction
+- [x] casehubio/platform#922 — issue-922
   - [x] Batch 1: API-Foundation
     - [x] Task 1: Core types and VariableConstraint
     - [x] Task 2: RegexMessageMatcher
