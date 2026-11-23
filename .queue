@@ -1,3 +1,14 @@
+# Work Plan —
+
+## State
+branch: 
+issue-repo: casehubio/platform
+status: active
+covers: 
+date: 2026-11-18
+active_issue: casehubio/platform#928
+
+## Queue
 - [x] casehubio/platform#898 — issue 898
 - [x] casehubio/platform#902 — issue 902
 - [x] casehubio/platform#904 — issue 904
@@ -67,22 +78,11 @@
 - [x] casehubio/platform#935 — authn-social-jpa classpath failure
 - [x] casehubio/platform#936 — seed-catalog instanceId mismatch
 - [x] casehubio/platform#922 — issue-922
-  - [x] Batch 1: API-Foundation
-    - [x] Task 1: Core types and VariableConstraint
-    - [x] Task 2: RegexMessageMatcher
-  - [x] Batch 2: NLP-Impl
-    - [x] Task 3: OpenNLP tokenizer and TwoTierMatcher
-  - [x] Batch 3: Verification
-    - [x] Task 4: Full build and cross-module test
-- [ ] casehubio/platform#942 — move-opennlp-models-to-maven-or-lfs        ← active
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-covers: casehubio/platform#942
-date: 2026-11-18
-active_issue: casehubio/platform#928
+- [ ] casehubio/platform#942 — move-opennlp-models-to-maven-or-lfs ← done on issue-929-sanitized-group-collisions
+- [ ] casehubio/platform#944 — variable-type-validation-TemplateExtractor
+- [ ] casehubio/platform#945 — nlp-fallback-keyword-scoped-candidate-selection
+- [ ] casehubio/platform#946 — playbook-template-declaration-executor-wiring
+- [ ] casehubio/platform#947 — unmatched-response-handling-pass-through-rephrase
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
