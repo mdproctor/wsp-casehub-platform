@@ -1,7 +1,7 @@
 # Work Plan —
 
 ## State
-branch: main
+branch: 
 issue-repo: casehubio/platform
 status: active
 date: 2026-11-18
@@ -73,7 +73,9 @@ active_issue: casehubio/platform#928
 - [x] casehubio/platform#931 — PlaybookRunnerCore-run-overload
 - [x] casehubio/platform#932 — refactor-playbook-runner-shared-logic
 - [x] casehubio/platform#933 — cleanup-unused-stepLookup
-- [ ] casehubio/platform#934 — comprehensive-review-and-audit ← active
+- [ ] casehubio/platform#934 — comprehensive-review-and-audit ← done on issue-934-comprehensive-review-audit
+- [ ] casehubio/platform#935 — authn-social-jpa classpath failure
+- [ ] casehubio/platform#936 — seed-catalog instanceId mismatch
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []

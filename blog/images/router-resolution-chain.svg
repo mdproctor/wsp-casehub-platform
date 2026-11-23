@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 520" font-family="system-ui, -apple-system, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#16a34a"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc2626"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="340" y="28" text-anchor="middle" font-size="16" font-weight="bold" fill="#1e293b">RoutingAgentProvider.resolve()</text>
+
+  <!-- Step 0: null model -->
+  <rect x="220" y="48" width="240" height="36" rx="6" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="340" y="71" text-anchor="middle" fill="#334155">model == null?</text>
+  <line x1="460" y1="66" x2="540" y2="66" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <text x="480" y="58" fill="#16a34a" font-size="11">yes</text>
+  <rect x="544" y="50" width="120" height="32" rx="4" fill="#dcfce7" stroke="#16a34a" stroke-width="1"/>
+  <text x="604" y="71" text-anchor="middle" fill="#166534" font-size="12">default backend</text>
+
+  <!-- Arrow down -->
+  <line x1="340" y1="84" x2="340" y2="110" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="354" y="100" fill="#64748b" font-size="11">no</text>
+
+  <!-- Step 1: Tier ref -->
+  <rect x="220" y="114" width="240" height="36" rx="6" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="340" y="137" text-anchor="middle" fill="#334155">Step 1: Tier reference?</text>
+  <line x1="460" y1="132" x2="540" y2="132" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <text x="480" y="124" fill="#16a34a" font-size="11">yes</text>
+  <rect x="544" y="116" width="120" height="32" rx="4" fill="#dcfce7" stroke="#16a34a" stroke-width="1"/>
+  <text x="604" y="137" text-anchor="middle" fill="#166534" font-size="12">query registry</text>
+
+  <!-- Arrow down -->
+  <line x1="340" y1="150" x2="340" y2="176" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="354" y="166" fill="#64748b" font-size="11">no</text>
+
+  <!-- Step 2: Registry ID -->
+  <rect x="220" y="180" width="240" height="36" rx="6" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="340" y="203" text-anchor="middle" fill="#334155">Step 2: Registry ID match?</text>
+  <line x1="460" y1="198" x2="540" y2="198" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <text x="480" y="190" fill="#16a34a" font-size="11">yes</text>
+  <rect x="544" y="182" width="120" height="32" rx="4" fill="#dcfce7" stroke="#16a34a" stroke-width="1"/>
+  <text x="604" y="203" text-anchor="middle" fill="#166534" font-size="12">mapped backend</text>
+
+  <!-- Arrow down -->
+  <line x1="340" y1="216" x2="340" y2="242" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="354" y="232" fill="#64748b" font-size="11">no</text>
+
+  <!-- Step 3: Backend key -->
+  <rect x="220" y="246" width="240" height="36" rx="6" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="340" y="269" text-anchor="middle" fill="#334155">Step 3: Backend key match?</text>
+  <line x1="460" y1="264" x2="540" y2="264" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <text x="480" y="256" fill="#16a34a" font-size="11">yes</text>
+  <rect x="544" y="248" width="120" height="32" rx="4" fill="#dcfce7" stroke="#16a34a" stroke-width="1"/>
+  <text x="604" y="269" text-anchor="middle" fill="#166534" font-size="12">direct backend</text>
+
+  <!-- Arrow down -->
+  <line x1="340" y1="282" x2="340" y2="308" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="354" y="298" fill="#64748b" font-size="11">no</text>
+
+  <!-- Step 4: NEW — Default fallback -->
+  <rect x="195" y="312" width="290" height="40" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="340" y="332" text-anchor="middle" fill="#1e40af" font-weight="bold" font-size="13">Step 4: Default backend fallback</text>
+  <text x="340" y="346" text-anchor="middle" fill="#3b82f6" font-size="10">(NEW — direct resolution only)</text>
+  <line x1="485" y1="332" x2="540" y2="332" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <text x="500" y="324" fill="#16a34a" font-size="11">yes</text>
+  <rect x="544" y="316" width="120" height="32" rx="4" fill="#dcfce7" stroke="#16a34a" stroke-width="1"/>
+  <text x="604" y="337" text-anchor="middle" fill="#166534" font-size="12">default + warn</text>
+
+  <!-- Arrow down to throw -->
+  <line x1="340" y1="352" x2="340" y2="378" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+  <text x="354" y="368" fill="#dc2626" font-size="11">no</text>
+
+  <!-- Throw -->
+  <rect x="240" y="382" width="200" height="36" rx="6" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5"/>
+  <text x="340" y="405" text-anchor="middle" fill="#991b1b" font-weight="bold">IllegalArgumentException</text>
+
+  <!-- Before label -->
+  <rect x="16" y="370" width="160" height="56" rx="4" fill="#fff7ed" stroke="#f97316" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="96" y="390" text-anchor="middle" fill="#c2410c" font-size="11" font-weight="bold">Before fix:</text>
+  <text x="96" y="406" text-anchor="middle" fill="#c2410c" font-size="11">Step 3 fell straight</text>
+  <text x="96" y="420" text-anchor="middle" fill="#c2410c" font-size="11">through to throw</text>
+
+  <!-- Chain note -->
+  <rect x="16" y="300" width="160" height="56" rx="4" fill="#f0f9ff" stroke="#0284c7" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="96" y="316" text-anchor="middle" fill="#0369a1" font-size="11" font-weight="bold">Chain resolution:</text>
+  <text x="96" y="332" text-anchor="middle" fill="#0369a1" font-size="11">allowDefaultFallback</text>
+  <text x="96" y="348" text-anchor="middle" fill="#0369a1" font-size="11">= false (skip step 4)</text>
+</svg>
