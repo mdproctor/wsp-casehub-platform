@@ -1,30 +1,31 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #934 (RoutingAgentProvider default backend fallback) — done, landing.
-**Branch:** `issue-934-comprehensive-review-audit` — squashed to 1 commit, ready to land.
-**Active item:** none — #935 and #936 queued.
+**Last worked:** #934 (RoutingAgentProvider default backend fallback) — landed on main.
+**Branch:** `issue-936-seed-catalog-instanceid` — scaffolded, no work started.
+**Active item:** #936 (seed-catalog instanceId field mismatch).
 
 ## Session summary
 
-Single-issue session — #934 fixed two compounding bugs that prevented containerised deployments from invoking any LLM model.
+Landed #934 — two compounding bugs that prevented containerised deployments from invoking any LLM model. ModelDescriptor `apiModelId` now defaults to `id` when null; RoutingAgentProvider falls back to default backend when all resolution steps fail.
 
-**Bug 1 — ModelDescriptor apiModelId:** `Objects.requireNonNull(apiModelId)` in the compact constructor throws when Jackson deserialises seed-catalog.yaml entries that omit `apiModelId`. The manual parser in `SeedCatalogModelSource` defaults to `id`, but the Jackson path in `AgentManifestLoader` doesn't. Fixed by defaulting `apiModelId` to `id` when null.
+Filed #935 (authn-social-jpa classpath failure, pre-existing) and #936 (seed-catalog instanceId mismatch, same root cause area as #934). #936 was prioritised because the context from #934 is still fresh.
 
-**Bug 2 — RoutingAgentProvider fallback:** `resolve()` throws `IllegalArgumentException` when all four resolution steps fail, without checking `defaultBackendKey`. Added a Step 4 fallback to the default backend with a warning log. Uses `allowDefaultFallback` parameter (`false` for chain entries) to preserve chain exhaustion semantics.
+## What to do
 
-**Code review:** Clean — zero findings. 1,012 tests pass across platform-api, agent-router-core, agent-router.
+**#936 is a one-line fix.** The seed catalog YAML uses field name `instanceId` but `ModelDescriptor` has `backendInstanceId`. Jackson silently drops the value. `SeedCatalogModelSource` handles it manually (line 75), but the `AgentManifestLoader` Jackson path doesn't.
 
-**Filed:** #935 (authn-social-jpa classpath failure, pre-existing), #936 (seed-catalog instanceId field mismatch, latent).
+**Recommended fix:** Add `@JsonAlias("instanceId")` on the `backendInstanceId` record component in `ModelDescriptor`. This accepts both names without breaking existing code. File: `platform-api/src/main/java/io/casehub/platform/api/model/ModelDescriptor.java`.
+
+**Test:** Construct a `ModelDescriptor` via Jackson with `instanceId` in the YAML and assert `backendInstanceId()` is populated.
 
 ## Queue state
 
 | # | Issue | Status |
 |---|-------|--------|
-| #934 | RoutingAgentProvider default backend fallback | done, landing |
-| #935 | authn-social-jpa classpath failure | queued |
-| #936 | seed-catalog instanceId mismatch | queued |
+| #934 | RoutingAgentProvider default backend fallback | done, landed |
+| #936 | seed-catalog instanceId mismatch | active — scaffolded |
+| #935 | authn-social-jpa classpath failure | deferred (different domain) |
 
-## Attention for next session
+## Deferred
 
-1. **#935 is next** — `AbstractStaticCredentialStoreTest` not on classpath in `authn-social-jpa`. Pre-existing, XS/Low.
-2. **#936** — `instanceId` YAML field silently lost by Jackson deserialization. Same root cause area as #934. XS/Low. Option 2 (`@JsonAlias`) is safest.
+- ts-core TsjTsExecutor JVM-native TS execution (XS/Low)
