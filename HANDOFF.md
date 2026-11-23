@@ -1,27 +1,30 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #932 + #933 (playbook runner refactoring) — landing via work end.
-**Branch:** `issue-932-playbook-runner-shared-logic` — squashed, ready to land.
-**Active item:** #934 (comprehensive-review-and-audit) — queued for next session.
+**Last worked:** #934 (RoutingAgentProvider default backend fallback) — done, landing.
+**Branch:** `issue-934-comprehensive-review-audit` — squashed to 1 commit, ready to land.
+**Active item:** none — #935 and #936 queued.
 
 ## Session summary
 
-Two-issue session — #932 refactoring and #933 cleanup in `PlaybookRunnerCore`.
+Single-issue session — #934 fixed two compounding bugs that prevented containerised deployments from invoking any LLM model.
 
-**#932 (S/Low) — refactor:** Extracted ~65 lines of duplicated step execution logic from two `run()` overloads into a private `executeSteps()` method. Both overloads (`Path` and `String`) now delegate to it. The method takes a `sourceLabel` (path string vs `"<inline>"`) and `enableDryRunSimulation` boolean (Path version supports dry-run simulation via filesystem discovery; String version cannot). Error handling stays in each overload since error messages differ by source type.
+**Bug 1 — ModelDescriptor apiModelId:** `Objects.requireNonNull(apiModelId)` in the compact constructor throws when Jackson deserialises seed-catalog.yaml entries that omit `apiModelId`. The manual parser in `SeedCatalogModelSource` defaults to `id`, but the Jackson path in `AgentManifestLoader` doesn't. Fixed by defaulting `apiModelId` to `id` when null.
 
-**#933 (XS/Low) — cleanup:** Removed unused `stepLookup` variable (and its `stepIndex` source) from `executeSteps()`. Dead since original implementation — assigned from `stepIndex::get` but never read. Surfaced by the #932 extraction.
+**Bug 2 — RoutingAgentProvider fallback:** `resolve()` throws `IllegalArgumentException` when all four resolution steps fail, without checking `defaultBackendKey`. Added a Step 4 fallback to the default backend with a warning log. Uses `allowDefaultFallback` parameter (`false` for chain entries) to preserve chain exhaustion semantics.
 
-**Code review:** Clean — zero findings. All 28 existing tests pass.
+**Code review:** Clean — zero findings. 1,012 tests pass across platform-api, agent-router-core, agent-router.
+
+**Filed:** #935 (authn-social-jpa classpath failure, pre-existing), #936 (seed-catalog instanceId field mismatch, latent).
 
 ## Queue state
 
 | # | Issue | Status |
 |---|-------|--------|
-| #932 | refactor-playbook-runner-shared-logic | done, landing |
-| #933 | cleanup-unused-stepLookup | done, landing (squashed into #932) |
-| #934 | comprehensive-review-and-audit | queued — next |
+| #934 | RoutingAgentProvider default backend fallback | done, landing |
+| #935 | authn-social-jpa classpath failure | queued |
+| #936 | seed-catalog instanceId mismatch | queued |
 
 ## Attention for next session
 
-1. **#934 is next** — comprehensive code review and audit. Covers gaps, correctness, robustness, consistency, coherence, thread safety, dead code, test coverage. Blog, issue filing, and scheduling included.
+1. **#935 is next** — `AbstractStaticCredentialStoreTest` not on classpath in `authn-social-jpa`. Pre-existing, XS/Low.
+2. **#936** — `instanceId` YAML field silently lost by Jackson deserialization. Same root cause area as #934. XS/Low. Option 2 (`@JsonAlias`) is safest.
