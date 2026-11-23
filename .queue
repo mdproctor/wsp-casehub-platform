@@ -71,12 +71,12 @@
 - [x] casehubio/platform#944 — variable-type-validation-TemplateExtractor
 - [x] casehubio/platform#945 — nlp-fallback-keyword-scoped-candidate-selection
 - [x] casehubio/platform#946 — playbook-template-declaration-executor-wiring
-- [ ] casehubio/platform#947 — unmatched-response-handling-pass-through-rephrase ← done on issue-947-unmatched-pass-through-rephrase
+- [x] casehubio/platform#947 — unmatched-response-handling-pass-through-rephrase
 
 ## State
 branch: 
 issue-repo: casehubio/platform
-status: active
+status: drained
 date: 2026-11-18
 active_issue: casehubio/platform#928
 
