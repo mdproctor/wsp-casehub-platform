@@ -1,31 +1,47 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #934 (RoutingAgentProvider default backend fallback) — landed on main.
-**Branch:** `issue-936-seed-catalog-instanceid` — scaffolded, no work started.
-**Active item:** #936 (seed-catalog instanceId field mismatch).
+**Last worked:** #922 (template-based message extraction) — complete, landing.
+**Branch:** `issue-922-template-message-extraction` (stacked on `issue-936-seed-catalog-instanceid`)
+**Active item:** #922 — done, closing.
 
 ## Session summary
 
-Landed #934 — two compounding bugs that prevented containerised deployments from invoking any LLM model. ModelDescriptor `apiModelId` now defaults to `id` when null; RoutingAgentProvider falls back to default backend when all resolution steps fail.
+Built two new modules for structured prose extraction — an alternative to JSON for LLM-to-LLM communication where agents speak in prescribed sentence templates and the platform mechanically extracts typed data.
 
-Filed #935 (authn-social-jpa classpath failure, pre-existing) and #936 (seed-catalog instanceId mismatch, same root cause area as #934). #936 was prioritised because the context from #934 is still fresh.
+Also fixed #936 (seed-catalog instanceId field mismatch) via Jackson mixin in agent-config-core.
 
-## What to do
+### What was built
 
-**#936 is a one-line fix.** The seed catalog YAML uses field name `instanceId` but `ModelDescriptor` has `backendInstanceId`. Jackson silently drops the value. `SeedCatalogModelSource` handles it manually (line 75), but the `AgentManifestLoader` Jackson path doesn't.
+**message-extraction-api** (zero-dep):
+- Core types: `MessageSchema`, `MessageType`, `VariableConstraint` (sealed: String/Enum), `MessageMatch` (sealed: Matched/Unmatched)
+- `RegexMessageMatcher` — compiles templates to regex, extracts variables, validates enum constraints post-match (case-insensitive)
+- SPI: `NlpTokenizer`, `AnnotatedToken`
+- 22 tests
 
-**Recommended fix:** Add `@JsonAlias("instanceId")` on the `backendInstanceId` record component in `ModelDescriptor`. This accepts both names without breaking existing code. File: `platform-api/src/main/java/io/casehub/platform/api/model/ModelDescriptor.java`.
+**message-extraction** (OpenNLP):
+- `OpenNlpTokenizer` — tokenization, POS tagging, lemmatization with UD-to-PTB tag mapping for dictionary lookup. Lazy model loading, thread-safe (models shared, ME instances per-call)
+- `StructuralPattern` — POS/lemma structural matching with scored coverage
+- `TwoTierMessageMatcher` — regex first (score=1.0), NLP fallback (scored coverage)
+- 10 tests
 
-**Test:** Construct a `ModelDescriptor` via Jackson with `instanceId` in the YAML and assert `backendInstanceId()` is populated.
+### Design decisions
+
+9 decisions captured and reviewed (3 rounds, $44). Key:
+- D1: Standalone engine, not coupled to yaml-core
+- D2: Two-tier matching — regex first, NLP structural fallback
+- D3: NlpTokenizer SPI for pluggable tokenization
+- D6: Regex matcher in zero-dep -api module; NLP in -impl
+
+Spec: `docs/specs/issue-922-template-message-extraction/2026-11-23-message-extraction-design.md`
 
 ## Queue state
 
 | # | Issue | Status |
 |---|-------|--------|
-| #934 | RoutingAgentProvider default backend fallback | done, landed |
-| #936 | seed-catalog instanceId mismatch | active — scaffolded |
-| #935 | authn-social-jpa classpath failure | deferred (different domain) |
+| #936 | seed-catalog instanceId mismatch | done on branch |
+| #922 | template-based message extraction | done on branch |
+| #942 | move OpenNLP models to Maven/LFS | queued |
 
-## Deferred
+## What's next
 
-- ts-core TsjTsExecutor JVM-native TS execution (XS/Low)
+#942 is a small cleanup (XS/Low) — move bundled OpenNLP model files out of the git repo into a Maven artifact or Git LFS. Filed from code review.
