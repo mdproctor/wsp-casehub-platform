@@ -26,10 +26,12 @@ message-extraction          (NLP structural matcher, OpenNLP default tokenizer)
 - Implementation: `RegexMessageMatcher` (compiled regex patterns, first-match-wins)
 
 **`message-extraction`** — Depends on `message-extraction-api` + Apache OpenNLP. Contains:
-- `NlpMessageMatcher` (POS-tag + lemma structural matching with scored coverage)
 - `TwoTierMessageMatcher` (wraps regex + NLP: tries regex first, falls back to NLP)
 - `OpenNlpTokenizer` implements `NlpTokenizer` (tokenization, POS tagging, lemmatization)
-- Bundled OpenNLP English models as classpath resources
+- NLP structural pattern compilation (runs NLP pipeline on template literal segments at matcher construction time to determine POS tags)
+- Bundled OpenNLP English models as classpath resources (lazy-loaded on first NLP match attempt)
+
+NLP structural pattern compilation happens inside `TwoTierMessageMatcher`, not in `MessageSchema`. The schema holds templates as strings; the matcher compiles them to structural patterns using its `NlpTokenizer`. This keeps `MessageSchema` in the zero-dep `-api` module.
 
 ### Two-Tier Matching (D2)
 
@@ -45,15 +47,22 @@ The regex tier subsumes keyword pre-filtering — it is strictly more precise an
 Input prose
   │
   ├─ Tier 1: Regex match against all templates
-  │   └─ Match? → MessageMatch(type, fields, score=1.0)
+  │   ├─ Pattern match? → Post-match constraint validation
+  │   │   ├─ Constraints pass → Matched(type, fields, score=1.0)
+  │   │   └─ Constraints fail → try next template
+  │   └─ No regex match → fall through
   │
   └─ Tier 2: NLP structural match (if regex missed)
       ├─ Tokenize → POS tag → Lemmatize (via NlpTokenizer SPI)
-      ├─ Match against structural patterns
-      └─ Match? → MessageMatch(type, fields, score=coverage)
+      ├─ Match against structural patterns (constraints enforced during match)
+      └─ Match? → Matched(type, fields, score=coverage)
   │
   └─ No match → Unmatched(input)
 ```
+
+### Constraint Enforcement
+
+Enum constraints are enforced uniformly across both tiers via post-match validation. The regex tier extracts variable values using `.+?` capture groups (same as `TemplateExtractor`), then validates extracted values against `VariableConstraint`. If validation fails, the template does not match and the next template is tried. This keeps regex compilation simple while ensuring consistent constraint behaviour across tiers.
 
 ## Core Types
 
@@ -79,14 +88,16 @@ var schema = MessageSchema.builder()
 
 ### MessageMatch (D7)
 
-Sealed interface — the extraction result.
+Sealed interface — the extraction result. Immutable and thread-safe.
 
 ```java
 public sealed interface MessageMatch {
-    record Matched(String type, Map<String, String> fields, double score) implements MessageMatch {}
+    record Matched(String type, int templateIndex, Map<String, String> fields, double score) implements MessageMatch {}
     record Unmatched(String input) implements MessageMatch {}
 }
 ```
+
+`templateIndex` identifies which template within a multi-template message type matched (0-based). This preserves template identity — consumers can distinguish "I approve this design" (full form, index 0) from "approve" (terse form, index 1).
 
 - Regex tier: score is always 1.0 (exact match)
 - NLP tier: score is coverage ratio in (0, 1.0] — the fraction of structural elements matched
@@ -94,7 +105,7 @@ public sealed interface MessageMatch {
 
 ### MessageMatcher
 
-The extraction interface — implemented by both `RegexMessageMatcher` and `TwoTierMessageMatcher`.
+The extraction interface — implemented by `RegexMessageMatcher` (in `-api`) and `TwoTierMessageMatcher` (in `-impl`).
 
 ```java
 public interface MessageMatcher {
@@ -131,6 +142,10 @@ public sealed interface VariableConstraint {
 }
 ```
 
+## Thread Safety
+
+`MessageSchema`, `RegexMessageMatcher`, and `TwoTierMessageMatcher` are immutable after construction and inherently thread-safe. Compiled patterns are stored in `final` fields; matching creates no mutable state. Same guarantees as `TemplateExtractor` and `TemplateRegistry`.
+
 ## NLP Structural Matching
 
 A template like `"I ${decision} this ${subject} because ${rationale}"` compiles to:
@@ -151,13 +166,21 @@ The displayed template text is a rendered approximation. The structural pattern 
 | Clause variable | Remaining tokens to end or next literal anchor | `[CLAUSE:rationale]` |
 | DET/CONJ/PREP | Structural markers — match by POS, not content | `[DET]`, `[CONJ:because]` |
 
+### Variable Extraction in NLP Tier
+
+- **Enum variables** (`[VERB:decision{approve,reject,abstain}]`): extracted value is the **lemma** (e.g., "approved" → "approve"). The lemma matches against the enum values.
+- **String variables** (`[NOUN:subject]`): extracted value is the **surface token(s)**. Single-token capture — NP chunking is out of scope for this iteration.
+- **Clause variables** (`[CLAUSE:rationale]`): captured as all surface tokens from the current position to the next literal anchor or end of input. Joined with spaces.
+
 ### Score Calculation
 
-Coverage score = (matched elements / total template elements). A template with 6 elements where 5 match produces score 0.83. When multiple templates partially match, highest score wins (above a configurable threshold).
+Coverage score = (matched elements / total template elements). A template with 6 elements where 5 match produces score 0.83. When multiple templates partially match, highest score wins above a minimum threshold.
 
-## YAML Storage Format
+Threshold is set on `TwoTierMessageMatcher` construction (default: 0.5). Matches below the threshold are treated as `Unmatched`.
 
-Message schemas persist as YAML — the standard CaseHub data format:
+## YAML Storage Format (Convention)
+
+Message schemas persist as YAML — the standard CaseHub data format. The YAML format is documented here as a convention; deserialization is a consumer concern (not in the engine modules).
 
 ```yaml
 messages:
@@ -178,7 +201,7 @@ messages:
       reason: { type: string, required: false }
 ```
 
-Jackson deserialization produces the canonical `MessageSchema` Java model.
+Consumers deserialize YAML and build `MessageSchema` via the Java DSL builder.
 
 ## Migration (D8)
 
@@ -192,7 +215,7 @@ Jackson deserialization produces the canonical `MessageSchema` Java model.
 - `message-extraction-api` module with core types and regex matcher
 - `message-extraction` module with NLP structural matcher and OpenNLP tokenizer
 - Java DSL builder for `MessageSchema`
-- YAML storage format with Jackson deserialization
+- YAML storage format documented as convention (deserialization is consumer-side)
 - English language only (D9)
 - Build-time schema definition (D4)
 
@@ -200,8 +223,9 @@ Jackson deserialization produces the canonical `MessageSchema` Java model.
 - LLM-generated NLP processors (roadmap — requires runtime service)
 - Runtime service for dynamic schema registration
 - Multi-language support (NlpTokenizer SPI supports it; models required per language)
-- Playbook integration (consumer concern — separate issue)
-- ProtocolEvaluator migration (separate issue, mechanical)
+- Playbook integration (consumer concern)
+- ProtocolEvaluator migration (mechanical — ProtocolEvaluator and ProtocolDefinitionParser both migrate together)
+- `TemplateExtractor` deprecation for extraction use (long-term direction: extraction use migrates to `RegexMessageMatcher`; `TemplateExtractor` continues for forward interpolation)
 
 ## References
 
