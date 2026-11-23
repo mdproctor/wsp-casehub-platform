@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 400" font-family="system-ui, -apple-system, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#475569"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#16a34a"/>
+    </marker>
+    <marker id="arrow-amber" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#d97706"/>
+    </marker>
+    <marker id="arrow-gray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="360" y="28" text-anchor="middle" font-size="16" font-weight="600" fill="#1e293b">Template Matching Pipeline</text>
+
+  <!-- Input -->
+  <rect x="20" y="55" width="140" height="44" rx="6" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="90" y="82" text-anchor="middle" font-weight="500" fill="#334155">Raw Message</text>
+
+  <!-- Arrow to Regex -->
+  <line x1="160" y1="77" x2="200" y2="77" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Regex Match -->
+  <rect x="200" y="55" width="160" height="44" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="280" y="75" text-anchor="middle" font-weight="600" fill="#1e40af">Regex Match</text>
+  <text x="280" y="90" text-anchor="middle" font-size="11" fill="#3b82f6">TemplateExtractor</text>
+
+  <!-- Match arrow down to Constraint Check -->
+  <line x1="280" y1="99" x2="280" y2="130" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <text x="296" y="118" font-size="11" fill="#16a34a">match</text>
+
+  <!-- Constraint Validation -->
+  <rect x="200" y="130" width="160" height="44" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="280" y="150" text-anchor="middle" font-weight="600" fill="#166534">Constraint Check</text>
+  <text x="280" y="165" text-anchor="middle" font-size="11" fill="#16a34a">VariableConstraint</text>
+
+  <!-- Pass arrow to Matched -->
+  <line x1="360" y1="152" x2="460" y2="152" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <text x="410" y="145" font-size="11" fill="#16a34a">valid</text>
+
+  <!-- Miss arrow from Regex to Keyword Scoping -->
+  <line x1="360" y1="77" x2="400" y2="77" stroke="#d97706" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+  <text x="380" y="68" font-size="11" fill="#d97706">miss</text>
+
+  <!-- Keyword Scoping -->
+  <rect x="400" y="55" width="160" height="44" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="480" y="75" text-anchor="middle" font-weight="600" fill="#92400e">Keyword Scoping</text>
+  <text x="480" y="90" text-anchor="middle" font-size="11" fill="#d97706">TemplateKeywords</text>
+
+  <!-- Affinity arrow down to NLP -->
+  <line x1="480" y1="99" x2="480" y2="195" stroke="#d97706" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+  <text x="496" y="140" font-size="11" fill="#d97706">affinity</text>
+
+  <!-- No affinity arrow to PassThrough -->
+  <line x1="560" y1="77" x2="620" y2="77" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow-gray)"/>
+  <text x="590" y="68" font-size="11" fill="#94a3b8">none</text>
+
+  <!-- NLP Fallback -->
+  <rect x="400" y="195" width="160" height="44" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="480" y="215" text-anchor="middle" font-weight="600" fill="#92400e">NLP Fallback</text>
+  <text x="480" y="230" text-anchor="middle" font-size="11" fill="#d97706">NlpProtocolMatcher</text>
+
+  <!-- NLP match arrow to Matched -->
+  <line x1="480" y1="239" x2="480" y2="270" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <text x="496" y="258" font-size="11" fill="#16a34a">match</text>
+
+  <!-- NLP miss arrow right -->
+  <line x1="560" y1="217" x2="620" y2="217" stroke="#d97706" stroke-width="1.5" marker-end="url(#arrow-amber)"/>
+  <text x="590" y="210" font-size="11" fill="#d97706">miss</text>
+
+  <!-- Results column -->
+  <!-- Matched (score 1.0) -->
+  <rect x="460" y="130" width="140" height="44" rx="6" fill="#bbf7d0" stroke="#16a34a" stroke-width="2"/>
+  <text x="530" y="150" text-anchor="middle" font-weight="700" fill="#166534">Matched</text>
+  <text x="530" y="165" text-anchor="middle" font-size="11" fill="#16a34a">score: 1.0</text>
+
+  <!-- Matched (NLP score) -->
+  <rect x="410" y="270" width="140" height="44" rx="6" fill="#bbf7d0" stroke="#16a34a" stroke-width="2"/>
+  <text x="480" y="290" text-anchor="middle" font-weight="700" fill="#166534">Matched</text>
+  <text x="480" y="305" text-anchor="middle" font-size="11" fill="#16a34a">score: 0.0–1.0</text>
+
+  <!-- NearMiss -->
+  <rect x="620" y="195" width="90" height="44" rx="6" fill="#fde68a" stroke="#d97706" stroke-width="2"/>
+  <text x="665" y="215" text-anchor="middle" font-weight="700" fill="#92400e">NearMiss</text>
+  <text x="665" y="230" text-anchor="middle" font-size="11" fill="#d97706">rephrase</text>
+
+  <!-- PassThrough -->
+  <rect x="620" y="55" width="90" height="44" rx="6" fill="#e2e8f0" stroke="#94a3b8" stroke-width="2"/>
+  <text x="665" y="75" text-anchor="middle" font-weight="700" fill="#475569">Pass</text>
+  <text x="665" y="90" text-anchor="middle" font-size="11" fill="#94a3b8">Through</text>
+
+  <!-- Legend -->
+  <rect x="20" y="340" width="680" height="50" rx="4" fill="#f8fafc" stroke="#e2e8f0"/>
+  <circle cx="50" cy="365" r="6" fill="#3b82f6"/>
+  <text x="62" y="369" font-size="11" fill="#334155">Deterministic (regex)</text>
+  <circle cx="210" cy="365" r="6" fill="#d97706"/>
+  <text x="222" y="369" font-size="11" fill="#334155">Heuristic (NLP)</text>
+  <circle cx="350" cy="365" r="6" fill="#16a34a"/>
+  <text x="362" y="369" font-size="11" fill="#334155">Structured event</text>
+  <circle cx="490" cy="365" r="6" fill="#94a3b8"/>
+  <text x="502" y="369" font-size="11" fill="#334155">Conversation (ignored)</text>
+</svg>
