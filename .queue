@@ -1,3 +1,13 @@
+# Work Plan —
+
+## State
+branch: main
+issue-repo: casehubio/platform
+status: active
+date: 2026-11-18
+active_issue: casehubio/platform#928
+
+## Queue
 - [x] casehubio/platform#898 — issue 898
 - [x] casehubio/platform#902 — issue 902
 - [x] casehubio/platform#904 — issue 904
@@ -63,14 +73,7 @@
 - [x] casehubio/platform#931 — PlaybookRunnerCore-run-overload
 - [x] casehubio/platform#932 — refactor-playbook-runner-shared-logic
 - [x] casehubio/platform#933 — cleanup-unused-stepLookup
-- [ ] casehubio/platform#934 — comprehensive-review-and-audit        ← active
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-date: 2026-11-18
-active_issue: casehubio/platform#928
+- [ ] casehubio/platform#934 — comprehensive-review-and-audit ← active
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
