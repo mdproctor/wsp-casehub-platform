@@ -19,25 +19,26 @@ The unified registry solves the **lifecycle problem**: a single shared registry 
 ```
 yaml-core (zero-dep, existing — VariableConstraint canonical, TemplateExtractor for YAML)
     ↑
-template-registry-api  (zero-dep Declaration Primitive — types, SPI, regex matching)
+template-registry-api  (Declaration Primitive — types, SPI, regex matching; depends on yaml-core)
     ↑
 template-registry      (L4 Extension — NLP matching, OpenNLP, structural patterns)
 ```
 
-**`template-registry-api`** — Pure Java, zero external dependencies. Contains:
+**`template-registry-api`** — Declaration Primitive. Depends on `yaml-core` for `VariableConstraint` (canonical definition). No external dependencies (no OpenNLP, no Quarkus). Contains:
 - Core types: `TemplateDefinition`, `TemplateNamespace`, `TemplateMatch`, `TemplateSchema`
-- Registry SPI: `TemplateRegistry` (register/deregister/match/generate/schema)
+- Registry SPI: `UnifiedTemplateRegistry` (register/deregister/match/generate/schema)
 - Regex compilation and matching (inlined from `RegexMessageMatcher`)
 - `NlpTokenizer` SPI and `AnnotatedToken` (migrated from `message-extraction-api`)
-- `@McpDomain` API interface for schema discovery and matching operations
-- Depends on `yaml-core` for `VariableConstraint` (canonical definition)
 
-**`template-registry`** — Depends on `template-registry-api` + Apache OpenNLP. Contains:
+**`template-registry`** — L4 Extension. Depends on `template-registry-api` + `mcp-api` + Apache OpenNLP. Contains:
 - `NlpTemplateCompiler` — structural pattern compilation from templates using NLP pipeline
 - `StructuralMatcher` — lemma/POS-based matching (evolved from `StructuralPattern`)
 - `OpenNlpTokenizer` (migrated from `message-extraction`)
 - `LemmatisedKeywordFilter` — upgraded `TemplateKeywords` operating on lemmatised tokens
 - `@ApplicationScoped` registry implementation with immutable-snapshot concurrency
+- `TemplateSchemaEndpoint` — `@McpDomain("template-schemas")` class for schema discovery and matching operations (follows established pattern: `@McpDomain` classes in core/impl modules, not API modules)
+
+**`@DefaultBean` NoOp** — A no-op `UnifiedTemplateRegistry` implementation in `platform-core`, following the established SPI displacement pattern (ARC42STORIES §4). `platform-core` depends on `template-registry-api` for this. The NoOp returns `Unmatched` for all matches, empty schemas, and throws on generate(). The `@ApplicationScoped` implementation in `template-registry` displaces it automatically when on the classpath.
 
 ### Existing Modules — Disposition
 
@@ -46,20 +47,22 @@ template-registry      (L4 Extension — NLP matching, OpenNLP, structural patte
 | `TemplateExtractor` (yaml-core) | **Kept** — YAML variable resolution (forward interpolation) |
 | `VariableConstraint` (yaml-core) | **Kept as canonical** — template-registry-api depends on it |
 | `TemplateRegistry` (yaml-core) | **Retired for matching** — unified registry replaces. Builder/build pattern continues for TemplateExtractor use |
-| `ProtocolEvaluator` (coordination-core) | **Retired** — migrates to unified registry |
-| `NlpProtocolMatcher` (coordination-core) | **Retired** — zero implementations, role absorbed (D7) |
+| `ProtocolEvaluator` (coordination-core) | **Superseded** — replaced by unified registry; removed when consumer migration lands |
+| `NlpProtocolMatcher` (coordination-core) | **Retired** — zero implementations, role absorbed (D7); safe to remove immediately |
 | `TemplateKeywords` (coordination-core) | **Evolved** — becomes `LemmatisedKeywordFilter` in template-registry |
-| `TemplateMatchingFilter` (yaml-step-runtime) | **Retired** — migrates to unified registry |
-| `TemplateMatchResult` (yaml-step-runtime) | **Retired** — replaced by `TemplateMatch` |
-| `TemplateMatchEvent` (yaml-step-runtime) | **Retired** — fields absorbed into `TemplateMatch` |
-| `RegexMessageMatcher` (message-extraction-api) | **Retired** — compilation logic inlined into template-registry-api |
-| `TwoTierMessageMatcher` (message-extraction) | **Retired** — two-tier logic absorbed into registry |
+| `TemplateMatchingFilter` (yaml-step-runtime) | **Superseded** — replaced by unified registry; removed when consumer migration lands |
+| `TemplateMatchResult` (yaml-step-runtime) | **Superseded** — replaced by `TemplateMatch`; removed with TemplateMatchingFilter |
+| `TemplateMatchEvent` (yaml-step-runtime) | **Superseded** — fields absorbed into `TemplateMatch`; removed with TemplateMatchingFilter |
+| `RegexMessageMatcher` (message-extraction-api) | **Superseded** — compilation logic inlined into template-registry-api |
+| `TwoTierMessageMatcher` (message-extraction) | **Superseded** — two-tier logic absorbed into registry |
 | `StructuralPattern` (message-extraction) | **Evolved** — becomes `StructuralMatcher` in template-registry |
 | `OpenNlpTokenizer` (message-extraction) | **Migrated** — to template-registry |
-| `MessageSchema`, `MessageType` (message-extraction-api) | **Retired** — registry handles type definitions |
-| `VariableConstraint` (message-extraction-api) | **Retired** — yaml-core copy is canonical |
-| `message-extraction-api` module | **Retired** — types absorbed into template-registry-api |
-| `message-extraction` module | **Retired** — NLP code absorbed into template-registry |
+| `MessageMatcher` (message-extraction-api) | **Superseded** — replaced by `UnifiedTemplateRegistry.match()` |
+| `MessageMatch` (message-extraction-api) | **Superseded** — replaced by `TemplateMatch` |
+| `MessageSchema`, `MessageType` (message-extraction-api) | **Superseded** — registry handles type definitions |
+| `VariableConstraint` (message-extraction-api) | **Retired** — yaml-core copy is canonical; safe to remove immediately |
+| `message-extraction-api` module | **Superseded** — types absorbed into template-registry-api; removed when consumer migration lands |
+| `message-extraction` module | **Superseded** — NLP code absorbed into template-registry; removed when consumer migration lands |
 
 ### Two-Tier Matching (D3)
 
@@ -93,7 +96,7 @@ Positional discrimination (lemma trie) is a future optimisation reserved for whe
 
 ### Concurrency Model (D9)
 
-Immutable snapshots with atomic swap. The internal index (keyword sets, compiled templates, regex patterns) is immutable after build. Register/deregister operations build a new snapshot and atomically swap it via `volatile` field. Readers see a consistent snapshot — no locking on the read path.
+Immutable snapshots with atomic swap. The internal index (keyword sets, compiled templates, regex patterns) is immutable after build. Register/deregister operations build a new snapshot and atomically swap it via `AtomicReference` with CAS retry (compare-and-swap ensures concurrent registrations don't silently overwrite each other). Readers see a consistent snapshot — no locking on the read path.
 
 This extends `ProtocolEvaluator`'s existing pattern (`ConcurrentMap<String, TemplateRegistry>`) to a single consolidated index.
 
@@ -109,6 +112,19 @@ public record TemplateDefinition(
     List<String> patterns,
     Map<String, VariableConstraint> variables
 ) {
+    public TemplateDefinition {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(patterns, "patterns");
+        if (patterns.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Template must have at least one pattern");
+        }
+        patterns = List.copyOf(patterns);
+        variables = variables != null
+            ? Collections.unmodifiableMap(new LinkedHashMap<>(variables))
+            : Map.of();
+    }
+
     public static Builder builder(String name) { ... }
 }
 ```
@@ -202,14 +218,18 @@ public interface UnifiedTemplateRegistry {
 }
 ```
 
-- `match(input)` searches all namespaces
-- `match(namespace, input)` scopes to a single namespace
-- `generate()` produces a surface form via template slot-filling (D2, D6)
+- `match(input)` searches all namespaces using registration order:
+  - **Regex tier:** iterates namespaces in registration order, templates within each namespace in definition order. Returns the first regex match (score=1.0). Consistent with `TemplateRegistry.match()` and `RegexMessageMatcher.match()`.
+  - **NLP tier (fallback):** searches all namespaces, returns the highest-scoring NLP match above threshold. Consistent with `TwoTierMessageMatcher`'s best-score selection.
+  - If the regex tier produces a match, the NLP tier is not attempted.
+- `match(namespace, input)` scopes to a single namespace (no cross-namespace ambiguity)
+- `generate()` produces a surface form via template slot-filling (D2, D6). Always uses pattern index 0 (the canonical form). Pattern 0 is the primary, human-readable surface form; additional patterns are matching alternatives.
 - `schema()` returns the published sentence schema (D8)
 
 ### NlpTokenizer (SPI) — migrated from message-extraction-api
 
 ```java
+@FunctionalInterface
 public interface NlpTokenizer {
     List<AnnotatedToken> tokenize(String text);
 }
@@ -225,7 +245,9 @@ public record AnnotatedToken(
 
 ## Generation — Template Slot-Filling (D2, D6)
 
-Templates are bidirectional. Generation re-expands the template by substituting `${var}` placeholders with values via `VariableResolver`. No morphological rules in the first iteration.
+Templates are bidirectional. Generation re-expands the template by direct regex substitution — the same `VAR_PATTERN` (`\$\{([^}]+)}`) used for template compilation finds each `${var}` placeholder and replaces it with the corresponding value from the provided map. Optional segments (`[...]`) are included when all their variables have values, omitted otherwise. No morphological rules in the first iteration.
+
+Note: `VariableResolver` (yaml-core) is not used for generation — it requires prefixed variable references (`${prefix.name}`) and throws `UnresolvedVariableException` on bare references. Template variables use bare names (`${decision}`, `${subject}`), so generation uses direct substitution.
 
 ```java
 // Extract
@@ -243,30 +265,35 @@ The template IS the grammatically correct surface form. Variables slot into posi
 
 ## Schema Publication (D8)
 
-Each registered template type publishes a sentence schema. Schemas are queryable via the registry API and exposed via `@McpDomain` for REST/GraphQL/MCP access.
+Each registered template type publishes a sentence schema. Schemas are queryable via the registry SPI and exposed via `@McpDomain` for REST/GraphQL/MCP access.
+
+`TemplateSchemaEndpoint` lives in `template-registry` (the impl module), not `template-registry-api`, following the established pattern where `@McpDomain` classes reside in core/impl modules (cf. `ConnectionEndpointCore` in `authn-core`, `AgentHttpService` in `agent-http-core`).
 
 ```java
 @McpDomain("template-schemas")
-public interface TemplateSchemaApi {
+public class TemplateSchemaEndpoint {
+
+    private final UnifiedTemplateRegistry registry;
 
     @PlatformQuery
-    List<TemplateSchema> listSchemas(@ContextParam String tenancyId);
+    List<TemplateSchema> listSchemas(
+        @ContextParam("tenancyId") String tenancyId);
 
     @PlatformQuery
     Optional<TemplateSchema> getSchema(
-        @ContextParam String tenancyId,
+        @ContextParam("tenancyId") String tenancyId,
         String namespace,
-        String templateName
-    );
+        String templateName);
 
     @PlatformQuery
     TemplateMatch matchTemplate(
-        @ContextParam String tenancyId,
+        @ContextParam("tenancyId") String tenancyId,
         String namespace,
-        String input
-    );
+        String input);
 }
 ```
+
+`tenancyId` is passed for framework identity context propagation (all `@McpDomain` endpoints receive it via `CurrentPrincipal`). It does not filter template schemas — templates are platform-global, not tenant-scoped.
 
 Schema publication is co-located with template registration — when templates are registered, their schemas are automatically available. The schema includes patterns, variables, and (when NLP is on the classpath) POS-annotated structural summaries.
 
@@ -296,7 +323,7 @@ var result = registry.match("protocol:" + protocol.name(), input);
 
 ## Thread Safety
 
-`TemplateDefinition`, `TemplateNamespace`, `TemplateMatch`, `TemplateSchema` are immutable records. The registry implementation uses immutable-snapshot concurrency (D9) — no locking on the read path. Registration operations (startup-time, protocol activation) build and swap snapshots atomically.
+`TemplateDefinition`, `TemplateNamespace`, `TemplateMatch`, `TemplateSchema` are immutable records. The registry implementation uses immutable-snapshot concurrency (D9) — no locking on the read path. Registration operations (startup-time, protocol activation) build new snapshots and swap via `AtomicReference.compareAndSet()` with retry on contention.
 
 ## Scope
 
@@ -311,11 +338,11 @@ var result = registry.match("protocol:" + protocol.name(), input);
 - Integration test suite as acceptance criterion (D5)
 
 ### Out of scope
-- POS-driven morphological generation (future — POS metadata preserved)
-- ICU MessageFormat 2.0 for multilingual formatting (future)
-- Positional discrimination trie (future — when template counts exceed ~100)
-- Consumer migration (ProtocolEvaluator, TemplateMatchingFilter, PlaybookRunnerCore) — separate issues
-- Multi-language support (NlpTokenizer SPI supports it; models required per language)
+- Consumer migration (ProtocolEvaluator, TemplateMatchingFilter, PlaybookRunnerCore) — #961
+- POS-driven morphological generation (future — POS metadata preserved) — #962
+- ICU MessageFormat 2.0 for multilingual formatting (future) — #963
+- Positional discrimination trie (future — when template counts exceed ~100) — #964
+- Multi-language support (NlpTokenizer SPI supports it; models required per language) — #965
 
 ## References
 
