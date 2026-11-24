@@ -17,6 +17,8 @@ Both compile `${var}` templates to regex. Both extract variable bindings from in
 
 Worse: each playbook creates its own isolated `ProtocolEvaluator`. Templates compile per-playbook. Keyword caches duplicate. There is no cross-playbook composition. The lifecycle is the problem, not the matching algorithm.
 
+![Before and after: two parallel stacks unified into a single registry](images/template-registry-before-after.svg)
+
 ## What "unified" means here
 
 The unified template registry (#959) replaces both stacks with two new modules: `template-registry-api` (zero external deps, depends on yaml-core for the canonical `VariableConstraint`) and `template-registry` (OpenNLP, structural matching, CDI wiring).
