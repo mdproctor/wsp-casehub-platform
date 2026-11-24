@@ -1,47 +1,65 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #922 (template-based message extraction) — complete, landing.
-**Branch:** `issue-922-template-message-extraction` (stacked on `issue-936-seed-catalog-instanceid`)
-**Active item:** #922 — done, closing.
+**Last worked:** #959 (unified template registry) — Batch 1 complete, Batches 2-3 remaining.
+**Branch:** `issue-959-unified-template-registry`
+**Active item:** #959 — in progress (Batch 1 of 3 done)
 
 ## Session summary
 
-Built two new modules for structured prose extraction — an alternative to JSON for LLM-to-LLM communication where agents speak in prescribed sentence templates and the platform mechanically extracts typed data.
+Designed and began implementing a unified template registry that replaces the fragmented template matching infrastructure. The existing architecture had two parallel, unconnected stacks (protocol and extraction) with duplicated compilation logic, constraint types, and per-playbook isolated evaluators.
 
-Also fixed #936 (seed-catalog instanceId field mismatch) via Jackson mixin in agent-config-core.
+### Design phase
 
-### What was built
+10 decisions captured and validated:
+- D1: Lemmatised keyword filtering (not a full discrimination trie — premature for near-term template counts)
+- D2: Template slot-filling for generation (not morphological — premature)
+- D3: Single template type with regex fast-path; NLP lazy when on classpath
+- D4: template-registry-api supersedes message-extraction-api
+- D5: Integration test suite as acceptance criterion
+- D6: Bidirectionality via slot-filling
+- D7: NlpProtocolMatcher retired (zero implementations)
+- D8: Schema publication co-located with registration
+- D9: Immutable snapshots with AtomicReference CAS
+- D10: Module hierarchy (Declaration Primitive + L4 Extension)
 
-**message-extraction-api** (zero-dep):
-- Core types: `MessageSchema`, `MessageType`, `VariableConstraint` (sealed: String/Enum), `MessageMatch` (sealed: Matched/Unmatched)
-- `RegexMessageMatcher` — compiles templates to regex, extracts variables, validates enum constraints post-match (case-insensitive)
-- SPI: `NlpTokenizer`, `AnnotatedToken`
-- 22 tests
+Spec: `specs/issue-959-unified-template-registry/2026-11-24-unified-template-registry-design.md`
+Plan: `plans/2026-11-24-unified-template-registry.md`
 
-**message-extraction** (OpenNLP):
-- `OpenNlpTokenizer` — tokenization, POS tagging, lemmatization with UD-to-PTB tag mapping for dictionary lookup. Lazy model loading, thread-safe (models shared, ME instances per-call)
-- `StructuralPattern` — POS/lemma structural matching with scored coverage
-- `TwoTierMessageMatcher` — regex first (score=1.0), NLP fallback (scored coverage)
-- 10 tests
+### What was built (Batch 1)
 
-### Design decisions
+**template-registry-api module** — zero external deps, depends on yaml-core:
+- Core types: `TemplateDefinition`, `TemplateNamespace`, `TemplateMatch` (sealed), `TemplateSchema`, `NlpTokenizer` SPI, `AnnotatedToken`
+- `UnifiedTemplateRegistry` SPI interface
+- `RegexTemplateCompiler` — compiles `${var}` templates to regex (ported from TemplateExtractor)
+- `CompiledTemplate` — holds compiled pattern, extracts variables, validates constraints
+- `TemplateGenerator` — slot-filling generation (fields → prose), segment-aware optional handling
+- `InMemoryTemplateRegistry` — regex-only implementation with immutable-snapshot concurrency
+- 53 tests, all passing
 
-9 decisions captured and reviewed (3 rounds, $44). Key:
-- D1: Standalone engine, not coupled to yaml-core
-- D2: Two-tier matching — regex first, NLP structural fallback
-- D3: NlpTokenizer SPI for pluggable tokenization
-- D6: Regex matcher in zero-dep -api module; NLP in -impl
+Review finding fixed: TemplateSchema variable ordering (Map.copyOf → LinkedHashMap), Snapshot.EMPTY immutability, TemplateGenerator redundant guard.
+Filed: #967 (atomic namespace replace — XS/Low).
 
-Spec: `docs/specs/issue-922-template-message-extraction/2026-11-23-message-extraction-design.md`
+### What's next (Batches 2-3)
+
+**Batch 2 — NLP tier:**
+- Task 3: OpenNlpTokenizer migration + LemmatisedKeywordFilter + StructuralMatcher
+- Task 4: NlpTemplateRegistry (two-tier matching with immutable snapshots)
+
+**Batch 3 — Platform integration:**
+- Task 5: NoOp @DefaultBean in platform-core + @McpDomain TemplateSchemaEndpoint
+- Task 6: Integration test suite (D5 acceptance criterion)
+
+### Follow-up issues filed
+
+- #961 — Consumer migration (ProtocolEvaluator, TemplateMatchingFilter, PlaybookRunnerCore)
+- #962 — POS-driven morphological generation
+- #963 — ICU MessageFormat 2.0 for multilingual formatting
+- #964 — Positional discrimination trie
+- #965 — Multi-language NLP support
+- #967 — Atomic namespace replace
 
 ## Queue state
 
 | # | Issue | Status |
 |---|-------|--------|
-| #936 | seed-catalog instanceId mismatch | done on branch |
-| #922 | template-based message extraction | done on branch |
-| #942 | move OpenNLP models to Maven/LFS | queued |
-
-## What's next
-
-#942 is a small cleanup (XS/Low) — move bundled OpenNLP model files out of the git repo into a Maven artifact or Git LFS. Filed from code review.
+| #959 | unified template registry | active — Batch 1 done, Batches 2-3 next |
