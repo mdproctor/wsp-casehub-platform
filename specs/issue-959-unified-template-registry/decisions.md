@@ -49,3 +49,29 @@
 **Exploration:** quick
 **Depends on:** D3 (single template type means no need for separate regex/NLP module split)
 **Status:** captured
+
+## D5: Integration test suite as acceptance criterion
+
+**Choice:** The integration test suite IS the acceptance criterion. The implementation is not complete until tests demonstrate robustness across the full input spectrum and the full output pipeline.
+**Scope — matching/extraction tests:**
+- Short sentences (single clause, one variable)
+- Long sentences (multi-clause, embedded variables)
+- Multi-sentence paragraphs (protocol sentences in conversational prose)
+- Variable type permutations (string × enum × optional, all combinations)
+- Grammar variation (tense, plurals, contractions, determiners, auxiliaries)
+- Score distribution (exact=1.0, NLP proportional, below-threshold rejects)
+**Scope — generation tests:**
+- Metadata layering: no metadata → partial (number only) → full (person + number + gender)
+- Graceful degradation verification at each metadata level
+- Bidirectional roundtrip: extract → generate → verify semantic equivalence
+**Scope — structural mapping tests:**
+- Extracted matches map to typed structures
+- Structures can drive function calls (protocol actions)
+- Structures can emit events (CDI/subscription pipeline)
+- End-to-end: prose → match → extract → structure → function call / event emission
+**Alternatives:** None — this is a hard requirement, not a choice
+**Rationale:** The proof of a template matching system is in its behaviour across real input variation. Code correctness without demonstrated robustness is insufficient. The test suite documents the system's capabilities as executable specifications.
+**Trade-offs:** Test suite is substantial work — but it's the only reliable way to validate NLP-based matching across grammar variation.
+**Sources:** Existing TemplateExtractorTest (22 tests), TwoTierMessageMatcherTest (10 tests) — these set the baseline; the unified registry needs broader coverage
+**Exploration:** quick (non-negotiable requirement from stakeholder)
+**Status:** captured
