@@ -87,12 +87,12 @@ active_issue: casehubio/platform#928
   - [x] Batch 1: Foundation
     - [x] Task 1: Core types and SPI
     - [x] Task 2: Regex matching and generation
-  - [ ] Batch 2: NLP
-    - [ ] Task 3: NLP components
-    - [ ] Task 4: Two-tier NlpTemplateRegistry
-  - [ ] Batch 3: Integration
-    - [ ] Task 5: NoOp and McpDomain
-    - [ ] Task 6: Integration test suite
+  - [x] Batch 2: NLP
+    - [x] Task 3: NLP components
+    - [x] Task 4: Two-tier NlpTemplateRegistry
+  - [x] Batch 3: Integration
+    - [x] Task 5: NoOp and McpDomain
+    - [x] Task 6: Integration test suite
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
