@@ -16,7 +16,7 @@
 
 ## D2: NLP generation model
 
-**Choice:** Template slot-filling for the first iteration — generation re-expands the template by substituting `${var}` placeholders with their extracted values via VariableResolver. No morphological rules, no POS-based verb conjugation. Templates are authored to be grammatically correct as-is; variable values slot into positions where any value produces correct grammar. POS metadata from the parsing pipeline is preserved in the template compilation output for future morphological enhancement.
+**Choice:** Template slot-filling for the first iteration — generation re-expands the template by substituting `${var}` placeholders with their extracted values via direct regex substitution (the same `VAR_PATTERN` used for template compilation). Not via `VariableResolver`, which requires prefixed references and rejects bare variables. No morphological rules, no POS-based verb conjugation. Templates are authored to be grammatically correct as-is; variable values slot into positions where any value produces correct grammar. POS metadata from the parsing pipeline is preserved in the template compilation output for future morphological enhancement.
 **Alternatives:**
 - Layered resolution with POS-driven morphological generation (original D2) — verb conjugation and determiner agreement from POS structure. Ambitious but premature: English morphological rules are irregular, the effort is substantial, and no concrete consumer requires subject-dependent generation yet
 - ICU MessageFormat 2.0 — handles plural forms, gender selection, and ordinal formatting via standard CLDR data. Not a direct substitute: ICU MF2 is selector-based formatting (choose between pre-defined message variants), not morphological generation (transform verb forms based on POS analysis). The two are complementary, not competing. ICU MF2 is a viable path for future multilingual formatting when the need arises but doesn't address the specific problem D2 originally tried to solve (automatic verb conjugation from POS structure)
@@ -24,7 +24,7 @@
 - Mandatory metadata (all-or-nothing) — rejects generation without full context
 **Rationale:** "Grammatically correct surface form" (issue #959 requirement) is achieved by template slot-filling when templates are authored with grammar in mind — the template IS the grammatically correct form, variables slot into positions where any value is grammatically valid. This avoids the complexity of building custom morphological generation for English (irregular verbs, determiner rules, pronoun agreement) without evidence that subject-dependent generation is a concrete requirement. The POS metadata from NLP parsing is preserved, providing the foundation for morphological rules or ICU MF2 integration if the need is established.
 **Trade-offs:** Generation cannot adapt grammatical forms to context (e.g., "She approves" vs "They approve"). This is acceptable for the first iteration — governed communications use prescribed templates where the subject is part of the template, not a variable requiring agreement.
-**Sources:** VariableResolver in yaml-core (existing slot-filling), issue #922 spec D2 (two-tier matching, NLP pipeline), ICU MessageFormat 2.0 Tech Preview (CLDR data for 500+ locales)
+**Sources:** `VAR_PATTERN` in RegexMessageMatcher/TemplateExtractor (regex substitution pattern), issue #922 spec D2 (two-tier matching, NLP pipeline), ICU MessageFormat 2.0 Tech Preview (CLDR data for 500+ locales)
 **Exploration:** quick
 **Status:** revised — simplified to template slot-filling (R1-05: custom morphological generation premature, ICU MF2 evaluated as future alternative), deferred POS-driven generation (R1-06: bidirectionality scope now explicit in D6), removed graceful degradation concern (R1-07: slot-filling has no quality variance)
 
@@ -83,7 +83,7 @@
 
 ## D6: Bidirectionality — template slot-filling for generation
 
-**Choice:** Templates are bidirectional: parsers (input → extracted fields) and generators (fields → surface form). Generation uses template slot-filling — re-expanding the template with field values via VariableResolver. No morphological generation in the first iteration. The bidirectional promise is fulfilled because template slot-filling is sufficient for governed communications where templates are authored with grammar in mind.
+**Choice:** Templates are bidirectional: parsers (input → extracted fields) and generators (fields → surface form). Generation uses template slot-filling — re-expanding the template with field values via direct regex substitution on `VAR_PATTERN`. No morphological generation in the first iteration. The bidirectional promise is fulfilled because template slot-filling is sufficient for governed communications where templates are authored with grammar in mind.
 **Alternatives:**
 - Parsing only, no generation — consumers handle generation themselves. Rejects the stated requirement in issue #959 ("templates are bidirectional"). Would work for extraction-only consumers but leaves the generation contract unspecified
 - POS-driven morphological generation — verb conjugation and determiner agreement from POS structure. Premature: no concrete consumer requires subject-dependent generation
@@ -91,7 +91,7 @@
 - Generation delegated to callers — each consumer implements generation differently. Duplicates effort and risks inconsistency
 **Rationale:** Issue #959 explicitly states "templates are bidirectional." The simplest fulfilment is template slot-filling — the template IS the grammatically correct surface form, and variable values slot into the designated positions. This covers the governed-communications use case where LLMs must conform to published schemas: the schema tells the LLM the template, the LLM fills in the values, the platform can re-generate the expected surface form from extracted values. Morphological generation is deferred until a concrete consumer requires subject-dependent grammatical adaptation.
 **Trade-offs:** Cannot adapt grammatical forms to different subjects or contexts. This is a known limitation accepted for the first iteration.
-**Sources:** Issue #959 ("templates are bidirectional"), VariableResolver in yaml-core, issue #922 spec
+**Sources:** Issue #959 ("templates are bidirectional"), `VAR_PATTERN` in RegexMessageMatcher/TemplateExtractor, issue #922 spec
 **Exploration:** surfaced by review (R1-06)
 **Status:** captured
 
@@ -123,7 +123,7 @@
 
 ## D9: Concurrency model — immutable snapshots with atomic swap
 
-**Choice:** The unified registry uses immutable snapshots with atomic swap for concurrency. Following ProtocolEvaluator's existing pattern: the internal index (discrimination structure, compiled templates) is immutable after build. Register/deregister operations build a new snapshot and atomically swap it via `AtomicReference` or `volatile` field. Readers see a consistent snapshot — no locking on the read path.
+**Choice:** The unified registry uses immutable snapshots with atomic swap for concurrency. Following ProtocolEvaluator's existing pattern: the internal index (discrimination structure, compiled templates) is immutable after build. Register/deregister operations build a new snapshot and atomically swap it via `AtomicReference` with CAS retry (`compareAndSet` loop ensures concurrent registrations don't silently overwrite each other). Readers see a consistent snapshot — no locking on the read path.
 **Alternatives:**
 - Mutable concurrent index (ConcurrentHashMap + read-write lock on trie) — allows fine-grained concurrent updates but adds locking complexity on the read path. Reads are the hot path; locking them is unacceptable
 - Full rebuild on every registration (current ProtocolEvaluator approach per-protocol) — ProtocolEvaluator uses ConcurrentHashMap<String, TemplateRegistry> where each protocol has its own immutable registry. The unified registry is broader (all templates in one structure) but the same atomic-swap principle applies
