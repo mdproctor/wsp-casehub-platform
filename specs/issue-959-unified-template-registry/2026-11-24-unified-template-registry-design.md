@@ -186,12 +186,26 @@ public sealed interface TemplateMatch {
     }
 
     record NearMiss(
+        String namespace,
         String input,
         String suggestedTemplate,
         String suggestedFormat
-    ) implements TemplateMatch {}
+    ) implements TemplateMatch {
+        public NearMiss {
+            Objects.requireNonNull(namespace, "namespace");
+            Objects.requireNonNull(input, "input");
+            Objects.requireNonNull(suggestedTemplate,
+                "suggestedTemplate");
+            Objects.requireNonNull(suggestedFormat,
+                "suggestedFormat");
+        }
+    }
 
-    record Unmatched(String input) implements TemplateMatch {}
+    record Unmatched(String input) implements TemplateMatch {
+        public Unmatched {
+            Objects.requireNonNull(input, "input");
+        }
+    }
 }
 ```
 
@@ -239,6 +253,10 @@ public interface UnifiedTemplateRegistry {
     void deregister(String namespaceName);
 
     TemplateMatch match(String input);
+
+    /**
+     * @throws IllegalArgumentException if namespaceName is not registered
+     */
     TemplateMatch match(String namespaceName, String input);
 
     /**
@@ -261,7 +279,7 @@ public interface UnifiedTemplateRegistry {
   - **Regex tier:** iterates namespaces in registration order, templates within each namespace in definition order. Returns the first regex match (score=1.0). Consistent with `TemplateRegistry.match()` and `RegexMessageMatcher.match()`.
   - **NLP tier (fallback):** searches all namespaces, returns the highest-scoring NLP match above threshold. Consistent with `TwoTierMessageMatcher`'s best-score selection.
   - If the regex tier produces a match, the NLP tier is not attempted.
-- `match(namespace, input)` scopes to a single namespace (no cross-namespace ambiguity)
+- `match(namespace, input)` scopes to a single namespace (no cross-namespace ambiguity). Throws `IllegalArgumentException` if the namespace is not registered — matching against a non-existent namespace is a configuration bug, not a "no match" scenario. Consistent with `generate()` and `ProtocolEvaluator.evaluate()`.
 - `generate()` produces a surface form via template slot-filling (D2, D6). Always uses pattern index 0 (the canonical form). Pattern 0 is the primary, human-readable surface form; additional patterns are matching alternatives. Error semantics:
   - Unknown namespace → `IllegalArgumentException` (consistent with `ProtocolEvaluator.evaluate()`)
   - Unknown template name within namespace → `IllegalArgumentException`
@@ -282,7 +300,13 @@ public record AnnotatedToken(
     String pos,
     int start,
     int end
-) {}
+) {
+    public AnnotatedToken {
+        Objects.requireNonNull(surface, "surface");
+        Objects.requireNonNull(lemma, "lemma");
+        Objects.requireNonNull(pos, "pos");
+    }
+}
 ```
 
 ## Generation — Template Slot-Filling (D2, D6)
