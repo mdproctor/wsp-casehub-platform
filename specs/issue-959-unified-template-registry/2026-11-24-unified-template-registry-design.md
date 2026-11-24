@@ -137,7 +137,26 @@ Groups templates by source (playbook, protocol, runtime). Prevents name collisio
 public record TemplateNamespace(
     String name,
     Map<String, TemplateDefinition> templates
-) {}
+) {
+    public TemplateNamespace {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(templates, "templates");
+        if (templates.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Namespace must have at least one template");
+        }
+        for (var entry : templates.entrySet()) {
+            if (!entry.getKey().equals(entry.getValue().name())) {
+                throw new IllegalArgumentException(
+                    "Map key '" + entry.getKey()
+                    + "' must equal definition name '"
+                    + entry.getValue().name() + "'");
+            }
+        }
+        templates = Collections.unmodifiableMap(
+            new LinkedHashMap<>(templates));
+    }
+}
 ```
 
 ### TemplateMatch
@@ -152,7 +171,19 @@ public sealed interface TemplateMatch {
         int patternIndex,
         Map<String, String> fields,
         double score
-    ) implements TemplateMatch {}
+    ) implements TemplateMatch {
+        public Matched {
+            Objects.requireNonNull(namespace, "namespace");
+            Objects.requireNonNull(templateName, "templateName");
+            Objects.requireNonNull(fields, "fields");
+            if (score <= 0.0 || score > 1.0) {
+                throw new IllegalArgumentException(
+                    "Score must be in (0, 1.0]: " + score);
+            }
+            fields = Collections.unmodifiableMap(
+                new LinkedHashMap<>(fields));
+        }
+    }
 
     record NearMiss(
         String input,
@@ -201,12 +232,19 @@ public record TemplateSchema(
 
 ```java
 public interface UnifiedTemplateRegistry {
+    /**
+     * @throws IllegalArgumentException if namespace name is already registered
+     */
     void register(TemplateNamespace namespace);
     void deregister(String namespaceName);
 
     TemplateMatch match(String input);
     TemplateMatch match(String namespaceName, String input);
 
+    /**
+     * @throws IllegalArgumentException if namespace or template not found,
+     *         or if a required variable value is missing
+     */
     String generate(String namespaceName, String templateName,
                     Map<String, String> values);
 
@@ -218,12 +256,16 @@ public interface UnifiedTemplateRegistry {
 }
 ```
 
+- `register()` throws `IllegalArgumentException` if the namespace name is already registered. Callers must `deregister()` before re-registering. Fail-fast on duplicate prevents silent overwrites, consistent with `ProtocolEvaluator.register()`.
 - `match(input)` searches all namespaces using registration order:
   - **Regex tier:** iterates namespaces in registration order, templates within each namespace in definition order. Returns the first regex match (score=1.0). Consistent with `TemplateRegistry.match()` and `RegexMessageMatcher.match()`.
   - **NLP tier (fallback):** searches all namespaces, returns the highest-scoring NLP match above threshold. Consistent with `TwoTierMessageMatcher`'s best-score selection.
   - If the regex tier produces a match, the NLP tier is not attempted.
 - `match(namespace, input)` scopes to a single namespace (no cross-namespace ambiguity)
-- `generate()` produces a surface form via template slot-filling (D2, D6). Always uses pattern index 0 (the canonical form). Pattern 0 is the primary, human-readable surface form; additional patterns are matching alternatives.
+- `generate()` produces a surface form via template slot-filling (D2, D6). Always uses pattern index 0 (the canonical form). Pattern 0 is the primary, human-readable surface form; additional patterns are matching alternatives. Error semantics:
+  - Unknown namespace → `IllegalArgumentException` (consistent with `ProtocolEvaluator.evaluate()`)
+  - Unknown template name within namespace → `IllegalArgumentException`
+  - Missing required variable value → `IllegalArgumentException`. Unresolved `${var}` placeholders in generated output are silent corruption for governed communications; throwing at generation time is fail-fast.
 - `schema()` returns the published sentence schema (D8)
 
 ### NlpTokenizer (SPI) — migrated from message-extraction-api
@@ -245,9 +287,16 @@ public record AnnotatedToken(
 
 ## Generation — Template Slot-Filling (D2, D6)
 
-Templates are bidirectional. Generation re-expands the template by direct regex substitution — the same `VAR_PATTERN` (`\$\{([^}]+)}`) used for template compilation finds each `${var}` placeholder and replaces it with the corresponding value from the provided map. Optional segments (`[...]`) are included when all their variables have values, omitted otherwise. No morphological rules in the first iteration.
+Templates are bidirectional. Generation re-expands the template via segment-aware template expansion:
 
-Note: `VariableResolver` (yaml-core) is not used for generation — it requires prefixed variable references (`${prefix.name}`) and throws `UnresolvedVariableException` on bare references. Template variables use bare names (`${decision}`, `${subject}`), so generation uses direct substitution.
+1. **Parse segments** — the template is parsed into mandatory and optional segments using the same bracket-aware logic as `TemplateExtractor.parseSegments()` (tracking `inOptional` state, handling `\[`/`\]` escapes, building a segment list).
+2. **Substitute variables** — within each segment, `VAR_PATTERN` (`\$\{([^}]+)}`) finds each `${var}` placeholder and replaces it with the corresponding value from the provided map.
+3. **Resolve optional segments** — optional segments (`[...]`) are included when all their variables have values, omitted when any variable is missing.
+4. **Validate completeness** — if a mandatory segment contains a `${var}` with no value in the map, `generate()` throws `IllegalArgumentException`. Unresolved placeholders in generated output are silent corruption for governed communications.
+
+No morphological rules in the first iteration.
+
+Note: `VariableResolver` (yaml-core) is not used for generation — it requires prefixed variable references (`${prefix.name}`) and throws `UnresolvedVariableException` on bare references. Template variables use bare names (`${decision}`, `${subject}`).
 
 ```java
 // Extract
