@@ -1,10 +1,10 @@
 # Work Plan —
 
 ## State
-branch: issue-959-unified-template-registry
+branch: 
 issue-repo: casehubio/platform
 status: active
-covers: casehubio/platform#959
+covers: 
 date: 2026-11-18
 active_issue: casehubio/platform#928
 
@@ -83,7 +83,7 @@ active_issue: casehubio/platform#928
 - [x] casehubio/platform#945 — nlp-fallback-keyword-scoped-candidate-selection
 - [x] casehubio/platform#946 — playbook-template-declaration-executor-wiring
 - [x] casehubio/platform#947 — unmatched-response-handling-pass-through-rephrase
-- [ ] casehubio/platform#959 — issue 959 ← active
+- [ ] casehubio/platform#959 — issue 959 ← done on issue-959-unified-template-registry
   - [x] Batch 1: Foundation
     - [x] Task 1: Core types and SPI
     - [x] Task 2: Regex matching and generation
@@ -93,6 +93,9 @@ active_issue: casehubio/platform#928
   - [x] Batch 3: Integration
     - [x] Task 5: NoOp and McpDomain
     - [x] Task 6: Integration test suite
+- [ ] casehubio/platform#969 — YAML corpus format for template registry
+- [ ] casehubio/platform#970 — match playbook step with type-safe variable flow
+- [ ] casehubio/platform#967 — atomic namespace replace
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
