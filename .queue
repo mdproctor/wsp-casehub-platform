@@ -13,7 +13,7 @@
     - [x] Task 4: NlpTemplateRegistry.matchWithTrace
     - [x] Task 5: Integration test
 - [x] casehubio/platform#973 — NearMiss guided rejection
-- [ ] casehubio/platform#967 — atomic namespace replace ← done on issue-973-nearmiss-guided-rejection
+- [x] casehubio/platform#967 — atomic namespace replace
 - [ ] casehubio/platform#971 — adaptive semantic variation        ← active
 - [ ] casehubio/platform#979 — per-namespace threshold and ambiguity
 - [ ] casehubio/platform#974 — corpus quality testing
