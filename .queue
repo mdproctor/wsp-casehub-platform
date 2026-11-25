@@ -1,15 +1,15 @@
 # Work Plan —
 
 ## State
-branch: issue-977-fix-global-match-nlp-best
+branch: 
 issue-repo: casehubio/platform
 status: active
 date: 2026-11-18
 active_issue: casehubio/platform#928
 
 ## Queue
-- [ ] casehubio/platform#977 — fix global match NLP best-score ← active
-- [ ] casehubio/platform#978 — detect adjacent CLAUSE variables
+- [x] casehubio/platform#977 — fix global match NLP best-score
+- [ ] casehubio/platform#978 — detect adjacent CLAUSE variables ← active
 - [ ] casehubio/platform#980 — multi-word enum fix
 - [ ] casehubio/platform#949 — NLP score preservation
 - [ ] casehubio/platform#975 — negation detection
