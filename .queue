@@ -1,17 +1,18 @@
 # Work Plan —
 
 ## State
-branch: issue-980-multi-word-enum-fix
+branch: 
 issue-repo: casehubio/platform
 status: active
 date: 2026-11-18
 active_issue: casehubio/platform#928
+covers: casehubio/platform#949
 
 ## Queue
 - [x] casehubio/platform#977 — fix global match NLP best-score
 - [x] casehubio/platform#978 — detect adjacent CLAUSE variables
-- [ ] casehubio/platform#980 — multi-word enum fix ← active
-- [ ] casehubio/platform#949 — NLP score preservation
+- [ ] casehubio/platform#980 — multi-word enum fix ← done on issue-980-multi-word-enum-fix
+- [ ] casehubio/platform#949 — NLP score preservation ← active
 - [ ] casehubio/platform#975 — negation detection
 - [ ] casehubio/platform#976 — match diagnostics trace
 - [ ] casehubio/platform#973 — NearMiss guided rejection
