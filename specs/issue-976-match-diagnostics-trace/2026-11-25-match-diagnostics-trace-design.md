@@ -68,7 +68,9 @@ enum CandidateOutcome {
     BELOW_THRESHOLD
 }
 
-// ElementKind reused from StructuralMatcher.ElementKind
+// ElementKind: new top-level enum in template-registry-api
+// (StructuralMatcher.ElementKind in template-registry is updated to
+// reference this shared type rather than defining its own)
 ```
 
 ### Implementation Layers
