@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 340">
+  <style>
+    text { font-family: -apple-system, 'Segoe UI', sans-serif; font-size: 13px; fill: #1a1a2e; }
+    .title { font-size: 15px; font-weight: bold; }
+    .label { font-size: 11px; fill: #6b7280; }
+    .score { font-size: 12px; font-weight: bold; }
+    .fix { fill: #059669; }
+    .bug { fill: #dc2626; }
+  </style>
+
+  <!-- Before -->
+  <text x="180" y="24" class="title" text-anchor="middle">Before (short-circuit)</text>
+  <rect x="40" y="40" width="280" height="260" rx="8" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+
+  <text x="180" y="68" text-anchor="middle" class="label">Input: "I approved this design"</text>
+
+  <!-- NS1 -->
+  <rect x="60" y="84" width="240" height="52" rx="6" fill="#fee2e2" stroke="#ef4444" stroke-width="1"/>
+  <text x="80" y="104">NS: protocol:loose</text>
+  <text x="80" y="118" class="score bug">score 0.8 — returned ✗</text>
+
+  <!-- NS2 -->
+  <rect x="60" y="148" width="240" height="52" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1" stroke-dasharray="4"/>
+  <text x="80" y="168" fill="#9ca3af">NS: protocol:tight</text>
+  <text x="80" y="182" class="label">score 1.0 — never tried</text>
+
+  <!-- Arrow showing short-circuit -->
+  <line x1="180" y1="136" x2="180" y2="148" stroke="#ef4444" stroke-width="2" stroke-dasharray="4"/>
+  <text x="180" y="220" text-anchor="middle" class="bug" font-size="12">First match wins → wrong result</text>
+
+  <!-- After -->
+  <text x="540" y="24" class="title" text-anchor="middle">After (best score)</text>
+  <rect x="400" y="40" width="280" height="260" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+
+  <text x="540" y="68" text-anchor="middle" class="label">Input: "I approved this design"</text>
+
+  <!-- NS1 -->
+  <rect x="420" y="84" width="240" height="52" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1"/>
+  <text x="440" y="104">NS: protocol:loose</text>
+  <text x="440" y="118" class="score label">score 0.8 — collected</text>
+
+  <!-- NS2 -->
+  <rect x="420" y="148" width="240" height="52" rx="6" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="440" y="168">NS: protocol:tight</text>
+  <text x="440" y="182" class="score fix">score 1.0 — returned ✓</text>
+
+  <!-- Arrow showing all tried -->
+  <path d="M540 136 L540 148" stroke="#22c55e" stroke-width="2" marker-end="url(#arrowG)"/>
+  <text x="540" y="220" text-anchor="middle" class="fix" font-size="12">All namespaces tried → best wins</text>
+
+  <defs>
+    <marker id="arrowG" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#22c55e"/>
+    </marker>
+  </defs>
+
+  <!-- Bottom legend -->
+  <text x="360" y="320" text-anchor="middle" class="label" font-size="11">NlpTemplateRegistry.match(input) — iterate all namespaces, return highest NLP score</text>
+</svg>
