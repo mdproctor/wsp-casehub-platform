@@ -12,7 +12,7 @@
   - [x] Batch 3: NLP tier and integration
     - [x] Task 4: NlpTemplateRegistry.matchWithTrace
     - [x] Task 5: Integration test
-- [ ] casehubio/platform#973 — NearMiss guided rejection ← done on issue-973-nearmiss-guided-rejection
+- [x] casehubio/platform#973 — NearMiss guided rejection
 - [ ] casehubio/platform#967 — atomic namespace replace ← done on issue-973-nearmiss-guided-rejection
 - [ ] casehubio/platform#971 — adaptive semantic variation        ← active
 - [ ] casehubio/platform#979 — per-namespace threshold and ambiguity
