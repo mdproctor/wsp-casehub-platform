@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="system-ui, -apple-system, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#475569"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#16a34a"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#dc2626"/>
+    </marker>
+    <marker id="arrow-amber" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#d97706"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="760" height="420" fill="#fafafa" rx="4"/>
+
+  <!-- Title -->
+  <text x="380" y="28" text-anchor="middle" font-size="15" font-weight="600" fill="#1e293b">matchWithTrace() — per-candidate diagnostic pipeline</text>
+
+  <!-- Input -->
+  <rect x="20" y="52" width="160" height="40" rx="6" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5"/>
+  <text x="100" y="77" text-anchor="middle" font-weight="600" fill="#0c4a6e">Input text</text>
+
+  <!-- Arrow to keyword filter -->
+  <line x1="180" y1="72" x2="220" y2="72" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Keyword Filter -->
+  <rect x="225" y="52" width="140" height="40" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="295" y="77" text-anchor="middle" font-weight="600" fill="#92400e">Keyword Filter</text>
+
+  <!-- Filtered outcome -->
+  <line x1="295" y1="92" x2="295" y2="130" stroke="#dc2626" stroke-width="1.2" marker-end="url(#arrow-red)"/>
+  <rect x="220" y="134" width="150" height="32" rx="4" fill="#fef2f2" stroke="#fca5a5"/>
+  <text x="295" y="155" text-anchor="middle" font-size="11" fill="#991b1b">KEYWORD_FILTERED</text>
+  <text x="295" y="176" text-anchor="middle" font-size="10" fill="#6b7280">affinity: 0.15</text>
+
+  <!-- Arrow to regex tier -->
+  <line x1="365" y1="72" x2="405" y2="72" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Regex Tier -->
+  <rect x="410" y="52" width="130" height="40" rx="6" fill="#f3e8ff" stroke="#9333ea" stroke-width="1.5"/>
+  <text x="475" y="77" text-anchor="middle" font-weight="600" fill="#581c87">Regex Tier</text>
+
+  <!-- Regex outcomes -->
+  <line x1="435" y1="92" x2="435" y2="130" stroke="#16a34a" stroke-width="1.2" marker-end="url(#arrow-green)"/>
+  <rect x="390" y="134" width="90" height="32" rx="4" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="435" y="155" text-anchor="middle" font-size="11" fill="#166534">MATCHED</text>
+  <text x="435" y="176" text-anchor="middle" font-size="10" fill="#6b7280">score: 1.0</text>
+
+  <line x1="510" y1="92" x2="510" y2="130" stroke="#dc2626" stroke-width="1.2" marker-end="url(#arrow-red)"/>
+  <rect x="485" y="134" width="110" height="32" rx="4" fill="#fef2f2" stroke="#fca5a5"/>
+  <text x="540" y="155" text-anchor="middle" font-size="11" fill="#991b1b">REGEX_FAILED</text>
+
+  <!-- Arrow to NLP tier -->
+  <line x1="540" y1="72" x2="580" y2="72" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- NLP Structural Tier -->
+  <rect x="585" y="44" width="155" height="56" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="662" y="68" text-anchor="middle" font-weight="600" fill="#14532d">NLP Structural</text>
+  <text x="662" y="84" text-anchor="middle" font-size="11" fill="#166534">StructuralMatcher</text>
+
+  <!-- NLP outcomes -->
+  <line x1="610" y1="100" x2="610" y2="138" stroke="#16a34a" stroke-width="1.2" marker-end="url(#arrow-green)"/>
+  <rect x="565" y="142" width="90" height="32" rx="4" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="610" y="163" text-anchor="middle" font-size="11" fill="#166534">MATCHED</text>
+  <text x="610" y="183" text-anchor="middle" font-size="10" fill="#6b7280">score: 0.85</text>
+
+  <line x1="710" y1="100" x2="710" y2="138" stroke="#d97706" stroke-width="1.2" marker-end="url(#arrow-amber)"/>
+  <rect x="660" y="142" width="80" height="32" rx="4" fill="#fffbeb" stroke="#fcd34d"/>
+  <text x="700" y="163" text-anchor="middle" font-size="11" fill="#92400e">BELOW_</text>
+  <text x="700" y="176" text-anchor="middle" font-size="10" fill="#92400e">THRESHOLD</text>
+
+  <!-- Element Trace detail box -->
+  <rect x="20" y="210" width="720" height="190" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="40" y="234" font-size="13" font-weight="600" fill="#334155">Element Trace (NLP tier only)</text>
+
+  <!-- Element rows -->
+  <rect x="40" y="248" width="680" height="28" rx="3" fill="#f0fdf4"/>
+  <text x="55" y="267" font-size="12" font-weight="500" fill="#166534">LITERAL</text>
+  <text x="150" y="267" font-size="12" fill="#475569">expected: "i"</text>
+  <text x="310" y="267" font-size="12" fill="#475569">actual: "i"</text>
+  <text x="460" y="267" font-size="12" font-weight="600" fill="#16a34a">matched: true</text>
+
+  <rect x="40" y="282" width="680" height="28" rx="3" fill="#f0fdf4"/>
+  <text x="55" y="301" font-size="12" font-weight="500" fill="#166534">CLAUSE</text>
+  <text x="150" y="301" font-size="12" fill="#475569">expected: "decision"</text>
+  <text x="310" y="301" font-size="12" fill="#475569">actual: "approve"</text>
+  <text x="460" y="301" font-size="12" font-weight="600" fill="#16a34a">matched: true</text>
+
+  <rect x="40" y="316" width="680" height="28" rx="3" fill="#f0fdf4"/>
+  <text x="55" y="335" font-size="12" font-weight="500" fill="#166534">LITERAL</text>
+  <text x="150" y="335" font-size="12" fill="#475569">expected: "this"</text>
+  <text x="310" y="335" font-size="12" fill="#475569">actual: "this"</text>
+  <text x="460" y="335" font-size="12" font-weight="600" fill="#16a34a">matched: true</text>
+
+  <rect x="40" y="350" width="680" height="28" rx="3" fill="#fef2f2"/>
+  <text x="55" y="369" font-size="12" font-weight="500" fill="#991b1b">CLAUSE</text>
+  <text x="150" y="369" font-size="12" fill="#475569">expected: "subject"</text>
+  <text x="310" y="369" font-size="12" fill="#475569">actual: null</text>
+  <text x="460" y="369" font-size="12" font-weight="600" fill="#dc2626">matched: false</text>
+  <text x="600" y="369" font-size="11" fill="#6b7280">← tokens exhausted</text>
+</svg>
