@@ -1,7 +1,7 @@
 - [x] casehubio/platform#977 — fix global match NLP best-score
 - [x] casehubio/platform#978 — detect adjacent CLAUSE variables
 - [x] casehubio/platform#980 — multi-word enum fix
-- [ ] casehubio/platform#949 — NLP score preservation ← done on issue-980-multi-word-enum-fix
+- [x] casehubio/platform#949 — NLP score preservation
 - [ ] casehubio/platform#975 — negation detection        ← active
 - [ ] casehubio/platform#976 — match diagnostics trace
 - [ ] casehubio/platform#973 — NearMiss guided rejection
