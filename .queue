@@ -1,9 +1,28 @@
+# Work Plan —
+
+## State
+branch: issue-976-match-diagnostics-trace
+issue-repo: casehubio/platform
+status: active
+covers: casehubio/platform#976
+date: 2026-11-18
+active_issue: casehubio/platform#928
+
+## Queue
 - [x] casehubio/platform#977 — fix global match NLP best-score
 - [x] casehubio/platform#978 — detect adjacent CLAUSE variables
 - [x] casehubio/platform#980 — multi-word enum fix
 - [x] casehubio/platform#949 — NLP score preservation
-- [ ] casehubio/platform#975 — negation detection        ← active
-- [ ] casehubio/platform#976 — match diagnostics trace
+- [ ] casehubio/platform#975 — negation detection ← done on issue-949-nlp-score-preservation
+- [ ] casehubio/platform#976 — match diagnostics trace ← active
+  - [ ] Batch 1: Trace types and SPI
+    - [ ] Task 1: Trace data model types
+  - [ ] Batch 2: Structural and regex tier
+    - [ ] Task 2: StructuralMatcher.matchWithTrace
+    - [ ] Task 3: InMemoryTemplateRegistry.matchWithTrace
+  - [ ] Batch 3: NLP tier and integration
+    - [ ] Task 4: NlpTemplateRegistry.matchWithTrace
+    - [ ] Task 5: Integration test
 - [ ] casehubio/platform#973 — NearMiss guided rejection
 - [ ] casehubio/platform#967 — atomic namespace replace
 - [ ] casehubio/platform#971 — adaptive semantic variation
@@ -86,14 +105,6 @@
 - [x] casehubio/platform#946 — playbook-template-declaration-executor-wiring
 - [x] casehubio/platform#947 — unmatched-response-handling-pass-through-rephrase
 - [x] casehubio/platform#959 — issue 959
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-covers: casehubio/platform#975
-date: 2026-11-18
-active_issue: casehubio/platform#928
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
