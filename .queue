@@ -1,3 +1,17 @@
+# Work Plan —
+
+## State
+branch: 
+issue-repo: casehubio/platform
+status: active
+date: 2026-11-18
+active_issue: casehubio/platform#928
+
+## Queue
+- [ ] casehubio/platform#971 — adaptive semantic variation ← active
+- [ ] casehubio/platform#969 — YAML corpus format for template registry
+- [ ] casehubio/platform#970 — match playbook step with type-safe variable flow
+- [ ] casehubio/platform#967 — atomic namespace replace
 - [x] casehubio/platform#898 — issue 898
 - [x] casehubio/platform#902 — issue 902
 - [x] casehubio/platform#904 — issue 904
@@ -73,25 +87,6 @@
 - [x] casehubio/platform#946 — playbook-template-declaration-executor-wiring
 - [x] casehubio/platform#947 — unmatched-response-handling-pass-through-rephrase
 - [x] casehubio/platform#959 — issue 959
-  - [x] Batch 1: Foundation
-    - [x] Task 1: Core types and SPI
-    - [x] Task 2: Regex matching and generation
-  - [x] Batch 2: NLP
-    - [x] Task 3: NLP components
-    - [x] Task 4: Two-tier NlpTemplateRegistry
-  - [x] Batch 3: Integration
-    - [x] Task 5: NoOp and McpDomain
-    - [x] Task 6: Integration test suite
-- [ ] casehubio/platform#969 — YAML corpus format for template registry        ← active
-- [ ] casehubio/platform#970 — match playbook step with type-safe variable flow
-- [ ] casehubio/platform#967 — atomic namespace replace
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-date: 2026-11-18
-active_issue: casehubio/platform#928
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
