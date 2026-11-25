@@ -15,12 +15,12 @@ active_issue: casehubio/platform#928
 - [ ] casehubio/platform#975 — negation detection
 - [ ] casehubio/platform#976 — match diagnostics trace
 - [ ] casehubio/platform#973 — NearMiss guided rejection
+- [ ] casehubio/platform#967 — atomic namespace replace
 - [ ] casehubio/platform#971 — adaptive semantic variation
 - [ ] casehubio/platform#979 — per-namespace threshold and ambiguity
 - [ ] casehubio/platform#974 — corpus quality testing
 - [ ] casehubio/platform#969 — YAML corpus format for template registry
 - [ ] casehubio/platform#970 — match playbook step with type-safe variable flow
-- [ ] casehubio/platform#967 — atomic namespace replace
 - [x] casehubio/platform#898 — issue 898
 - [x] casehubio/platform#902 — issue 902
 - [x] casehubio/platform#904 — issue 904
