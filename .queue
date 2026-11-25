@@ -8,7 +8,16 @@ date: 2026-11-18
 active_issue: casehubio/platform#928
 
 ## Queue
-- [ ] casehubio/platform#971 — adaptive semantic variation ← active
+- [ ] casehubio/platform#977 — fix global match NLP best-score ← active
+- [ ] casehubio/platform#978 — detect adjacent CLAUSE variables
+- [ ] casehubio/platform#980 — multi-word enum fix
+- [ ] casehubio/platform#949 — NLP score preservation
+- [ ] casehubio/platform#975 — negation detection
+- [ ] casehubio/platform#976 — match diagnostics trace
+- [ ] casehubio/platform#973 — NearMiss guided rejection
+- [ ] casehubio/platform#971 — adaptive semantic variation
+- [ ] casehubio/platform#979 — per-namespace threshold and ambiguity
+- [ ] casehubio/platform#974 — corpus quality testing
 - [ ] casehubio/platform#969 — YAML corpus format for template registry
 - [ ] casehubio/platform#970 — match playbook step with type-safe variable flow
 - [ ] casehubio/platform#967 — atomic namespace replace
