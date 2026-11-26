@@ -59,3 +59,15 @@
 **Sources:** AgentProvider/ChatModel in agent-api, ResponseFormat structured output support
 **Exploration:** quick
 **Status:** captured
+
+## D6: Collision guard placement
+
+**Choice:** Standalone CollisionDetector utility in template-registry-api — a pure function that takes candidate variations + registry reference, loops over registry.match() for each candidate, rejects any that match a different template. No new SPI.
+**Alternatives:**
+- Built into VariationSeeder SPI — seeder takes registry reference and self-filters. Couples seeding to collision detection.
+- Registry-side validation on register() — registry rejects namespaces with colliding patterns. Changes registry contract, makes registration O(patterns × templates).
+**Rationale:** Keeps concerns separate. Collision detection is a policy decision — the caller decides whether a collision is a hard reject or a logged warning. Composes existing registry.match() operations.
+**Trade-offs:** Callers must remember to call it. But both call sites (seeding orchestrator and adaptive fallback) are in the same module, so this is easy to enforce.
+**Sources:** Issue #979 (cross-namespace ambiguity), issue body collision guard section
+**Exploration:** quick
+**Status:** captured
