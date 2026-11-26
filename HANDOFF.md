@@ -1,7 +1,6 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #971 — adaptive semantic variation
-**Branch:** `issue-971-adaptive-semantic-variation` (done, landing)
+**Last worked:** #971 — adaptive semantic variation (landed, follow-up integration tests on main)
 **Active item:** #979 — per-namespace threshold and ambiguity (next)
 
 ## Session summary
@@ -45,6 +44,10 @@ Three-tier adaptive semantic variation for the unified template registry. Templa
 - NearMiss tracking preserved in `AdaptiveTemplateRegistry.match(input)` global search
 - String-aware comma splitting in `LlmAdaptiveFallback.extractFields`
 - LLM-returned template name validated against namespace before returning Matched
+
+### Follow-up: enriched integration tests (on main)
+
+Rewrote `AdaptiveRegistryIntegrationTest` from 8 thin tests to 25 comprehensive tests in 9 `@Nested` sections. Every test has prose Javadoc explaining the concept, every assertion carries `.as()` with full-sentence failure messages. The centrepiece `FullPipelineScenario` walks through 10 steps proving the full lifecycle: regex → NLP inflection → LLM learning → structural reuse → NLP on learned patterns → caching → negative caching. Each step verifies scores, fields, pattern counts, and LLM call counts to prove which tier handled the input.
 
 ## Queue — next session
 
