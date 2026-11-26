@@ -45,7 +45,7 @@ Match found? → extract fields + register variation (atomic replace)
 Next occurrence → structural matcher handles it (free)
 ```
 
-### Module Placement (D4)
+### Module Placement (D4 revised)
 
 ```
 template-registry-api (zero-dep)
@@ -53,17 +53,56 @@ template-registry-api (zero-dep)
   ├── AdaptiveFallbackMatcher (SPI — @FunctionalInterface)
   ├── CollisionDetector       (utility — composes registry.match())
   ├── ClassificationResult    (sealed record — match result from adaptive fallback)
-  └── TemplateNamespace       (extended with language field)
+  ├── TemplateCandidate       (record — LLM classification input)
+  ├── TemplateNamespace       (extended with language field)
+  └── UnifiedTemplateRegistry (extended with replaceOrRegister)
 
-template-registry (OpenNLP + CDI)
-  ├── LlmVariationSeeder      (ChatModel-backed implementation)
-  ├── LlmAdaptiveFallback     (ChatModel-backed implementation)
-  └── AdaptiveTemplateRegistry (extends NlpTemplateRegistry — adds tier 3)
+template-registry (OpenNLP — unchanged dependency profile)
+  └── (no changes — NLP matching only)
+
+template-registry-llm (new — depends on template-registry + langchain4j-core)
+  ├── LlmVariationSeeder      (ChatModel-backed VariationSeeder)
+  ├── LlmAdaptiveFallback     (ChatModel-backed AdaptiveFallbackMatcher)
+  ├── AdaptiveTemplateRegistry (extends NlpTemplateRegistry — adds tier 3)
+  └── VariationSeedingService  (seeding orchestrator)
 ```
 
-LLM implementations inject `ChatModel` from the agent routing layer. The SPIs have no LLM dependency.
+LLM implementations inject `ChatModel` from the agent routing layer. The SPIs in template-registry-api have no LLM dependency. template-registry retains its current dependency profile (OpenNLP only).
 
 ## New Types
+
+### UnifiedTemplateRegistry — replaceOrRegister (D3 revised)
+
+Add a default method to the existing SPI for atomic namespace replacement. Implements #967.
+
+```java
+public interface UnifiedTemplateRegistry {
+    // ... existing methods ...
+
+    default void replaceOrRegister(TemplateNamespace namespace) {
+        deregister(namespace.name());
+        register(namespace);
+    }
+}
+```
+
+The default method provides backward compatibility. `InMemoryTemplateRegistry` overrides with a true single-CAS implementation:
+
+```java
+public void replaceOrRegister(TemplateNamespace namespace) {
+    Objects.requireNonNull(namespace, "namespace");
+    while (true) {
+        Snapshot current = snapshot.get();
+        Snapshot next = current.withoutNamespace(namespace.name())
+                               .withNamespace(namespace);
+        if (snapshot.compareAndSet(current, next)) {
+            return;
+        }
+    }
+}
+```
+
+No gap where the namespace is absent — readers see either the old or new snapshot atomically.
 
 ### VariationSeeder (SPI)
 
@@ -268,13 +307,12 @@ public class LlmAdaptiveFallback implements AdaptiveFallbackMatcher {
 
 ## AdaptiveTemplateRegistry
 
-Extends `NlpTemplateRegistry` to add the third matching tier. The adaptive fallback fires only when both regex and NLP return `Unmatched`.
+Lives in `template-registry-llm`. Extends `NlpTemplateRegistry` to add the third matching tier. The adaptive fallback fires only when both regex and NLP return `Unmatched`.
 
 ```java
 public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
     private final AdaptiveFallbackMatcher fallbackMatcher;
-    private final UnifiedTemplateRegistry self;
 
     @Override
     public TemplateMatch match(String namespaceName, String input) {
@@ -290,8 +328,15 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
         List<TemplateCandidate> candidates = ns.templates().values()
             .stream().map(TemplateCandidate::from).toList();
 
-        ClassificationResult cr = fallbackMatcher.classify(
-            input, candidates, ns.language());
+        ClassificationResult cr;
+        try {
+            cr = fallbackMatcher.classify(
+                input, candidates, ns.language());
+        } catch (Exception e) {
+            // LLM unavailable — graceful degradation to Unmatched
+            // Log at WARN, do not propagate
+            return new TemplateMatch.Unmatched(input);
+        }
 
         if (cr instanceof ClassificationResult.Matched matched) {
             // 1. Collision check on suggestedVariation
@@ -300,7 +345,7 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
                     List.of(matched.suggestedVariation()),
                     namespaceName, matched.templateName(), this);
 
-            // 2. If no collision, register the variation
+            // 2. If no collision, register the variation (atomic, D3 revised)
             if (collisions.isEmpty()) {
                 registerLearnedVariation(
                     namespaceName, matched.templateName(),
@@ -318,13 +363,20 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
     private void registerLearnedVariation(
             String namespaceName, String templateName, String variation) {
-        // Atomic replace (D3):
+        // Atomic replace (D3 revised — replaceOrRegister):
         // 1. Read current namespace from snapshot
         // 2. Build new TemplateDefinition with original patterns + variation
         // 3. Build new TemplateNamespace with updated template
-        // 4. deregister(namespaceName) + register(expandedNamespace)
+        // 4. replaceOrRegister(expandedNamespace) — single CAS, no gap
     }
 }
+```
+
+### Error Handling
+
+- **LLM unavailable:** `adaptiveFallback()` catches all exceptions from `fallbackMatcher.classify()` and degrades gracefully to `Unmatched`. The two structural tiers still work. Log at WARN level.
+- **LLM misclassification:** The collision guard (D6) catches cross-namespace errors. Same-namespace misclassification (LLM says input matches template A but it semantically matches template B within the same namespace) is not detectable without ground truth. The registered variation will be incorrect but structurally valid — it matches structurally on subsequent inputs, which is self-correcting (the structural matcher validates independently).
+- **Cost control:** The `AdaptiveFallbackMatcher` SPI is a simple functional interface. Rate limiting is the caller's responsibility. When wired via CDI, the existing `agent-gate` decorator on `ChatModel` provides token-bucket rate limiting. Additionally, `AdaptiveTemplateRegistry` can track recent unmatched inputs and skip the LLM call for inputs that were recently classified as unmatched (simple in-memory TTL cache of negative results).
 ```
 
 **Score for adaptive matches:** 0.9 — lower than regex (1.0) but higher than the NLP threshold. Distinguishes LLM-classified matches in downstream processing.
@@ -400,11 +452,12 @@ Input prose
   │   ├─ Structural pattern match against candidates
   │   └─ Match? → TemplateMatch.Matched(score=coverage)
   │
-  └─ Tier 3: Adaptive fallback (LLM classification)
+  └─ Tier 3: Adaptive fallback (LLM classification — template-registry-llm)
       ├─ Build TemplateCandidate list from namespace
       ├─ Single LLM call: classify + extract + suggest variation
+      │   └─ LLM unavailable? → graceful degradation to Unmatched
       ├─ Match? → collision check on suggested variation
-      │   ├─ No collision → register variation (atomic replace)
+      │   ├─ No collision → register variation (replaceOrRegister — single CAS)
       │   └─ Collision → log warning, don't persist
       └─ Return TemplateMatch.Matched(score=0.9) or Unmatched
 ```
@@ -442,13 +495,15 @@ Tests use a stub `VariationSeeder` and `AdaptiveFallbackMatcher` with predetermi
 ## Scope
 
 ### In scope
+- `replaceOrRegister()` on `UnifiedTemplateRegistry` SPI (implements #967)
 - `VariationSeeder` SPI and `LlmVariationSeeder` implementation
 - `AdaptiveFallbackMatcher` SPI and `LlmAdaptiveFallback` implementation
 - `CollisionDetector` utility
 - `ClassificationResult` and `TemplateCandidate` types
-- `AdaptiveTemplateRegistry` extending `NlpTemplateRegistry`
-- `VariationSeedingService` orchestrator
+- `AdaptiveTemplateRegistry` extending `NlpTemplateRegistry` (in new `template-registry-llm` module)
+- `VariationSeedingService` orchestrator (in `template-registry-llm`)
 - `TemplateNamespace` language field (i18n hook)
+- Graceful degradation on LLM unavailability
 - Integration tests proving the three tiers work together
 - `ParaphraseCliff` tests updated to pass after seeding
 

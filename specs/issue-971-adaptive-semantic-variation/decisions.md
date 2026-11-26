@@ -25,28 +25,29 @@
 
 ## D3: Learned variation mutation strategy
 
-**Choice:** Atomic replace via deregister + re-register — the adaptive fallback builds a new TemplateNamespace including original patterns plus the learned variation, then atomically swaps via deregister(ns) + register(expandedNs)
+**Choice:** ~~Atomic replace via deregister + re-register~~ **REVISED:** Add `replaceOrRegister(TemplateNamespace)` to the `UnifiedTemplateRegistry` SPI — single CAS swap that removes old namespace and adds new one atomically. Issue #967 filed this but never implemented it. We implement it as part of #971.
 **Alternatives:**
-- New addVariation() method on the registry SPI — cleaner caller API but changes the SPI contract and needs a new snapshot operation
-- Separate variation overlay — learned variations in a parallel structure, match checks main then overlay. No mutation of original namespace but adds query complexity
-**Rationale:** Requires zero SPI changes. The existing deregister + register pair already provides atomic namespace replacement (#967). Learned variations are just patterns, same as seeded ones. The immutable-snapshot concurrency model means readers see either old or new state, never torn.
-**Trade-offs:** Brief logical gap between deregister and register — but CAS retry handles contention. Rebuilds the entire namespace snapshot for each learned variation (acceptable: learning is rare, O(templates) not O(corpus)).
+- Deregister + re-register — creates a window where the namespace is absent; any match() during the gap returns Unmatched. Not acceptable for governed protocol communications.
+- New addVariation() method — changes the SPI with a narrow-purpose method. replaceOrRegister is more general and also serves #969's YAML reload use case.
+- Separate variation overlay — learned variations in a parallel structure. Adds query complexity without benefit.
+**Rationale:** replaceOrRegister provides true atomicity via single CAS swap in the immutable snapshot. No gap where the namespace is absent. Also needed by #969 for reloading YAML corpus files. Small SPI addition (one default method with deregister+register fallback for backward compat).
+**Trade-offs:** Adds one method to UnifiedTemplateRegistry SPI. Rebuilds the entire namespace snapshot for each learned variation (acceptable: learning is rare).
 **Depends on:** D2 (variations are patterns — no distinction between seeded and learned in the registry)
-**Sources:** InMemoryTemplateRegistry.Snapshot, issue #967 (atomic namespace replace)
+**Sources:** InMemoryTemplateRegistry.Snapshot, issue #967 (atomic namespace replace — open, not implemented), decision review R1-02
 **Exploration:** quick
-**Status:** captured
+**Status:** revised
 
 ## D4: Module placement for variation SPIs
 
-**Choice:** SPIs in template-registry-api, LLM implementations in template-registry — VariationSeeder and AdaptiveFallbackMatcher are functional interfaces with no LLM dependency. LLM-backed implementations live in template-registry (which has CDI wiring) and inject ChatModel.
+**Choice:** ~~SPIs in api, LLM impls in template-registry~~ **REVISED:** SPIs in template-registry-api (unchanged), LLM implementations in a new `template-registry-llm` module. template-registry keeps its current dependency profile (OpenNLP only).
 **Alternatives:**
-- Everything in template-registry — simpler but puts the SPI where only one implementation can see it
-- New template-registry-llm module — clean separation but adds a module for two classes
-**Rationale:** Follows the established platform pattern: SPI in -api, impl in the runtime module. NlpTokenizer SPI is already in template-registry-api with OpenNlpTokenizer impl in template-registry. Keeps template-registry-api zero-dep.
-**Trade-offs:** None significant — this is the standard platform convention.
-**Sources:** NlpTokenizer in template-registry-api, OpenNlpTokenizer in template-registry
+- LLM impls in template-registry — adds langchain4j/agent-api dependency to a pure NLP module, changing its architectural character
+- Everything in template-registry — same coupling problem plus SPI visibility
+**Rationale:** template-registry currently depends on OpenNLP only. Adding ChatModel/langchain4j would be a significant new coupling. The NlpTokenizer analogy breaks: NlpTokenizer has no external SDK dependency, but ChatModel does. A dedicated module preserves template-registry's dependency profile. The platform already has 100+ modules — one more for clean LLM/NLP separation follows established convention.
+**Trade-offs:** Additional module. But template-registry-llm is small (LlmVariationSeeder, LlmAdaptiveFallback, AdaptiveTemplateRegistry, VariationSeedingService) and has a clear dependency boundary.
+**Sources:** template-registry/pom.xml (no agent-api dependency), decision review R1-03
 **Exploration:** quick
-**Status:** captured
+**Status:** revised
 
 ## D5: Adaptive fallback classification strategy
 
