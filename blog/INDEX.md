@@ -66,3 +66,4 @@
 | [2026-11-26-mdp01-agent-service-design.md](2026-11-26-mdp01-agent-service-design.md) | 2026-11-26 | Design session for @AgentService + Guardrails — why CaseHub uses direct SDKs over normalisation, real sessions vs stateless replay, cross-cutting guardrails, expanded capability surface, phased delivery plan |
 | [2026-11-26-mdp02-agent-service-implementation.md](2026-11-26-mdp02-agent-service-implementation.md) | 2026-11-26 | Implementation diary: @AgentService proxy generation, CDI guardrail decorators, and prompt caching parity |
 | [2026-11-26-mdp02-recoverable-failure.md](2026-11-26-mdp02-recoverable-failure.md) | 2026-11-26 | Recoverable failure mechanism for the playbook runner — command pattern SPI, depth-limited recursive setup |
+| [2026-11-26-mdp03-manual-option-flow.md](2026-11-26-mdp03-manual-option-flow.md) | 2026-11-26 | ManualOption flow: playbook runner prompts users for capability input instead of failing |
