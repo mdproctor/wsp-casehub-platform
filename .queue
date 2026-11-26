@@ -1,20 +1,23 @@
+# Work Plan —
+
+## State
+branch: issue-971-adaptive-semantic-variation
+issue-repo: casehubio/platform
+status: active
+covers: casehubio/platform#971
+date: 2026-11-18
+active_issue: casehubio/platform#928
+
+## Queue
 - [x] casehubio/platform#977 — fix global match NLP best-score
 - [x] casehubio/platform#978 — detect adjacent CLAUSE variables
 - [x] casehubio/platform#980 — multi-word enum fix
 - [x] casehubio/platform#949 — NLP score preservation
 - [x] casehubio/platform#975 — negation detection
 - [x] casehubio/platform#976 — match diagnostics trace
-  - [x] Batch 1: Trace types and SPI
-    - [x] Task 1: Trace data model types
-  - [x] Batch 2: Structural and regex tier
-    - [x] Task 2: StructuralMatcher.matchWithTrace
-    - [x] Task 3: InMemoryTemplateRegistry.matchWithTrace
-  - [x] Batch 3: NLP tier and integration
-    - [x] Task 4: NlpTemplateRegistry.matchWithTrace
-    - [x] Task 5: Integration test
 - [x] casehubio/platform#973 — NearMiss guided rejection
 - [x] casehubio/platform#967 — atomic namespace replace
-- [ ] casehubio/platform#971 — adaptive semantic variation        ← active
+- [ ] casehubio/platform#971 — adaptive semantic variation ← active
 - [ ] casehubio/platform#979 — per-namespace threshold and ambiguity
 - [ ] casehubio/platform#974 — corpus quality testing
 - [ ] casehubio/platform#969 — YAML corpus format for template registry
@@ -94,14 +97,8 @@
 - [x] casehubio/platform#946 — playbook-template-declaration-executor-wiring
 - [x] casehubio/platform#947 — unmatched-response-handling-pass-through-rephrase
 - [x] casehubio/platform#959 — issue 959
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-covers: casehubio/platform#971
-date: 2026-11-18
-active_issue: casehubio/platform#928
+- [ ] casehubio/platform#986 — playbook-runner-unmet-requirement
+- [ ] casehubio/platform#987 — manual-option-flow
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
