@@ -99,12 +99,12 @@
 - [x] casehubio/platform#946 — playbook-template-declaration-executor-wiring
 - [x] casehubio/platform#947 — unmatched-response-handling-pass-through-rephrase
 - [x] casehubio/platform#959 — issue 959
-- [ ] casehubio/platform#999 — matchStructural-namespace-overload ← done on issue-970-match-step-type-safe-vars
+- [x] casehubio/platform#999 — matchStructural-namespace-overload
 
 ## State
 branch: 
 issue-repo: casehubio/platform
-status: active
+status: drained
 date: 2026-11-18
 active_issue: casehubio/platform#986
 
