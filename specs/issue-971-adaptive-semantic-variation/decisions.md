@@ -71,3 +71,14 @@
 **Sources:** Issue #979 (cross-namespace ambiguity), issue body collision guard section
 **Exploration:** quick
 **Status:** captured
+
+## D7: Language parameter strategy
+
+**Choice:** Language on TemplateNamespace, not on individual method calls — add a language field to TemplateNamespace (defaults to "en"). The seeder and adaptive fallback read language from the namespace. match() signatures stay unchanged.
+**Alternatives:**
+- Language parameter on every method — match(input, language), seed(pattern, variables, language), classify(input, templates, language). Explicit but changes every SPI signature and forces callers to pass language even for English-only use.
+**Rationale:** Language is a property of the template corpus, not of each match request. A namespace is authored in one language. The issue's YAML format already shows language: en as a namespace-level field. Avoids breaking SPI changes for a feature not yet used.
+**Trade-offs:** Cannot match the same namespace in multiple languages simultaneously — but that's the right constraint: each language should be its own namespace (e.g. protocol:review:de).
+**Sources:** Issue #971 i18n hooks section, issue #969 YAML corpus format (language field)
+**Exploration:** quick
+**Status:** captured
