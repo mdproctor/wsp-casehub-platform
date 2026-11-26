@@ -47,3 +47,15 @@
 **Sources:** NlpTokenizer in template-registry-api, OpenNlpTokenizer in template-registry
 **Exploration:** quick
 **Status:** captured
+
+## D5: Adaptive fallback classification strategy
+
+**Choice:** Single LLM call that classifies and extracts — AdaptiveFallbackMatcher sends input plus all candidate template patterns/variables to the LLM in one structured-output call. Returns either "no match" or {templateName, fields, suggestedVariation}. One call per miss.
+**Alternatives:**
+- Two-step: classify then extract — first call determines which template matches, second call extracts field values. More precise extraction but doubles latency and cost per miss.
+**Rationale:** Modern LLMs handle classification + extraction in a single structured-output call reliably. Per-miss cost sensitivity makes doubling calls expensive. The suggestedVariation field lets the LLM produce a normalised pattern that the system registers for future structural matching.
+**Trade-offs:** Single call is slightly less precise for complex extraction, but template variable schemas are simple enough (enum, string, clause) that this is not a practical concern.
+**Depends on:** D4 (AdaptiveFallbackMatcher SPI in template-registry-api)
+**Sources:** AgentProvider/ChatModel in agent-api, ResponseFormat structured output support
+**Exploration:** quick
+**Status:** captured
