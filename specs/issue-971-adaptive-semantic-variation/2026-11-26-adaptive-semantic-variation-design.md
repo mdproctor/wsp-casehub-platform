@@ -13,7 +13,7 @@ Template authors write one canonical pattern per intent. The system handles sema
 2. **NLP structural matching** — the existing tier handles inflection, plurals, determiners on canonical AND seeded patterns.
 3. **Runtime adaptive fallback** — when both regex and NLP return `Unmatched`, a lightweight LLM call classifies the input, extracts fields, and registers the new phrasing as a variation. Next time, the structural matcher handles it without an LLM call.
 
-The `ParaphraseCliff` tests document the current boundary: "I'm in favour of this design" does not match the template "I ${decision} this ${subject}". After this feature, it matches — either via pre-seeded variation or via runtime learning.
+The `ParaphraseCliff` tests document the current boundary: "I'm in favour of this design" does not match the template "I ${decision} this ${subject}". After this feature, it matches via runtime adaptive fallback — the LLM classifies the input, extracts `{decision: "approve", subject: "design"}`, and caches the classification for future occurrences. Seeded variations handle structural rearrangements that preserve all variable placeholders (e.g. "This ${subject} gets my ${decision}") but cannot bridge true semantic paraphrase where the user substitutes a synonym for an enum-constrained variable value ("in favour of" for `approve`).
 
 ## Architecture
 
@@ -143,12 +143,17 @@ public sealed interface ClassificationResult {
     record Matched(
         String templateName,
         Map<String, String> fields,
-        String suggestedVariation
+        String suggestedVariation,
+        double confidence
     ) implements ClassificationResult {
         public Matched {
             Objects.requireNonNull(templateName, "templateName");
             Objects.requireNonNull(fields, "fields");
             Objects.requireNonNull(suggestedVariation, "suggestedVariation");
+            if (confidence < 0.0 || confidence > 1.0) {
+                throw new IllegalArgumentException(
+                    "Confidence must be in [0.0, 1.0]: " + confidence);
+            }
             fields = Map.copyOf(fields);
         }
     }
@@ -159,7 +164,8 @@ public sealed interface ClassificationResult {
 
 - `templateName` — the template within the namespace that the input matches
 - `fields` — extracted variable values
-- `suggestedVariation` — a normalised pattern string the LLM produces (e.g. `"I'm in favour of this ${subject}"`) that can be registered for future structural matching
+- `suggestedVariation` — a normalised pattern string the LLM produces (e.g. `"This ${subject} gets my ${decision}"`) that can be registered for future structural matching. Must preserve all `${var}` placeholders to be registrable as a variation; patterns that drop variables are not registered but the match is still returned and cached (see §AdaptiveTemplateRegistry — Classification Cache).
+- `confidence` — LLM classification confidence in `[0.0, 1.0]`. Variations are only registered when confidence meets the configurable threshold (default 0.8).
 
 ### TemplateCandidate
 
@@ -199,13 +205,15 @@ public final class CollisionDetector {
 
     public static List<Collision> detect(
             List<String> candidateVariations,
+            Map<String, VariableConstraint> sourceVariables,
             String sourceNamespace,
             String sourceTemplate,
             UnifiedTemplateRegistry registry) {
 
         List<Collision> collisions = new ArrayList<>();
         for (String variation : candidateVariations) {
-            TemplateMatch result = registry.match(variation);
+            String testInput = substituteTestValues(variation, sourceVariables);
+            TemplateMatch result = registry.match(testInput);
             if (result instanceof TemplateMatch.Matched matched) {
                 boolean isSelf = matched.namespace().equals(sourceNamespace)
                     && matched.templateName().equals(sourceTemplate);
@@ -217,8 +225,28 @@ public final class CollisionDetector {
         }
         return List.copyOf(collisions);
     }
+
+    private static String substituteTestValues(
+            String variation,
+            Map<String, VariableConstraint> variables) {
+        String result = variation;
+        for (var entry : variables.entrySet()) {
+            String placeholder = "${" + entry.getKey() + "}";
+            if (!result.contains(placeholder)) continue;
+            String testValue;
+            if (entry.getValue() instanceof VariableConstraint.EnumConstraint ec) {
+                testValue = ec.values().iterator().next();
+            } else {
+                testValue = "__collision_test_" + entry.getKey() + "__";
+            }
+            result = result.replace(placeholder, testValue);
+        }
+        return result;
+    }
 }
 ```
+
+Collision detection substitutes `${var}` placeholders with valid test values before matching — enum-constrained variables use the first allowed value, string-constrained variables use a unique sentinel. This ensures enum constraint validation doesn't mask real collisions.
 
 This is O(variations × templates) — acceptable at registration time (batch, infrequent). Runtime-learned variations check a single candidate, so the cost is O(templates) per learn event.
 
@@ -252,7 +280,7 @@ Backward-compatible: existing two-arg constructor delegates to the three-arg wit
 
 ### LlmVariationSeeder
 
-Lives in `template-registry`. Injects `ChatModel` from the agent routing layer. Generates paraphrases via a structured-output prompt.
+Lives in `template-registry-llm`. Injects `ChatModel` from the agent routing layer. Generates paraphrases via a structured-output prompt.
 
 ```java
 public class LlmVariationSeeder implements VariationSeeder {
@@ -281,7 +309,7 @@ Key prompt constraints:
 
 ### LlmAdaptiveFallback
 
-Lives in `template-registry`. Single LLM call per miss (D5).
+Lives in `template-registry-llm`. Single LLM call per miss (D5).
 
 ```java
 public class LlmAdaptiveFallback implements AdaptiveFallbackMatcher {
@@ -307,23 +335,33 @@ public class LlmAdaptiveFallback implements AdaptiveFallbackMatcher {
 
 ## AdaptiveTemplateRegistry
 
-Lives in `template-registry-llm`. Extends `NlpTemplateRegistry` to add the third matching tier. The adaptive fallback fires only when both regex and NLP return `Unmatched`.
+Lives in `template-registry-llm`. Extends `NlpTemplateRegistry` to add the third matching tier. The adaptive fallback fires when both regex and NLP fail to produce a confident `Matched` result — this includes both `Unmatched` and `NearMiss` outcomes, since a near-miss indicates the structural matcher found something similar but couldn't confidently extract fields, which is exactly the scenario where LLM classification adds value.
 
 ```java
 public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
     private final AdaptiveFallbackMatcher fallbackMatcher;
+    private final double confidenceThreshold; // default 0.8
+    private final ClassificationCache classificationCache;
 
     @Override
     public TemplateMatch match(String namespaceName, String input) {
         TemplateMatch result = super.match(namespaceName, input);
-        if (!(result instanceof TemplateMatch.Unmatched)) {
+        if (result instanceof TemplateMatch.Matched) {
             return result;
         }
+        // NearMiss or Unmatched → try classification cache, then adaptive fallback
         return adaptiveFallback(namespaceName, input);
     }
 
     private TemplateMatch adaptiveFallback(String namespaceName, String input) {
+        // 0. Check classification cache (positive and negative results)
+        String cacheKey = namespaceName + ":" + input;
+        ClassificationCache.Entry cached = classificationCache.get(cacheKey);
+        if (cached != null) {
+            return cached.toTemplateMatch(namespaceName);
+        }
+
         TemplateNamespace ns = /* get from snapshot */;
         List<TemplateCandidate> candidates = ns.templates().values()
             .stream().map(TemplateCandidate::from).toList();
@@ -339,26 +377,58 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
         }
 
         if (cr instanceof ClassificationResult.Matched matched) {
-            // 1. Collision check on suggestedVariation
-            List<CollisionDetector.Collision> collisions =
-                CollisionDetector.detect(
-                    List.of(matched.suggestedVariation()),
-                    namespaceName, matched.templateName(), this);
+            // Cache the positive result regardless of registration
+            classificationCache.putPositive(cacheKey, matched);
 
-            // 2. If no collision, register the variation (atomic, D3 revised)
-            if (collisions.isEmpty()) {
-                registerLearnedVariation(
-                    namespaceName, matched.templateName(),
-                    matched.suggestedVariation());
+            // Only register variation if confidence meets threshold
+            if (matched.confidence() >= confidenceThreshold) {
+                tryRegisterVariation(namespaceName, matched);
             }
-            // else: log warning, don't persist — still return the match
 
-            // 3. Return the match (even if variation wasn't persisted)
             return new TemplateMatch.Matched(
                 namespaceName, matched.templateName(), -1,
                 matched.fields(), 0.9);
         }
+
+        // Cache the negative result
+        classificationCache.putNegative(cacheKey);
         return new TemplateMatch.Unmatched(input);
+    }
+
+    private void tryRegisterVariation(String namespaceName,
+                                       ClassificationResult.Matched matched) {
+        String variation = matched.suggestedVariation();
+
+        // Validate: variation must preserve ALL ${var} placeholders
+        TemplateNamespace ns = /* get from snapshot */;
+        TemplateDefinition def = ns.templates().get(matched.templateName());
+        if (!preservesAllVariables(variation, def.variables())) {
+            // Variation drops a variable (e.g. enum value baked into phrasing)
+            // — don't register, the classification cache handles future hits
+            return;
+        }
+
+        // Collision check with test value substitution
+        List<CollisionDetector.Collision> collisions =
+            CollisionDetector.detect(
+                List.of(variation), def.variables(),
+                namespaceName, matched.templateName(), this);
+
+        if (collisions.isEmpty()) {
+            registerLearnedVariation(
+                namespaceName, matched.templateName(), variation);
+        }
+        // else: log warning, don't persist — match already returned
+    }
+
+    private boolean preservesAllVariables(
+            String variation, Map<String, VariableConstraint> variables) {
+        for (String varName : variables.keySet()) {
+            if (!variation.contains("${" + varName + "}")) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void registerLearnedVariation(
@@ -372,12 +442,76 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 }
 ```
 
+### NlpTemplateRegistry — replaceOrRegister Override
+
+`NlpTemplateRegistry` must override `replaceOrRegister()` to update both the immutable snapshot AND the `nlpCompiled` cache. Without this override, the CAS in `InMemoryTemplateRegistry.replaceOrRegister()` updates the snapshot directly, bypassing `NlpTemplateRegistry.register()` — the NLP compilation step is skipped, and the tier 2 NLP matcher won't see new patterns.
+
+```java
+// In NlpTemplateRegistry:
+@Override
+public void replaceOrRegister(TemplateNamespace namespace) {
+    super.replaceOrRegister(namespace);
+    // Remove old NLP compilations for this namespace
+    nlpCompiled.keySet().removeIf(k -> k.startsWith(namespace.name() + ":"));
+    // Compile NLP patterns for the new namespace
+    for (TemplateDefinition def : namespace.templates().values()) {
+        String key = namespace.name() + ":" + def.name();
+        nlpCompiled.put(key, NlpTemplateCompiler.compile(def, tokenizer));
+    }
+}
+```
+
+### Classification Cache
+
+Mandatory in-memory cache for LLM classification results, covering both positive (matched) and negative (unmatched) outcomes. Prevents repeated LLM calls for the same input.
+
+| Parameter | Default | Notes |
+|-----------|---------|-------|
+| Positive TTL | 30 minutes | Longer — positive results are valuable to retain |
+| Negative TTL | 5 minutes | Shorter — input that doesn't match today might match after new registrations |
+| Max entries | 1000 | Per-registry, covers both positive and negative entries |
+| Cache key | `namespace:input` | Per-namespace isolation — same input may match differently in different namespaces |
+| Eviction | LRU | When max entries exceeded, least-recently-used entries evicted first |
+
+Positive cache entries store the full `ClassificationResult.Matched` — on cache hit, the match is returned directly without an LLM call or variation registration attempt. This is the primary mechanism for handling repeated semantic paraphrases that cannot be registered as structural variations (e.g. enum value synonyms like "in favour of" for `approve`).
+
+### matchWithTrace Override
+
+`AdaptiveTemplateRegistry` overrides `matchWithTrace(String namespaceName, String input)` to include adaptive tier information in trace output. A new `CandidateOutcome.ADAPTIVE_MATCHED` value distinguishes LLM-classified matches from regex and NLP matches.
+
+```java
+// In AdaptiveTemplateRegistry:
+@Override
+public MatchTraceResult matchWithTrace(String namespaceName, String input) {
+    MatchTraceResult structuralResult = super.matchWithTrace(namespaceName, input);
+    if (structuralResult.result() instanceof TemplateMatch.Matched) {
+        return structuralResult;
+    }
+
+    TemplateMatch adaptiveResult = adaptiveFallback(namespaceName, input);
+    List<CandidateTrace> candidates = new ArrayList<>(
+        structuralResult.trace().candidates());
+
+    if (adaptiveResult instanceof TemplateMatch.Matched matched) {
+        candidates.add(new CandidateTrace(
+            namespaceName, matched.templateName(), -1, -1.0,
+            CandidateOutcome.ADAPTIVE_MATCHED, List.of(), matched.score()));
+    }
+
+    return new MatchTraceResult(adaptiveResult,
+        new MatchTrace(candidates,
+            adaptiveResult instanceof TemplateMatch.Matched m
+                ? namespaceName + ":" + m.templateName() : null,
+            adaptiveResult instanceof TemplateMatch.Matched m
+                ? m.score() : 0.0));
+}
+```
+
 ### Error Handling
 
 - **LLM unavailable:** `adaptiveFallback()` catches all exceptions from `fallbackMatcher.classify()` and degrades gracefully to `Unmatched`. The two structural tiers still work. Log at WARN level.
-- **LLM misclassification:** The collision guard (D6) catches cross-namespace errors. Same-namespace misclassification (LLM says input matches template A but it semantically matches template B within the same namespace) is not detectable without ground truth. The registered variation will be incorrect but structurally valid — it matches structurally on subsequent inputs, which is self-correcting (the structural matcher validates independently).
-- **Cost control:** The `AdaptiveFallbackMatcher` SPI is a simple functional interface. Rate limiting is the caller's responsibility. When wired via CDI, the existing `agent-gate` decorator on `ChatModel` provides token-bucket rate limiting. Additionally, `AdaptiveTemplateRegistry` can track recent unmatched inputs and skip the LLM call for inputs that were recently classified as unmatched (simple in-memory TTL cache of negative results).
-```
+- **LLM misclassification:** The collision guard (D6) catches cross-namespace errors. Same-namespace misclassification (LLM says input matches template A but it semantically matches template B within the same namespace) is not detectable without ground truth. This is **self-reinforcing**: the registered variation causes future similar inputs to match the wrong template via the structural matcher. Mitigations: (1) the confidence threshold (default 0.8) prevents low-confidence classifications from being registered; (2) re-registering the namespace via `replaceOrRegister()` with canonical-only patterns purges all learned variations; (3) learned variations are in-memory only (D1) and cleared on restart.
+- **Cost control:** The classification cache is mandatory — both positive and negative results are cached with configurable TTLs (see §Classification Cache). The `agent-gate` decorator on `ChatModel` provides global token-bucket rate limiting across all LLM consumers.
 
 **Score for adaptive matches:** 0.9 — lower than regex (1.0) but higher than the NLP threshold. Distinguishes LLM-classified matches in downstream processing.
 
@@ -408,7 +542,8 @@ public class VariationSeedingService {
             // Collision check against already-registered templates
             List<CollisionDetector.Collision> collisions =
                 CollisionDetector.detect(
-                    variations, namespace.name(), def.name(), registry);
+                    variations, def.variables(),
+                    namespace.name(), def.name(), registry);
 
             // Filter out colliding variations
             Set<String> collidingVariations = collisions.stream()
@@ -453,12 +588,17 @@ Input prose
   │   └─ Match? → TemplateMatch.Matched(score=coverage)
   │
   └─ Tier 3: Adaptive fallback (LLM classification — template-registry-llm)
+      ├─ Check classification cache (positive/negative)
+      │   └─ Cache hit? → return cached result directly
       ├─ Build TemplateCandidate list from namespace
       ├─ Single LLM call: classify + extract + suggest variation
       │   └─ LLM unavailable? → graceful degradation to Unmatched
-      ├─ Match? → collision check on suggested variation
-      │   ├─ No collision → register variation (replaceOrRegister — single CAS)
-      │   └─ Collision → log warning, don't persist
+      ├─ Match? → cache positive result, then try registration:
+      │   ├─ Confidence < threshold? → skip registration, return match
+      │   ├─ Variation drops variables? → skip registration, return match
+      │   ├─ Collision detected? → log warning, skip registration, return match
+      │   └─ All checks pass → register variation (replaceOrRegister — single CAS)
+      ├─ No match? → cache negative result
       └─ Return TemplateMatch.Matched(score=0.9) or Unmatched
 ```
 
@@ -469,7 +609,8 @@ Tier 1 and 2 operate on both canonical patterns AND seeded variations — seeded
 - `VariationSeeder` and `AdaptiveFallbackMatcher` are stateless functional interfaces — thread-safe by contract
 - `CollisionDetector` is a stateless utility — thread-safe
 - `AdaptiveTemplateRegistry` inherits the immutable-snapshot concurrency model from `InMemoryTemplateRegistry`
-- Learned variation registration uses atomic `deregister` + `register` with CAS retry
+- Learned variation registration uses `replaceOrRegister()` — single CAS on the snapshot, no gap where the namespace is absent. `NlpTemplateRegistry` overrides `replaceOrRegister()` to update both the snapshot and `nlpCompiled` cache; the two stores are not atomically updated (brief window where snapshot is updated but NLP cache lags). This is consistent with the existing `register()`/`deregister()` behaviour in `NlpTemplateRegistry` — the regex tier (checked first) covers the gap.
+- `ClassificationCache` uses `ConcurrentHashMap` — thread-safe, no external locking required
 - `LlmVariationSeeder` and `LlmAdaptiveFallback` delegate to `ChatModel` which is thread-safe per platform convention
 
 ## Testing Strategy
@@ -483,29 +624,78 @@ Tier 1 and 2 operate on both canonical patterns AND seeded variations — seeded
 
 ### Integration Tests
 
-- **Seeded variation matches without LLM:** Register a template with pre-seeded variations. Assert that "I'm in favour of this design" matches via regex or NLP without any LLM call. The `ParaphraseCliff` tests flip from `Unmatched` to `Matched`.
-- **Runtime-learned variation matches without LLM on second occurrence:** First call to `match()` for a novel paraphrase triggers adaptive fallback (mock LLM). Assert match returned. Second call for same input matches via regex/NLP without LLM.
+- **Seeded variation matches structural rearrangements:** Register a template with seeded variations that preserve all `${var}` placeholders (e.g. `"This ${subject} gets my ${decision}"`). Assert that structural rearrangements match via regex or NLP without any LLM call.
+- **Seeded variations do NOT bridge semantic paraphrase for enum variables:** Register a template with seeded variations. Assert that "I'm in favour of this design" (a synonym paraphrase, not a structural rearrangement) still returns `Unmatched` from tiers 1 and 2. This documents the deliberate boundary.
+- **Adaptive fallback bridges ParaphraseCliff:** Configure `AdaptiveTemplateRegistry` with mock LLM. Assert that "I'm in favour of this design" matches via tier 3, with `{decision: "approve", subject: "design"}` extracted. The `ParaphraseCliff` tests flip from `Unmatched` to `Matched`.
+- **Classification cache prevents repeated LLM calls:** First call for a semantic paraphrase triggers adaptive fallback (mock LLM). Second call for same input returns cached result without LLM call.
+- **Runtime-learned variation matches without LLM on second occurrence:** First call to `match()` for a structural paraphrase (preserves all variables) triggers adaptive fallback (mock LLM) and registers variation. Second call matches via regex/NLP without LLM.
+- **NearMiss triggers adaptive fallback:** Configure input that produces a NearMiss from tiers 1+2. Assert the adaptive fallback fires and classifies correctly.
 - **Collision rejection:** Seed template A. Attempt to seed template B with a variation that matches A. Assert the variation is rejected and logged.
 - **Adaptive fallback collision guard:** Adaptive fallback suggests a variation that collides. Assert the match is returned but the variation is NOT registered.
+- **Confidence threshold prevents low-confidence registration:** Adaptive fallback returns a match with confidence below threshold. Assert the match is returned but no variation is registered.
 
 ### Mock LLM for Tests
 
 Tests use a stub `VariationSeeder` and `AdaptiveFallbackMatcher` with predetermined responses — no real LLM calls in the test suite.
 
+## CDI Wiring
+
+The registry displacement chain follows the platform's established `@DefaultBean` pattern (ARC42STORIES §4):
+
+```
+NoOpUnifiedTemplateRegistry (@DefaultBean in platform-core)
+  ↓ displaced by
+NlpTemplateRegistry (@ApplicationScoped in template-registry)
+  ↓ displaced by
+AdaptiveTemplateRegistry (@ApplicationScoped @Alternative @Priority(100) in template-registry-llm)
+```
+
+- **No `template-registry-llm` on classpath:** `NlpTemplateRegistry` is active — two-tier matching (regex + NLP)
+- **`template-registry-llm` on classpath:** `AdaptiveTemplateRegistry` is active — three-tier matching (regex + NLP + LLM adaptive)
+- **Neither on classpath:** `NoOpUnifiedTemplateRegistry` — returns `Unmatched` for everything
+
+All callers inject `UnifiedTemplateRegistry` — never the concrete type. The active implementation is determined by classpath composition.
+
+```java
+// In template-registry-llm:
+@ApplicationScoped
+@Alternative
+@Priority(100)
+public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
+
+    @Inject
+    public AdaptiveTemplateRegistry(
+            NlpTokenizer tokenizer,
+            AdaptiveFallbackMatcher fallbackMatcher) {
+        super(tokenizer);
+        this.fallbackMatcher = fallbackMatcher;
+    }
+}
+```
+
+The `AdaptiveFallbackMatcher` SPI bean is provided by `LlmAdaptiveFallback` (also in `template-registry-llm`), which injects `ChatModel` from the agent routing layer. `NlpTokenizer` is provided by `OpenNlpTokenizer` in `template-registry`.
+
+Note: `NlpTemplateRegistry`'s `@ApplicationScoped` annotation is part of #959's remaining CDI work. This spec assumes that wiring is in place.
+
 ## Scope
 
 ### In scope
 - `replaceOrRegister()` on `UnifiedTemplateRegistry` SPI (implements #967)
+- `NlpTemplateRegistry.replaceOrRegister()` override for `nlpCompiled` cache synchronisation
 - `VariationSeeder` SPI and `LlmVariationSeeder` implementation
 - `AdaptiveFallbackMatcher` SPI and `LlmAdaptiveFallback` implementation
-- `CollisionDetector` utility
-- `ClassificationResult` and `TemplateCandidate` types
+- `CollisionDetector` utility (with test value substitution for enum-constrained variables)
+- `ClassificationResult` and `TemplateCandidate` types (including `confidence` field)
 - `AdaptiveTemplateRegistry` extending `NlpTemplateRegistry` (in new `template-registry-llm` module)
+- `ClassificationCache` — mandatory in-memory cache for positive and negative LLM results
 - `VariationSeedingService` orchestrator (in `template-registry-llm`)
 - `TemplateNamespace` language field (i18n hook)
+- `CandidateOutcome.ADAPTIVE_MATCHED` — new enum value for trace output
+- `AdaptiveTemplateRegistry.matchWithTrace()` override for observability
+- CDI wiring: `AdaptiveTemplateRegistry` as `@ApplicationScoped @Alternative @Priority(100)`
 - Graceful degradation on LLM unavailability
 - Integration tests proving the three tiers work together
-- `ParaphraseCliff` tests updated to pass after seeding
+- `ParaphraseCliff` tests updated to pass via adaptive fallback (tier 3), not seeded variations
 
 ### Out of scope
 - Variation persistence across restarts — #969 (YAML corpus)
