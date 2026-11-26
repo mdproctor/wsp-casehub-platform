@@ -83,8 +83,14 @@ public interface UnifiedTemplateRegistry {
         deregister(namespace.name());
         register(namespace);
     }
+
+    default TemplateMatch matchStructural(String input) {
+        return match(input);
+    }
 }
 ```
+
+`matchStructural()` performs structural matching only (tiers 1+2: regex + NLP). The default delegates to `match()`. `AdaptiveTemplateRegistry` overrides to bypass its own adaptive fallback tier (see §AdaptiveTemplateRegistry). Used by `CollisionDetector` — collision detection must not trigger LLM calls, since only structural collisions are meaningful (a variation is registered as a structural pattern, so the structural matcher finds it before any adaptive fallback fires).
 
 The default method provides backward compatibility. `InMemoryTemplateRegistry` overrides with a true single-CAS implementation:
 
@@ -103,6 +109,19 @@ public void replaceOrRegister(TemplateNamespace namespace) {
 ```
 
 No gap where the namespace is absent — readers see either the old or new snapshot atomically.
+
+Add protected snapshot access methods for subclass CAS operations (needed by `AdaptiveTemplateRegistry.registerLearnedVariation()`):
+
+```java
+// In InMemoryTemplateRegistry:
+protected Snapshot currentSnapshot() {
+    return snapshot.get();
+}
+
+protected boolean compareAndSetSnapshot(Snapshot expected, Snapshot next) {
+    return snapshot.compareAndSet(expected, next);
+}
+```
 
 ### VariationSeeder (SPI)
 
@@ -213,7 +232,7 @@ public final class CollisionDetector {
         List<Collision> collisions = new ArrayList<>();
         for (String variation : candidateVariations) {
             String testInput = substituteTestValues(variation, sourceVariables);
-            TemplateMatch result = registry.match(testInput);
+            TemplateMatch result = registry.matchStructural(testInput);
             if (result instanceof TemplateMatch.Matched matched) {
                 boolean isSelf = matched.namespace().equals(sourceNamespace)
                     && matched.templateName().equals(sourceTemplate);
@@ -433,12 +452,57 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
     private void registerLearnedVariation(
             String namespaceName, String templateName, String variation) {
-        // Atomic replace (D3 revised — replaceOrRegister):
-        // 1. Read current namespace from snapshot
-        // 2. Build new TemplateDefinition with original patterns + variation
-        // 3. Build new TemplateNamespace with updated template
-        // 4. replaceOrRegister(expandedNamespace) — single CAS, no gap
-        //    (replaceOrRegister also invalidates classification cache — see override below)
+        // Read-modify-write with CAS retry: build the expanded namespace
+        // from the CURRENT snapshot inside the loop, so concurrent
+        // registerLearnedVariation calls don't overwrite each other's
+        // variations (see §Thread Safety — concurrent variation registration).
+        while (true) {
+            Snapshot current = currentSnapshot();
+            TemplateNamespace ns = current.namespaces.get(namespaceName);
+            if (ns == null) return;
+            TemplateDefinition def = ns.templates().get(templateName);
+            if (def == null || def.patterns().contains(variation)) return;
+
+            List<String> expanded = new ArrayList<>(def.patterns());
+            expanded.add(variation);
+            TemplateDefinition expandedDef =
+                new TemplateDefinition(def.name(), expanded, def.variables());
+            Map<String, TemplateDefinition> expandedTemplates =
+                new LinkedHashMap<>(ns.templates());
+            expandedTemplates.put(def.name(), expandedDef);
+            TemplateNamespace expandedNs = new TemplateNamespace(
+                ns.name(), expandedTemplates, ns.language());
+
+            Snapshot next = current.withoutNamespace(namespaceName)
+                                   .withNamespace(expandedNs);
+            if (compareAndSetSnapshot(current, next)) {
+                // Update NLP cache + invalidate classification cache
+                recompileNlp(namespaceName, expandedNs);
+                classificationCache.invalidateNamespace(namespaceName);
+                return;
+            }
+            // CAS failed — concurrent modification — retry with fresh snapshot
+        }
+    }
+
+    @Override
+    public TemplateMatch matchStructural(String input) {
+        // Structural-only matching (tiers 1+2) — no adaptive fallback.
+        // Used by CollisionDetector to avoid spurious LLM calls.
+        // super.match(ns, input) → InMemoryTemplateRegistry.match(ns, input)
+        // → this.matchInNamespace() → NlpTemplateRegistry.matchInNamespace()
+        // — regex + NLP only, bypasses AdaptiveTemplateRegistry.match(ns, input).
+        TemplateMatch.Matched bestMatch = null;
+        for (String ns : namespaces()) {
+            TemplateMatch result = super.match(ns, input);
+            if (result instanceof TemplateMatch.Matched matched) {
+                if (matched.score() == 1.0) return matched;
+                if (bestMatch == null || matched.score() > bestMatch.score()) {
+                    bestMatch = matched;
+                }
+            }
+        }
+        return bestMatch != null ? bestMatch : new TemplateMatch.Unmatched(input);
     }
 
     @Override
@@ -458,11 +522,13 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 @Override
 public void replaceOrRegister(TemplateNamespace namespace) {
     super.replaceOrRegister(namespace);
-    // Remove old NLP compilations for this namespace
-    nlpCompiled.keySet().removeIf(k -> k.startsWith(namespace.name() + ":"));
-    // Compile NLP patterns for the new namespace
+    recompileNlp(namespace.name(), namespace);
+}
+
+protected void recompileNlp(String namespaceName, TemplateNamespace namespace) {
+    nlpCompiled.keySet().removeIf(k -> k.startsWith(namespaceName + ":"));
     for (TemplateDefinition def : namespace.templates().values()) {
-        String key = namespace.name() + ":" + def.name();
+        String key = namespaceName + ":" + def.name();
         nlpCompiled.put(key, NlpTemplateCompiler.compile(def, tokenizer));
     }
 }
@@ -628,7 +694,8 @@ Tier 1 and 2 operate on both canonical patterns AND seeded variations — seeded
 - `VariationSeeder` and `AdaptiveFallbackMatcher` are stateless functional interfaces — thread-safe by contract
 - `CollisionDetector` is a stateless utility — thread-safe
 - `AdaptiveTemplateRegistry` inherits the immutable-snapshot concurrency model from `InMemoryTemplateRegistry`
-- Learned variation registration uses `replaceOrRegister()` — single CAS on the snapshot, no gap where the namespace is absent. `NlpTemplateRegistry` overrides `replaceOrRegister()` to update both the snapshot and `nlpCompiled` cache; the two stores are not atomically updated (brief window where snapshot is updated but NLP cache lags). This is consistent with the existing `register()`/`deregister()` behaviour in `NlpTemplateRegistry` — the regex tier (checked first) covers the gap.
+- Learned variation registration uses a read-modify-write CAS retry loop directly on the snapshot (via `currentSnapshot()`/`compareAndSetSnapshot()`) — NOT `replaceOrRegister()`. This prevents concurrent `registerLearnedVariation()` calls from overwriting each other's variations: each attempt reads the latest snapshot, builds the expanded namespace from it, and CAS-swaps. If another thread modified the snapshot between read and CAS, the CAS fails and the loop retries with a fresh read. After a successful CAS, the NLP cache and classification cache are updated. External callers (re-registering a full namespace) still use `replaceOrRegister()`.
+- `NlpTemplateRegistry` overrides `replaceOrRegister()` to update both the snapshot and `nlpCompiled` cache; the two stores are not atomically updated (brief window where snapshot is updated but NLP cache lags). This is consistent with the existing `register()`/`deregister()` behaviour in `NlpTemplateRegistry` — the regex tier (checked first) covers the gap. `NlpTemplateRegistry` also exposes a protected `recompileNlp(namespaceName, namespace)` helper used by `AdaptiveTemplateRegistry.registerLearnedVariation()` after its own CAS.
 - `ClassificationCache` uses `ConcurrentHashMap` — thread-safe, no external locking required
 - `LlmVariationSeeder` and `LlmAdaptiveFallback` delegate to `ChatModel` which is thread-safe per platform convention
 
@@ -715,8 +782,11 @@ Note: `NlpTemplateRegistry`'s `@ApplicationScoped` annotation is part of #959's 
 - `NlpTemplateRegistry.replaceOrRegister()` override for `nlpCompiled` cache synchronisation
 - `VariationSeeder` SPI and `LlmVariationSeeder` implementation
 - `AdaptiveFallbackMatcher` SPI and `LlmAdaptiveFallback` implementation
-- `CollisionDetector` utility (with test value substitution for enum-constrained variables)
+- `matchStructural()` on `UnifiedTemplateRegistry` SPI — structural-only matching for collision detection
+- `CollisionDetector` utility (with test value substitution and `matchStructural()` to avoid LLM calls)
 - `ClassificationResult` and `TemplateCandidate` types (including `confidence` field)
+- `InMemoryTemplateRegistry` — protected `currentSnapshot()`/`compareAndSetSnapshot()` for subclass CAS
+- `NlpTemplateRegistry` — protected `recompileNlp()` helper for subclass NLP cache updates
 - `AdaptiveTemplateRegistry` extending `NlpTemplateRegistry` (in new `template-registry-llm` module)
 - `ClassificationCache` — mandatory in-memory cache for positive and negative LLM results
 - `VariationSeedingService` orchestrator (in `template-registry-llm`)
