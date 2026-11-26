@@ -1,7 +1,28 @@
+# Work Plan —
+
+## State
+branch: issue-974-corpus-quality-testing
+issue-repo: casehubio/platform
+status: active
+covers: casehubio/platform#974
+date: 2026-11-18
+active_issue: casehubio/platform#986
+
+## Queue
 - [x] casehubio/platform#986 — playbook-runner-unmet-requirement
 - [x] casehubio/platform#987 — manual-option-flow
 - [x] casehubio/platform#979 — per-namespace threshold and ambiguity
-- [ ] casehubio/platform#974 — corpus quality testing        ← active
+- [ ] casehubio/platform#974 — corpus quality testing ← active
+  - [ ] Batch 1: Report Types and Fixture Format
+    - [ ] Task 1: VariationResult TemplateReport CorpusQualityReport records
+    - [ ] Task 2: VariationFixture record and VariationFixtureLoader
+  - [ ] Batch 2: Quality Harness
+    - [ ] Task 3: CorpusQualityHarness corpus mode evaluate
+  - [ ] Batch 3: Fixture Writer and CLI
+    - [ ] Task 4: VariationFixtureWriter
+    - [ ] Task 5: CorpusVariationGenerator CLI tool
+  - [ ] Batch 4: CI Quality Gate
+    - [ ] Task 6: JUnit quality gate test
 - [ ] casehubio/platform#969 — YAML corpus format for template registry
 - [ ] casehubio/platform#970 — match playbook step with type-safe variable flow
 - [x] casehubio/platform#977 — fix global match NLP best-score
@@ -88,14 +109,6 @@
 - [x] casehubio/platform#946 — playbook-template-declaration-executor-wiring
 - [x] casehubio/platform#947 — unmatched-response-handling-pass-through-rephrase
 - [x] casehubio/platform#959 — issue 959
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-covers: casehubio/platform#974
-date: 2026-11-18
-active_issue: casehubio/platform#986
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
