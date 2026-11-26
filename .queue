@@ -9,8 +9,8 @@ date: 2026-11-18
 active_issue: casehubio/platform#986
 
 ## Queue
-- [ ] casehubio/platform#986 — playbook-runner-unmet-requirement
-- [ ] casehubio/platform#987 — manual-option-flow ← active
+- [ ] casehubio/platform#986 — playbook-runner-unmet-requirement ← active
+- [ ] casehubio/platform#987 — manual-option-flow
 - [ ] casehubio/platform#979 — per-namespace threshold and ambiguity
 - [ ] casehubio/platform#974 — corpus quality testing
 - [ ] casehubio/platform#969 — YAML corpus format for template registry
