@@ -18,6 +18,17 @@ active_issue: casehubio/platform#928
 - [x] casehubio/platform#973 — NearMiss guided rejection
 - [x] casehubio/platform#967 — atomic namespace replace
 - [ ] casehubio/platform#971 — adaptive semantic variation ← active
+  - [ ] Batch 1: SPI Foundation
+    - [ ] Task 1: replaceOrRegister and matchStructural
+    - [ ] Task 2: API types and CollisionDetector
+  - [ ] Batch 2: NLP Tier Update
+    - [ ] Task 3: NlpTemplateRegistry replaceOrRegister
+  - [ ] Batch 3: template-registry-llm
+    - [ ] Task 4: ClassificationCache
+    - [ ] Task 5: AdaptiveTemplateRegistry
+    - [ ] Task 6: LLM impls and SeedingService
+  - [ ] Batch 4: Integration
+    - [ ] Task 7: Tests and ParaphraseCliff
 - [ ] casehubio/platform#979 — per-namespace threshold and ambiguity
 - [ ] casehubio/platform#974 — corpus quality testing
 - [ ] casehubio/platform#969 — YAML corpus format for template registry
