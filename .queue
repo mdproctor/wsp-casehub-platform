@@ -12,7 +12,7 @@
     - [x] Task 5: CorpusVariationGenerator CLI tool
   - [x] Batch 4: CI Quality Gate
     - [x] Task 6: JUnit quality gate test
-- [ ] casehubio/platform#969 — YAML corpus format for template registry ← done on issue-974-corpus-quality-testing
+- [x] casehubio/platform#969 — YAML corpus format for template registry
 - [ ] casehubio/platform#970 — match playbook step with type-safe variable flow        ← active
 - [x] casehubio/platform#977 — fix global match NLP best-score
 - [x] casehubio/platform#978 — detect adjacent CLAUSE variables
