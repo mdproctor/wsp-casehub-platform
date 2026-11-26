@@ -35,3 +35,15 @@
 **Sources:** InMemoryTemplateRegistry.Snapshot, issue #967 (atomic namespace replace)
 **Exploration:** quick
 **Status:** captured
+
+## D4: Module placement for variation SPIs
+
+**Choice:** SPIs in template-registry-api, LLM implementations in template-registry — VariationSeeder and AdaptiveFallbackMatcher are functional interfaces with no LLM dependency. LLM-backed implementations live in template-registry (which has CDI wiring) and inject ChatModel.
+**Alternatives:**
+- Everything in template-registry — simpler but puts the SPI where only one implementation can see it
+- New template-registry-llm module — clean separation but adds a module for two classes
+**Rationale:** Follows the established platform pattern: SPI in -api, impl in the runtime module. NlpTokenizer SPI is already in template-registry-api with OpenNlpTokenizer impl in template-registry. Keeps template-registry-api zero-dep.
+**Trade-offs:** None significant — this is the standard platform convention.
+**Sources:** NlpTokenizer in template-registry-api, OpenNlpTokenizer in template-registry
+**Exploration:** quick
+**Status:** captured
