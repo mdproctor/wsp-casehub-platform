@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 440" font-family="system-ui, -apple-system, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="680" height="440" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+
+  <!-- Input -->
+  <rect x="250" y="16" width="180" height="36" rx="6" fill="#1e293b" stroke="none"/>
+  <text x="340" y="39" text-anchor="middle" fill="#f8fafc" font-weight="600">Input prose</text>
+
+  <!-- Arrow down -->
+  <line x1="340" y1="52" x2="340" y2="76" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Tier 1: Regex -->
+  <rect x="60" y="78" width="560" height="60" rx="6" fill="#dbeafe" stroke="#93c5fd"/>
+  <text x="80" y="100" fill="#1e40af" font-weight="700" font-size="12">TIER 1</text>
+  <text x="130" y="100" fill="#1e40af" font-size="12">Regex — canonical + seeded patterns</text>
+  <text x="80" y="120" fill="#1e40af" font-size="11">Score: 1.0 · Cost: zero · Deterministic</text>
+
+  <!-- Match arrow right -->
+  <text x="540" y="115" fill="#16a34a" font-weight="600" font-size="11">→ Matched</text>
+
+  <!-- Arrow down -->
+  <line x1="340" y1="138" x2="340" y2="162" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="355" y="155" fill="#94a3b8" font-size="10">miss</text>
+
+  <!-- Tier 2: NLP -->
+  <rect x="60" y="164" width="560" height="60" rx="6" fill="#fef3c7" stroke="#fbbf24"/>
+  <text x="80" y="186" fill="#92400e" font-weight="700" font-size="12">TIER 2</text>
+  <text x="130" y="186" fill="#92400e" font-size="12">NLP structural — lemmatised keyword filter + POS matching</text>
+  <text x="80" y="206" fill="#92400e" font-size="11">Score: 0.5–1.0 · Cost: local CPU · Handles inflection</text>
+
+  <!-- Match arrow right -->
+  <text x="540" y="201" fill="#16a34a" font-weight="600" font-size="11">→ Matched</text>
+
+  <!-- Arrow down -->
+  <line x1="340" y1="224" x2="340" y2="248" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="355" y="241" fill="#94a3b8" font-size="10">miss</text>
+
+  <!-- Tier 3: LLM -->
+  <rect x="60" y="250" width="560" height="80" rx="6" fill="#fce7f3" stroke="#f9a8d4"/>
+  <text x="80" y="272" fill="#9d174d" font-weight="700" font-size="12">TIER 3</text>
+  <text x="130" y="272" fill="#9d174d" font-size="12">Adaptive LLM fallback — classify + extract + learn</text>
+  <text x="80" y="292" fill="#9d174d" font-size="11">Score: 0.9 · Cost: LLM call (once) · Handles paraphrase</text>
+  <text x="80" y="312" fill="#9d174d" font-size="11">Cache: positive 30m / negative 5m · Confidence threshold: 0.8</text>
+
+  <!-- Match arrow right -->
+  <text x="540" y="287" fill="#16a34a" font-weight="600" font-size="11">→ Matched</text>
+
+  <!-- Learn arrow looping back -->
+  <line x1="340" y1="330" x2="340" y2="370" stroke="#64748b" stroke-width="1.5"/>
+  <rect x="200" y="370" width="280" height="36" rx="6" fill="#dcfce7" stroke="#86efac"/>
+  <text x="340" y="393" text-anchor="middle" fill="#166534" font-size="12">Register variation → next time: Tier 1 handles it</text>
+
+  <!-- Loop arrow back to Tier 1 -->
+  <line x1="200" y1="388" x2="40" y2="388" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="40" y1="388" x2="40" y2="108" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="40" y1="108" x2="58" y2="108" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+
+  <!-- Unmatched -->
+  <text x="540" y="393" fill="#dc2626" font-weight="600" font-size="11">→ Unmatched</text>
+</svg>
