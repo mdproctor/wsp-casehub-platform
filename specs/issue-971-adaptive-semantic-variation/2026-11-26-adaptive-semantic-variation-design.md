@@ -356,7 +356,7 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
     private TemplateMatch adaptiveFallback(String namespaceName, String input) {
         // 0. Check classification cache (positive and negative results)
-        String cacheKey = namespaceName + ":" + input;
+        var cacheKey = new ClassificationCache.CacheKey(namespaceName, input);
         ClassificationCache.Entry cached = classificationCache.get(cacheKey);
         if (cached != null) {
             return cached.toTemplateMatch(namespaceName);
@@ -438,6 +438,13 @@ public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
         // 2. Build new TemplateDefinition with original patterns + variation
         // 3. Build new TemplateNamespace with updated template
         // 4. replaceOrRegister(expandedNamespace) — single CAS, no gap
+        //    (replaceOrRegister also invalidates classification cache — see override below)
+    }
+
+    @Override
+    public void replaceOrRegister(TemplateNamespace namespace) {
+        super.replaceOrRegister(namespace);
+        classificationCache.invalidateNamespace(namespace.name());
     }
 }
 ```
@@ -465,15 +472,27 @@ public void replaceOrRegister(TemplateNamespace namespace) {
 
 Mandatory in-memory cache for LLM classification results, covering both positive (matched) and negative (unmatched) outcomes. Prevents repeated LLM calls for the same input.
 
-| Parameter | Default | Notes |
-|-----------|---------|-------|
-| Positive TTL | 30 minutes | Longer — positive results are valuable to retain |
-| Negative TTL | 5 minutes | Shorter — input that doesn't match today might match after new registrations |
-| Max entries | 1000 | Per-registry, covers both positive and negative entries |
-| Cache key | `namespace:input` | Per-namespace isolation — same input may match differently in different namespaces |
-| Eviction | LRU | When max entries exceeded, least-recently-used entries evicted first |
+```java
+public class ClassificationCache {
+
+    public record CacheKey(String namespace, String input) {}
+
+    // ... Entry, get(), putPositive(), putNegative(), invalidateNamespace()
+}
+```
+
+The cache key is a typed record — not a string concatenation — because namespace names contain colons (e.g. `"protocol:review"`). A string key like `namespace + ":" + input` would be ambiguous.
+
+| Parameter | Default | Config property | Notes |
+|-----------|---------|-----------------|-------|
+| Positive TTL | 30 minutes | `casehub.template.adaptive.cache.positive-ttl` | Longer — positive results are valuable to retain |
+| Negative TTL | 5 minutes | `casehub.template.adaptive.cache.negative-ttl` | Shorter — input that doesn't match today might match after new registrations |
+| Max entries | 1000 | `casehub.template.adaptive.cache.max-entries` | Per-registry, covers both positive and negative entries |
+| Eviction | LRU | — | When max entries exceeded, least-recently-used entries evicted first |
 
 Positive cache entries store the full `ClassificationResult.Matched` — on cache hit, the match is returned directly without an LLM call or variation registration attempt. This is the primary mechanism for handling repeated semantic paraphrases that cannot be registered as structural variations (e.g. enum value synonyms like "in favour of" for `approve`).
+
+**Cache invalidation:** `AdaptiveTemplateRegistry.replaceOrRegister()` calls `classificationCache.invalidateNamespace(namespaceName)` after the snapshot update. This clears all cached entries (positive and negative) for the mutated namespace, ensuring the cache doesn't serve stale results for templates that have been added, removed, or changed. `invalidateNamespace()` iterates the `CacheKey` key set and removes entries where `key.namespace().equals(namespaceName)`.
 
 ### matchWithTrace Override
 
@@ -663,15 +682,27 @@ All callers inject `UnifiedTemplateRegistry` — never the concrete type. The ac
 @Priority(100)
 public class AdaptiveTemplateRegistry extends NlpTemplateRegistry {
 
+    private final AdaptiveFallbackMatcher fallbackMatcher;
+    private final double confidenceThreshold;
+    private final ClassificationCache classificationCache;
+
     @Inject
     public AdaptiveTemplateRegistry(
             NlpTokenizer tokenizer,
-            AdaptiveFallbackMatcher fallbackMatcher) {
+            AdaptiveFallbackMatcher fallbackMatcher,
+            @ConfigProperty(name = "casehub.template.adaptive.confidence-threshold",
+                            defaultValue = "0.8")
+            double confidenceThreshold,
+            ClassificationCache classificationCache) {
         super(tokenizer);
         this.fallbackMatcher = fallbackMatcher;
+        this.confidenceThreshold = confidenceThreshold;
+        this.classificationCache = classificationCache;
     }
 }
 ```
+
+`ClassificationCache` is an `@ApplicationScoped` bean in `template-registry-llm` with its own `@ConfigProperty` injection for TTLs and max entries (see §Classification Cache for config property names).
 
 The `AdaptiveFallbackMatcher` SPI bean is provided by `LlmAdaptiveFallback` (also in `template-registry-llm`), which injects `ChatModel` from the agent routing layer. `NlpTokenizer` is provided by `OpenNlpTokenizer` in `template-registry`.
 
