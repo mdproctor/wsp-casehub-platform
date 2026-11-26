@@ -4,7 +4,7 @@
 branch: 
 issue-repo: casehubio/platform
 status: active
-covers: casehubio/platform#969
+covers: casehubio/platform#970
 date: 2026-11-18
 active_issue: casehubio/platform#986
 
@@ -23,8 +23,8 @@ active_issue: casehubio/platform#986
     - [x] Task 5: CorpusVariationGenerator CLI tool
   - [x] Batch 4: CI Quality Gate
     - [x] Task 6: JUnit quality gate test
-- [ ] casehubio/platform#969 — YAML corpus format for template registry ← active
-- [ ] casehubio/platform#970 — match playbook step with type-safe variable flow
+- [ ] casehubio/platform#969 — YAML corpus format for template registry ← done on issue-974-corpus-quality-testing
+- [ ] casehubio/platform#970 — match playbook step with type-safe variable flow ← active
 - [x] casehubio/platform#977 — fix global match NLP best-score
 - [x] casehubio/platform#978 — detect adjacent CLAUSE variables
 - [x] casehubio/platform#980 — multi-word enum fix
