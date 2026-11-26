@@ -1,18 +1,7 @@
-# Work Plan —
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-covers: casehubio/platform#974
-date: 2026-11-18
-active_issue: casehubio/platform#986
-
-## Queue
-- [ ] casehubio/platform#986 — playbook-runner-unmet-requirement ← done on issue-986-playbook-runner-unmet-req
+- [x] casehubio/platform#986 — playbook-runner-unmet-requirement
 - [ ] casehubio/platform#987 — manual-option-flow ← done on issue-987-manual-option-flow
 - [ ] casehubio/platform#979 — per-namespace threshold and ambiguity ← done on issue-987-manual-option-flow
-- [ ] casehubio/platform#974 — corpus quality testing ← active
+- [ ] casehubio/platform#974 — corpus quality testing        ← active
 - [ ] casehubio/platform#969 — YAML corpus format for template registry
 - [ ] casehubio/platform#970 — match playbook step with type-safe variable flow
 - [x] casehubio/platform#977 — fix global match NLP best-score
@@ -99,6 +88,14 @@ active_issue: casehubio/platform#986
 - [x] casehubio/platform#946 — playbook-template-declaration-executor-wiring
 - [x] casehubio/platform#947 — unmatched-response-handling-pass-through-rephrase
 - [x] casehubio/platform#959 — issue 959
+
+## State
+branch: 
+issue-repo: casehubio/platform
+status: active
+covers: casehubio/platform#974
+date: 2026-11-18
+active_issue: casehubio/platform#986
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
