@@ -1,41 +1,62 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #949, #976, #973 — NLP template matching observability
-**Branches:** `issue-949-nlp-score-preservation` (done), `issue-976-match-diagnostics-trace` (done), `issue-973-nearmiss-guided-rejection` (done, landing)
-**Active item:** #967 — atomic namespace replace (next)
+**Last worked:** #971 — adaptive semantic variation
+**Branch:** `issue-971-adaptive-semantic-variation` (done, landing)
+**Active item:** #979 — per-namespace threshold and ambiguity (next)
 
 ## Session summary
 
-Three features closing the gap between "template didn't match" and "here's why and what to try instead." All in the unified template registry layer (`template-registry-api` and `template-registry`).
+Three-tier adaptive semantic variation for the unified template registry. Template authors write one canonical pattern; the system handles paraphrases through LLM-seeded variations at registration time, NLP structural matching across all patterns, and runtime adaptive LLM fallback that learns new phrasings.
 
 ### What was built
 
-**#949 — NLP score preservation:** `ProtocolMatchResult.Matched` gains `double score` (default 1.0 for regex, explicit for NLP). Propagated through `ProtocolEvaluator` and `TemplateMatchingFilter`. Previously all matches reported 1.0 regardless of actual NLP confidence.
+**template-registry-api (zero-dep):**
+- `replaceOrRegister()` — single-CAS atomic namespace replacement (implements #967)
+- `matchStructural()` — structural-only matching for collision detection (bypasses LLM tier)
+- `VariationSeeder` SPI — generates paraphrases from template patterns
+- `AdaptiveFallbackMatcher` SPI — classifies unmatched input via LLM
+- `ClassificationResult` — sealed interface (Matched with confidence, Unmatched)
+- `TemplateCandidate` — LLM classification input record
+- `CollisionDetector` — stateless utility with test value substitution
+- `TemplateNamespace` — language field (default "en", backward-compatible)
+- `CandidateOutcome.ADAPTIVE_MATCHED` — trace output for tier 3
+- Protected snapshot accessors for subclass CAS operations
 
-**#976 — Match diagnostics trace API:** `matchWithTrace()` on `UnifiedTemplateRegistry` returns `MatchTraceResult` with full pipeline diagnostics — per-candidate keyword affinity, structural element walk (`ElementTrace`), and `CandidateOutcome` enum. Six new types in `template-registry-api`: `MatchTraceResult`, `MatchTrace`, `CandidateTrace`, `ElementTrace`, `CandidateOutcome`, `ElementKind`. `StructuralMatcher.matchWithTrace()` added with `TraceableMatchResult`. Implementations in `InMemoryTemplateRegistry` (regex tier — opaque) and `NlpTemplateRegistry` (full element traces).
+**template-registry:**
+- `NlpTemplateRegistry.replaceOrRegister()` override with `nlpCompiled` cache sync
+- `recompileNlp()` protected helper for subclass NLP cache updates
 
-**#973 — NearMiss guided rejection:** `NlpTemplateRegistry.matchInNamespace()` now produces `TemplateMatch.NearMiss` when structural matching scores > 0 but below threshold. `TemplateFormatHelper` utility extracted for format suggestion generation. Cross-namespace NearMiss tracking in `match(String input)`.
+**template-registry-llm (new module — depends on template-registry + langchain4j-core):**
+- `AdaptiveTemplateRegistry` — extends NlpTemplateRegistry with tier 3 adaptive fallback
+- `ClassificationCache` — positive/negative TTL cache for LLM results
+- `LlmVariationSeeder` — ChatModel-backed variation generator
+- `LlmAdaptiveFallback` — ChatModel-backed classifier with field extraction
+- `VariationSeedingService` — seed → collision check → register orchestrator
 
-### Issues filed
+### Key design decisions
 
-- **#982** — keyword filter improvement (statistical grammar + LLM fallback tiers). Existing bag-of-words filter can incorrectly exclude valid candidates. casehub connectors has statistical grammar integration in STT/TTS.
-- **casehubio/qhorus#544** — enforcement pipeline NearMiss wiring via `DispatchAdvisory.evidence` map.
+- **D3 revised:** `replaceOrRegister` instead of deregister+register — no gap where namespace is absent
+- **D4 revised:** LLM implementations in separate module — template-registry keeps pure NLP dependency profile
+- **D5:** Single LLM call per miss for classify + extract + suggest variation
+- **D7:** Language on namespace, not per-call — each language is its own namespace
 
-### Code review finding fixed
+### Code review fixes applied
 
-`StructuralMatcher.matchWithTrace()` had a behavioral divergence from `match()` — set `failed=true` when tokens exhausted instead of allowing partial scores. Fixed to match `match()` behavior (break without failure flag).
+- NearMiss tracking preserved in `AdaptiveTemplateRegistry.match(input)` global search
+- String-aware comma splitting in `LlmAdaptiveFallback.extractFields`
+- LLM-returned template name validated against namespace before returning Matched
 
 ## Queue — next session
 
 | # | Issue | Scale | Complexity |
 |---|-------|-------|------------|
-| #967 | atomic namespace replace | XS | Low |
-| #969 | YAML corpus format for template registry | S | Med |
-| #970 | match playbook step with type-safe variable flow | M | High |
+| 979 | per-namespace score threshold and ambiguity | S | Med |
+| 974 | corpus quality testing | — | — |
+| 969 | YAML corpus format for template registry | S | Med |
+| 970 | match playbook step with type-safe variable flow | — | — |
 
-## Context for next session
+## Notes for next session
 
-- The `NoOpUnifiedTemplateRegistry` in `platform-core` was updated to implement `matchWithTrace()` — returns empty trace with Unmatched.
-- `ElementKind` was extracted from `StructuralMatcher`'s inner enum to a shared top-level type in `template-registry-api`. `StructuralMatcher` imports it.
-- `CONSTRAINT_FAILED` in `CandidateOutcome` is intentionally unused — reserved for future enrichment of `ElementTrace` with specific constraint rejection detail.
-- `matchWithTrace()` runs the regex/NLP pipeline twice (once for result, once for trace). Acceptable for a diagnostics API; noted as a future optimization target.
+- #979 is closely related — the collision guard and per-namespace thresholds interact. The `CollisionDetector` already uses `matchStructural()` which #979 should respect when adding per-namespace threshold config.
+- #969 (YAML corpus) can now store seeded and learned variations — the `TemplateNamespace.language` field maps directly to its proposed `language:` YAML field.
+- The `ClassificationCache` config properties (`casehub.template.adaptive.cache.*`) are referenced in the spec but CDI wiring is not in scope for #971 — the CDI `@ApplicationScoped` beans are documented in the spec but require the Quarkus module wiring work.
