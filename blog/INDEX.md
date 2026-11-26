@@ -67,3 +67,4 @@
 | [2026-11-26-mdp02-agent-service-implementation.md](2026-11-26-mdp02-agent-service-implementation.md) | 2026-11-26 | Implementation diary: @AgentService proxy generation, CDI guardrail decorators, and prompt caching parity |
 | [2026-11-26-mdp02-recoverable-failure.md](2026-11-26-mdp02-recoverable-failure.md) | 2026-11-26 | Recoverable failure mechanism for the playbook runner — command pattern SPI, depth-limited recursive setup |
 | [2026-11-26-mdp03-manual-option-flow.md](2026-11-26-mdp03-manual-option-flow.md) | 2026-11-26 | ManualOption flow: playbook runner prompts users for capability input instead of failing |
+| [2026-11-26-mdp06-corpus-quality-harness.md](2026-11-26-mdp06-corpus-quality-harness.md) | 2026-11-26 | Two-mode quality harness for template corpora — field validation, collision detection, CI quality gate |
