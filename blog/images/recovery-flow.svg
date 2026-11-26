@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 340">
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; fill: #1a1a2e; }
+    .label { font-size: 11px; fill: #666; }
+    .title { font-size: 15px; font-weight: 600; }
+    rect.step { rx: 6; fill: #e8eaf6; stroke: #5c6bc0; stroke-width: 1.5; }
+    rect.handler { rx: 6; fill: #e0f2f1; stroke: #26a69a; stroke-width: 1.5; }
+    rect.action { rx: 6; fill: #fff3e0; stroke: #ff9800; stroke-width: 1.5; }
+    rect.outcome { rx: 6; fill: #fce4ec; stroke: #e91e63; stroke-width: 1.5; }
+    rect.success { rx: 6; fill: #e8f5e9; stroke: #4caf50; stroke-width: 1.5; }
+    line, path { stroke: #546e7a; stroke-width: 1.5; fill: none; }
+    marker { fill: #546e7a; }
+  </style>
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6"/>
+    </marker>
+  </defs>
+
+  <text x="360" y="24" text-anchor="middle" class="title">Recovery Flow in the Step Loop</text>
+
+  <!-- Step fails -->
+  <rect class="step" x="20" y="50" width="140" height="40"/>
+  <text x="90" y="75" text-anchor="middle">Step fails</text>
+
+  <!-- Handler check -->
+  <rect class="handler" x="200" y="50" width="160" height="40"/>
+  <text x="280" y="68" text-anchor="middle">canRecover()?</text>
+  <text x="280" y="82" text-anchor="middle" class="label">first match wins</text>
+
+  <!-- diagnose -->
+  <rect class="handler" x="400" y="50" width="140" height="40"/>
+  <text x="470" y="75" text-anchor="middle">diagnose()</text>
+
+  <!-- RunPlaybook -->
+  <rect class="action" x="30" y="140" width="160" height="40"/>
+  <text x="110" y="165" text-anchor="middle">RunPlaybook</text>
+
+  <!-- Resolved -->
+  <rect class="action" x="220" y="140" width="130" height="40"/>
+  <text x="285" y="165" text-anchor="middle">Resolved</text>
+
+  <!-- Unrecoverable -->
+  <rect class="outcome" x="380" y="140" width="150" height="40"/>
+  <text x="455" y="165" text-anchor="middle">Unrecoverable</text>
+
+  <!-- No handler -->
+  <rect class="outcome" x="560" y="50" width="140" height="40"/>
+  <text x="630" y="75" text-anchor="middle">Terminal failure</text>
+
+  <!-- Run sub-playbook -->
+  <rect class="step" x="10" y="220" width="180" height="40"/>
+  <text x="100" y="237" text-anchor="middle">Run sub-playbook</text>
+  <text x="100" y="251" text-anchor="middle" class="label">depth + cycle check</text>
+
+  <!-- Retry step -->
+  <rect class="success" x="80" y="290" width="140" height="40"/>
+  <text x="150" y="315" text-anchor="middle">Retry step once</text>
+
+  <!-- Retry from Resolved -->
+  <rect class="success" x="220" y="220" width="130" height="40"/>
+  <text x="285" y="245" text-anchor="middle">Retry step once</text>
+
+  <!-- Arrows -->
+  <line x1="160" y1="70" x2="198" y2="70" marker-end="url(#arr)"/>
+  <line x1="360" y1="70" x2="398" y2="70" marker-end="url(#arr)"/>
+
+  <!-- No match -->
+  <path d="M 280 90 L 280 110 L 630 110 L 630 48" marker-end="url(#arr)"/>
+  <text x="440" y="106" class="label">no match</text>
+
+  <!-- diagnose branches -->
+  <line x1="430" y1="90" x2="110" y2="138" marker-end="url(#arr)"/>
+  <line x1="470" y1="90" x2="285" y2="138" marker-end="url(#arr)"/>
+  <line x1="510" y1="90" x2="455" y2="138" marker-end="url(#arr)"/>
+
+  <!-- RunPlaybook -> sub-playbook -->
+  <line x1="110" y1="180" x2="100" y2="218" marker-end="url(#arr)"/>
+
+  <!-- sub-playbook -> retry -->
+  <line x1="100" y1="260" x2="150" y2="288" marker-end="url(#arr)"/>
+
+  <!-- Resolved -> retry -->
+  <line x1="285" y1="180" x2="285" y2="218" marker-end="url(#arr)"/>
+</svg>
