@@ -1,14 +1,3 @@
-# Work Plan —
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-covers: casehubio/platform#979
-date: 2026-11-18
-active_issue: casehubio/platform#928
-
-## Queue
 - [x] casehubio/platform#977 — fix global match NLP best-score
 - [x] casehubio/platform#978 — detect adjacent CLAUSE variables
 - [x] casehubio/platform#980 — multi-word enum fix
@@ -17,7 +6,7 @@ active_issue: casehubio/platform#928
 - [x] casehubio/platform#976 — match diagnostics trace
 - [x] casehubio/platform#973 — NearMiss guided rejection
 - [x] casehubio/platform#967 — atomic namespace replace
-- [ ] casehubio/platform#971 — adaptive semantic variation ← done on issue-971-adaptive-semantic-variation
+- [x] casehubio/platform#971 — adaptive semantic variation
   - [x] Batch 1: SPI Foundation
     - [x] Task 1: replaceOrRegister and matchStructural
     - [x] Task 2: API types and CollisionDetector
@@ -29,7 +18,7 @@ active_issue: casehubio/platform#928
     - [x] Task 6: LLM impls and SeedingService
   - [x] Batch 4: Integration
     - [x] Task 7: Tests and ParaphraseCliff
-- [ ] casehubio/platform#979 — per-namespace threshold and ambiguity ← active
+- [ ] casehubio/platform#979 — per-namespace threshold and ambiguity        ← active
 - [ ] casehubio/platform#974 — corpus quality testing
 - [ ] casehubio/platform#969 — YAML corpus format for template registry
 - [ ] casehubio/platform#970 — match playbook step with type-safe variable flow
@@ -110,6 +99,14 @@ active_issue: casehubio/platform#928
 - [x] casehubio/platform#959 — issue 959
 - [ ] casehubio/platform#986 — playbook-runner-unmet-requirement
 - [ ] casehubio/platform#987 — manual-option-flow
+
+## State
+branch: 
+issue-repo: casehubio/platform
+status: active
+covers: casehubio/platform#979
+date: 2026-11-18
+active_issue: casehubio/platform#928
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
