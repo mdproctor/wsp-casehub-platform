@@ -1,10 +1,10 @@
 # Work Plan —
 
 ## State
-branch: issue-971-adaptive-semantic-variation
+branch: 
 issue-repo: casehubio/platform
 status: active
-covers: casehubio/platform#971
+covers: casehubio/platform#979
 date: 2026-11-18
 active_issue: casehubio/platform#928
 
@@ -17,19 +17,19 @@ active_issue: casehubio/platform#928
 - [x] casehubio/platform#976 — match diagnostics trace
 - [x] casehubio/platform#973 — NearMiss guided rejection
 - [x] casehubio/platform#967 — atomic namespace replace
-- [ ] casehubio/platform#971 — adaptive semantic variation ← active
-  - [ ] Batch 1: SPI Foundation
-    - [ ] Task 1: replaceOrRegister and matchStructural
-    - [ ] Task 2: API types and CollisionDetector
-  - [ ] Batch 2: NLP Tier Update
-    - [ ] Task 3: NlpTemplateRegistry replaceOrRegister
-  - [ ] Batch 3: template-registry-llm
-    - [ ] Task 4: ClassificationCache
-    - [ ] Task 5: AdaptiveTemplateRegistry
-    - [ ] Task 6: LLM impls and SeedingService
-  - [ ] Batch 4: Integration
-    - [ ] Task 7: Tests and ParaphraseCliff
-- [ ] casehubio/platform#979 — per-namespace threshold and ambiguity
+- [ ] casehubio/platform#971 — adaptive semantic variation ← done on issue-971-adaptive-semantic-variation
+  - [x] Batch 1: SPI Foundation
+    - [x] Task 1: replaceOrRegister and matchStructural
+    - [x] Task 2: API types and CollisionDetector
+  - [x] Batch 2: NLP Tier Update
+    - [x] Task 3: NlpTemplateRegistry replaceOrRegister
+  - [x] Batch 3: template-registry-llm
+    - [x] Task 4: ClassificationCache
+    - [x] Task 5: AdaptiveTemplateRegistry
+    - [x] Task 6: LLM impls and SeedingService
+  - [x] Batch 4: Integration
+    - [x] Task 7: Tests and ParaphraseCliff
+- [ ] casehubio/platform#979 — per-namespace threshold and ambiguity ← active
 - [ ] casehubio/platform#974 — corpus quality testing
 - [ ] casehubio/platform#969 — YAML corpus format for template registry
 - [ ] casehubio/platform#970 — match playbook step with type-safe variable flow
