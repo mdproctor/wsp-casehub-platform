@@ -1,41 +1,43 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #987 — ManualOption flow (complete, landing pending)
-**Done items:** #986 (recoverable failure), #987 (manual option flow) — both done on their branches, awaiting work-end landing
-**Next in queue:** #979 — per-namespace threshold and ambiguity
+**Last worked:** #974 — corpus quality testing (design complete, plan pending)
+**Branch:** `issue-974-corpus-quality-testing`
+**Previous session landed:** #986, #987, #979
 
 ## This session
 
-Implemented #987: ManualOption flow — user-provided capability resolution in playbooks. Builds directly on #986's recoverable failure mechanism.
+Two issues completed:
 
-### What was built
+### #987 — ManualOption flow (implemented + landed)
 
-- **`UserInputProvider`** — `@FunctionalInterface` SPI for synchronous user prompting during playbook execution
-- **`RecoveryAction.PromptUser`** — fourth sealed variant in the command pattern (alongside RunPlaybook, Resolved, Unrecoverable)
-- **`RecoveryOutcome.outputVars`** — new field + `recoveredWithOutput()` factory for the no-retry prompt path
-- **`UnmetRequirementHandler`** — returns `PromptUser` when manual option has `promptText`, falls back to `Unrecoverable` when it doesn't
-- **`PlaybookRunnerCore`** — 8-arg constructor with `UserInputProvider`, `attemptRecovery` handles `PromptUser`, step loop merges `${manual.<key>}` variables without retry
-- **CDI/Spring wiring** — optional `UserInputProvider` injection in `PlaybookBeans` and `PlaybookAutoConfiguration`
+User-provided capability resolution in playbooks. When `require-capability` fails with only manual options, the runner now prompts the user for input and continues without re-invocation.
 
-### Key design decisions
+- `UserInputProvider` SPI, `RecoveryAction.PromptUser` command, `${manual.<key>}` variable scope
+- CDI + Spring wiring, full test coverage
+- Landed via work-end alongside #986
 
-1. **Manual input = resolution, no retry** — unlike provider path where setup playbook changes the world, user input IS the resolution; step is not re-evaluated
-2. **Command pattern extended** — `PromptUser` is a runner instruction like `RunPlaybook`, not handler-internal prompting
-3. **Prompt metadata from connector** — the connector that defines the capability owns the prompt text and variable name, not platform code
+### #974 — Corpus quality testing (designed, not yet planned)
 
-### Code review findings
+Design spec complete with 5 decisions and a light review pass (15 findings, 7 addressed in spec revision).
 
-4 notes, all cosmetic — no Fix or File items. `context.putAll(metadata)` could shadow keys (informational map), `outputVars().isEmpty()` as discriminator is implicit, minor `variableName` default source inconsistency.
+**Key decisions:**
+1. Variations recorded to simulation corpus (not separate fixtures)
+2. Two-mode harness — corpus replay (CI) or LLM generation (developer)
+3. Quality tool is a main class in `template-registry-llm`
+4. Harness + report types live in `template-registry-api` (no LLM dependency for corpus mode)
+5. Ollama on GitHub free tier for one-off integration builds
 
-### Next session should
+**Light review addressed:** module placement (harness → template-registry-api), field-level validation, CI quality gate with per-template thresholds, negative fixtures (hand-curated), custom `VariationFixtureLoader` (not `CorpusLoader`), `VariationSeedingService` relationship.
 
-1. Run `work end` to land #986 and #987 (both done, squash-reviewed)
-2. Then `work start #979` or `work next` for the next item
+## Next session should
+
+1. Run `work continue` on branch `issue-974-corpus-quality-testing`
+2. Write the implementation plan (`writing-plans` skill) — the spec is at `specs/issue-974-corpus-quality-testing/2026-11-26-corpus-quality-testing-design.md`
+3. Execute the plan
 
 ## References
 
-- Design spec: `specs/issue-987-manual-option-flow/2026-11-26-manual-option-flow-design.md`
-- Decisions: `specs/issue-987-manual-option-flow/decisions.md`
-- Plan: `plans/2026-11-26-manual-option-flow.md`
-- Blog: `blog/2026-11-26-mdp03-manual-option-flow.md`
-- Key files: `yaml-step-runtime/.../UserInputProvider.java`, `RecoveryAction.java`, `PlaybookRunnerCore.java`, `UnmetRequirementHandler.java`
+- Spec: `specs/issue-974-corpus-quality-testing/2026-11-26-corpus-quality-testing-design.md`
+- Decisions: `specs/issue-974-corpus-quality-testing/decisions.md`
+- Review: `/Users/mdproctor/reviews/casehub-platform/issue-974-corpus-quality-testing-20261126-104645/`
+- Key files: `template-registry-api/UnifiedTemplateRegistry.java`, `template-registry-llm/LlmVariationSeeder.java`, `template-registry-api/CollisionDetector.java`, `template-registry-llm/VariationSeedingService.java`
