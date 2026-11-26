@@ -22,3 +22,16 @@
 **Sources:** UnifiedTemplateRegistry SPI, InMemoryTemplateRegistry.register(), template-registry-api zero-dep constraint
 **Exploration:** quick
 **Status:** captured
+
+## D3: Learned variation mutation strategy
+
+**Choice:** Atomic replace via deregister + re-register — the adaptive fallback builds a new TemplateNamespace including original patterns plus the learned variation, then atomically swaps via deregister(ns) + register(expandedNs)
+**Alternatives:**
+- New addVariation() method on the registry SPI — cleaner caller API but changes the SPI contract and needs a new snapshot operation
+- Separate variation overlay — learned variations in a parallel structure, match checks main then overlay. No mutation of original namespace but adds query complexity
+**Rationale:** Requires zero SPI changes. The existing deregister + register pair already provides atomic namespace replacement (#967). Learned variations are just patterns, same as seeded ones. The immutable-snapshot concurrency model means readers see either old or new state, never torn.
+**Trade-offs:** Brief logical gap between deregister and register — but CAS retry handles contention. Rebuilds the entire namespace snapshot for each learned variation (acceptable: learning is rare, O(templates) not O(corpus)).
+**Depends on:** D2 (variations are patterns — no distinction between seeded and learned in the registry)
+**Sources:** InMemoryTemplateRegistry.Snapshot, issue #967 (atomic namespace replace)
+**Exploration:** quick
+**Status:** captured
