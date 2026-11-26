@@ -4,32 +4,11 @@
 branch: 
 issue-repo: casehubio/platform
 status: active
-covers: casehubio/platform#986
+covers: casehubio/platform#848
 date: 2026-11-18
-active_issue: casehubio/platform#986
+active_issue: casehubio/platform#893
 
 ## Queue
-- [ ] casehubio/platform#986 — playbook-runner-unmet-requirement ← active
-- [ ] casehubio/platform#987 — manual-option-flow
-- [ ] casehubio/platform#979 — per-namespace threshold and ambiguity
-- [ ] casehubio/platform#974 — corpus quality testing
-- [ ] casehubio/platform#969 — YAML corpus format for template registry
-- [ ] casehubio/platform#970 — match playbook step with type-safe variable flow
-- [x] casehubio/platform#977 — fix global match NLP best-score
-- [x] casehubio/platform#978 — detect adjacent CLAUSE variables
-- [x] casehubio/platform#980 — multi-word enum fix
-- [x] casehubio/platform#949 — NLP score preservation
-- [x] casehubio/platform#975 — negation detection
-- [x] casehubio/platform#976 — match diagnostics trace
-- [x] casehubio/platform#973 — NearMiss guided rejection
-- [x] casehubio/platform#967 — atomic namespace replace
-- [x] casehubio/platform#971 — adaptive semantic variation
-- [x] casehubio/platform#898 — issue 898
-- [x] casehubio/platform#902 — issue 902
-- [x] casehubio/platform#904 — issue 904
-- [x] casehubio/platform#910 — PostgreSQL partial unique indexes
-- [x] casehubio/platform#911 — contract test base StaticCredentialStore
-- [x] casehubio/platform#912 — credential grace period cleanup scheduler
 - [x] casehubio/platform#879 — Eliminate dual-parse SnakeYAML dependency
 - [x] casehubio/platform#885 — apt SchemaEmitter generates bare array type for List plugin fields
 - [x] casehubio/platform#883 — Test deferred condition with use inside branch structures
@@ -64,41 +43,34 @@ active_issue: casehubio/platform#986
 - [x] casehubio/platform#826 — Budget pool telemetry types for LLM cost
 - [x] casehubio/platform#697 — AgentSession.clear for non-Claude backends
 - [x] casehubio/platform#251 — ts-core TsjTsExecutor JVM-native TS execution
-- [x] casehubio/platform#284 — Capacity MCP tools
-- [x] casehubio/platform#891 — AgentSessionPlugins absorbs response-format but never reads it
-- [x] casehubio/platform#893 — Migrate test yaml from steps wrapper
-- [x] casehubio/platform#894 — ModelParameters range validation
-- [x] casehubio/platform#895 — Walker parallel key validation
-- [x] casehubio/platform#896 — YamlTestDiscovery first-doc guard
-- [x] casehubio/platform#900 — credential resolution + rotation for StaticCredentialStore
-- [x] casehubio/platform#914 — WebAuthn delete ownership SPI
-- [x] casehubio/platform#903 — regression variable resolution yaml-test-core
-- [x] casehubio/platform#921 — template-variable-extraction
-- [x] casehubio/platform#915 — restore-StepRunner-pipeline-coverage
-- [x] casehubio/platform#916 — Spring-REST-authn-endpoints
-- [x] casehubio/platform#913 — Spring-parity-mcp-server
-- [x] casehubio/platform#917 — Spring-parity-CredentialRetentionPurge
-- [x] casehubio/platform#918 — Contract-test-WorkerCredentialStore
-- [x] casehubio/platform#919 — Spring-contract-StaticCredentialStore
-- [x] casehubio/platform#923 — optional-segments-TemplateExtractor
-- [x] casehubio/platform#924 — governance-protocol-integration
-- [x] casehubio/platform#925 — dotted-variable-names-TemplateExtractor
-- [x] casehubio/platform#928 — trailing-dots-hyphens
-- [x] casehubio/platform#929 — sanitized-group-collision
-- [x] casehubio/platform#930 — yaml-protocol-parsing
-- [x] casehubio/platform#931 — PlaybookRunnerCore-run-overload
-- [x] casehubio/platform#932 — refactor-playbook-runner-shared-logic
-- [x] casehubio/platform#933 — cleanup-unused-stepLookup
-- [x] casehubio/platform#934 — comprehensive-review-and-audit
-- [x] casehubio/platform#935 — authn-social-jpa classpath failure
-- [x] casehubio/platform#936 — seed-catalog instanceId mismatch
-- [x] casehubio/platform#922 — issue-922
-- [x] casehubio/platform#942 — move-opennlp-models-to-maven-or-lfs
-- [x] casehubio/platform#944 — variable-type-validation-TemplateExtractor
-- [x] casehubio/platform#945 — nlp-fallback-keyword-scoped-candidate-selection
-- [x] casehubio/platform#946 — playbook-template-declaration-executor-wiring
-- [x] casehubio/platform#947 — unmatched-response-handling-pass-through-rephrase
-- [x] casehubio/platform#959 — issue 959
+- [ ] casehubio/platform#284 — Capacity MCP tools ← active
+  - [ ] Batch 1: API-Foundation
+    - [ ] Task 1: Annotations and guardrail SPIs
+    - [ ] Task 2: Guardrail SPIs
+    - [ ] Task 3: Add tools to AgentSessionConfig
+  - [ ] Batch 2: Guardrail-Module
+    - [ ] Task 4: GuardrailStreamOperator
+    - [ ] Task 5: Decorators and built-ins
+  - [ ] Batch 3: APT-Processor
+    - [ ] Task 6: Blocking proxy generation
+    - [ ] Task 7: Streaming and session generation
+  - [ ] Batch 4: CDI-Spring-Wiring
+    - [ ] Task 8: agent-service Quarkus
+    - [ ] Task 9: agent-service-spring and guardrail-spring
+  - [ ] Batch 5: Caching-Parity
+    - [ ] Task 10: Anthropic caching features
+    - [ ] Task 11: OpenAI caching features
+- [ ] casehubio/platform#891 — AgentSessionPlugins absorbs response-format but never reads it
+- [ ] casehubio/platform#893 — Migrate test yaml from steps wrapper
+- [ ] casehubio/platform#894 — ModelParameters range validation
+- [ ] casehubio/platform#895 — Walker parallel key validation
+- [ ] casehubio/platform#896 — YamlTestDiscovery first-doc guard
+- [ ] casehubio/platform#989 — ModelParameters per-method
+- [ ] casehubio/platform#990 — Budget limits
+- [ ] casehubio/platform#991 — Retry governance
+- [ ] casehubio/platform#992 — Fallback resilience
+- [ ] casehubio/platform#993 — RequiresConfirmation
+- [ ] casehubio/agency#549 — Built-in guardrails PII content-policy
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []

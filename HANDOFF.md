@@ -1,65 +1,73 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #971 — adaptive semantic variation (landed, follow-up integration tests on main)
-**Active item:** #979 — per-namespace threshold and ambiguity (next)
+**Last worked:** #984 (epic) — design session, no code changes yet
+**Active:** #984 on branch `issue-984-agent-service-guardrails` (design complete, implementation pending)
+**Queue:** Phase 1 (#983, #985, #988) + Phase 2 (#989-#993, agency#549) queued
 
-## Session summary
+## This session
 
-Three-tier adaptive semantic variation for the unified template registry. Template authors write one canonical pattern; the system handles paraphrases through LLM-seeded variations at registration time, NLP structural matching across all patterns, and runtime adaptive LLM fallback that learns new phrasings.
+Full design session for epic #984: Declarative Agent Invocation — @AgentService + Guardrails.
 
-### What was built
+**No code was written.** This session produced design artifacts, issues, and an implementation plan.
 
-**template-registry-api (zero-dep):**
-- `replaceOrRegister()` — single-CAS atomic namespace replacement (implements #967)
-- `matchStructural()` — structural-only matching for collision detection (bypasses LLM tier)
-- `VariationSeeder` SPI — generates paraphrases from template patterns
-- `AdaptiveFallbackMatcher` SPI — classifies unmatched input via LLM
-- `ClassificationResult` — sealed interface (Matched with confidence, Unmatched)
-- `TemplateCandidate` — LLM classification input record
-- `CollisionDetector` — stateless utility with test value substitution
-- `TemplateNamespace` — language field (default "en", backward-compatible)
-- `CandidateOutcome.ADAPTIVE_MATCHED` — trace output for tier 3
-- Protected snapshot accessors for subclass CAS operations
+### Design artifacts
 
-**template-registry:**
-- `NlpTemplateRegistry.replaceOrRegister()` override with `nlpCompiled` cache sync
-- `recompileNlp()` protected helper for subclass NLP cache updates
+- **Design spec:** `specs/issue-984-agent-service-guardrails/2026-11-26-agent-service-guardrails-design.md` — 10 sections, covers annotations, guardrail SPIs, APT proxy generation, decorator stack, session integration, simulation, type changes, phasing
+- **Decisions:** `specs/issue-984-agent-service-guardrails/decisions.md` — 9 decisions (D1-D9), reviewed (standard) and revised
+- **Comparison doc:** `platform/docs/specs/casehub-vs-langchain4j-agent-invocation.md` — strategic comparison of CaseHub vs LangChain4j invocation architectures
+- **Implementation plan:** `plans/2026-11-26-agent-service-guardrails.md` — 5 batches, 11 tasks
+- **Blog:** `blog/2026-11-26-mdp01-agent-service-design.md`
 
-**template-registry-llm (new module — depends on template-registry + langchain4j-core):**
-- `AdaptiveTemplateRegistry` — extends NlpTemplateRegistry with tier 3 adaptive fallback
-- `ClassificationCache` — positive/negative TTL cache for LLM results
-- `LlmVariationSeeder` — ChatModel-backed variation generator
-- `LlmAdaptiveFallback` — ChatModel-backed classifier with field extraction
-- `VariationSeedingService` — seed → collision check → register orchestrator
+### Issues filed
+
+| Issue | Repo | What |
+|-------|------|------|
+| #988 | platform | Prompt caching parity — wire existing SDK features |
+| #989 | platform | ModelParameters per-method overrides |
+| #990 | platform | Budget limits via AutonomyBudgetPolicy |
+| #991 | platform | Retry and governance via PolicyEnforcer |
+| #992 | platform | Fallback implementation for resilience |
+| #993 | platform | @RequiresConfirmation composability |
+| #549 | agency | Built-in guardrails — PII, content policy |
 
 ### Key design decisions
 
-- **D3 revised:** `replaceOrRegister` instead of deregister+register — no gap where namespace is absent
-- **D4 revised:** LLM implementations in separate module — template-registry keeps pure NLP dependency profile
-- **D5:** Single LLM call per miss for classify + extract + suggest variation
-- **D7:** Language on namespace, not per-call — each language is its own namespace
+1. **Guardrails** are separate CDI decorators on `AgentProvider` at `@Priority(1400)` input / `@Priority(1600)` output — before the gate at `@Priority(2000)`
+2. **APT code generation** (not Quarkus extension) — agnostic core, implement Quarkus, generate Spring
+3. **Resolution via AgentResolver SPI** — eidos is one implementation, clean dependency direction
+4. **All three return types** — blocking (`String`/`T`), streaming (`Multi<AgentEvent>`), session (`AgentSession`)
+5. **Session-backed multi-turn** — real sessions (Claude CLI) or cached replay (Anthropic HTTP)
+6. **Tools via `AgentSessionConfig.tools`** — new field, backends handle execution via native SDK
+7. **4 new modules** — agent-service-generator, agent-service, guardrail, guardrail-spring (+ types in agent-api)
+8. **Buffer-then-validate** for output guardrails — consumer gets full response or failure, never partial
+9. **Built-ins split** — platform owns JsonSchema/MaxToken, agency owns PII/ContentPolicy
 
-### Code review fixes applied
+### Next session should
 
-- NearMiss tracking preserved in `AdaptiveTemplateRegistry.match(input)` global search
-- String-aware comma splitting in `LlmAdaptiveFallback.extractFields`
-- LLM-returned template name validated against namespace before returning Matched
+1. Run `work continue` — the plan is written and tasks are injected
+2. Start Batch 1: annotations and guardrail SPIs in `agent-api`
+3. The implementation plan is at `plans/2026-11-26-agent-service-guardrails.md`
 
-### Follow-up: enriched integration tests (on main)
+## Queue
 
-Rewrote `AdaptiveRegistryIntegrationTest` from 8 thin tests to 25 comprehensive tests in 9 `@Nested` sections. Every test has prose Javadoc explaining the concept, every assertion carries `.as()` with full-sentence failure messages. The centrepiece `FullPipelineScenario` walks through 10 steps proving the full lifecycle: regex → NLP inflection → LLM learning → structural reuse → NLP on learned patterns → caching → negative caching. Each step verifies scores, fields, pattern counts, and LLM call counts to prove which tier handled the input.
+Phase 1 (this branch):
+- #983 — @AgentService core (11 tasks injected)
+- #985 — Guardrails
+- #988 — Caching parity
 
-## Queue — next session
+Phase 2 (follow-ups):
+- #989 — ModelParameters per-method
+- #990 — Budget limits
+- #991 — Retry governance
+- #992 — Fallback resilience
+- #993 — RequiresConfirmation
+- agency#549 — Built-in guardrails
 
-| # | Issue | Scale | Complexity |
-|---|-------|-------|------------|
-| 979 | per-namespace score threshold and ambiguity | S | Med |
-| 974 | corpus quality testing | — | — |
-| 969 | YAML corpus format for template registry | S | Med |
-| 970 | match playbook step with type-safe variable flow | — | — |
+## References
 
-## Notes for next session
-
-- #979 is closely related — the collision guard and per-namespace thresholds interact. The `CollisionDetector` already uses `matchStructural()` which #979 should respect when adding per-namespace threshold config.
-- #969 (YAML corpus) can now store seeded and learned variations — the `TemplateNamespace.language` field maps directly to its proposed `language:` YAML field.
-- The `ClassificationCache` config properties (`casehub.template.adaptive.cache.*`) are referenced in the spec but CDI wiring is not in scope for #971 — the CDI `@ApplicationScoped` beans are documented in the spec but require the Quarkus module wiring work.
+- Design spec: `specs/issue-984-agent-service-guardrails/2026-11-26-agent-service-guardrails-design.md`
+- Decisions: `specs/issue-984-agent-service-guardrails/decisions.md`
+- Plan: `plans/2026-11-26-agent-service-guardrails.md`
+- Comparison: `platform/docs/specs/casehub-vs-langchain4j-agent-invocation.md`
+- Blog: `blog/2026-11-26-mdp01-agent-service-design.md`
+- Key files: `agent-api/AgentProvider.java`, `agent-api/AgentSessionConfig.java`, `agent-gate/GatedAgentProvider.java`, `graphql-generator/GraphQLResolverProcessor.java`
