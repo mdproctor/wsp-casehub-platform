@@ -24,6 +24,31 @@ Each tier is cheaper than the next. The system learns from expensive tiers to tr
 
 `template-registry` stays behind the `NlpTokenizer` SPI with `OpenNlpTokenizer` as its current implementation. No LangChain4j dependency. All embedding and LLM code stays in `template-registry-llm`, which already depends on `langchain4j-core`. Classpath-based activation — adding `template-registry-llm` turns on both embedding and LLM tiers. This respects the boundary established in #971 D4.
 
+### NlpTemplateRegistry Protected Accessors
+
+`AdaptiveTemplateRegistry` needs access to the NLP compiled templates, tokenizer, and affinity threshold to run embedding rescue and synonym-aware keyword affinity. `NlpTemplateRegistry` gains three protected accessor methods:
+
+- `protected NlpTokenizer tokenizer()` — needed for input tokenization in embedding rescue and structural matching
+- `protected double affinityThreshold()` — needed for synonym-aware keyword affinity check
+- `protected ConcurrentMap<String, CompiledNlpTemplate> nlpCompiled()` — needed for keyword sets and structural matchers
+
+These are minimal visibility changes — `protected` accessor methods, no field visibility changes. The fields remain `private final`. This is the same pattern used by `InMemoryTemplateRegistry` which exposes `currentSnapshot()`, `compareAndSetSnapshot()`, and `getNamespaceFromSnapshot()` as protected methods.
+
+### Constructor Change
+
+`AdaptiveTemplateRegistry` gains `EmbeddingModel` (nullable) and `embeddingSimilarityThreshold` (default 0.5) constructor parameters:
+
+```java
+public AdaptiveTemplateRegistry(NlpTokenizer tokenizer,
+                                AdaptiveFallbackMatcher fallbackMatcher,
+                                double confidenceThreshold,
+                                ClassificationCache classificationCache,
+                                EmbeddingModel embeddingModel,          // nullable
+                                double embeddingSimilarityThreshold)    // default 0.5
+```
+
+When `embeddingModel` is null, the embedding tier is inactive — `embeddingRescue()` returns `Unmatched` immediately. The synonym learning threshold (0.7) is an internal constant, not a constructor parameter — it's a quality gate that rarely needs tuning.
+
 ## Embedding Infrastructure
 
 ### Template Embeddings (Registration Time)
@@ -39,11 +64,19 @@ This gives a semantic fingerprint of "what this pattern is about" without variab
 
 ### Input Embedding (Match Time)
 
-When a candidate fails keyword affinity and needs the embedding rescue, embed the input text. One `EmbeddingModel.embed()` call per match attempt that reaches tier 2 — not per candidate. The input embedding is reused across all candidates in the namespace.
+When a candidate pattern fails keyword affinity and needs the embedding rescue, embed the input's keyword lemmas — not the full input text. Extract content lemmas via `LemmatisedKeywordFilter.extract()` (stop words removed), join into a phrase, embed that phrase. This produces a **symmetric comparison**: both template and input embeddings represent keyword-level semantics stripped of stop words and variables.
+
+Asymmetric comparison (keyword phrase vs full sentence) produces unreliable cosine similarity scores because sentence embedding models are optimized for sentence-to-sentence comparison. Comparing "raise" (bare keyword) against "I escalated this to the manager" (full sentence) gives low scores regardless of semantic relatedness — the surrounding words dilute the signal.
+
+One `EmbeddingModel.embed()` call per match attempt that reaches tier 2 — the input keyword embedding is computed once and reused across all candidate patterns in the namespace.
 
 ### Similarity Computation
 
-For each candidate that failed keyword affinity, compute `Vectors.cosineSimilarity()` (from `platform-api`) between the input embedding and each of the candidate's pattern embeddings. Take the maximum. If it exceeds the threshold (default 0.5), the candidate passes to the structural matcher.
+For each candidate pattern that failed keyword affinity, compute `Vectors.cosineSimilarity()` (from `platform-api`) between the input keyword embedding and that pattern's keyword embedding. If the similarity exceeds the threshold (default 0.5), the pattern passes to the structural matcher.
+
+### Input Embedding Cache
+
+Extend the existing `ClassificationCache` to also cache embedding-tier results (positive and negative) keyed by `(namespace, input)`. When the same input is matched again before synonym learning takes effect, the cache short-circuits the embedding API call. The cache is invalidated on namespace replace, same as LLM classification cache entries.
 
 ### Graceful Degradation
 
@@ -64,7 +97,7 @@ After embedding similarity rescues a candidate and the structural matcher confir
 
 ### Storage
 
-`ConcurrentMap<String, Map<String, Set<String>>>` on `AdaptiveTemplateRegistry`, keyed by namespace name → lemma → synonyms. Same lifecycle as the `nlpCompiled` map — cleared when a namespace is deregistered or replaced via `replaceOrRegister()`.
+`ConcurrentMap<String, ConcurrentMap<String, Set<String>>>` on `AdaptiveTemplateRegistry`, keyed by namespace name → lemma → synonyms. Inner map is `ConcurrentHashMap`, innermost sets are `ConcurrentHashMap.newKeySet()` — both levels are thread-safe for concurrent synonym learning. Same lifecycle as the `nlpCompiled` map — cleared when a namespace is deregistered or replaced via `replaceOrRegister()`.
 
 ### Consumption
 
@@ -76,19 +109,43 @@ If embedding rescue succeeds, synonym learning fires. If embedding rescue fails 
 
 ## Cascade Integration Point
 
-The embedding rescue slots into `AdaptiveTemplateRegistry.match(namespaceName, input)`, between structural matching failure and LLM fallback:
+`AdaptiveTemplateRegistry` overrides `matchInNamespace()` to insert the embedding rescue between keyword affinity failure and LLM fallback. The per-pattern flow becomes:
 
-```java
-TemplateMatch result = super.match(namespaceName, input);  // tiers 0-1
-if (result instanceof TemplateMatch.Matched) return result;
-
-result = embeddingRescue(namespaceName, input);             // tier 2 (NEW)
-if (result instanceof TemplateMatch.Matched) return result;
-
-return adaptiveFallback(namespaceName, input);              // tier 3 (existing)
+```
+For each pattern in template:
+  keyword affinity (with synonyms) ≥ 0.3?  →  yes → structural matcher
+                                             →  no  → embedding similarity ≥ 0.5?  →  yes → structural matcher
+                                                                                     →  no  → EMBEDDING_FILTERED
 ```
 
-`matchWithTrace()` follows the same pattern, recording `CandidateOutcome.EMBEDDING_RESCUED` for candidates rescued by the embedding tier. Both the per-namespace `matchWithTrace(namespaceName, input)` and the cross-namespace `matchWithTrace(input)` overrides must include the embedding rescue step.
+Rescue operates at the **per-pattern** level, matching the existing architecture where `matchInNamespace()` iterates patterns within templates. A template with patterns ["Raising ${target}", "Promote ${target}"] has each pattern independently checked — pattern 0 may be embedding-rescued while pattern 1 passes keyword affinity.
+
+The overridden `matchInNamespace()` calls the synonym-aware `LemmatisedKeywordFilter.affinity()` overload, passing the synonym map. When affinity fails even with synonyms, it falls through to embedding similarity for that specific pattern.
+
+The namespace-level cascade in `match(namespaceName, input)` remains:
+
+```java
+TemplateMatch result = super.match(namespaceName, input);  // calls overridden matchInNamespace (tiers 0-2)
+if (result instanceof TemplateMatch.Matched) return result;
+
+return adaptiveFallback(namespaceName, input);              // tier 3 (existing LLM)
+```
+
+### matchWithTrace
+
+Only the per-namespace `matchWithTrace(namespaceName, input)` override is needed. The cross-namespace `matchWithTrace(input)` delegates to the per-namespace version via iteration, so embedding rescue is included automatically.
+
+### matchStructural
+
+`matchStructural()` bypasses both embedding (tier 2) and LLM (tier 3), consistent with its purpose for collision detection. It calls `super.match(ns, input)` directly, which uses the base `NlpTemplateRegistry.matchInNamespace()` without embedding rescue.
+
+### Lifecycle Overrides
+
+`AdaptiveTemplateRegistry` overrides all three lifecycle methods to manage embedding and synonym state:
+
+- `register()` — compute template embeddings (existing: compiles NLP)
+- `deregister()` — clear template embeddings and synonyms for the namespace
+- `replaceOrRegister()` — recompute template embeddings, clear synonyms, invalidate classification cache (existing: invalidates cache)
 
 ## Thresholds
 
@@ -102,9 +159,29 @@ All overridable per-namespace via constructor parameters.
 
 ## Diagnostics
 
-New `CandidateOutcome` value: `EMBEDDING_RESCUED` — appears in `matchWithTrace()` output for candidates rescued by the embedding tier. `CandidateTrace` includes both keyword affinity score and embedding similarity score.
+### New CandidateOutcome Values
 
-Existing outcomes unchanged: `KEYWORD_FILTERED` now means failed both keyword affinity AND embedding similarity. `ADAPTIVE_MATCHED` remains for tier 3 (LLM) rescues.
+- `EMBEDDING_RESCUED` — candidate failed keyword affinity but was rescued by embedding similarity and matched structurally
+- `EMBEDDING_FILTERED` — candidate failed keyword affinity AND failed embedding similarity rescue
+
+`KEYWORD_FILTERED` retains its current meaning: failed keyword affinity check (never reached embedding). It is emitted only when no `EmbeddingModel` is available (standalone `NlpTemplateRegistry`). When the embedding tier is active, candidates that fail keyword affinity receive either `EMBEDDING_RESCUED` or `EMBEDDING_FILTERED`, never `KEYWORD_FILTERED`.
+
+`ADAPTIVE_MATCHED` remains for tier 3 (LLM) rescues.
+
+### CandidateTrace API Change
+
+`CandidateTrace` gains an `embeddingSimilarity` field (double, default -1.0 for non-embedding outcomes). This is a source-breaking change to the record in `template-registry-api`. All existing constructor calls must be updated.
+
+```java
+public record CandidateTrace(
+    String namespace, String templateName, int patternIndex,
+    double keywordAffinity, double embeddingSimilarity,   // NEW
+    CandidateOutcome outcome,
+    List<ElementTrace> elements, double score
+) { ... }
+```
+
+This is acceptable — `template-registry-api` has no external consumers outside the casehub build. The break is mechanical (add one field to each constructor call).
 
 ## Testing Strategy
 
@@ -132,7 +209,7 @@ The test suite serves three purposes: **specification** (each test demonstrates 
 
 **Local development:** Run with real `EmbeddingModel` (e.g., Ollama) and real `AdaptiveFallbackMatcher` (LLM). The simulation framework records inputs and outputs via `@SimulationEligible` decorators. Recorded corpus captures actual embedding vectors and LLM classification results.
 
-**CI:** `SimulatedEmbeddingModel` replays recorded embeddings. Simulated `AdaptiveFallbackMatcher` replays LLM results. Full integration paths exercised — cascade ordering, synonym learning, tier interaction, fallthrough — all with real data shapes.
+**CI:** Simulation framework replays recorded responses. `EmbeddingModel` is a third-party interface (LangChain4j) so `@SimulationEligible` can't annotate it directly — use `META-INF/simulation-eligible.txt` listing to generate a decorator, following the platform's listing-file path for non-annotatable interfaces. `AdaptiveFallbackMatcher` uses hand-written stubs (existing pattern from #971). Full integration paths exercised — cascade ordering, synonym learning, tier interaction, fallthrough — all with real data shapes.
 
 **What CI proves:**
 - Integration wiring correct — tiers called in right order
