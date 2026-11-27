@@ -1,10 +1,10 @@
 # Work Plan —
 
 ## State
-branch: issue-982-goodness-of-fit-filter
+branch: issue-964-positional-discrimination-trie
 issue-repo: casehubio/platform
 status: active
-covers: casehubio/platform#982
+covers: casehubio/platform#964
 date: 2026-11-18
 active_issue: casehubio/platform#986
 
@@ -103,7 +103,7 @@ active_issue: casehubio/platform#986
 - [x] casehubio/platform#961 — consumer-migration
 - [x] casehubio/platform#972 — atomic-namespace-version-safety
 - [x] casehubio/platform#962 — pos-morphological-generation
-- [ ] casehubio/platform#982 — statistical-goodness-of-fit-filter ← active
+- [ ] casehubio/platform#982 — statistical-goodness-of-fit-filter ← done on issue-982-goodness-of-fit-filter
   - [x] Batch 1: Foundation
     - [x] Task 1: API changes and CandidateTrace field
     - [x] Task 2: Synonym-aware keyword affinity
@@ -118,7 +118,13 @@ active_issue: casehubio/platform#986
     - [x] Task 7: Comprehensive test suite
   - [x] Batch 6: Caching
     - [x] Task 8: Extend ClassificationCache for embedding results
-- [ ] casehubio/platform#964 — positional-discrimination-trie
+- [ ] casehubio/platform#964 — positional-discrimination-trie ← active
+  - [ ] Batch 1: Core trie
+    - [ ] Task 1: DiscriminationTrie build and walk
+  - [ ] Batch 2: Integration
+    - [ ] Task 2: Wire trie into NlpTemplateRegistry
+  - [ ] Batch 3: Compatibility
+    - [ ] Task 3: Downstream module tests
 - [ ] casehubio/platform#965 — multi-language-nlp-tokenizers
 - [ ] casehubio/platform#963 — icu-messageformat-2
 
