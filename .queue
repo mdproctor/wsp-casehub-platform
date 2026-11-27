@@ -1,3 +1,14 @@
+# Work Plan —
+
+## State
+branch: 
+issue-repo: casehubio/platform
+status: active
+covers: casehubio/platform#963
+date: 2026-11-18
+active_issue: casehubio/platform#986
+
+## Queue
 - [x] casehubio/platform#986 — playbook-runner-unmet-requirement
 - [x] casehubio/platform#987 — manual-option-flow
 - [x] casehubio/platform#979 — per-namespace threshold and ambiguity
@@ -93,37 +104,10 @@
 - [x] casehubio/platform#972 — atomic-namespace-version-safety
 - [x] casehubio/platform#962 — pos-morphological-generation
 - [x] casehubio/platform#982 — statistical-goodness-of-fit-filter
-  - [x] Batch 1: Foundation
-    - [x] Task 1: API changes and CandidateTrace field
-    - [x] Task 2: Synonym-aware keyword affinity
-    - [x] Task 3: Protected accessors on NlpTemplateRegistry
-  - [x] Batch 2: Embedding rescue
-    - [x] Task 4: Core tier 2 cascade in AdaptiveTemplateRegistry
-  - [x] Batch 3: Synonym learning
-    - [x] Task 5: Synonym learning after embedding rescue
-  - [x] Batch 4: Diagnostics
-    - [x] Task 6: matchWithTrace embedding diagnostics
-  - [x] Batch 5: Capability proofs
-    - [x] Task 7: Comprehensive test suite
-  - [x] Batch 6: Caching
-    - [x] Task 8: Extend ClassificationCache for embedding results
 - [x] casehubio/platform#964 — positional-discrimination-trie
-  - [x] Batch 1: Core trie
-    - [x] Task 1: DiscriminationTrie build and walk
-  - [x] Batch 2: Integration
-    - [x] Task 2: Wire trie into NlpTemplateRegistry
-  - [x] Batch 3: Compatibility
-    - [x] Task 3: Downstream module tests
-- [ ] casehubio/platform#965 — multi-language-nlp-tokenizers        ← active
-- [ ] casehubio/platform#963 — icu-messageformat-2
-
-## State
-branch: issue-965-multi-lang-nlp-tokenizers
-issue-repo: casehubio/platform
-status: active
-covers: casehubio/platform#965
-date: 2026-11-18
-active_issue: casehubio/platform#986
+- [ ] casehubio/platform#965 — multi-language-nlp-tokenizers ← done on issue-965-multi-lang-nlp-tokenizers
+- [ ] casehubio/platform#963 — icu-messageformat-2 ← active
+- [ ] casehubio/platform#1013 — cdi-producer-NlpTemplateRegistry
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
