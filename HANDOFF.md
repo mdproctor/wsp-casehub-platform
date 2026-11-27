@@ -1,32 +1,18 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #982 + #964 — embedding rescue tier and positional discrimination trie (implementation complete, landing next)
-**Branch:** `issue-964-positional-discrimination-trie` (stacked on `issue-982-goodness-of-fit-filter`)
-**This session landed:** nothing (work-end in progress)
+## Last Session
 
-## This session
+Design session for #965 (multi-language NLP tokenizer models). Brainstormed 12 decisions, ran decision review (3 rounds, APPROVED) and spec review (3 rounds, APPROVED). Scope narrowed from full-tier implementation to SPI design + SVO family — the design review caught that OpenNLP can't handle CJK segmentation or Turkish morpheme decomposition. Wrote implementation plan (3 batches, 8 tasks).
 
-Implemented two features for the template matching pipeline:
+## Immediate Next Step
 
-- **#982 (M/High):** Embedding rescue tier — four-tier cascade (regex → keyword affinity → embedding similarity → LLM). `AdaptiveTemplateRegistry` overrides `matchInNamespace()` for per-pattern embedding rescue. Synonym learning feeds back into keyword affinity. `ClassificationCache` extended for embedding results. 8 commits, 1,173 lines.
-- **#964 (S/Med):** Positional discrimination trie — `DiscriminationTrie` with literal + wildcard nodes for O(depth) candidate selection. Threshold activation at 100 patterns per namespace. Integrated into `NlpTemplateRegistry.matchInNamespace()`. 3 commits, 506 lines.
-- **Code review:** 1 Critical finding (embedding cache key scope) + 4 Important findings fixed. Diary entry written.
+Execute the plan at `/Users/mdproctor/claude/casehub/work/plans/2026-11-27-multi-language-nlp-tokenizers.md` using `executing-plans`. Start with Batch 1 Task 1 (MatchingStrategy SPI in template-registry-api).
 
-## Next session should
+## References
 
-1. Run `work end` — both issues are done on their branches, squash reviews recorded, ready to land
-2. After landing, #965 (multi-language-nlp-tokenizers) is next in queue — not yet started, needs brainstorming
-
-## Key decisions to know
-
-- **Trie + embedding rescue are independent.** Trie is in NlpTemplateRegistry (base), embedding rescue is in AdaptiveTemplateRegistry (subclass). No pre-engineered interaction — LLM fallback tier catches what both miss.
-- **Trie skips optional literals during build** to maintain equivalence with bag-of-words path.
-- **Embedding cache removed from inner loop** — the per-namespace cache key caused false negatives across templates. Input embedding is computed once per match via local variable.
-- **Synonym learning threshold:** 0.7 cosine similarity for per-word synonym pairs; 0.5 for overall embedding rescue gate.
-
-## Queue state
-
-- #982 — done on branch, awaiting landing
-- #964 — done on branch, awaiting landing
-- #965 — multi-language-nlp-tokenizers — next, not started
-- #963 — icu-messageformat-2 — queued
+- Spec: `docs/specs/issue-965-multi-lang-nlp-tokenizers/2026-11-27-multi-language-nlp-tokenizers-design.md`
+- Plan: `~/claude/casehub/work/plans/2026-11-27-multi-language-nlp-tokenizers.md`
+- Decisions: `~/claude/casehub/work/specs/issue-965-multi-lang-nlp-tokenizers/decisions.md`
+- Decision review: `~/reviews/casehub-platform/issue-965-decision-20261127-174540/`
+- Spec review: `~/reviews/casehub-platform/issue-965-spec-20261127-182354/`
+- Diary: `docs/blog/2026-11-27-mdp02-language-families-and-the-matching-strategy-spi.md`
