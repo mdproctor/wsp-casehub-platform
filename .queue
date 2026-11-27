@@ -1,10 +1,10 @@
 # Work Plan —
 
 ## State
-branch: issue-964-positional-discrimination-trie
+branch: 
 issue-repo: casehubio/platform
 status: active
-covers: casehubio/platform#964
+covers: casehubio/platform#965
 date: 2026-11-18
 active_issue: casehubio/platform#986
 
@@ -118,14 +118,14 @@ active_issue: casehubio/platform#986
     - [x] Task 7: Comprehensive test suite
   - [x] Batch 6: Caching
     - [x] Task 8: Extend ClassificationCache for embedding results
-- [ ] casehubio/platform#964 — positional-discrimination-trie ← active
+- [ ] casehubio/platform#964 — positional-discrimination-trie ← done on issue-964-positional-discrimination-trie
   - [x] Batch 1: Core trie
     - [x] Task 1: DiscriminationTrie build and walk
   - [x] Batch 2: Integration
     - [x] Task 2: Wire trie into NlpTemplateRegistry
   - [x] Batch 3: Compatibility
     - [x] Task 3: Downstream module tests
-- [ ] casehubio/platform#965 — multi-language-nlp-tokenizers
+- [ ] casehubio/platform#965 — multi-language-nlp-tokenizers ← active
 - [ ] casehubio/platform#963 — icu-messageformat-2
 
 ## Deferred
