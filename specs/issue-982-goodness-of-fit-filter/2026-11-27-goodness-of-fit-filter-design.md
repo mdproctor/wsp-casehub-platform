@@ -88,7 +88,7 @@ if (result instanceof TemplateMatch.Matched) return result;
 return adaptiveFallback(namespaceName, input);              // tier 3 (existing)
 ```
 
-`matchWithTrace()` follows the same pattern, recording `CandidateOutcome.EMBEDDING_RESCUED` for candidates rescued by the embedding tier.
+`matchWithTrace()` follows the same pattern, recording `CandidateOutcome.EMBEDDING_RESCUED` for candidates rescued by the embedding tier. Both the per-namespace `matchWithTrace(namespaceName, input)` and the cross-namespace `matchWithTrace(input)` overrides must include the embedding rescue step.
 
 ## Thresholds
 
