@@ -3,7 +3,8 @@
 ## State
 branch: 
 issue-repo: casehubio/platform
-status: drained
+status: active
+covers: casehubio/platform#982
 date: 2026-11-18
 active_issue: casehubio/platform#986
 
@@ -99,10 +100,10 @@ active_issue: casehubio/platform#986
 - [x] casehubio/platform#947 — unmatched-response-handling-pass-through-rephrase
 - [x] casehubio/platform#959 — issue 959
 - [x] casehubio/platform#999 — matchStructural-namespace-overload
-- [ ] casehubio/platform#961 — consumer-migration
-- [ ] casehubio/platform#972 — atomic-namespace-version-safety
-- [ ] casehubio/platform#962 — pos-morphological-generation
-- [ ] casehubio/platform#982 — statistical-goodness-of-fit-filter
+- [ ] casehubio/platform#961 — consumer-migration ← done on issue-961-consumer-migration
+- [ ] casehubio/platform#972 — atomic-namespace-version-safety ← done on issue-972-atomic-namespace-version
+- [ ] casehubio/platform#962 — pos-morphological-generation ← done on issue-972-atomic-namespace-version
+- [ ] casehubio/platform#982 — statistical-goodness-of-fit-filter ← active
 - [ ] casehubio/platform#964 — positional-discrimination-trie
 - [ ] casehubio/platform#965 — multi-language-nlp-tokenizers
 - [ ] casehubio/platform#963 — icu-messageformat-2
