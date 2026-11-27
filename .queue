@@ -1,14 +1,3 @@
-# Work Plan —
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-covers: casehubio/platform#982
-date: 2026-11-18
-active_issue: casehubio/platform#986
-
-## Queue
 - [x] casehubio/platform#986 — playbook-runner-unmet-requirement
 - [x] casehubio/platform#987 — manual-option-flow
 - [x] casehubio/platform#979 — per-namespace threshold and ambiguity
@@ -100,13 +89,21 @@ active_issue: casehubio/platform#986
 - [x] casehubio/platform#947 — unmatched-response-handling-pass-through-rephrase
 - [x] casehubio/platform#959 — issue 959
 - [x] casehubio/platform#999 — matchStructural-namespace-overload
-- [ ] casehubio/platform#961 — consumer-migration ← done on issue-961-consumer-migration
+- [x] casehubio/platform#961 — consumer-migration
 - [ ] casehubio/platform#972 — atomic-namespace-version-safety ← done on issue-972-atomic-namespace-version
 - [ ] casehubio/platform#962 — pos-morphological-generation ← done on issue-972-atomic-namespace-version
-- [ ] casehubio/platform#982 — statistical-goodness-of-fit-filter ← active
+- [ ] casehubio/platform#982 — statistical-goodness-of-fit-filter        ← active
 - [ ] casehubio/platform#964 — positional-discrimination-trie
 - [ ] casehubio/platform#965 — multi-language-nlp-tokenizers
 - [ ] casehubio/platform#963 — icu-messageformat-2
+
+## State
+branch: 
+issue-repo: casehubio/platform
+status: active
+covers: casehubio/platform#982
+date: 2026-11-18
+active_issue: casehubio/platform#986
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
