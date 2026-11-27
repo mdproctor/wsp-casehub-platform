@@ -1,26 +1,27 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #961 + #972 — consumer migration and version safety (done, landed)
-**Branch:** `issue-972-atomic-namespace-version` (stacked on `issue-961-consumer-migration`)
+**Last worked:** #982 — statistical goodness-of-fit filter (branch created, not started)
+**Branch:** `issue-982-goodness-of-fit-filter`
 **This session landed:** #961, #972
 
 ## This session
 
-Two issues under epic #943 (unified template registry):
+Landed two issues under epic #943 (unified template registry):
 
-**#961 — Consumer migration:** Migrated `PlaybookRunnerCore` from creating per-playbook `TemplateMatchingFilter` instances to registering `TemplateNamespace` with the shared `UnifiedTemplateRegistry`. Removed `NlpProtocolMatcher` dependency. Deleted `ProtocolEvaluator` and 8 ancillary types from coordination-core. Deleted `message-extraction-api` and `message-extraction` modules (~2,500 lines removed).
+- **#961:** Consumer migration — moved PlaybookRunnerCore to UnifiedTemplateRegistry, deleted ProtocolEvaluator stack + message-extraction modules (~2,500 lines)
+- **#972:** Version safety — monotonic version on TemplateNamespace, bounded history ring in Snapshot, version-pinned match() overload
 
-**#972 — Version safety:** Added monotonic `version` field to `TemplateNamespace` and `TemplateMatch.Matched`. Implemented bounded version history ring in `InMemoryTemplateRegistry` Snapshot (default 3 previous versions). Added `match(namespace, input, version)` overload for dispatch-time version pinning. Created `NamespaceVersionNotFoundException`. Exposed `_tmatch.version` in playbook scope.
+Created branch for #982 but did not start brainstorming — topic change to NLP/statistical grammar warrants a fresh session.
 
 ## Next session should
 
-1. Run `work continue` — #962 (`pos-morphological-generation`) is the next active item
-2. The qhorus side of version safety (storing version in commitment metadata, passing at resolution time) is a separate qhorus change — not a platform issue
-3. Template-registry modules (`template-registry-api`, `template-registry`, `template-registry-llm`) are not yet documented in CLAUDE.md — worth adding when next touching those modules
+1. Run `work continue` — #982 is active on `issue-982-goodness-of-fit-filter`
+2. Start with brainstorming — M-scale, complexity High, design questions about statistical grammar approach
+3. Note: issue #982 body references `ProtocolEvaluator.scopeCandidates()` which was deleted in #961 — only `NlpTemplateRegistry.matchInNamespace()` remains as the active call site for keyword filtering
+4. `LemmatisedKeywordFilter` in `template-registry` is the class to replace/augment
 
 ## References
 
-- Spec: `docs/specs/issue-972-atomic-namespace-version/2026-11-27-atomic-namespace-version-design.md`
-- Plan: `plans/2026-11-27-atomic-namespace-version.md`
-- Diary: `docs/blog/2026-11-27-mdp01-closing-the-registry-loop.md`
-- Decisions: `docs/specs/issue-972-atomic-namespace-version/decisions.md`
+- Issue: casehubio/platform#982
+- Key file: `template-registry/src/main/java/io/casehub/template/registry/nlp/LemmatisedKeywordFilter.java`
+- Key file: `template-registry/src/main/java/io/casehub/template/registry/nlp/NlpTemplateRegistry.java`
