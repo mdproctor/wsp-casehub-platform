@@ -1,35 +1,32 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #982 — statistical goodness-of-fit filter (design and plan complete, implementation next)
-**Branch:** `issue-982-goodness-of-fit-filter`
-**This session landed:** nothing (design-only session)
+**Last worked:** #982 + #964 — embedding rescue tier and positional discrimination trie (implementation complete, landing next)
+**Branch:** `issue-964-positional-discrimination-trie` (stacked on `issue-982-goodness-of-fit-filter`)
+**This session landed:** nothing (work-end in progress)
 
 ## This session
 
-Completed full design cycle for #982 — embedding-based rescue tier for template matching:
+Implemented two features for the template matching pipeline:
 
-- **Design:** Four-tier cascade (regex → keyword affinity → embedding similarity → LLM classification). Embedding tier uses symmetric keyword-level comparison via `EmbeddingModel` (LangChain4j). Learned synonym pairs feed back into keyword affinity so the system gets faster over time.
-- **Decisions:** 11 decisions captured, Standard decision review (3 rounds) revised 4 decisions — corrected module boundary (embedding stays in `template-registry-llm`), storage model (ConcurrentMap on registry, not namespace metadata), activation model (classpath-based), integration point (`AdaptiveTemplateRegistry.matchInNamespace()` override).
-- **Spec:** Written and reviewed (Light, 1 round) — 13 findings addressed including symmetric embedding comparison, per-pattern granularity, thread-safe synonym storage, `CandidateTrace` API change.
-- **Plan:** 8 tasks across 5 batches — Foundation (API changes, synonym-aware affinity, protected accessors) → Embedding rescue → Synonym learning → Capability proofs → Caching.
+- **#982 (M/High):** Embedding rescue tier — four-tier cascade (regex → keyword affinity → embedding similarity → LLM). `AdaptiveTemplateRegistry` overrides `matchInNamespace()` for per-pattern embedding rescue. Synonym learning feeds back into keyword affinity. `ClassificationCache` extended for embedding results. 8 commits, 1,173 lines.
+- **#964 (S/Med):** Positional discrimination trie — `DiscriminationTrie` with literal + wildcard nodes for O(depth) candidate selection. Threshold activation at 100 patterns per namespace. Integrated into `NlpTemplateRegistry.matchInNamespace()`. 3 commits, 506 lines.
+- **Code review:** 1 Critical finding (embedding cache key scope) + 4 Important findings fixed. Diary entry written.
 
 ## Next session should
 
-1. Run `work continue` — #982 is active on `issue-982-goodness-of-fit-filter`
-2. Execute the implementation plan at `plans/2026-11-27-goodness-of-fit-filter.md` using `executing-plans`
-3. Start with Batch 1 Task 1 (CandidateOutcome values and CandidateTrace field change)
+1. Run `work end` — both issues are done on their branches, squash reviews recorded, ready to land
+2. After landing, #965 (multi-language-nlp-tokenizers) is next in queue — not yet started, needs brainstorming
 
-## Key design decisions to know
+## Key decisions to know
 
-- **Module boundary:** All embedding code in `template-registry-llm`, not `template-registry`. Respects #971 D4.
-- **Symmetric comparison:** Both template and input embeddings use keyword lemma phrases, not full sentences. Asymmetric comparison produces unreliable cosine similarity.
-- **Per-pattern granularity:** Embedding rescue runs per-pattern within templates, matching the existing `matchInNamespace()` architecture.
-- **Protected accessors:** `NlpTemplateRegistry` gains `tokenizer()`, `affinityThreshold()`, `nlpCompiled()` — same pattern as `InMemoryTemplateRegistry`'s snapshot accessors.
-- **Thread safety:** Synonym map is `ConcurrentMap<String, ConcurrentMap<String, Set<String>>>` with `ConcurrentHashMap.newKeySet()` for innermost sets.
+- **Trie + embedding rescue are independent.** Trie is in NlpTemplateRegistry (base), embedding rescue is in AdaptiveTemplateRegistry (subclass). No pre-engineered interaction — LLM fallback tier catches what both miss.
+- **Trie skips optional literals during build** to maintain equivalence with bag-of-words path.
+- **Embedding cache removed from inner loop** — the per-namespace cache key caused false negatives across templates. Input embedding is computed once per match via local variable.
+- **Synonym learning threshold:** 0.7 cosine similarity for per-word synonym pairs; 0.5 for overall embedding rescue gate.
 
-## References
+## Queue state
 
-- Design spec: `specs/issue-982-goodness-of-fit-filter/2026-11-27-goodness-of-fit-filter-design.md`
-- Decisions: `specs/issue-982-goodness-of-fit-filter/decisions.md`
-- Implementation plan: `plans/2026-11-27-goodness-of-fit-filter.md`
-- Issue: casehubio/platform#982
+- #982 — done on branch, awaiting landing
+- #964 — done on branch, awaiting landing
+- #965 — multi-language-nlp-tokenizers — next, not started
+- #963 — icu-messageformat-2 — queued
