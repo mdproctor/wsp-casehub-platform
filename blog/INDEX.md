@@ -70,3 +70,4 @@
 | [2026-11-26-mdp06-corpus-quality-harness.md](2026-11-26-mdp06-corpus-quality-harness.md) | 2026-11-26 | Two-mode quality harness for template corpora — field validation, collision detection, CI quality gate |
 | [2026-11-26-mdp07-match-step-type-safe-vars.md](2026-11-26-mdp07-match-step-type-safe-vars.md) | 2026-11-26 | Template-mode match step with compile-time variable validation and scoped runtime bindings |
 | [2026-11-27-mdp01-closing-the-registry-loop.md](2026-11-27-mdp01-closing-the-registry-loop.md) | 2026-11-27 | Consumer migration to unified template registry + version-pinned matching for long-lived commitments |
+| [2026-11-27-mdp01-when-keywords-arent-enough.md](2026-11-27-mdp01-when-keywords-arent-enough.md) | 2026-11-27 | Designing an embedding-based rescue tier for template matching — four-tier cascade, synonym learning, symmetric comparison |

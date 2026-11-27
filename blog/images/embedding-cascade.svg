@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 480" font-family="system-ui, -apple-system, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#475569"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#16a34a"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#dc2626"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="720" height="480" fill="#f8fafc" rx="8"/>
+
+  <!-- Title -->
+  <text x="360" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#1e293b">Template Matching Cascade — Four Tiers</text>
+
+  <!-- Tier 0: Regex -->
+  <rect x="40" y="55" width="640" height="55" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="60" y="78" font-weight="bold" fill="#1e3a8a">Tier 0 — Regex</text>
+  <text x="60" y="96" fill="#475569">Exact pattern match. Score 1.0. Free.</text>
+  <text x="560" y="88" fill="#6b7280" font-size="11">InMemoryTemplateRegistry</text>
+
+  <!-- Arrow down -->
+  <line x1="360" y1="110" x2="360" y2="130" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+  <text x="375" y="125" fill="#dc2626" font-size="11">miss</text>
+
+  <!-- Tier 1: Keyword + Structural -->
+  <rect x="40" y="135" width="640" height="70" rx="6" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="60" y="158" font-weight="bold" fill="#166534">Tier 1 — Keyword Affinity → Structural Matcher</text>
+  <text x="60" y="176" fill="#475569">Lemma overlap ≥ 0.3 → run structural matcher. Free (OpenNLP).</text>
+  <text x="60" y="192" fill="#475569">With synonyms: checks learned synonym pairs before rejecting.</text>
+  <text x="560" y="162" fill="#6b7280" font-size="11">NlpTemplateRegistry</text>
+
+  <!-- Arrow down -->
+  <line x1="360" y1="205" x2="360" y2="225" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+  <text x="375" y="220" fill="#dc2626" font-size="11">miss</text>
+
+  <!-- Tier 2: Embedding (NEW) -->
+  <rect x="40" y="230" width="640" height="80" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+  <text x="60" y="253" font-weight="bold" fill="#92400e">Tier 2 — Embedding Similarity Rescue (NEW)</text>
+  <text x="60" y="271" fill="#475569">Keyword embeddings cosine ≥ 0.5 → structural matcher. Medium cost.</text>
+  <text x="60" y="289" fill="#475569">On match: learns synonym pairs → feeds back to Tier 1.</text>
+  <text x="60" y="302" fill="#6b7280" font-size="11">Symmetric: template keywords ↔ input keywords (not full sentences)</text>
+  <text x="535" y="253" fill="#6b7280" font-size="11">AdaptiveTemplateRegistry</text>
+
+  <!-- Learn arrow curving back up -->
+  <path d="M 690 270 Q 710 200 690 170" fill="none" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-green)"/>
+  <text x="696" y="225" fill="#16a34a" font-size="10" transform="rotate(-90, 696, 225)">learns synonyms</text>
+
+  <!-- Arrow down -->
+  <line x1="360" y1="310" x2="360" y2="330" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+  <text x="375" y="325" fill="#dc2626" font-size="11">miss</text>
+
+  <!-- Tier 3: LLM -->
+  <rect x="40" y="335" width="640" height="70" rx="6" fill="#fce7f3" stroke="#ec4899" stroke-width="1.5"/>
+  <text x="60" y="358" font-weight="bold" fill="#9d174d">Tier 3 — LLM Classification</text>
+  <text x="60" y="376" fill="#475569">Full LLM semantic classification. Expensive.</text>
+  <text x="60" y="392" fill="#475569">On match: registers variation pattern → feeds back to Tiers 0-1.</text>
+  <text x="535" y="358" fill="#6b7280" font-size="11">AdaptiveTemplateRegistry</text>
+
+  <!-- Learn arrow curving back up -->
+  <path d="M 690 370 Q 720 200 690 85" fill="none" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-green)"/>
+  <text x="718" y="225" fill="#16a34a" font-size="10" transform="rotate(-90, 718, 225)">registers variation</text>
+
+  <!-- Cost labels at bottom -->
+  <rect x="40" y="425" width="150" height="35" rx="4" fill="#dbeafe"/>
+  <text x="115" y="447" text-anchor="middle" fill="#1e3a8a" font-size="12">Free (in-memory)</text>
+
+  <rect x="210" y="425" width="150" height="35" rx="4" fill="#dcfce7"/>
+  <text x="285" y="447" text-anchor="middle" fill="#166534" font-size="12">Free (OpenNLP)</text>
+
+  <rect x="380" y="425" width="150" height="35" rx="4" fill="#fef3c7"/>
+  <text x="455" y="447" text-anchor="middle" fill="#92400e" font-size="12">1 API call</text>
+
+  <rect x="550" y="425" width="130" height="35" rx="4" fill="#fce7f3"/>
+  <text x="615" y="447" text-anchor="middle" fill="#9d174d" font-size="12">Full LLM call</text>
+</svg>
