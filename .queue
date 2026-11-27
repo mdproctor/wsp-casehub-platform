@@ -104,20 +104,20 @@ active_issue: casehubio/platform#986
 - [x] casehubio/platform#972 — atomic-namespace-version-safety
 - [x] casehubio/platform#962 — pos-morphological-generation
 - [ ] casehubio/platform#982 — statistical-goodness-of-fit-filter ← active
-  - [ ] Batch 1: Foundation
-    - [ ] Task 1: API changes and CandidateTrace field
-    - [ ] Task 2: Synonym-aware keyword affinity
-    - [ ] Task 3: Protected accessors on NlpTemplateRegistry
-  - [ ] Batch 2: Embedding rescue
-    - [ ] Task 4: Core tier 2 cascade in AdaptiveTemplateRegistry
-  - [ ] Batch 3: Synonym learning
-    - [ ] Task 5: Synonym learning after embedding rescue
-  - [ ] Batch 4: Diagnostics
-    - [ ] Task 6: matchWithTrace embedding diagnostics
-  - [ ] Batch 5: Capability proofs
-    - [ ] Task 7: Comprehensive test suite
-  - [ ] Batch 6: Caching
-    - [ ] Task 8: Extend ClassificationCache for embedding results
+  - [x] Batch 1: Foundation
+    - [x] Task 1: API changes and CandidateTrace field
+    - [x] Task 2: Synonym-aware keyword affinity
+    - [x] Task 3: Protected accessors on NlpTemplateRegistry
+  - [x] Batch 2: Embedding rescue
+    - [x] Task 4: Core tier 2 cascade in AdaptiveTemplateRegistry
+  - [x] Batch 3: Synonym learning
+    - [x] Task 5: Synonym learning after embedding rescue
+  - [x] Batch 4: Diagnostics
+    - [x] Task 6: matchWithTrace embedding diagnostics
+  - [x] Batch 5: Capability proofs
+    - [x] Task 7: Comprehensive test suite
+  - [x] Batch 6: Caching
+    - [x] Task 8: Extend ClassificationCache for embedding results
 - [ ] casehubio/platform#964 — positional-discrimination-trie
 - [ ] casehubio/platform#965 — multi-language-nlp-tokenizers
 - [ ] casehubio/platform#963 — icu-messageformat-2
