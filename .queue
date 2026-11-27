@@ -107,7 +107,7 @@
     - [x] Task 7: Comprehensive test suite
   - [x] Batch 6: Caching
     - [x] Task 8: Extend ClassificationCache for embedding results
-- [ ] casehubio/platform#964 — positional-discrimination-trie ← done on issue-964-positional-discrimination-trie
+- [x] casehubio/platform#964 — positional-discrimination-trie
   - [x] Batch 1: Core trie
     - [x] Task 1: DiscriminationTrie build and walk
   - [x] Batch 2: Integration
