@@ -91,7 +91,7 @@
 - [x] casehubio/platform#999 — matchStructural-namespace-overload
 - [x] casehubio/platform#961 — consumer-migration
 - [x] casehubio/platform#972 — atomic-namespace-version-safety
-- [ ] casehubio/platform#962 — pos-morphological-generation ← done on issue-972-atomic-namespace-version
+- [x] casehubio/platform#962 — pos-morphological-generation
 - [ ] casehubio/platform#982 — statistical-goodness-of-fit-filter        ← active
 - [ ] casehubio/platform#964 — positional-discrimination-trie
 - [ ] casehubio/platform#965 — multi-language-nlp-tokenizers
