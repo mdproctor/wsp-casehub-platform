@@ -119,12 +119,12 @@ active_issue: casehubio/platform#986
   - [x] Batch 6: Caching
     - [x] Task 8: Extend ClassificationCache for embedding results
 - [ ] casehubio/platform#964 — positional-discrimination-trie ← active
-  - [ ] Batch 1: Core trie
-    - [ ] Task 1: DiscriminationTrie build and walk
-  - [ ] Batch 2: Integration
-    - [ ] Task 2: Wire trie into NlpTemplateRegistry
-  - [ ] Batch 3: Compatibility
-    - [ ] Task 3: Downstream module tests
+  - [x] Batch 1: Core trie
+    - [x] Task 1: DiscriminationTrie build and walk
+  - [x] Batch 2: Integration
+    - [x] Task 2: Wire trie into NlpTemplateRegistry
+  - [x] Batch 3: Compatibility
+    - [x] Task 3: Downstream module tests
 - [ ] casehubio/platform#965 — multi-language-nlp-tokenizers
 - [ ] casehubio/platform#963 — icu-messageformat-2
 
