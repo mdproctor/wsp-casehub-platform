@@ -1,28 +1,26 @@
 # HANDOFF — casehub-platform
 
-**Last worked:** #970 — match playbook step with type-safe variable flow (done, landing via work end)
-**Branch:** `issue-970-match-step-type-safe-vars`
-**This session landed:** #970
+**Last worked:** #961 + #972 — consumer migration and version safety (done, landed)
+**Branch:** `issue-972-atomic-namespace-version` (stacked on `issue-961-consumer-migration`)
+**This session landed:** #961, #972
 
 ## This session
 
-Extended the `match` playbook step with a template mode that connects the unified template registry to playbook execution. Changes span 3 modules:
+Two issues under epic #943 (unified template registry):
 
-- **yaml-core:** `VariableConstraint` gained `metadata` field + `MetadataKeys` constants for grammar hints (person, number, pronouns)
-- **yaml-step-runtime:** Walker template-mode parsing, `TemplateMatchSpec` record, `MatchStep` factory methods, `StructuralStepEvaluator` template dispatch with `${templateName.variable}` scoping and `_tmatch` context
-- **playbook-compiler:** `TemplateSchemaResolver` SPI, `MatchCompiler` template mode with compile-time variable validation (undeclared, optional, cross-handler)
+**#961 — Consumer migration:** Migrated `PlaybookRunnerCore` from creating per-playbook `TemplateMatchingFilter` instances to registering `TemplateNamespace` with the shared `UnifiedTemplateRegistry`. Removed `NlpProtocolMatcher` dependency. Deleted `ProtocolEvaluator` and 8 ancillary types from coordination-core. Deleted `message-extraction-api` and `message-extraction` modules (~2,500 lines removed).
 
-Design went through brainstorming → standard spec review (3 rounds, 19 issues) → 6-task plan → implementation → code review → squash.
+**#972 — Version safety:** Added monotonic `version` field to `TemplateNamespace` and `TemplateMatch.Matched`. Implemented bounded version history ring in `InMemoryTemplateRegistry` Snapshot (default 3 previous versions). Added `match(namespace, input, version)` overload for dispatch-time version pinning. Created `NamespaceVersionNotFoundException`. Exposed `_tmatch.version` in playbook scope.
 
 ## Next session should
 
-1. Run `work continue` — #999 is the next active item (matchStructural namespace overload)
-2. The `generate` step (downstream consumer of metadata) is a separate future issue
-3. Consumer migration from `TemplateMatchingFilter` tracked by #961
+1. Run `work continue` — #962 (`pos-morphological-generation`) is the next active item
+2. The qhorus side of version safety (storing version in commitment metadata, passing at resolution time) is a separate qhorus change — not a platform issue
+3. Template-registry modules (`template-registry-api`, `template-registry`, `template-registry-llm`) are not yet documented in CLAUDE.md — worth adding when next touching those modules
 
 ## References
 
-- Spec: `docs/specs/issue-970-match-step-type-safe-vars/2026-11-26-match-step-type-safe-vars-design.md`
-- Plan: `plans/2026-11-26-match-step-type-safe-vars.md`
-- Diary: `docs/blog/2026-11-26-mdp07-match-step-type-safe-vars.md`
-- Decisions: `docs/specs/issue-970-match-step-type-safe-vars/decisions.md`
+- Spec: `docs/specs/issue-972-atomic-namespace-version/2026-11-27-atomic-namespace-version-design.md`
+- Plan: `plans/2026-11-27-atomic-namespace-version.md`
+- Diary: `docs/blog/2026-11-27-mdp01-closing-the-registry-loop.md`
+- Decisions: `docs/specs/issue-972-atomic-namespace-version/decisions.md`
