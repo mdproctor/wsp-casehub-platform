@@ -108,7 +108,7 @@ active_issue: casehubio/platform#986
 - [ ] casehubio/platform#965 — multi-language-nlp-tokenizers ← done on issue-965-multi-lang-nlp-tokenizers
 - [ ] casehubio/platform#963 — icu-messageformat-2 ← active
   - [ ] Batch 1: SPI and types
-    - [ ] Task 1: MessageFormatResolver SPI and schema types
+    - [x] Task 1: MessageFormatResolver SPI and schema types
     - [ ] Task 2: TemplateDefinition messageFormat field and fail-fast guard
   - [ ] Batch 2: MF2 dispatch
     - [ ] Task 3: NlpTemplateRegistry MF2 generation dispatch
