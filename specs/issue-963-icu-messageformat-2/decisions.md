@@ -1,14 +1,16 @@
-## D1: MF2 integration point — MessageFormatResolver SPI
+## D1: MF2 integration point — MessageFormatResolver SPI in NlpTemplateRegistry
 
-**Choice:** MessageFormatResolver `@FunctionalInterface` in `template-registry-api`. `InMemoryTemplateRegistry.generate()` accepts an optional resolver at construction. Templates with `messageFormat != null` delegate to the resolver. No resolver + MF2 template → fail-fast at registration.
+**Choice:** `MessageFormatResolver` multi-method interface in `template-registry-api` with `compile()` (registration time) and `format()` (generation time). Injected into `NlpTemplateRegistry` via CDI producer — not on `InMemoryTemplateRegistry`. The base class (Declaration Primitive) stays unchanged.
 **Alternatives:**
-- Subclass override (Mf2TemplateRegistry extends NlpTemplateRegistry) — couples MF2 to NLP inheritance hierarchy, MF2 is orthogonal to matching
+- Nullable constructor on InMemoryTemplateRegistry — rejected: contradicts platform opt-in pattern (#982 D5 explicitly rejected this); pollutes Declaration Primitive with optional capability
+- Subclass override (Mf2TemplateRegistry extends NlpTemplateRegistry) — couples MF2 to NLP inheritance hierarchy unnecessarily
 - Decorator/wrapper — needs access to TemplateDefinition internals not exposed on the SPI
-**Rationale:** Follows the established classpath-activation pattern (MatchingStrategy, NlpTokenizerFactory). The API module stays zero-dep. Fail-fast at registration prevents runtime surprises.
-**Trade-offs:** InMemoryTemplateRegistry constructor gains a nullable parameter.
-**Sources:** MatchingStrategy SPI (template-registry-api), NlpTokenizerFactory SPI, NlpTemplateRegistry.buildNamespaceState() fail-fast pattern
-**Exploration:** quick
-**Status:** captured
+- GenerationStrategy SPI (parallel to MatchingStrategy) — over-engineered for a single-concern extension; matching needs strategies because different language families use fundamentally different algorithms; generation has only two modes (slot-fill and MF2)
+**Rationale:** Follows the established subclass extension pattern (NlpTemplateRegistry adds NLP matching, now also adds MF2 generation). The resolver SPI separates compilation (registration) from formatting (generation), matching the MatchingStrategy precedent. The API module stays zero-dep.
+**Trade-offs:** MF2 generation is only available when NlpTemplateRegistry is on the classpath (not with bare InMemoryTemplateRegistry). This is acceptable — MF2 is a production feature, not a testing primitive.
+**Sources:** MatchingStrategy SPI (multi-method: buildIndex/selectCandidates/match), #982 D5 (rejected nullable constructor), NlpTemplateRegistry.buildNamespaceState() fail-fast pattern
+**Exploration:** quick → revised after decision review (R1-01, R1-02)
+**Status:** revised
 
 ## D2: MF2 pattern location — field on TemplateDefinition
 
@@ -81,7 +83,7 @@
 
 ## D8: Custom MF2 functions — built-ins only, extension deferred
 
-**Choice:** Ship with ICU4J's standard function registry (`:plural`, `:select`, `:selectordinal`, `:number`, `:integer`, `:date`, `:time`, `:string`). No custom function SPI in v1.
+**Choice:** Ship with MF2's built-in functions (`:string`, `:number`, `:integer`, `:date`, `:time`, `:datetime`). Pluralization via `:integer`/`:number` selection, gender via `:string`, ordinals via `:integer select=ordinal`. No custom function SPI in v1.
 **Alternatives:**
 - Custom function registry from day one (Mf2FunctionProvider CDI SPI) — YAGNI, no concrete use case, complex to design while ICU4J function API is Draft
 **Rationale:** All stated use cases (plural, gender, ordinal, number, date) are covered by built-in functions. The thin adapter design makes adding an extension point later non-breaking.
@@ -100,4 +102,15 @@
 **Trade-offs:** Template YAML declarations can grow larger when MF2 is used (MF2 patterns are verbose).
 **Sources:** Existing YAML template syntax, TemplateNamespace YAML parsing
 **Exploration:** quick
+**Status:** captured
+
+## D10: MF2 is generation-only — matching unchanged
+
+**Choice:** MF2 affects only the generation path (`generate()`). Matching (regex + NLP structural) is unchanged. MF2 syntax (`.match`/`when` variant selection) is not used for input matching — it selects output forms, not input patterns. Authors are responsible for ensuring matching patterns cover the surface forms MF2 can generate.
+**Alternatives:**
+- MF2 patterns inform matching (extract variants as matching patterns) — MF2 syntax is designed for output selection, not extraction; variant text contains formatting placeholders that differ from matching variable positions
+**Rationale:** MF2's `.match`/`when` structure selects between pre-defined output variants based on variable values and CLDR rules. This is fundamentally different from template matching which extracts variable values from free-form input. The bidirectionality contract from #959 D6 holds at the template level (each template can match and generate) but the mechanisms differ.
+**Trade-offs:** Matching patterns and MF2 generation patterns are authored separately — they can drift. An MF2 template might generate a form that the matching patterns don't recognise, or matching patterns might accept input that MF2 can't generate. Authors must maintain coherence manually. Testing (generate → match round-trip) is the validation mechanism.
+**Sources:** MF2 specification Part 9 of LDML (variant selection semantics), #959 D6 (bidirectional template contract), decision review R1-09
+**Exploration:** quick (surfaced by decision review)
 **Status:** captured
