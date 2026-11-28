@@ -1,7 +1,7 @@
 # Work Plan —
 
 ## State
-branch: issue-1014-multi-strategy-language-mapping
+branch: 
 issue-repo: casehubio/platform
 status: active
 date: 2026-11-18
@@ -108,7 +108,7 @@ queue.9.children.0.children.1.done: true
 - [x] casehubio/platform#965 — multi-language-nlp-tokenizers
 - [x] casehubio/platform#963 — icu-messageformat-2
 - [x] casehubio/platform#1013 — cdi-producer-NlpTemplateRegistry
-- [ ] casehubio/platform#1014 — multi-strategy-language-mapping ← active
+- [ ] casehubio/platform#1014 — multi-strategy-language-mapping ← done on issue-1014-multi-strategy-language-mapping
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
