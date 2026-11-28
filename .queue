@@ -1,15 +1,3 @@
-# Work Plan —
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-covers: 
-date: 2026-11-18
-active_issue: casehubio/platform#986
-queue.9.children.0.children.1.done: true
-
-## Queue
 - [x] casehubio/platform#986 — playbook-runner-unmet-requirement
 - [x] casehubio/platform#987 — manual-option-flow
 - [x] casehubio/platform#979 — per-namespace threshold and ambiguity
@@ -106,8 +94,8 @@ queue.9.children.0.children.1.done: true
 - [x] casehubio/platform#962 — pos-morphological-generation
 - [x] casehubio/platform#982 — statistical-goodness-of-fit-filter
 - [x] casehubio/platform#964 — positional-discrimination-trie
-- [ ] casehubio/platform#965 — multi-language-nlp-tokenizers ← done on issue-965-multi-lang-nlp-tokenizers
-- [ ] casehubio/platform#963 — icu-messageformat-2 ← done on issue-963-icu-messageformat-2
+- [x] casehubio/platform#965 — multi-language-nlp-tokenizers
+- [x] casehubio/platform#963 — icu-messageformat-2
   - [ ] Batch 1: SPI and types
     - [x] Task 1: MessageFormatResolver SPI and schema types
     - [ ] Task 2: TemplateDefinition messageFormat field and fail-fast guard
@@ -119,6 +107,14 @@ queue.9.children.0.children.1.done: true
     - [ ] Task 5: End-to-end MF2 integration test
 - [ ] casehubio/platform#1013 — cdi-producer-NlpTemplateRegistry ← done on issue-1013-cdi-producer-nlp-template-registry
 - [ ] casehubio/platform#1014 — multi-strategy-language-mapping
+
+## State
+branch: 
+issue-repo: casehubio/platform
+status: active
+date: 2026-11-18
+active_issue: casehubio/platform#986
+queue.9.children.0.children.1.done: true
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
