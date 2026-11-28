@@ -1,3 +1,14 @@
+# Work Plan —
+
+## State
+branch: issue-1014-multi-strategy-language-mapping
+issue-repo: casehubio/platform
+status: active
+date: 2026-11-18
+active_issue: casehubio/platform#986
+queue.9.children.0.children.1.done: true
+
+## Queue
 - [x] casehubio/platform#986 — playbook-runner-unmet-requirement
 - [x] casehubio/platform#987 — manual-option-flow
 - [x] casehubio/platform#979 — per-namespace threshold and ambiguity
@@ -96,25 +107,8 @@
 - [x] casehubio/platform#964 — positional-discrimination-trie
 - [x] casehubio/platform#965 — multi-language-nlp-tokenizers
 - [x] casehubio/platform#963 — icu-messageformat-2
-  - [ ] Batch 1: SPI and types
-    - [x] Task 1: MessageFormatResolver SPI and schema types
-    - [ ] Task 2: TemplateDefinition messageFormat field and fail-fast guard
-  - [ ] Batch 2: MF2 dispatch
-    - [ ] Task 3: NlpTemplateRegistry MF2 generation dispatch
-  - [ ] Batch 3: ICU4J module
-    - [ ] Task 4: IcuMessageFormatResolver implementation
-  - [ ] Batch 4: Integration
-    - [ ] Task 5: End-to-end MF2 integration test
 - [x] casehubio/platform#1013 — cdi-producer-NlpTemplateRegistry
-- [ ] casehubio/platform#1014 — multi-strategy-language-mapping        ← active
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-date: 2026-11-18
-active_issue: casehubio/platform#986
-queue.9.children.0.children.1.done: true
+- [ ] casehubio/platform#1014 — multi-strategy-language-mapping ← active
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
