@@ -1,14 +1,3 @@
-# Work Plan —
-
-## State
-branch: 
-issue-repo: casehubio/platform
-status: active
-date: 2026-11-18
-active_issue: casehubio/platform#986
-queue.9.children.0.children.1.done: true
-
-## Queue
 - [x] casehubio/platform#986 — playbook-runner-unmet-requirement
 - [x] casehubio/platform#987 — manual-option-flow
 - [x] casehubio/platform#979 — per-namespace threshold and ambiguity
@@ -108,7 +97,15 @@ queue.9.children.0.children.1.done: true
 - [x] casehubio/platform#965 — multi-language-nlp-tokenizers
 - [x] casehubio/platform#963 — icu-messageformat-2
 - [x] casehubio/platform#1013 — cdi-producer-NlpTemplateRegistry
-- [ ] casehubio/platform#1014 — multi-strategy-language-mapping ← done on issue-1014-multi-strategy-language-mapping
+- [x] casehubio/platform#1014 — multi-strategy-language-mapping
+
+## State
+branch: 
+issue-repo: casehubio/platform
+status: drained
+date: 2026-11-18
+active_issue: casehubio/platform#986
+queue.9.children.0.children.1.done: true
 
 ## Deferred
 - [ ] ts-core TsjTsExecutor JVM-native TS execution (XS / Low) []
