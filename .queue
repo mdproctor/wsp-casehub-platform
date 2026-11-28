@@ -105,8 +105,8 @@
     - [ ] Task 4: IcuMessageFormatResolver implementation
   - [ ] Batch 4: Integration
     - [ ] Task 5: End-to-end MF2 integration test
-- [ ] casehubio/platform#1013 — cdi-producer-NlpTemplateRegistry ← done on issue-1013-cdi-producer-nlp-template-registry
-- [ ] casehubio/platform#1014 — multi-strategy-language-mapping
+- [x] casehubio/platform#1013 — cdi-producer-NlpTemplateRegistry
+- [ ] casehubio/platform#1014 — multi-strategy-language-mapping        ← active
 
 ## State
 branch: 
